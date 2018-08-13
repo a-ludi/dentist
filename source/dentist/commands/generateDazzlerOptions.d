@@ -8,8 +8,14 @@
 */
 module dentist.commands.generateDazzlerOptions;
 
+import std.string : join;
+import std.stdio : writefln, writeln;
+
 /// Execute the `generateDazzlerOptions` command with `options`.
 void execute(Options)(in Options options)
 {
-    assert(0, "not implemented");
+    writeln("# self alignment options (consider using `HPC.daligner`)");
+    writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
+    writeln("# ref vs reads alignment options (consider using `HPC.damapper`)");
+    writefln!"damapper %-(%s %) <reference> <reads>"(options.refVsReadsAlignmentOptions);
 }
