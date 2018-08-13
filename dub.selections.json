@@ -1,0 +1,22 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"botan": "1.12.10",
+		"botan-math": "1.0.3",
+		"darg": "0.0.5",
+		"diet-ng": "1.5.0",
+		"dstats": "1.0.5",
+		"dub": "1.11.0-alpha.1",
+		"eventcore": "0.8.35",
+		"libasync": "0.8.3",
+		"libevent": "2.0.2+2.0.16",
+		"memutils": "0.4.11",
+		"mir-linux-kernel": "1.0.0",
+		"openssl": "1.1.6+1.0.1g",
+		"stdx-allocator": "2.77.2",
+		"string-transform-d": "1.0.0",
+		"taggedalgebraic": "0.10.11",
+		"vibe-core": "1.4.1",
+		"vibe-d": "0.8.4"
+	}
+}
