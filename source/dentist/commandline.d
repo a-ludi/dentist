@@ -30,18 +30,24 @@ import dentist.dazzler :
     ProvideMethod,
     provideMethods;
 import dentist.scaffold : JoinPolicy;
+import dentist.swinfo :
+    copyright,
+    executableName,
+    description,
+    license,
+    version_;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
-import std.algorithm : among, each, endsWith, find, map, startsWith;
+import std.algorithm : among, each, endsWith, filter, find, map, startsWith;
 import std.conv;
 import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
 import std.format : format;
 import std.meta : AliasSeq, staticMap, staticSort;
 import std.path : absolutePath, buildPath;
-import std.range : takeOne;
+import std.range : only, takeOne;
 import std.stdio : File, stderr;
-import std.string : join, outdent, strip, tr, wrap;
+import std.string : join, tr, wrap;
 import std.traits :
     arity,
     EnumMembers,
@@ -54,19 +60,6 @@ import std.typecons : BitFlags;
 import transforms : camelCase, snakeCaseCT;
 import vibe.data.json : serializeToJsonString;
 
-
-enum executableName = "dentist";
-// TODO get version number from `git`
-enum version_ = "v0.0.0";
-// TODO get summary from `dub.sdl`
-enum executableSummary = q"{
-    Close assembly gaps using long-reads with focus on correctness.
-}".strip.outdent.wrap;
-enum copyright = "Copyright © 2018 Arne Ludwig <arne.ludwig@posteo.de>";
-enum license = q"{
-    Subject to the terms of the MIT license, as written in the included
-    LICENSE file
-}".strip.outdent.wrap;
 
 /// Possible returns codes of the command line execution.
 enum ReturnCode
@@ -120,7 +113,8 @@ ReturnCode run(in string[] args)
         break;
     }
 
-    auto commandWithArgs = args[1 .. $].find!(arg => arg.among(dentistCommands));
+    auto commandName = parseCommandName(args);
+    auto commandWithArgs = args[1 .. $];
 
     if (commandWithArgs.length == 0)
     {
@@ -135,7 +129,6 @@ ReturnCode run(in string[] args)
         return ReturnCode.commandlineError;
     }
 
-    auto commandName = args[1].tr("-", "_").camelCase;
     DentistCommand command = parseArgs!BaseOptions([commandName]).command;
 
     try
@@ -176,11 +169,27 @@ unittest
     assert(run([executableName]) == ReturnCode.commandlineError);
 }
 
+string parseCommandName(in string[] args)
+{
+    enforce!CLIException(!args[1].startsWith("-"), format!"Error: Missing <command> '%s'"(args[1]));
+
+    auto candidates = only(dentistCommands).filter!(cmd => cmd.startsWith(args[1]));
+
+    enforce!CLIException(!candidates.empty, format!"Error: Unkown <command> '%s'"(args[1]));
+
+    auto dashCaseCommand = candidates.front;
+
+    candidates.popFront();
+    enforce!CLIException(candidates.empty, format!"Error: Ambiguous <command> '%s'"(args[1]));
+
+    return dashCaseCommand.tr("-", "_").camelCase;
+}
+
 private void printBaseHelp()
 {
     stderr.write(usageString!BaseOptions(executableName));
     stderr.writeln();
-    stderr.writeln(executableSummary);
+    stderr.writeln(description);
     stderr.writeln();
     stderr.write(helpString!BaseOptions);
 }
@@ -191,7 +200,7 @@ private void printVersion()
     stderr.writeln();
     stderr.writeln(copyright);
     stderr.writeln();
-    stderr.writeln(license);
+    stderr.write(license);
 }
 
 /// The set of options common to all stages.
@@ -499,17 +508,6 @@ struct OptionsFor(DentistCommand command)
         uint numThreads;
     }
 
-    static if (command.among(
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("unused-reads")
-        @Help("if given write unused read IDs to the designated file - one ID per line")
-        @Validate!(value => enforce!CLIException(value !is null, "unimplemented"))
-        string unusedReadsList = null;
-    }
-
     static if (needWorkdir)
     {
         /**
@@ -684,23 +682,23 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Generate a set of options to pass to `daligner` and `damapper`
             needed for the input alignments.
-        }".strip.outdent.wrap;
+        }".wrap;
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{
             Build pile ups.
-        }".strip.outdent.wrap;
+        }".wrap;
     else static if (command == DentistCommand.processPileUps)
         enum commandSummary = q"{
             Process pile ups.
-        }".strip.outdent.wrap;
+        }".wrap;
     else static if (command == DentistCommand.mergeInsertions)
         enum commandSummary = q"{
             Merge multiple insertions files into a single one.
-        }".strip.outdent.wrap;
+        }".wrap;
     else static if (command == DentistCommand.output)
         enum commandSummary = q"{
             Write output.
-        }".strip.outdent.wrap;
+        }".wrap;
     else
         static assert(0, "missing commandSummary for " ~ command.to!string);
 }
@@ -726,6 +724,8 @@ struct BaseOptions
     @Help(format!q"{
         Execute <command>. Available commands are: %-(%s, %). Use
         `dentist <command> --help` to get help for a specific command.
+        <command> may be abbreviated by using a unique prefix of the full
+        command string.
     }"([dentistCommands]))
     DentistCommand command;
 

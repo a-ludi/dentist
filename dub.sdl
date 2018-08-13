@@ -11,3 +11,5 @@ dependency  "vibe-d:data"        version="~>0.8.4-alpha.1"
 
 // NOTE: fixes deprecation warning in `std.typecons.BitFlags`
 dflags "-transition=intpromote"
+
+preBuildCommands "./update-swinfo.sh"
