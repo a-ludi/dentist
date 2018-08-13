@@ -19,6 +19,7 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
+import dentist.scaffold : JoinPolicy;
 import dentist.dazzler :
     DalignerOptions,
     DamapperOptions,
@@ -29,7 +30,6 @@ import dentist.dazzler :
     provideLasFileInWorkdir,
     ProvideMethod,
     provideMethods;
-import dentist.scaffold : JoinPolicy;
 import dentist.swinfo :
     copyright,
     executableName,

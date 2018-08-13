@@ -8,7 +8,7 @@
 */
 module dentist.dazzler;
 
-import dentist.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
+import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.util.fasta : parseFastaRecord;
 import dentist.util.log;
 import dentist.util.range : arrayChunks, takeExactly;

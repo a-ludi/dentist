@@ -6,7 +6,7 @@
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
-module dentist.scaffold;
+module dentist.common.scaffold;
 
 import dentist.util.log;
 import dentist.util.math : Graph, MissingNodeException, NaturalNumberSet;

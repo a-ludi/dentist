@@ -6,12 +6,12 @@
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
-module dentist.alignments;
+module dentist.common.alignments;
 
+import dentist.common.scaffold : buildScaffold, concatenatePayloads, ContigNode,
+    ContigPart, discardAmbiguousJoins, Join, mergeExtensionsWithGaps;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
 import dentist.util.log;
-import dentist.scaffold : buildScaffold, concatenatePayloads, ContigNode,
-    ContigPart, discardAmbiguousJoins, Join, mergeExtensionsWithGaps;
 import core.exception : AssertError;
 import std.algorithm : all, any, canFind, chunkBy, equal, filter, isSorted,
     joiner, map, mean, min, sort, sum, swap, SwapStrategy;
