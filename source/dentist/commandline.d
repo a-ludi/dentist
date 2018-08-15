@@ -197,7 +197,7 @@ private void printVersion()
 {
     stderr.writeln(format!"%s %s"(executableName, version_));
     stderr.writeln();
-    stderr.writeln(copyright);
+    stderr.write(copyright);
     stderr.writeln();
     stderr.write(license);
 }
