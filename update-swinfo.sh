@@ -8,7 +8,7 @@ set -e  # exit when any command fails
 INFO_JSON="$(dub describe | jq -c '.packages[0]')"
 
 EXECUTABLE_NAME="$(jq '.targetName' <<<"$INFO_JSON")"
-VERSION="$(jq '.version' <<<"$INFO_JSON")"
+VERSION="\"$(git describe --dirty)\""
 DESCRIPTION="$(jq '.description' <<<"$INFO_JSON")"
 COPYRIGHT="$(jq '.copyright' <<<"$INFO_JSON")"
 
