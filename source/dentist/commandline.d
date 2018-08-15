@@ -19,7 +19,7 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
-import dentist.scaffold : JoinPolicy;
+import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DalignerOptions,
     DamapperOptions,
