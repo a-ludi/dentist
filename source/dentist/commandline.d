@@ -19,12 +19,14 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
+import dentist.common.alignments : trace_point_t;
 import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DalignerOptions,
     DamapperOptions,
     getHiddenDbFiles,
     getMaskFiles,
+    getTracePointDistance,
     lasEmpty,
     provideDamFileInWorkdir,
     provideLasFileInWorkdir,
@@ -514,6 +516,24 @@ struct OptionsFor(DentistCommand command)
                 defaultPoolThreads = numThreads - 1;
 
             options.numThreads = defaultPoolThreads + 1;
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("trace-point-spacing", "s")
+        @Help("trace point spacing used for the ref vs. reads alignment")
+        trace_point_t tracePointDistance;
+
+        @PostValidate()
+        void hookEnsurePresenceOfTracePointDistance()
+        {
+            if (tracePointDistance > 0)
+                return;
+
+            tracePointDistance = getTracePointDistance(refVsReadsAlignmentOptions);
         }
     }
 
