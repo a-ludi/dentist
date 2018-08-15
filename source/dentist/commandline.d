@@ -503,7 +503,11 @@ struct OptionsFor(DentistCommand command)
         size_t minReadsPerPileUp = 5;
     }
 
-    static if (command.among())
+    static if (command.among(
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+        DentistCommand.mergeInsertions,
+    ))
     {
         @Option("threads", "T")
         @Help("use <uint> threads (defaults to the number of cores)")
@@ -515,7 +519,7 @@ struct OptionsFor(DentistCommand command)
             if (numThreads > 0)
                 defaultPoolThreads = numThreads - 1;
 
-            options.numThreads = defaultPoolThreads + 1;
+            numThreads = defaultPoolThreads + 1;
         }
     }
 
