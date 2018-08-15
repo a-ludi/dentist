@@ -44,6 +44,7 @@ import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
 import std.format : format;
 import std.meta : AliasSeq, staticMap, staticSort;
+import std.parallelism : defaultPoolThreads;
 import std.path : absolutePath, buildPath;
 import std.range : only, takeOne;
 import std.stdio : File, stderr;
@@ -505,6 +506,15 @@ struct OptionsFor(DentistCommand command)
         @Option("threads", "T")
         @Help("use <uint> threads (defaults to the number of cores)")
         uint numThreads;
+
+        @PostValidate()
+        void hookInitThreads()
+        {
+            if (numThreads > 0)
+                defaultPoolThreads = numThreads - 1;
+
+            options.numThreads = defaultPoolThreads + 1;
+        }
     }
 
     static if (needWorkdir)
