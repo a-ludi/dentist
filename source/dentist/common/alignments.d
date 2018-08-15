@@ -1800,14 +1800,43 @@ struct PileUpDb
 
     private File pileUpDb;
     private PileUpDbIndex dbIndex;
-    DbSlices dbSlices;
+    private DbSlices dbSlices;
+
+    @property auto pileUps() const pure nothrow
+    {
+        return dbIndex.pileUps;
+    }
+    @property auto readAlignments() const pure nothrow
+    {
+        return dbIndex.readAlignments;
+    }
+    @property auto seededAlignments() const pure nothrow
+    {
+        return dbIndex.seededAlignments;
+    }
+    @property auto localAlignments() const pure nothrow
+    {
+        return dbIndex.localAlignments;
+    }
+    @property auto tracePoints() const pure nothrow
+    {
+        return dbIndex.tracePoints;
+    }
 
     static PileUpDb parse(in string dbFile)
     {
         auto pileUpDb = File(dbFile, "rb");
         pileUpDb.lock(LockType.read);
 
-        return PileUpDb(pileUpDb);
+        auto db = PileUpDb(pileUpDb);
+        db.ensureDbIndex();
+
+        return db;
+    }
+
+    void releaseDb()
+    {
+        pileUpDb.close();
     }
 
     PileUp[] opIndex()
@@ -2456,16 +2485,16 @@ private struct PileUpDbIndex
         return fieldPtr!(NextType!T);
     }
 
-    @property ArrayStorage!(StorageType!T) arrayStorage(T)() pure nothrow
+    @property ArrayStorage!(StorageType!T) arrayStorage(T)() const pure nothrow
     {
         return typeof(return).fromPtrs(beginPtr!T, endPtr!T);
     }
 
     @property alias pileUps = arrayStorage!PileUp;
-    @property alias readAlignments = arrayStorage!PileUp;
-    @property alias seededAlignments = arrayStorage!PileUp;
-    @property alias localAlignments = arrayStorage!PileUp;
-    @property alias tracePoints = arrayStorage!PileUp;
+    @property alias readAlignments = arrayStorage!ReadAlignment;
+    @property alias seededAlignments = arrayStorage!SeededAlignment;
+    @property alias localAlignments = arrayStorage!(AlignmentChain.LocalAlignment);
+    @property alias tracePoints = arrayStorage!(AlignmentChain.LocalAlignment.TracePoint);
 }
 
 unittest

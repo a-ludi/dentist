@@ -78,6 +78,7 @@ enum DentistCommand
 {
     generateDazzlerOptions,
     collectPileUps,
+    showPileUps,
     processPileUps,
     mergeInsertions,
     output,
@@ -312,6 +313,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.showPileUps,
         DentistCommand.processPileUps,
     ))
     {
@@ -719,6 +721,10 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{
             Build pile ups.
+        }".wrap;
+    else static if (command == DentistCommand.showPileUps)
+        enum commandSummary = q"{
+            Show a short summary of the pile ups.
         }".wrap;
     else static if (command == DentistCommand.processPileUps)
         enum commandSummary = q"{
