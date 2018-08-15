@@ -798,7 +798,7 @@ unittest
 }
 
 /// Type of the read alignment.
-enum AlignmentLocationSeed
+enum AlignmentLocationSeed : ubyte
 {
     front,
     back,
@@ -903,11 +903,7 @@ struct ReadAlignment
         if (1 <= alignments.length && alignments.length <= 2)
         {
             this._length = alignments.length;
-
-            foreach (i, alignment; alignments)
-            {
-                this._alignments[i] = alignment;
-            }
+            this._alignments[0 .. _length] = alignments[0 .. _length];
         }
         else
         {
