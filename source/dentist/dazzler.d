@@ -230,75 +230,72 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
     return getAlignments(dbA, dbB, lasFile, options);
 }
 
-AlignmentChain[] getAlignments(Options)(in string dbA, in string lasFile, in Options options)
-        if (isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+AlignmentChain[] getAlignments(in string dbA, in string lasFile, in string workdir)
 {
-    return getAlignments(dbA, null, lasFile, options);
+    return getAlignments(dbA, null, lasFile, workdir);
 }
 
-AlignmentChain[] getAlignments(Options)(
+AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
     in string lasFile,
-    in Options options
+    in string workdir
 )
-        if (isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
 {
-    logJsonDiagnostic("state", "enter", "function", "dazzler.getAlignments");
-    // dfmt off
+    static enum ladumpOptions = [
+        LAdumpOptions.coordinates,
+        LAdumpOptions.numDiffs,
+        LAdumpOptions.lengths,
+    ];
+
     auto alignmentChains = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
-        options.ladumpOptions,
-        options.workdir,
+        ladumpOptions,
+        workdir,
     )).array;
-    // dfmt on
     alignmentChains.sort!("a < b", SwapStrategy.stable);
-    logJsonDiagnostic("state", "exit", "function", "dazzler.getAlignments");
 
     return alignmentChains;
 }
 
-void attachTracePoints(Options)(
+void attachTracePoints(
     AlignmentChain*[] alignmentChains,
     in string dbA,
     in string dbB,
     in string lasFile,
-    in string[] dazzlerOptions,
-    in Options options
+    in trace_point_t tracePointDistance,
+    in string workdir
 )
-        if (isSomeString!(typeof(options.workdir)))
 {
+    static enum ladumpOptions = [
+        LAdumpOptions.coordinates,
+        LAdumpOptions.tracePoints,
+    ];
+
     // NOTE: dump only for matching A reads; better would be for matching
     //       B reads but that is not possible with `LAdump`.
     auto aReadIds = alignmentChains.map!"a.contigA.id".uniq.array;
-
-    // dfmt off
     auto acsWithTracePoints = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         aReadIds,
-        [
-            LAdumpOptions.coordinates,
-            LAdumpOptions.tracePoints,
-        ],
+        ladumpOptions,
+        workdir,
     )).array;
-    // dfmt on
-    acsWithTracePoints.sort!("a < b", SwapStrategy.stable);
+    acsWithTracePoints.sort!"a < b";
     assert(isSorted!"*a < *b"(alignmentChains), "alignmentChains must be sorted");
 
-    auto numAttached = alignmentChains.attachTracePoints(acsWithTracePoints,
-            getTracePointDistance(dazzlerOptions));
+    auto numAttached = alignmentChains.attachTracePoints(acsWithTracePoints, tracePointDistance);
     assert(numAttached == alignmentChains.length,
             "missing trace point lists for some alignment chains");
 
     debug logJsonDebug("acsWithTracePoints", acsWithTracePoints.toJson);
     version (assert)
     {
+        // ensure all alignment chains are valid...
         foreach (alignmentChain; alignmentChains)
         {
             // trigger invariant of AlignmentChain
@@ -1627,15 +1624,14 @@ size_t getNumBlocks(in string damFile)
     return numBlocks;
 }
 
-size_t getNumContigs(Options)(in string damFile, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+size_t getNumContigs(in string damFile, in string workdir)
 {
     immutable contigNumFormat = "+ R %d";
     immutable contigNumFormatStart = contigNumFormat[0 .. 4];
     size_t numContigs;
     size_t[] empty;
     // dfmt off
-    auto matchingLine = dbdump(damFile, empty, [], options.workdir)
+    auto matchingLine = dbdump(damFile, empty, [], workdir)
         .filter!(line => line.startsWith(contigNumFormatStart))
         .front;
     // dfmt on
@@ -2003,27 +1999,26 @@ private T[] getBinaryFile(T)(in string fileName)
 
     See_Also: `readMask`, `getMaskFiles`
 */
-void writeMask(Region, Options)(in string dbFile, in string maskDestination,
-        in Region[] regions, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+void writeMask(Region)(
+    in string dbFile,
+    in string maskDestination,
+    in Region[] regions,
+    in string workdir,
+)
 {
-    // dfmt off
     alias MaskRegion = Tuple!(
         MaskHeaderEntry, "tag",
         MaskDataEntry, "begin",
         MaskDataEntry, "end",
     );
-    // dfmt on
 
     if (regions.length == 0)
     {
-        // dfmt off
         logJsonDiagnostic(
             "notice", "skipping empty mask",
             "dbFile", dbFile,
             "maskDestination", maskDestination,
         );
-        // dfmt on
 
         return;
     }
@@ -2032,7 +2027,6 @@ void writeMask(Region, Options)(in string dbFile, in string maskDestination,
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
 
-    // dfmt off
     auto maskRegions = regions
         .map!(region => MaskRegion(
             region.tag.to!MaskHeaderEntry,
@@ -2040,10 +2034,9 @@ void writeMask(Region, Options)(in string dbFile, in string maskDestination,
             region.end.to!MaskDataEntry,
         ))
         .array;
-    // dfmt on
     maskRegions.sort();
 
-    auto numReads = getNumContigs(dbFile, options).to!MaskHeaderEntry;
+    auto numReads = getNumContigs(dbFile, workdir).to!MaskHeaderEntry;
     MaskHeaderEntry size = 0; // this seems to be zero always (see DAMASKER/TANmask.c:422)
     MaskHeaderEntry currentContig = 1;
     MaskDataPointer dataPointer = 0;

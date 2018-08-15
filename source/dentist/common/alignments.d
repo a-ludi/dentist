@@ -1668,687 +1668,6 @@ unittest
 */
 alias PileUp = ReadAlignment[];
 
-PileUp[] buildPileUps(in size_t numReferenceContigs, AlignmentChain[] candidates)
-{
-    alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
-    alias Payload = ReadAlignment[];
-    alias ReadAlignmentJoin = Join!Payload;
-
-    candidates.sort!("a.contigB.id < b.contigB.id", SwapStrategy.stable);
-
-    // dfmt off
-    auto readAlignmentJoins = candidates
-        .filter!"!a.flags.disabled"
-        .chunkBy!isSameRead
-        .map!collectReadAlignments
-        .joiner
-        .filter!"a.isValid"
-        .map!"a.getInOrder()"
-        .map!(to!ReadAlignmentJoin);
-    // dfmt on
-
-    // dfmt off
-    auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins)
-        .discardAmbiguousJoins!Payload
-        .mergeExtensionsWithGaps!("a ~ b", Payload);
-    // dfmt on
-
-    // dfmt off
-    auto pileUps = alignmentsScaffold
-        .edges
-        .filter!"a.payload.length > 0"
-        .map!"a.payload"
-        .filter!(pileUp => pileUp.isValid)
-        .array;
-    // dfmt on
-
-    return pileUps;
-}
-
-unittest
-{
-    // FIXME add test case with contig spanning read
-    //               c1                       c2                       c3
-    //        0    5   10   15         0    5   10   15         0    5   10   15
-    // ref:   |---->---->----|.........|---->---->----|.........|---->---->----|
-    // reads: .    .    .    :    .    :    .    .    :    .    :    .    .    .
-    //        . #1 |---->---->--| .    :    .    .    :    .    :    .    .    .
-    //        . #2 |----<----<--| .    :    .    .    :    .    :    .    .    .
-    //        . #3 |---->---->----|    :    .    .    :    .    :    .    .    .
-    //        .    . #4 |---->----|    :    .    .    :    .    :    .    .    .
-    //        .    . #5 |---->---->---->----|    .    :    .    :    .    .    .
-    //        .    . #6 |----<----<----<----|    .    :    .    :    .    .    .
-    //        .    .    #7 |->---->---->---->--| .    :    .    :    .    .    .
-    //        .    .    .    : #8 |---->---->--| .    :    .    :    .    .    .
-    //        .    .    .    : #9 |----<----<--| .    :    .    :    .    .    .
-    //        .    .    .    :#10 |---->---->----|    :    .    :    .    .    .
-    //        .    .    .    :    #11 |----->----|    :    .    :    .    .    .
-    //        .    .    .    :    .    :    .    .    :    .    :    .    .    .
-    //        .    .    .    :    .    :#12 |---->---->--| .    :    .    .    .
-    //        .    .    .    :    .    :#13 |----<----<--| .    :    .    .    .
-    //        .    .    .    :    .    :#14 |---->---->----|    :    .    .    .
-    //        .    .    .    :    .    :    .#15 |---->----|    :    .    .    .
-    //        .    .    .    :    .    :    .#16 |---->---->---->----|    .    .
-    //        .    .    .    :    .    :    .#17 |----<----<----<----|    .    .
-    //        .    .    .    :    .    :    .   #18 |->---->---->---->--| .    .
-    //        .    .    .    :    .    :    .    .    :#19 |---->---->--| .    .
-    //        .    .    .    :    .    :    .    .    :#20 |----<----<--| .    .
-    //        .    .    .    :    .    :    .    .    :#21 |---->---->----|    .
-    //        .    .    .    :    .    :    .    .    :    #22 |----->----|    .
-    import std.algorithm : clamp;
-
-    with (AlignmentChain) with (LocalAlignment)
-        {
-            id_t alignmentChainId = 0;
-            id_t contReadId = 0;
-            ReadAlignment getDummyRead(id_t beginContigId, arithmetic_t beginIdx,
-                    id_t endContigId, arithmetic_t endIdx, Complement complement)
-            {
-                static immutable contigLength = 16;
-                static immutable gapLength = 9;
-                static immutable numDiffs = 0;
-
-                alignmentChainId += 2;
-                auto readId = ++contReadId;
-                // dfmt off
-                auto readLength = beginContigId == endContigId
-                    ? endIdx - beginIdx
-                    : contigLength - beginIdx + gapLength + endIdx;
-                // dfmt on
-                auto flags = complement ? Flags(Flag.complement) : emptyFlags;
-                coord_t firstReadBeginIdx;
-                coord_t firstReadEndIdx;
-
-                if (beginIdx < 0)
-                {
-                    firstReadBeginIdx = readLength - endIdx;
-                    firstReadEndIdx = readLength;
-                }
-                else
-                {
-                    firstReadBeginIdx = 0;
-                    firstReadEndIdx = contigLength - beginIdx;
-                }
-
-                beginIdx = clamp(beginIdx, 0, contigLength);
-                endIdx = clamp(endIdx, 0, contigLength);
-
-                if (beginContigId == endContigId)
-                {
-                    // dfmt off
-                    return ReadAlignment(SeededAlignment.from(AlignmentChain(
-                        alignmentChainId - 2,
-                        Contig(beginContigId, contigLength),
-                        Contig(readId, readLength),
-                        flags,
-                        [
-                            LocalAlignment(
-                                Locus(beginIdx, beginIdx + 1),
-                                Locus(firstReadBeginIdx, firstReadBeginIdx + 1),
-                                numDiffs,
-                            ),
-                            LocalAlignment(
-                                Locus(endIdx - 1, endIdx),
-                                Locus(firstReadEndIdx - 1, firstReadEndIdx),
-                                numDiffs,
-                            ),
-                        ],
-                    )).front);
-                    // dfmt on
-                }
-                else
-                {
-                    auto secondReadBeginIdx = readLength - endIdx;
-                    auto secondReadEndIdx = readLength;
-
-                    // dfmt off
-                    return ReadAlignment(
-                        SeededAlignment.from(AlignmentChain(
-                            alignmentChainId - 2,
-                            Contig(beginContigId, contigLength),
-                            Contig(readId, readLength),
-                            flags,
-                            [
-                                LocalAlignment(
-                                    Locus(beginIdx, beginIdx + 1),
-                                    Locus(firstReadBeginIdx, firstReadBeginIdx + 1),
-                                    numDiffs,
-                                ),
-                                LocalAlignment(
-                                    Locus(contigLength - 1, contigLength),
-                                    Locus(firstReadEndIdx - 1, firstReadEndIdx),
-                                    numDiffs,
-                                ),
-                            ],
-                        )).front,
-                        SeededAlignment.from(AlignmentChain(
-                            alignmentChainId - 1,
-                            Contig(endContigId, contigLength),
-                            Contig(readId, readLength),
-                            flags,
-                            [
-                                LocalAlignment(
-                                    Locus(0, 1),
-                                    Locus(secondReadBeginIdx, secondReadBeginIdx + 1),
-                                    numDiffs,
-                                ),
-                                LocalAlignment(
-                                    Locus(endIdx - 1, endIdx),
-                                    Locus(secondReadEndIdx - 1, secondReadEndIdx),
-                                    numDiffs,
-                                ),
-                            ],
-                        )).front,
-                    );
-                    // dfmt on
-                }
-            }
-
-            id_t c1 = 1;
-            id_t c2 = 2;
-            id_t c3 = 3;
-            // dfmt off
-            auto pileUps = [
-                [
-                    getDummyRead(c1,  5, c1, 18, Complement.no),  //  #1
-                    getDummyRead(c1,  5, c1, 18, Complement.yes), //  #2
-                    getDummyRead(c1,  5, c1, 20, Complement.no),  //  #3
-                    getDummyRead(c1, 10, c1, 20, Complement.no),  //  #4
-                    getDummyRead(c1, 10, c2,  5, Complement.no),  //  #5
-                    getDummyRead(c1, 10, c2,  5, Complement.yes), //  #6
-                    getDummyRead(c1, 13, c2,  8, Complement.no),  //  #7
-                    getDummyRead(c2, -5, c2,  8, Complement.no),  //  #8
-                    getDummyRead(c2, -5, c2,  8, Complement.yes), //  #9
-                    getDummyRead(c2, -5, c2, 10, Complement.no),  // #10
-                    getDummyRead(c2, -1, c2, 10, Complement.no),  // #11
-                ],
-                [
-                    getDummyRead(c2,  5, c2, 18, Complement.no),  // #12
-                    getDummyRead(c2,  5, c2, 18, Complement.yes), // #13
-                    getDummyRead(c2,  5, c2, 20, Complement.no),  // #14
-                    getDummyRead(c2, 10, c2, 20, Complement.no),  // #15
-                    getDummyRead(c2, 10, c3,  5, Complement.no),  // #16
-                    getDummyRead(c2, 10, c3,  5, Complement.yes), // #17
-                    getDummyRead(c2, 13, c3,  8, Complement.no),  // #18
-                    getDummyRead(c3, -5, c3,  8, Complement.no),  // #19
-                    getDummyRead(c3, -5, c3,  8, Complement.yes), // #20
-                    getDummyRead(c3, -5, c3, 10, Complement.no),  // #21
-                    getDummyRead(c3, -1, c3, 10, Complement.no),  // #22
-                ],
-            ];
-            auto alignmentChains = pileUps
-                .joiner
-                .map!"a[]"
-                .joiner
-                .map!"a.alignment"
-                .array;
-            // dfmt on
-            auto computedPileUps = buildPileUps(3, alignmentChains);
-
-            foreach (pileUp, computedPileUp; zip(pileUps, computedPileUps))
-            {
-                // pileUp is subset of computedPileUp
-                foreach (readAlignment; pileUp)
-                {
-                    assert(computedPileUp.canFind(readAlignment));
-                }
-                // computedPileUp is subset of pileUp
-                foreach (readAlignment; computedPileUp)
-                {
-                    assert(pileUp.canFind(readAlignment));
-                }
-            }
-        }
-}
-
-// Not meant for public usage.
-ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
-{
-    // dfmt off
-    alias beginRelToContigB = (alignment) => alignment.complement
-        ? alignment.contigB.length - alignment.last.contigB.end
-        : alignment.first.contigB.begin;
-    alias endRelToContigB = (alignment) => alignment.complement
-        ? alignment.contigB.length - alignment.first.contigB.begin
-        : alignment.last.contigB.end;
-    alias seedRelToContigB = (alignment) => alignment.complement
-        ? 0 - alignment.seed
-        : 0 + alignment.seed;
-    alias orderByLocusAndSeed = orderLexicographically!(
-        SeededAlignment,
-        beginRelToContigB,
-        endRelToContigB,
-        seedRelToContigB,
-    );
-    // dfmt on
-    alias seededPartsOfOneAlignment = (a, b) => a.alignment == b.alignment && a.seed != b.seed;
-    alias shareReadSequence = (a, b) => endRelToContigB(a) > beginRelToContigB(b);
-    alias emptyRange = () => cast(ReadAlignment[])[];
-
-    auto seededAlignments = sameReadAlignments.map!(SeededAlignment.from).joiner.array;
-    seededAlignments.sort!orderByLocusAndSeed;
-
-    if (seededAlignments.length == 0)
-    {
-        return emptyRange();
-    }
-
-    // Validate seeded alignments and discard accordingly.
-    foreach (saPair; seededAlignments.slide!(No.withPartial)(2))
-    {
-        if (shareReadSequence(saPair[0], saPair[1])
-                && !seededPartsOfOneAlignment(saPair[0], saPair[1]))
-        {
-            return emptyRange();
-        }
-    }
-
-    // Collect read alignments
-    bool startWithExtension = beginRelToContigB(seededAlignments[0]) > 0;
-    size_t sliceStart = startWithExtension ? 1 : 0;
-
-    // dfmt off
-    auto remainingReadAlignments = iota(sliceStart, seededAlignments.length, 2)
-        .map!(i => ReadAlignment(seededAlignments[i .. min(i + 2, $)]));
-    auto readAlignments = startWithExtension
-        ? chain(
-            only(ReadAlignment(seededAlignments[0 .. 1])),
-            remainingReadAlignments,
-        ).array
-        : remainingReadAlignments.array;
-    // dfmt on
-
-    if (readAlignments.any!"!a.isValid")
-    {
-        // If one read alignment is invalid we should not touch this read at all.
-        return emptyRange();
-    }
-
-    return readAlignments;
-}
-
-unittest
-{
-    alias Contig = AlignmentChain.Contig;
-    alias Flags = AlignmentChain.Flags;
-    immutable emptyFlags = AlignmentChain.emptyFlags;
-    immutable complement = AlignmentChain.Flag.complement;
-    alias LocalAlignment = AlignmentChain.LocalAlignment;
-    alias Locus = LocalAlignment.Locus;
-    alias Seed = AlignmentLocationSeed;
-
-    {
-        // Case 1:
-        //
-        // |-->-->-->--|  |-->-->-->--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).equal([
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.back),
-                SeededAlignment(alignmentChains[1], Seed.front),
-            ]),
-            ReadAlignment([
-                SeededAlignment(alignmentChains[1], Seed.back),
-                SeededAlignment(alignmentChains[2], Seed.front),
-            ]),
-        ]));
-        // dfmt on
-    }
-    {
-        // Case 2:
-        //
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).equal([
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.back),
-                SeededAlignment(alignmentChains[1], Seed.back),
-            ]),
-            ReadAlignment([
-                SeededAlignment(alignmentChains[1], Seed.front),
-                SeededAlignment(alignmentChains[2], Seed.front),
-            ]),
-        ]));
-        // dfmt on
-    }
-    {
-        // Case 3:
-        //
-        //                |--<--<--<--| |-->-->-->--|
-        //
-        //                <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).equal([
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.back),
-            ]),
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.front),
-                SeededAlignment(alignmentChains[1], Seed.front),
-            ]),
-        ]));
-        // dfmt on
-    }
-    {
-        // Case 4:
-        //
-        // |-->-->-->--|  |--<--<--<--|
-        //
-        //       |----->  <----------->
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).equal([
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.back),
-                SeededAlignment(alignmentChains[1], Seed.back),
-            ]),
-            ReadAlignment([
-                SeededAlignment(alignmentChains[1], Seed.front),
-            ]),
-        ]));
-        // dfmt on
-    }
-    {
-        // Case 5:
-        //
-        //                |--<--<--<--|
-        //
-        //                <----------->
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).equal([
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.back),
-            ]),
-            ReadAlignment([
-                SeededAlignment(alignmentChains[0], Seed.front),
-            ]),
-        ]));
-        // dfmt on
-    }
-    {
-        // Case 6:
-        //
-        // |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-        ];
-        // dfmt on
-        assert(collectReadAlignments(alignmentChains).length == 0);
-    }
-    {
-        // Case 7:
-        //
-        //                |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-        ];
-        // dfmt on
-        assert(collectReadAlignments(alignmentChains).length == 0);
-    }
-    {
-        // Case 8:
-        //
-        //                        |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        // dfmt off
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 30),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 30),
-                    Locus(30, 60),
-                )]
-            ),
-        ];
-        // dfmt on
-        assert(collectReadAlignments(alignmentChains).length == 0);
-    }
-}
-
 /**
     Get the type of the read alignment.
 
@@ -2903,11 +2222,13 @@ unittest
 void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == PileUp))
 {
-    version (assert)
-        auto storedPileUps = ArrayStorage!(StorageType!PileUp)(dbIndex.beginPtr!PileUp);
     auto readAlignments = ArrayStorage!(StorageType!ReadAlignment)(dbIndex.beginPtr!ReadAlignment);
 
-    assert(storedPileUps.ptr == pileUpDb.tell());
+    version (assert)
+    {
+        auto storedPileUps = ArrayStorage!(StorageType!PileUp)(dbIndex.beginPtr!PileUp);
+        assert(storedPileUps.ptr == pileUpDb.tell());
+    }
     foreach (ref pileUp; pileUps)
     {
         readAlignments.length = pileUp.length;
@@ -2917,19 +2238,23 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
         readAlignments.ptr = readAlignments[$];
 
         version (assert)
+        {
             ++storedPileUps.length;
-        assert(storedPileUps[$] == pileUpDb.tell());
+            assert(storedPileUps[$] == pileUpDb.tell());
+        }
     }
 }
 
 void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == ReadAlignment))
 {
-    version (assert)
-        auto readAlignments = ArrayStorage!(StorageType!ReadAlignment)(dbIndex.beginPtr!ReadAlignment);
     auto seededAlignments = ArrayStorage!(StorageType!SeededAlignment)(dbIndex.beginPtr!SeededAlignment);
 
-    assert(readAlignments.ptr == pileUpDb.tell());
+    version (assert)
+    {
+        auto readAlignments = ArrayStorage!(StorageType!ReadAlignment)(dbIndex.beginPtr!ReadAlignment);
+        assert(readAlignments.ptr == pileUpDb.tell());
+    }
     foreach (ref pileUp; pileUps)
     {
         foreach (ref readAlignment; pileUp)
@@ -2941,8 +2266,10 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
             seededAlignments.ptr = seededAlignments[$];
 
             version (assert)
+            {
                 ++readAlignments.length;
-            assert(readAlignments[$] == pileUpDb.tell());
+                assert(readAlignments[$] == pileUpDb.tell());
+            }
         }
     }
 }
@@ -2952,11 +2279,13 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-    version (assert)
-        auto seededAlignments = ArrayStorage!(StorageType!SeededAlignment)(dbIndex.beginPtr!SeededAlignment);
     auto localAlignments = ArrayStorage!(StorageType!LocalAlignment)(dbIndex.beginPtr!LocalAlignment);
 
-    assert(seededAlignments.ptr == pileUpDb.tell());
+    version (assert)
+    {
+        auto seededAlignments = ArrayStorage!(StorageType!SeededAlignment)(dbIndex.beginPtr!SeededAlignment);
+        assert(seededAlignments.ptr == pileUpDb.tell());
+    }
     foreach (ref pileUp; pileUps)
     {
         foreach (ref readAlignment; pileUp)
@@ -2980,8 +2309,10 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
                 localAlignments.ptr = localAlignments[$];
 
                 version (assert)
+                {
                     ++seededAlignments.length;
-                assert(seededAlignments[$] == pileUpDb.tell());
+                  assert(seededAlignments[$] == pileUpDb.tell());
+              }
             }
         }
     }
@@ -2993,11 +2324,13 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias TracePoint = LocalAlignment.TracePoint;
 
-    version (assert)
-        auto localAlignments = ArrayStorage!(StorageType!LocalAlignment)(dbIndex.beginPtr!LocalAlignment);
     auto tracePoints = ArrayStorage!(StorageType!TracePoint)(dbIndex.beginPtr!TracePoint);
 
-    assert(localAlignments.ptr == pileUpDb.tell());
+    version (assert)
+    {
+        auto localAlignments = ArrayStorage!(StorageType!LocalAlignment)(dbIndex.beginPtr!LocalAlignment);
+        assert(localAlignments.ptr == pileUpDb.tell());
+    }
     foreach (ref pileUp; pileUps)
     {
         foreach (ref readAlignment; pileUp)
@@ -3020,8 +2353,10 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
                     tracePoints.ptr = tracePoints[$];
 
                     version (assert)
+                    {
                         ++localAlignments.length;
-                    assert(localAlignments[$] == pileUpDb.tell());
+                        assert(localAlignments[$] == pileUpDb.tell());
+                    }
                 }
             }
         }
@@ -3035,9 +2370,10 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     alias TracePoint = LocalAlignment.TracePoint;
 
     version (assert)
+    {
         auto tracePoints = ArrayStorage!(StorageType!TracePoint)(dbIndex.beginPtr!TracePoint);
-
-    assert(tracePoints.ptr == pileUpDb.tell());
+        assert(tracePoints.ptr == pileUpDb.tell());
+    }
     foreach (ref pileUp; pileUps)
     {
         foreach (ref readAlignment; pileUp)
@@ -3049,8 +2385,10 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
                     pileUpDb.rawWrite(cast(const(StorageType!TracePoint[])) localAlignment.tracePoints);
 
                     version (assert)
+                    {
                         tracePoints.length += localAlignment.tracePoints.length;
-                    assert(tracePoints[$] == pileUpDb.tell());
+                        assert(tracePoints[$] == pileUpDb.tell());
+                    }
                 }
             }
         }

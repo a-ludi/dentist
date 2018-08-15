@@ -9,6 +9,9 @@
 module dentist.common;
 
 import dentist.util.region : Region;
+import std.algorithm : map;
+import std.array : array;
+import std.traits : TemplateOf;
 
 public import dentist.common.alignments;
 public import dentist.common.scaffold;
