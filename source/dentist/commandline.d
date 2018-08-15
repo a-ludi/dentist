@@ -113,22 +113,21 @@ ReturnCode run(in string[] args)
         break;
     }
 
-    auto commandName = parseCommandName(args);
-    auto commandWithArgs = args[1 .. $];
-
-    if (commandWithArgs.length == 0)
+    string commandName;
+    try
     {
-        if (args[1].startsWith("-"))
-            stderr.writeln("Error: Missing <command>");
-        else
-            stderr.writeln(format!"Error: Unkown <command> '%s'"(args[1]));
-
+        commandName = parseCommandName(args);
+    }
+    catch (Exception e)
+    {
+        stderr.writeln("Error: " ~ e.msg);
         stderr.writeln();
         stderr.write(usageString!BaseOptions(executableName));
 
         return ReturnCode.commandlineError;
     }
 
+    auto commandWithArgs = args[1 .. $];
     DentistCommand command = parseArgs!BaseOptions([commandName]).command;
 
     try
@@ -171,16 +170,16 @@ unittest
 
 string parseCommandName(in string[] args)
 {
-    enforce!CLIException(!args[1].startsWith("-"), format!"Error: Missing <command> '%s'"(args[1]));
+    enforce!CLIException(!args[1].startsWith("-"), format!"Missing <command> '%s'"(args[1]));
 
     auto candidates = only(dentistCommands).filter!(cmd => cmd.startsWith(args[1]));
 
-    enforce!CLIException(!candidates.empty, format!"Error: Unkown <command> '%s'"(args[1]));
+    enforce!CLIException(!candidates.empty, format!"Unkown <command> '%s'"(args[1]));
 
     auto dashCaseCommand = candidates.front;
 
     candidates.popFront();
-    enforce!CLIException(candidates.empty, format!"Error: Ambiguous <command> '%s'"(args[1]));
+    enforce!CLIException(candidates.empty, format!"Ambiguous <command> '%s'"(args[1]));
 
     return dashCaseCommand.tr("-", "_").camelCase;
 }
