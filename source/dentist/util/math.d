@@ -146,6 +146,24 @@ unittest
     assert(absdiff(2.5, 5) == 2.5);
 }
 
+/// Returns the result of `ceil(a / b)` but uses integer arithmetic only.
+Integer ceildiv(Integer)(in Integer a, in Integer b) pure nothrow if (isIntegral!Integer)
+{
+    return a % b == 0
+        ? a / b
+        : a / b + 1;
+}
+
+///
+unittest
+{
+    assert(ceildiv(0, 3) == 0);
+    assert(ceildiv(1UL, 3UL) == 1UL);
+    assert(ceildiv(2L, 3L) == 1L);
+    assert(ceildiv(3U, 3U) == 1U);
+    assert(ceildiv(4, 3) == 2);
+}
+
 class EdgeExistsException : Exception
 {
     this()
