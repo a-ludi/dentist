@@ -13,19 +13,44 @@ import dentist.util.fasta : parseFastaRecord;
 import dentist.util.log;
 import dentist.util.range : arrayChunks, takeExactly;
 import dentist.util.tempfile : mkstemp;
-import std.algorithm : all, cache, canFind, countUntil, endsWith, filter, find, isSorted, joiner,
-    map, min, sort, splitter, startsWith, SwapStrategy, uniq;
+import std.algorithm :
+    all,
+    among,
+    cache,
+    canFind,
+    countUntil,
+    endsWith,
+    filter,
+    find,
+    isSorted,
+    joiner,
+    map,
+    min,
+    sort,
+    splitter,
+    startsWith,
+    SwapStrategy,
+    uniq;
 import std.array : appender, Appender, array, uninitializedArray;
 import std.conv : to;
 import std.exception : enforce;
 import std.file : exists, remove;
 import std.format : format, formattedRead;
+import std.meta : AliasSeq;
 import std.path : absolutePath, baseName, buildPath, dirName, relativePath,
     stripExtension, withExtension;
 import std.process : Config, escapeShellCommand, kill, pipeProcess,
     ProcessPipes, Redirect, wait;
-import std.range : chain, chunks, drop, enumerate, only, slide;
-import std.range.primitives : ElementType, empty, isForwardRange, isInputRange;
+import std.range : chain, chunks, drop, enumerate, generate, only, slide, takeExactly;
+import std.range.primitives :
+    ElementType,
+    empty,
+    front,
+    isForwardRange,
+    isInputRange,
+    popFront,
+    save,
+    walkLength;
 import std.stdio : File;
 import std.string : lineSplitter, outdent;
 import std.traits : isArray, isIntegral, isSomeString, ReturnType, Unqual;
@@ -1152,7 +1177,7 @@ unittest
     }
 }
 
-trace_point_t getTracePointDistance(in string[] dazzlerOptions) pure
+trace_point_t getTracePointDistance(in string[] dazzlerOptions = []) pure
 {
     immutable defaultTracePointDistance = 100;
 
@@ -1194,48 +1219,69 @@ unittest
 }
 
 /**
-    Get the FASTA sequence of the designated record.
+    Get the FASTA sequences of the designated records.
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequence(Options)(in string dbFile, id_t recordNumber, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir)
+        if (isForwardRange!Range && is(ElementType!Range : size_t))
 {
-    // dfmt off
     string[] dbdumpOptions = [DBdumpOptions.sequenceString];
-    // dfmt on
+    auto numRecords = recordNumbers.save.walkLength;
+    auto sequences = readSequences(dbdump(dbFile, recordNumbers, dbdumpOptions, workdir));
+    size_t numFoundSequences;
 
-    return readFirstSequenceFromDump(dbdump(dbFile, [recordNumber], dbdumpOptions, options.workdir));
+    string countedSequences()
+    {
+        enforce!DazzlerCommandException(
+            !sequences.empty || numFoundSequences >= numRecords,
+            "cannot read sequence: dump too short"
+        );
+
+        if (sequences.empty)
+        {
+            assert(numFoundSequences == numRecords, "unexpected excessive sequence in dump");
+            return null;
+        }
+
+        ++numFoundSequences;
+        auto currentSequence = sequences.front;
+        sequences.popFront();
+
+        return currentSequence;
+    }
+
+    return generate!countedSequences.takeExactly(numRecords);
 }
 
-auto readFirstSequenceFromDump(R)(R dbdump)
+private auto readSequences(R)(R dbdump)
 {
-    auto sequenceDumpLines = dbdump.find!(dumpLine => dumpLine[0] == 'S');
+    enum baseLetters = AliasSeq!('A', 'C', 'G', 'N', 'T', 'a', 'c', 'g', 'n', 't');
 
-    enforce!DazzlerCommandException(!sequenceDumpLines.empty, "cannot read sequence: empty dump");
-
-    auto sequenceDumpLine = sequenceDumpLines.front;
-    static assert(isSomeString!(typeof(sequenceDumpLine)));
-    auto sequenceStart = sequenceDumpLine.countUntil!(c => "ACGNTacgnt".canFind(c));
-
-    enforce!DazzlerCommandException(sequenceStart < sequenceDumpLine.length, "cannot read sequence: no sequence");
-
-    return sequenceDumpLine[sequenceStart .. $];
+    return dbdump
+        .filter!(dumpLine => dumpLine[0] == 'S')
+        .map!(dumpLine => dumpLine.find!(among!baseLetters));
 }
 
 unittest
 {
+    import std.algorithm : equal;
+
     immutable testDbDump = q"EOF
-        + R 1
+        + R 2
         + M 0
-        + S 58
-        @ S 58
+        + S 100
+        @ S 100
         S 58 tgtgatatcggtacagtaaaccacagttgggtttaaggagggacgatcaacgaacacc
+        S 42 atgccaactactttgaacgcgccgcaaggcacaggtgcgcct
 EOF".outdent;
 
     size_t[] recordIds = [];
-    auto fastaSequence = readFirstSequenceFromDump(testDbDump.lineSplitter).array;
-    assert(fastaSequence == "tgtgatatcggtacagtaaaccacagttgggtttaaggagggacgatcaacgaacacc");
+    auto fastaSequences = readSequences(testDbDump.lineSplitter);
+    assert(fastaSequences.equal([
+        "tgtgatatcggtacagtaaaccacagttgggtttaaggagggacgatcaacgaacacc",
+        "atgccaactactttgaacgcgccgcaaggcacaggtgcgcct",
+    ]));
 }
 
 /**
@@ -1388,20 +1434,18 @@ EOF".outdent;
 }
 
 /// Build a .dam file with the given set of FASTA records.
-string buildDamFile(Range, Options)(Range fastaRecords, Options options)
-        if (isOptionsList!(typeof(options.dbsplitOptions)) &&
-            isSomeString!(typeof(options.workdir)) &&
-            isInputRange!Range && isSomeString!(ElementType!Range))
+string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
+        if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     immutable tempDbNameTemplate = "auxiliary-XXXXXX";
 
-    auto tempDbTemplate = buildPath(options.workdir, tempDbNameTemplate);
+    auto tempDbTemplate = buildPath(workdir, tempDbNameTemplate);
     auto tempDb = mkstemp(tempDbTemplate, damFileExtension);
 
     tempDb.file.close();
     remove(tempDb.name);
-    fasta2dam(tempDb.name, fastaRecords, options.workdir);
-    dbsplit(tempDb.name, options.dbsplitOptions, options.workdir);
+    fasta2dam(tempDb.name, fastaRecords, workdir);
+    dbsplit(tempDb.name, dbsplitOptions, workdir);
 
     return tempDb.name;
 }
@@ -1411,24 +1455,16 @@ unittest
     import dentist.util.tempfile : mkdtemp;
     import std.file : rmdirRecurse, isFile;
 
-    // dfmt off
     auto fastaRecords = [
         ">Sim/1/0_14 RQ=0.975\nggcccacccaggcagccc",
         ">Sim/3/0_11 RQ=0.975\ngagtgcgtgcagtgg",
     ];
-    // dfmt on
-    struct Options
-    {
-        string[] dbsplitOptions;
-        string workdir;
-    }
 
     auto tmpDir = mkdtemp("./.unittest-XXXXXX");
-    auto options = Options([], tmpDir);
     scope (exit)
         rmdirRecurse(tmpDir);
 
-    string dbName = buildDamFile(fastaRecords[], options);
+    string dbName = buildDamFile(fastaRecords[], tmpDir);
 
     assert(dbName.isFile);
     foreach (hiddenDbFile; getHiddenDbFiles(dbName))
@@ -1457,14 +1493,12 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
     }
 
     auto readIdx = readId - 1;
-    // dfmt off
     auto consensusDb = getConsensus(dbFile, const(ModifiedOptions)(
         options.daccordOptions ~ format!"%s%d,%d"(cast(string) DaccordOptions.readInterval, readIdx, readIdx),
         options.dalignerOptions,
         options.dbsplitOptions,
         options.workdir,
     ));
-    // dfmt on
 
     if (consensusDb is null)
     {
@@ -1539,7 +1573,6 @@ unittest
         string[] dbsplitOptions;
         string[] dalignerOptions;
         string[] daccordOptions;
-        string[] dbdumpOptions;
         size_t fastaLineWidth;
         string workdir;
     }
@@ -1550,11 +1583,6 @@ unittest
         [],
         [DalignerOptions.minAlignmentLength ~ "15"],
         [],
-        [
-            DBdumpOptions.readNumber,
-            DBdumpOptions.originalHeader,
-            DBdumpOptions.sequenceString,
-        ],
         74,
         tmpDir,
     );
@@ -1562,7 +1590,7 @@ unittest
     scope (exit)
         rmdirRecurse(tmpDir);
 
-    string dbName = buildDamFile(fastaRecords[], options);
+    string dbName = buildDamFile(fastaRecords[], tmpDir);
     string consensusDb = getConsensus(dbName, options);
     assert(consensusDb !is null);
     auto consensusFasta = getFastaEntries(consensusDb, cast(size_t[])[], options);
@@ -1915,8 +1943,7 @@ private
     Throws: MaskReaderException
     See_Also: `writeMask`, `getMaskFiles`
 */
-Region[] readMask(Region, Options)(in string dbFile, in string maskDestination, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+Region[] readMask(Region)(in string dbFile, in string maskDestination, in string workdir)
 {
     alias _enforce = enforce!MaskReaderException;
 
@@ -1928,7 +1955,7 @@ Region[] readMask(Region, Options)(in string dbFile, in string maskDestination, 
     alias RegionContigId = typeof(maskRegions.data[0].tag);
     alias RegionBegin = typeof(maskRegions.data[0].begin);
     alias RegionEnd = typeof(maskRegions.data[0].end);
-    auto numReads = getNumContigs(dbFile, options).to!int;
+    auto numReads = getNumContigs(dbFile, workdir).to!int;
 
     size_t currentContig = 1;
 
@@ -2382,7 +2409,7 @@ private
             "action", "execute",
             "type", "pipe",
             "command", command.map!Json.array,
-            "input", fastaRecords.map!(record => record[0 .. min(1024, $)].toJson).array,
+            "input", fastaRecords.map!(record => record[0 .. min(1024, $)].toJson).array[0 .. min(1024, $)],
             "state", "pre",
         );
         //dfmt on
