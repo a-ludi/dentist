@@ -259,7 +259,7 @@ struct CompressedBaseQuad
 
 struct CompressedSequence
 {
-    private CompressedBaseQuad[] data;
+    private CompressedBaseQuad[] _data;
     private size_t numBases;
 
     static CompressedSequence from(S)(S fastaString) if (isSomeString!S)
@@ -295,6 +295,11 @@ struct CompressedSequence
         {
             mixin("assert(cs[" ~ i.stringof ~ "] == CompressedBase." ~ base.toLower.to!char ~ ");");
         }
+    }
+
+    @property const(CompressedBaseQuad[]) data() const pure nothrow
+    {
+        return _data;
     }
 
     S to(S)() if (isSomeString!S)
@@ -334,6 +339,47 @@ struct CompressedSequence
         auto j = fastaIdx % 4;
 
         return data[i][j];
+    }
+
+    @property size_t compressedLength() const pure nothrow
+    {
+        return data.length;
+    }
+
+    unittest
+    {
+        enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
+        auto cs = CompressedSequence.from(testSequence);
+
+        assert(cs.compressedLength == 11);
+    }
+
+    static size_t compressedLength(S)(in S fastaSequence) if (isSomeString!S)
+    {
+        assert(canConvert(fastaSequence));
+
+        return ceildiv(fastaSequence.length, 4);
+    }
+
+    unittest
+    {
+        enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
+
+        assert(compressedLength(testSequence) == 11);
+    }
+
+    static size_t canConvert(S)(in S fastaSequence) if (isSomeString!S)
+    {
+        return fastaSequence.all!(c => c.toLower.among!('a', 'c', 'g', 't'));
+    }
+
+    unittest
+    {
+        enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
+        enum falseSequence = "atgccaactactttgaNNNNNnnnnnAGGCACAGGTGCGCCT";
+
+        assert(canConvert(testSequence));
+        assert(!canConvert(falseSequence));
     }
 
     static CompressedBase convert(C)(in C fastaBase) if (isSomeChar!C)
