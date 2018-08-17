@@ -84,6 +84,7 @@ enum DentistCommand
     collectPileUps,
     showPileUps,
     processPileUps,
+    showInsertions,
     mergeInsertions,
     output,
 }
@@ -339,6 +340,8 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.showInsertions,
+        DentistCommand.mergeInsertions,
         DentistCommand.output,
     ))
     {
@@ -846,6 +849,10 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.processPileUps)
         enum commandSummary = q"{
             Process pile ups.
+        }".wrap;
+    else static if (command == DentistCommand.showInsertions)
+        enum commandSummary = q"{
+            Show a short summary of the insertions.
         }".wrap;
     else static if (command == DentistCommand.mergeInsertions)
         enum commandSummary = q"{

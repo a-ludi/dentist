@@ -34,11 +34,12 @@ void execute(Options)(in Options options)
     FloatingPointControl fpCtrl;
     fpCtrl.rounding = FloatingPointControl.roundUp;
     auto numWidth = lrint(log10(max(stats.expand)));
+    numWidth += numWidth / 3;
 
-    writefln!"totalDbSize:         %*d"(numWidth, stats[0]);
-    writefln!"numPileUps:          %*d"(numWidth, stats[1]);
-    writefln!"numReadAlignments:   %*d"(numWidth, stats[2]);
-    writefln!"numSeededAlignments: %*d"(numWidth, stats[3]);
-    writefln!"numLocalAlignments:  %*d"(numWidth, stats[4]);
-    writefln!"numTracePoints:      %*d"(numWidth, stats[5]);
+    writefln!"totalDbSize:         %*,d bytes"(numWidth, stats[0]);
+    writefln!"numPileUps:          %*,d"(numWidth, stats[1]);
+    writefln!"numReadAlignments:   %*,d"(numWidth, stats[2]);
+    writefln!"numSeededAlignments: %*,d"(numWidth, stats[3]);
+    writefln!"numLocalAlignments:  %*,d"(numWidth, stats[4]);
+    writefln!"numTracePoints:      %*,d"(numWidth, stats[5]);
 }
