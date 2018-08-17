@@ -25,8 +25,8 @@ import dentist.common.alignments :
     alignmentCoverage,
     getAlignmentRefs,
     getType,
-    PileUp,
-    writePileUpsDb;
+    PileUp;
+import dentist.common.binio : writePileUpsDb;
 import dentist.dazzler :
     attachTracePoints,
     getAlignments,

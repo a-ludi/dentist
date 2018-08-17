@@ -8,7 +8,7 @@
 */
 module dentist.commands.showPileUps;
 
-import dentist.common.alignments : PileUpDb;
+import dentist.common.binio : PileUpDb;
 import std.algorithm : max;
 import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;

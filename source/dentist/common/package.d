@@ -14,6 +14,7 @@ import std.array : array;
 import std.traits : TemplateOf;
 
 public import dentist.common.alignments;
+public import dentist.common.binio;
 public import dentist.common.scaffold;
 
 /// Thrown if some runtime error in the `dentist` algorithm occurs.

@@ -19,6 +19,7 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment,
     to;
+import dentist.common.binio : ArrayStorage;
 import dentist.common.scaffold :
     buildScaffold,
     concatenatePayloads,
