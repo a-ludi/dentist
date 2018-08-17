@@ -2425,17 +2425,19 @@ private
             );
         }
 
-        auto process = pipeProcess(["fasta2DAM", Fasta2DazzlerOptions.fromStdin,
-                outFileArg], Redirect.stdin, null, // env
-                Config.none, workdir);
-        //dfmt off
+        auto process = pipeProcess(
+            ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFileArg],
+            Redirect.stdin,
+            null, // env
+            Config.none,
+            workdir
+        );
         fastaRecords
             .filter!(fastaRecord => parseFastaRecord(fastaRecord).length >= minSequenceLength)
             .joiner(only('\n'))
             .chain("\n")
             .chunks(writeChunkSize)
             .each!(chunk => process.stdin.write(chunk.array));
-        //dfmt on
         process.stdin.close();
         auto exitStatus = wait(process.pid);
         if (exitStatus != 0)
