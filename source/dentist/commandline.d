@@ -19,9 +19,13 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
-import dentist.common.alignments : trace_point_t;
+import dentist.common.alignments :
+    id_t,
+    trace_point_t;
+import dentist.common.binio : PileUpDb;
 import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
+    DaccordOptions,
     DalignerOptions,
     DamapperOptions,
     getHiddenDbFiles,
@@ -44,9 +48,9 @@ import std.algorithm : among, each, endsWith, filter, find, map, startsWith;
 import std.conv;
 import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
-import std.format : format;
+import std.format : format, formattedRead;
 import std.meta : AliasSeq, staticMap, staticSort;
-import std.parallelism : defaultPoolThreads;
+import std.parallelism : defaultPoolThreads, totalCPUs;
 import std.path : absolutePath, buildPath;
 import std.range : only, takeOne;
 import std.stdio : File, stderr;
@@ -289,6 +293,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (command.among(
         DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Argument("<in:ref-vs-reads-alignment>")
@@ -412,6 +417,91 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daccord-threads")
+        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <--threads>) )")
+        uint numDaccordThreads;
+
+        @PostValidate(Priority.low)
+        void hookInitDaccordThreads()
+        {
+            if (numDaccordThreads == 0)
+            {
+                numDaccordThreads = totalCPUs / numThreads;
+            }
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("pile-up-batch", "batch", "b")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            process only a subset of the pile ups in the given range (excluding <to>);
+            <from> and <to> are zero-based indices into the pile up DB
+        }")
+        void parsePileUpBatch(string batchString) pure
+        {
+            try
+            {
+                batchString.formattedRead!"%d..%d"(pileUpBatch[0], pileUpBatch[1]);
+            }
+            catch (Exception e)
+            {
+                throw new CLIException("ill-formatted batch range");
+            }
+        }
+
+        @property id_t pileUpLength() inout
+        {
+            static id_t numPileUps;
+
+            if (numPileUps == 0)
+            {
+                numPileUps = PileUpDb.parse(pileUpsFile).length.to!id_t;
+            }
+
+            return numPileUps;
+        }
+
+
+        @Option()
+        @Validate!validateBatchRange
+        id_t[2] pileUpBatch;
+
+        static void validateBatchRange(id_t[2] pileUpBatch, OptionsFor!command options)
+        {
+            auto from = pileUpBatch[0];
+            auto to = pileUpBatch[1];
+
+            enforce!CLIException(
+                pileUpBatch == pileUpBatch.init ||
+                (0 <= from && from < to && to <= options.pileUpLength),
+                format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
+                        options.pileUpLength)
+            );
+        }
+
+        @PostValidate()
+        void hookEnsurePresenceOfBatchRange()
+        {
+            if (pileUpBatch == pileUpBatch.init)
+            {
+                pileUpBatch[1] = pileUpLength;
+            }
+        }
+
+        @property id_t pileUpBatchSize() const pure nothrow
+        {
+            return pileUpBatch[1] - pileUpBatch[0];
+        }
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -431,7 +521,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("good-anchor-length")
@@ -477,6 +567,7 @@ struct OptionsFor(DentistCommand command)
     static if (command.among(
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("min-anchor-length")
@@ -496,7 +587,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("min-reads-per-pile-up")
@@ -526,6 +617,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (command.among(
         DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("trace-point-spacing", "s")
@@ -538,7 +630,7 @@ struct OptionsFor(DentistCommand command)
             if (tracePointDistance > 0)
                 return;
 
-            tracePointDistance = getTracePointDistance(refVsReadsAlignmentOptions);
+            tracePointDistance = getTracePointDistance();
         }
     }
 
@@ -690,6 +782,32 @@ struct OptionsFor(DentistCommand command)
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - readsErrorRate)^^2),
             ];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        static struct ConsensusOptions
+        {
+            string[] daccordOptions;
+            string[] dalignerOptions;
+            string[] dbsplitOptions;
+            string workdir;
+        }
+
+        @property auto consensusOptions() const
+        {
+            return const(ConsensusOptions)(
+                [
+                    DaccordOptions.produceFullSequences,
+                    DaccordOptions.numberOfThreads ~ numDaccordThreads.to!string,
+                ],
+                pileUpAlignmentOptions,
+                [],
+                workdir,
+            );
         }
     }
 
