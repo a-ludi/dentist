@@ -8,7 +8,6 @@
 */
 module dentist.commands.generateDazzlerOptions;
 
-import std.string : join;
 import std.stdio : writefln, writeln;
 
 /// Execute the `generateDazzlerOptions` command with `options`.

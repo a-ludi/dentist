@@ -218,7 +218,7 @@ class WeaklyAnchoredAlignmentChainsFilter : AlignmentChainFilter
     {
         // Mark reads as weakly anchored if they are mostly anchored in a
         // repetitive region
-        auto uniqueAlignmentRegion = alignment.to!ReferenceRegion - repetitiveRegions;
+        auto uniqueAlignmentRegion = alignment.to!(ReferenceRegion, "contigA") - repetitiveRegions;
         bool isWeaklyAnchored = uniqueAlignmentRegion.size <= minAnchorLength;
 
         return isWeaklyAnchored;
