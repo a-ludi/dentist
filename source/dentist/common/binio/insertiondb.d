@@ -31,9 +31,17 @@ import std.array : minimallyInitializedArray;
 import std.conv : to;
 import std.exception : assertThrown, enforce, ErrnoException;
 import std.format : format;
+import std.range :
+    ElementType,
+    empty,
+    front,
+    isForwardRange,
+    isInputRange,
+    popFront,
+    save;
+import std.stdio : File, LockType;
 import std.traits : isArray;
 import std.typecons : tuple, Tuple;
-import std.stdio : File, LockType;
 
 version (unittest) import dentist.common.binio._testdata :
     getInsertionsTestData,
@@ -252,9 +260,10 @@ struct InsertionDb
         compressedBaseQuads = file.readRecords(compressedBaseQuads);
     }
 
-    static void write(in string dbFile, in Insertion[] insertions)
+    static void write(R)(in string dbFile, R insertions)
+            if (isForwardRange!R && is(ElementType!R : const(Insertion)))
     {
-        auto writer = InsertionDbFileWriter(File(dbFile, "wb"), insertions);
+        auto writer = InsertionDbFileWriter!R(File(dbFile, "wb"), insertions);
         writer.file.lock();
         scope (exit)
             writer.file.unlock();
@@ -283,7 +292,7 @@ unittest
         remove(tmpDb.name);
     }
 
-    InsertionDbFileWriter(tmpDb.file, insertions).writeToFile();
+    InsertionDbFileWriter!(Insertion[])(tmpDb.file, insertions).writeToFile();
     tmpDb.file.sync();
 
     assert(tmpDb.file.size == totalDbSize);
@@ -294,15 +303,16 @@ unittest
     assert(insertionDb[] == insertions);
 }
 
-private struct InsertionDbFileWriter
+private struct InsertionDbFileWriter(R)
+        if (isForwardRange!R && is(ElementType!R : const(Insertion)))
 {
     File file;
-    const Insertion[] insertions;
+    R insertions;
     InsertionDbIndex index;
 
     void writeToFile()
     {
-        index = InsertionDbIndex.from(insertions);
+        index = InsertionDbIndex.from(insertions.save);
 
         file.rawWrite([index]);
         writeBlock!Insertion();
@@ -323,7 +333,7 @@ private struct InsertionDbFileWriter
             insertions.length = 0;
             assert(insertions.ptr == file.tell());
         }
-        foreach (insertion; this.insertions)
+        foreach (insertion; this.insertions.save)
         {
             compressedBaseQuads.length = insertion.payload.sequence.compressedLength;
             spliceSites.length = insertion.payload.spliceSites.length;
@@ -356,7 +366,7 @@ private struct InsertionDbFileWriter
             compressedBaseQuads.length = 0;
             assert(compressedBaseQuads.ptr == file.tell());
         }
-        foreach (insertion; this.insertions)
+        foreach (insertion; this.insertions.save)
         {
             static assert(CompressedBaseQuad.sizeof == StorageType!CompressedBaseQuad.sizeof);
             file.rawWrite(insertion.payload.sequence.data);
@@ -377,7 +387,7 @@ private struct InsertionDbFileWriter
             spliceSites.length = 0;
             assert(spliceSites.ptr == file.tell());
         }
-        foreach (insertion; this.insertions)
+        foreach (insertion; this.insertions.save)
         {
             static assert(SpliceSite.sizeof == StorageType!SpliceSite.sizeof);
             file.rawWrite(insertion.payload.spliceSites);
@@ -426,7 +436,8 @@ private struct InsertionDbIndex
     @property alias compressedBaseQuads = arrayStorage!CompressedBaseQuad;
     @property alias spliceSites = arrayStorage!SpliceSite;
 
-    static InsertionDbIndex from(in Insertion[] insertions) nothrow pure
+    static InsertionDbIndex from(R)(R insertions) nothrow pure
+            if (isInputRange!R && is(ElementType!R : const(Insertion)))
     {
         InsertionDbIndex index;
 
