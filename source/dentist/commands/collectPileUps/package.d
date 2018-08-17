@@ -33,14 +33,14 @@ import dentist.dazzler :
     getNumContigs,
     writeMask;
 import dentist.util.log;
-import dentist.util.math : NaturalNumberSet;
+import dentist.util.math : ceildiv, NaturalNumberSet;
 import dstats.distrib : invPoissonCDF;
 import std.algorithm : count, isSorted, map, sort, sum;
 import std.array : array;
 import std.conv : to;
 import std.exception : enforce;
 import std.format : format;
-import std.parallelism : parallel;
+import std.parallelism : parallel, taskPool;
 import std.typecons : tuple;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -83,20 +83,7 @@ class PileUpCollector
             options.workdir,
         );
         filterAlignments();
-
         auto pileUps = buildPileUps();
-
-        foreach (ref pileUp; parallel(pileUps))
-            fetchTracePoints(pileUp);
-
-        logJsonDebug("pileUpsWithTracePoints", pileUps
-            .map!(pileUp => toJson([
-                "type": toJson(pileUp.getType.to!string),
-                "readAlignments": pileUp.map!"a[]".array.toJson,
-            ]))
-            .array
-            .toJson);
-
         writePileUpsDb(pileUps, options.pileUpsFile);
     }
 
@@ -261,20 +248,5 @@ class PileUpCollector
         );
 
         return pileUps;
-    }
-
-    protected ref PileUp fetchTracePoints(ref PileUp pileUp)
-    {
-        auto allAlignmentChains = pileUp.getAlignmentRefs();
-        allAlignmentChains.sort!"*a < *b";
-        allAlignmentChains.attachTracePoints(
-            options.refDb,
-            options.readsDb,
-            options.readsAlignmentFile,
-            options.tracePointDistance,
-            options.workdir
-        );
-
-        return pileUp;
     }
 }

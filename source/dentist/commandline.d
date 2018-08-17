@@ -506,7 +506,6 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.mergeInsertions,
     ))
