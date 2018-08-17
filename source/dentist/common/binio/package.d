@@ -12,15 +12,22 @@ module dentist.common.binio;
 
 public import dentist.common.binio.pileupdb;
 
-import dentist.util.math : ceil;
-import std.algorithm : among, permutations;
+import dentist.util.math : ceil, ceildiv;
+import std.algorithm : all, among, permutations;
 import std.array : minimallyInitializedArray;
 import std.bitmanip : bitfields;
 import std.conv : to;
-import std.exception : enforce;
+import std.exception : enforce, ErrnoException;
+import std.format : format;
 import std.range : chunks, enumerate;
+import std.stdio : File;
 import std.string : toLower;
-import std.traits : isSomeChar, isSomeString, Unqual;
+import std.range : empty, front, popFront;
+import std.traits :
+    isArray,
+    isSomeChar,
+    isSomeString,
+    Unqual;
 import std.typecons : BitFlags, Yes;
 
 
@@ -54,6 +61,44 @@ mixin template DbIndex(T...)
     }
 }
 
+T readRecordAt(T)(File dbFile, size_t ptr)
+{
+    dbFile.seek(ptr.to!long);
+
+    return readRecord!T(dbFile);
+}
+
+T readRecord(T)(File dbFile)
+{
+    return readRecords(dbFile, new T[1])[0];
+}
+
+T readRecords(T)(File dbFile, T records) if (isArray!T)
+{
+    if (records.length == 0)
+        return records;
+
+    auto expectedLength = records.length;
+    try
+    {
+        records = dbFile.rawRead(records);
+
+        enforce!PileUpDbException(
+            records.length == expectedLength,
+            format!"malformed pile up DB `%s`: premature end of file"(
+                    dbFile.name)
+        );
+    }
+    catch (ErrnoException e)
+    {
+        throw new PileUpDbException(
+            format!"malformed pile up DB `%s`: cannot read record of type %s: %s"(
+                    dbFile.name, T.stringof, e.msg),
+        );
+    }
+
+    return records;
+}
 
 struct ArrayStorage(T)
 {

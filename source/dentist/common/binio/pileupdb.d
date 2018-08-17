@@ -20,14 +20,26 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment,
     trace_point_t;
-import dentist.common.binio : ArrayStorage, DbIndex;
+import dentist.common.binio :
+    ArrayStorage,
+    DbIndex,
+    readRecord,
+    readRecordAt,
+    readRecords;
 import std.array : minimallyInitializedArray;
 import std.conv : to;
 import std.exception : assertThrown, enforce, ErrnoException;
 import std.format : format;
-import std.traits : isArray;
 import std.typecons : tuple, Tuple;
 import std.stdio : File, LockType;
+
+version (unittest) import dentist.common.binio._testdata :
+    getPileUpsTestData,
+    numLocalAlignments,
+    numPileUps,
+    numReadAlignments,
+    numSeededAlignments,
+    numTracePoints;
 
 class PileUpDbException : Exception
 {
@@ -136,7 +148,7 @@ struct PileUpDb
     {
         ensureDbIndex();
 
-        return (dbIndex.endPtr!PileUp - dbIndex.beginPtr!PileUp) / StorageType!PileUp.sizeof;
+        return dbIndex.pileUps.length;
     }
 
     alias opDollar = length;
@@ -146,7 +158,7 @@ struct PileUpDb
         if (dbIndex != dbIndex.init)
             return;
 
-        dbIndex = readRecord!PileUpDbIndex();
+        dbIndex = pileUpDb.readRecord!PileUpDbIndex();
     }
 
     private PileUp[] readSlice(size_t from, size_t to)
@@ -177,29 +189,29 @@ struct PileUpDb
     private DbSlices getDbSlices(size_t from, size_t to)
     {
         auto pileUps = dbIndex.pileUps[from .. to];
-        auto firstPileUp = readRecordAt!(StorageType!PileUp)(pileUps[0]);
-        auto lastPileUp = readRecordAt!(StorageType!PileUp)(pileUps[$ - 1]);
+        auto firstPileUp = pileUpDb.readRecordAt!(StorageType!PileUp)(pileUps[0]);
+        auto lastPileUp = pileUpDb.readRecordAt!(StorageType!PileUp)(pileUps[$ - 1]);
 
         auto readAlignments = ArrayStorage!(StorageType!ReadAlignment).fromPtrs(
             firstPileUp[0],
             lastPileUp[$],
         );
-        auto firstReadAlignment = readRecordAt!(StorageType!ReadAlignment)(readAlignments[0]);
-        auto lastReadAlignment = readRecordAt!(StorageType!ReadAlignment)(readAlignments[$ - 1]);
+        auto firstReadAlignment = pileUpDb.readRecordAt!(StorageType!ReadAlignment)(readAlignments[0]);
+        auto lastReadAlignment = pileUpDb.readRecordAt!(StorageType!ReadAlignment)(readAlignments[$ - 1]);
 
         auto seededAlignments = ArrayStorage!(StorageType!SeededAlignment).fromPtrs(
             firstReadAlignment[0],
             lastReadAlignment[$],
         );
-        auto firstSeededAlignment = readRecordAt!(StorageType!SeededAlignment)(seededAlignments[0]);
-        auto lastSeededAlignment = readRecordAt!(StorageType!SeededAlignment)(seededAlignments[$ - 1]);
+        auto firstSeededAlignment = pileUpDb.readRecordAt!(StorageType!SeededAlignment)(seededAlignments[0]);
+        auto lastSeededAlignment = pileUpDb.readRecordAt!(StorageType!SeededAlignment)(seededAlignments[$ - 1]);
 
         auto localAlignments = ArrayStorage!(StorageType!LocalAlignment).fromPtrs(
             firstSeededAlignment.localAlignments[0],
             lastSeededAlignment.localAlignments[$],
         );
-        auto firstLocalAlignment = readRecordAt!(StorageType!LocalAlignment)(localAlignments[0]);
-        auto lastLocalAlignment = readRecordAt!(StorageType!LocalAlignment)(localAlignments[$ - 1]);
+        auto firstLocalAlignment = pileUpDb.readRecordAt!(StorageType!LocalAlignment)(localAlignments[0]);
+        auto lastLocalAlignment = pileUpDb.readRecordAt!(StorageType!LocalAlignment)(localAlignments[$ - 1]);
 
         auto tracePoints = ArrayStorage!(StorageType!TracePoint).fromPtrs(
             firstLocalAlignment.tracePoints[0],
@@ -219,7 +231,7 @@ struct PileUpDb
     {
         static assert(PileUp.sizeof == StorageType!PileUp.sizeof);
         pileUpDb.seek(dbSlices.pileUps.ptr);
-        pileUps = readRecords(pileUps);
+        pileUps = pileUpDb.readRecords(pileUps);
 
         size_t[2] pileUpSlice;
         foreach (ref pileUp; pileUps)
@@ -244,7 +256,7 @@ struct PileUpDb
         size_t[2] seededAlignmentsSlice;
         foreach (ref seededAlignment; seededAlignments)
         {
-            auto seededAlignmentStorage = readRecord!(StorageType!SeededAlignment);
+            auto seededAlignmentStorage = pileUpDb.readRecord!(StorageType!SeededAlignment);
 
             seededAlignmentsSlice[0] = seededAlignmentsSlice[1];
             seededAlignmentsSlice[1] += seededAlignmentStorage.localAlignments.length;
@@ -276,7 +288,7 @@ struct PileUpDb
         size_t[2] readAlignmentsSlice;
         foreach (ref readAlignment; readAlignments)
         {
-            auto readAlignmentStorage = readRecord!(StorageType!ReadAlignment);
+            auto readAlignmentStorage = pileUpDb.readRecord!(StorageType!ReadAlignment);
 
             readAlignmentsSlice[0] = readAlignmentsSlice[1];
             readAlignmentsSlice[1] += readAlignmentStorage.length;
@@ -299,7 +311,7 @@ struct PileUpDb
         size_t[2] localAlignmentsSlice;
         foreach (ref localAlignment; localAlignments)
         {
-            auto localAlignmentStorage = readRecord!(StorageType!LocalAlignment);
+            auto localAlignmentStorage = pileUpDb.readRecord!(StorageType!LocalAlignment);
 
             localAlignmentsSlice[0] = localAlignmentsSlice[1];
             localAlignmentsSlice[1] += localAlignmentStorage.tracePoints.length;
@@ -326,43 +338,7 @@ struct PileUpDb
 
         static assert(TracePoint.sizeof == StorageType!TracePoint.sizeof);
         pileUpDb.seek(dbSlices.tracePoints.ptr);
-        tracePoints = readRecords(tracePoints);
-    }
-
-    private T readRecordAt(T)(size_t ptr)
-    {
-        pileUpDb.seek(ptr.to!long);
-
-        return readRecord!T();
-    }
-
-    private T readRecord(T)()
-    {
-        return readRecords(new T[1])[0];
-    }
-
-    private T readRecords(T)(T records) if (isArray!T)
-    {
-        auto expectedLength = records.length;
-        try
-        {
-            records = pileUpDb.rawRead(records);
-
-            enforce!PileUpDbException(
-                records.length == expectedLength,
-                format!"malformed pile up DB `%s`: premature end of file"(
-                        pileUpDb.name)
-            );
-        }
-        catch (ErrnoException e)
-        {
-            throw new PileUpDbException(
-                format!"malformed pile up DB `%s`: cannot read record of type %s: %s"(
-                        pileUpDb.name, T.stringof, e.msg),
-            );
-        }
-
-        return records;
+        tracePoints = pileUpDb.readRecords(tracePoints);
     }
 }
 
@@ -402,11 +378,6 @@ unittest
 
     auto pileUps = getPileUpsTestData();
 
-    enum numPileUps = 2;
-    enum numReadAlignments = 5;
-    enum numSeededAlignments = 7;
-    enum numLocalAlignments = 8;
-    enum numTracePoints = 393;
     enum totalDbSize =
         PileUpDbIndex.sizeof +
         StorageType!PileUp.sizeof * numPileUps +
@@ -475,12 +446,6 @@ unittest
 
     auto pileUps = getPileUpsTestData();
     auto dbIndex = buildPileUpDbIndex(pileUps);
-
-    enum numPileUps = 2;
-    enum numReadAlignments = 5;
-    enum numSeededAlignments = 7;
-    enum numLocalAlignments = 8;
-    enum numTracePoints = 393;
 
     assert(dbIndex.pileUpsPtr == PileUpDbIndex.sizeof);
     assert(dbIndex.readAlignmentsPtr ==
@@ -859,562 +824,4 @@ private struct TracePointStorage
 {
     trace_point_t numDiffs;
     trace_point_t numBasePairs;
-}
-
-version (unittest)
-{
-    enum ushort defaultTracePointDistance = 100;
-    PileUp[] getPileUpsTestData()
-    {
-        with (AlignmentChain) with (LocalAlignment) with (Flag)
-            return [
-                [
-                    ReadAlignment(
-                        SeededAlignment(
-                            AlignmentChain(
-                                9,
-                                Contig(1, 8300),
-                                Contig(1539, 6414),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(0, 6227),
-                                        Locus(7, 6414),
-                                        309,
-                                        [
-                                            TracePoint(10, 98),
-                                            TracePoint(7, 107),
-                                            TracePoint(7, 105),
-                                            TracePoint(8, 108),
-                                            TracePoint(4, 99),
-                                            TracePoint(4, 102),
-                                            TracePoint(5, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(1, 101),
-                                            TracePoint(8, 107),
-                                            TracePoint(6, 102),
-                                            TracePoint(8, 103),
-                                            TracePoint(7, 105),
-                                            TracePoint(6, 105),
-                                            TracePoint(2, 102),
-                                            TracePoint(4, 104),
-                                            TracePoint(5, 101),
-                                            TracePoint(5, 99),
-                                            TracePoint(0, 100),
-                                            TracePoint(0, 100),
-                                            TracePoint(10, 107),
-                                            TracePoint(7, 103),
-                                            TracePoint(5, 102),
-                                            TracePoint(4, 101),
-                                            TracePoint(2, 100),
-                                            TracePoint(7, 106),
-                                            TracePoint(1, 101),
-                                            TracePoint(5, 101),
-                                            TracePoint(7, 107),
-                                            TracePoint(6, 106),
-                                            TracePoint(3, 103),
-                                            TracePoint(3, 103),
-                                            TracePoint(7, 105),
-                                            TracePoint(4, 103),
-                                            TracePoint(5, 102),
-                                            TracePoint(7, 103),
-                                            TracePoint(7, 104),
-                                            TracePoint(5, 105),
-                                            TracePoint(5, 101),
-                                            TracePoint(8, 106),
-                                            TracePoint(4, 102),
-                                            TracePoint(9, 104),
-                                            TracePoint(2, 100),
-                                            TracePoint(6, 102),
-                                            TracePoint(8, 104),
-                                            TracePoint(8, 106),
-                                            TracePoint(6, 102),
-                                            TracePoint(4, 102),
-                                            TracePoint(2, 101),
-                                            TracePoint(4, 102),
-                                            TracePoint(4, 103),
-                                            TracePoint(3, 103),
-                                            TracePoint(4, 101),
-                                            TracePoint(8, 108),
-                                            TracePoint(2, 102),
-                                            TracePoint(2, 101),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 100),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 102),
-                                            TracePoint(6, 105),
-                                            TracePoint(3, 98),
-                                            TracePoint(1, 28),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.front,
-                        ),
-                    ),
-                    ReadAlignment(
-                        SeededAlignment(
-                            AlignmentChain(
-                                17,
-                                Contig(1, 8300),
-                                Contig(3197, 8564),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(0, 71),
-                                        Locus(12, 86),
-                                        3,
-                                        [
-                                            TracePoint(3, 74),
-                                        ],
-                                    ),
-                                    LocalAlignment(
-                                        Locus(0, 8300),
-                                        Locus(0, 8530),
-                                        407,
-                                        [
-                                            TracePoint(6, 105),
-                                            TracePoint(9, 108),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 100),
-                                            TracePoint(5, 100),
-                                            TracePoint(6, 104),
-                                            TracePoint(7, 104),
-                                            TracePoint(5, 99),
-                                            TracePoint(4, 104),
-                                            TracePoint(2, 101),
-                                            TracePoint(3, 103),
-                                            TracePoint(6, 102),
-                                            TracePoint(7, 102),
-                                            TracePoint(8, 102),
-                                            TracePoint(4, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(6, 99),
-                                            TracePoint(7, 104),
-                                            TracePoint(6, 105),
-                                            TracePoint(3, 99),
-                                            TracePoint(5, 102),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 103),
-                                            TracePoint(4, 104),
-                                            TracePoint(7, 104),
-                                            TracePoint(6, 106),
-                                            TracePoint(6, 105),
-                                            TracePoint(7, 105),
-                                            TracePoint(2, 100),
-                                            TracePoint(2, 101),
-                                            TracePoint(9, 101),
-                                            TracePoint(6, 104),
-                                            TracePoint(4, 102),
-                                            TracePoint(6, 101),
-                                            TracePoint(7, 104),
-                                            TracePoint(8, 103),
-                                            TracePoint(7, 107),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 103),
-                                            TracePoint(3, 103),
-                                            TracePoint(3, 101),
-                                            TracePoint(7, 104),
-                                            TracePoint(1, 101),
-                                            TracePoint(8, 103),
-                                            TracePoint(3, 103),
-                                            TracePoint(1, 101),
-                                            TracePoint(4, 103),
-                                            TracePoint(4, 103),
-                                            TracePoint(5, 104),
-                                            TracePoint(4, 99),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 103),
-                                            TracePoint(4, 102),
-                                            TracePoint(3, 99),
-                                            TracePoint(4, 98),
-                                            TracePoint(8, 108),
-                                            TracePoint(4, 104),
-                                            TracePoint(6, 106),
-                                            TracePoint(7, 106),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 103),
-                                            TracePoint(4, 101),
-                                            TracePoint(1, 101),
-                                            TracePoint(6, 102),
-                                            TracePoint(7, 104),
-                                            TracePoint(1, 101),
-                                            TracePoint(5, 98),
-                                            TracePoint(8, 104),
-                                            TracePoint(5, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(5, 102),
-                                            TracePoint(4, 103),
-                                            TracePoint(4, 100),
-                                            TracePoint(3, 103),
-                                            TracePoint(6, 104),
-                                            TracePoint(7, 103),
-                                            TracePoint(4, 104),
-                                            TracePoint(5, 103),
-                                            TracePoint(5, 102),
-                                            TracePoint(2, 100),
-                                            TracePoint(7, 102),
-                                            TracePoint(5, 105),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.front,
-                        ),
-                    ),
-                ],
-                [
-                    ReadAlignment(
-                        SeededAlignment(
-                            AlignmentChain(
-                                42,
-                                Contig(1, 8300),
-                                Contig(2325, 16069),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(3562, 8300),
-                                        Locus(0, 4860),
-                                        229,
-                                        [
-                                            TracePoint(3, 41),
-                                            TracePoint(7, 102),
-                                            TracePoint(2, 102),
-                                            TracePoint(3, 103),
-                                            TracePoint(4, 102),
-                                            TracePoint(8, 108),
-                                            TracePoint(2, 100),
-                                            TracePoint(6, 102),
-                                            TracePoint(6, 104),
-                                            TracePoint(2, 102),
-                                            TracePoint(4, 102),
-                                            TracePoint(7, 102),
-                                            TracePoint(3, 99),
-                                            TracePoint(2, 102),
-                                            TracePoint(3, 100),
-                                            TracePoint(6, 100),
-                                            TracePoint(3, 102),
-                                            TracePoint(5, 104),
-                                            TracePoint(5, 104),
-                                            TracePoint(4, 101),
-                                            TracePoint(5, 103),
-                                            TracePoint(2, 102),
-                                            TracePoint(7, 106),
-                                            TracePoint(7, 103),
-                                            TracePoint(3, 101),
-                                            TracePoint(8, 106),
-                                            TracePoint(6, 103),
-                                            TracePoint(6, 103),
-                                            TracePoint(4, 103),
-                                            TracePoint(3, 102),
-                                            TracePoint(2, 101),
-                                            TracePoint(7, 106),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 101),
-                                            TracePoint(8, 103),
-                                            TracePoint(10, 102),
-                                            TracePoint(8, 104),
-                                            TracePoint(7, 102),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(6, 100),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 99),
-                                            TracePoint(3, 100),
-                                            TracePoint(5, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 100),
-                                            TracePoint(5, 103),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.back,
-                        ),
-                        SeededAlignment(
-                            AlignmentChain(
-                                76,
-                                Contig(2, 8350),
-                                Contig(2325, 16069),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(0, 6798),
-                                        Locus(9086, 16069),
-                                        308,
-                                        [
-                                            TracePoint(5, 103),
-                                            TracePoint(4, 101),
-                                            TracePoint(8, 106),
-                                            TracePoint(9, 104),
-                                            TracePoint(9, 104),
-                                            TracePoint(6, 106),
-                                            TracePoint(3, 101),
-                                            TracePoint(8, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(7, 101),
-                                            TracePoint(4, 102),
-                                            TracePoint(3, 100),
-                                            TracePoint(7, 105),
-                                            TracePoint(6, 99),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 102),
-                                            TracePoint(6, 102),
-                                            TracePoint(3, 103),
-                                            TracePoint(4, 102),
-                                            TracePoint(12, 110),
-                                            TracePoint(7, 103),
-                                            TracePoint(4, 104),
-                                            TracePoint(4, 102),
-                                            TracePoint(4, 100),
-                                            TracePoint(5, 105),
-                                            TracePoint(5, 100),
-                                            TracePoint(6, 102),
-                                            TracePoint(5, 105),
-                                            TracePoint(3, 102),
-                                            TracePoint(2, 102),
-                                            TracePoint(6, 103),
-                                            TracePoint(2, 100),
-                                            TracePoint(4, 104),
-                                            TracePoint(5, 103),
-                                            TracePoint(6, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 101),
-                                            TracePoint(4, 104),
-                                            TracePoint(6, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(1, 101),
-                                            TracePoint(3, 103),
-                                            TracePoint(8, 105),
-                                            TracePoint(2, 102),
-                                            TracePoint(4, 104),
-                                            TracePoint(1, 99),
-                                            TracePoint(6, 102),
-                                            TracePoint(3, 101),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 105),
-                                            TracePoint(1, 101),
-                                            TracePoint(1, 100),
-                                            TracePoint(4, 102),
-                                            TracePoint(4, 101),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 101),
-                                            TracePoint(5, 101),
-                                            TracePoint(6, 103),
-                                            TracePoint(6, 105),
-                                            TracePoint(7, 106),
-                                            TracePoint(8, 107),
-                                            TracePoint(5, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(2, 102),
-                                            TracePoint(2, 100),
-                                            TracePoint(1, 100),
-                                            TracePoint(5, 103),
-                                            TracePoint(3, 99),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.front,
-                        ),
-                   ),
-                    ReadAlignment(
-                        SeededAlignment(
-                            AlignmentChain(
-                                47,
-                                Contig(1, 8300),
-                                Contig(3332, 12946),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(4899, 8300),
-                                        Locus(0, 3507),
-                                        154,
-                                        [
-                                            TracePoint(0, 1),
-                                            TracePoint(7, 105),
-                                            TracePoint(6, 105),
-                                            TracePoint(6, 106),
-                                            TracePoint(7, 107),
-                                            TracePoint(3, 102),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 102),
-                                            TracePoint(4, 100),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 105),
-                                            TracePoint(3, 103),
-                                            TracePoint(7, 101),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 102),
-                                            TracePoint(7, 105),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 103),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 103),
-                                            TracePoint(6, 102),
-                                            TracePoint(4, 101),
-                                            TracePoint(6, 104),
-                                            TracePoint(2, 102),
-                                            TracePoint(8, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(4, 103),
-                                            TracePoint(1, 99),
-                                            TracePoint(0, 100),
-                                            TracePoint(9, 108),
-                                            TracePoint(5, 104),
-                                            TracePoint(5, 102),
-                                            TracePoint(5, 103),
-                                            TracePoint(3, 103),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.back,
-                        ),
-                        SeededAlignment(
-                            AlignmentChain(
-                                89,
-                                Contig(2, 8350),
-                                Contig(3332, 12946),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(0, 5082),
-                                        Locus(7726, 12946),
-                                        244,
-                                        [
-                                            TracePoint(5, 104),
-                                            TracePoint(2, 99),
-                                            TracePoint(3, 103),
-                                            TracePoint(7, 103),
-                                            TracePoint(2, 98),
-                                            TracePoint(2, 102),
-                                            TracePoint(11, 107),
-                                            TracePoint(4, 104),
-                                            TracePoint(4, 102),
-                                            TracePoint(8, 106),
-                                            TracePoint(5, 105),
-                                            TracePoint(11, 109),
-                                            TracePoint(8, 101),
-                                            TracePoint(5, 103),
-                                            TracePoint(4, 104),
-                                            TracePoint(2, 102),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 103),
-                                            TracePoint(5, 101),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 102),
-                                            TracePoint(4, 102),
-                                            TracePoint(6, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(3, 99),
-                                            TracePoint(5, 103),
-                                            TracePoint(2, 100),
-                                            TracePoint(7, 105),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 105),
-                                            TracePoint(5, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(5, 105),
-                                            TracePoint(7, 105),
-                                            TracePoint(5, 102),
-                                            TracePoint(3, 100),
-                                            TracePoint(3, 102),
-                                            TracePoint(4, 102),
-                                            TracePoint(5, 103),
-                                            TracePoint(5, 105),
-                                            TracePoint(8, 100),
-                                            TracePoint(6, 103),
-                                            TracePoint(5, 102),
-                                            TracePoint(6, 105),
-                                            TracePoint(2, 98),
-                                            TracePoint(2, 100),
-                                            TracePoint(7, 104),
-                                            TracePoint(5, 104),
-                                            TracePoint(3, 103),
-                                            TracePoint(2, 100),
-                                            TracePoint(5, 82),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.front,
-                        )
-                    ),
-                    ReadAlignment(
-                        SeededAlignment(
-                            AlignmentChain(
-                                43,
-                                Contig(1, 8300),
-                                Contig(3593, 6783),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(3943, 8300),
-                                        Locus(0, 4471),
-                                        213,
-                                        [
-                                            TracePoint(3, 56),
-                                            TracePoint(7, 102),
-                                            TracePoint(2, 102),
-                                            TracePoint(7, 101),
-                                            TracePoint(7, 103),
-                                            TracePoint(9, 107),
-                                            TracePoint(4, 104),
-                                            TracePoint(4, 104),
-                                            TracePoint(5, 100),
-                                            TracePoint(4, 104),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 102),
-                                            TracePoint(5, 101),
-                                            TracePoint(2, 102),
-                                            TracePoint(2, 98),
-                                            TracePoint(6, 102),
-                                            TracePoint(10, 109),
-                                            TracePoint(1, 99),
-                                            TracePoint(6, 102),
-                                            TracePoint(1, 101),
-                                            TracePoint(3, 101),
-                                            TracePoint(5, 104),
-                                            TracePoint(7, 101),
-                                            TracePoint(7, 105),
-                                            TracePoint(5, 102),
-                                            TracePoint(0, 100),
-                                            TracePoint(4, 104),
-                                            TracePoint(10, 105),
-                                            TracePoint(7, 103),
-                                            TracePoint(11, 111),
-                                            TracePoint(8, 105),
-                                            TracePoint(4, 101),
-                                            TracePoint(4, 103),
-                                            TracePoint(3, 100),
-                                            TracePoint(5, 104),
-                                            TracePoint(4, 102),
-                                            TracePoint(7, 105),
-                                            TracePoint(5, 105),
-                                            TracePoint(6, 104),
-                                            TracePoint(5, 102),
-                                            TracePoint(3, 103),
-                                            TracePoint(3, 101),
-                                            TracePoint(2, 100),
-                                            TracePoint(2, 100),
-                                        ],
-                                    ),
-                                ],
-                                defaultTracePointDistance,
-                            ),
-                            AlignmentLocationSeed.back,
-                        )
-                    ),
-                ],
-            ];
-    }
 }
