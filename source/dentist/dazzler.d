@@ -2404,15 +2404,27 @@ private
         immutable writeChunkSize = 1024 * 1024;
         auto outFileArg = outFile.relativeToWorkdir(workdir);
         auto command = ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFileArg];
-        //dfmt off
-        logJsonDiagnostic(
-            "action", "execute",
-            "type", "pipe",
-            "command", command.map!Json.array,
-            "input", fastaRecords.map!(record => record[0 .. min(1024, $)].toJson).array[0 .. min(1024, $)],
-            "state", "pre",
-        );
-        //dfmt on
+
+        if (shouldLog(LogLevel.diagnostic))
+        {
+            static if (isForwardRange!Range)
+                auto input = fastaRecords
+                    .save
+                    .map!(record => record[0 .. min(1024, $)].toJson)
+                    .array[0 .. min(1024, $)]
+                    .toJson;
+            else
+                auto input = toJson(null);
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "pipe",
+                "command", command.map!Json.array,
+                "input", input,
+                "state", "pre",
+            );
+        }
+
         auto process = pipeProcess(["fasta2DAM", Fasta2DazzlerOptions.fromStdin,
                 outFileArg], Redirect.stdin, null, // env
                 Config.none, workdir);
