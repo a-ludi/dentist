@@ -11,6 +11,7 @@ module dentist.common.binio;
 
 
 public import dentist.common.binio.pileupdb;
+public import dentist.common.binio.insertiondb;
 
 import dentist.util.math : ceil, ceildiv;
 import std.algorithm : all, among, permutations;
