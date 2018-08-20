@@ -14,6 +14,7 @@ import std.algorithm :
     isSorted,
     map,
     sort;
+import dentist.util.log;
 import std.array : array;
 
 
@@ -26,6 +27,11 @@ void execute(Options)(in Options options)
         .map!ensureSorted
         .array
         .mergeAll;
+
+    logJsonInfo(
+        "numInputFiles", options.insertionsFiles.length,
+        "totalNumInsertions", mergedInsertions.length,
+    );
 
     InsertionDb.write(options.mergedInsertionsFile, mergedInsertions);
 }
