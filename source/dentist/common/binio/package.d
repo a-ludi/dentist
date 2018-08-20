@@ -13,38 +13,60 @@ module dentist.common.binio;
 public import dentist.common.binio.pileupdb;
 public import dentist.common.binio.insertiondb;
 
+import dentist.util.log;
 import dentist.util.math : ceil, ceildiv;
-import std.algorithm : all, among, permutations;
+import std.algorithm :
+    all,
+    among,
+    joiner,
+    map,
+    permutations;
 import std.array : minimallyInitializedArray;
 import std.bitmanip : bitfields;
 import std.conv : to;
 import std.exception : enforce, ErrnoException;
 import std.format : format;
-import std.range : chunks, enumerate;
+import std.range :
+    chunks,
+    dropExactly,
+    empty,
+    enumerate,
+    front,
+    popFront,
+    retro,
+    takeExactly;
 import std.stdio : File;
 import std.string : toLower;
-import std.range : empty, front, popFront;
 import std.traits :
     isArray,
     isSomeChar,
     isSomeString,
     Unqual;
-import std.typecons : BitFlags, Yes;
+import std.typecons : BitFlags, Flag, No, Yes;
 
 
-void lockIfPossible(File file) pure nothrow
+void lockIfPossible(ref File file) nothrow
 {
     try
     {
-        file.tryLock();
+        file.lock();
     }
-    catch (ErrnoException e)
+    catch (Exception e)
     {
         logJsonDebug(
             "info", "could not lock file `%s`",
             "file", file.name,
             "error", e.message().to!string,
         );
+    }
+}
+
+class BinaryIOException : Exception
+{
+    pure nothrow @nogc @safe this(string msg, string file = __FILE__,
+            size_t line = __LINE__, Throwable nextInChain = null)
+    {
+        super(msg, file, line, nextInChain);
     }
 }
 
@@ -100,7 +122,7 @@ T readRecords(T)(File dbFile, T records) if (isArray!T)
     {
         records = dbFile.rawRead(records);
 
-        enforce!PileUpDbException(
+        enforce!BinaryIOException(
             records.length == expectedLength,
             format!"malformed pile up DB `%s`: premature end of file"(
                     dbFile.name)
@@ -108,7 +130,7 @@ T readRecords(T)(File dbFile, T records) if (isArray!T)
     }
     catch (ErrnoException e)
     {
-        throw new PileUpDbException(
+        throw new BinaryIOException(
             format!"malformed pile up DB `%s`: cannot read record of type %s: %s"(
                     dbFile.name, T.stringof, e.msg),
         );
@@ -235,7 +257,7 @@ struct CompressedBaseQuad
     enum length = 4;
     alias opDollar = length;
 
-    CompressedBase[4] opIndex() const pure nothrow
+    CompressedBase[] opIndex() const pure nothrow
     {
         return [_0, _1, _2, _3];
     }
@@ -324,12 +346,20 @@ struct CompressedSequence
         return _data;
     }
 
-    @property auto bases(T : CompressedBase)() const pure nothrow
+    @property auto bases(T : CompressedBase, Flag!"reverse" reverse = No.reverse)() const pure nothrow
     {
-        return _data
-            .map!(compressedBaseQuad => compressedBaseQuad[]);
-            .joiner
-            .takeExactly(length);
+        static if (reverse)
+            return _data
+                .retro
+                .map!"a[]"
+                .map!retro
+                .joiner
+                .dropExactly(length % 4);
+        else
+            return _data
+                .map!"a[]"
+                .joiner
+                .takeExactly(length);
     }
 
     unittest
@@ -340,15 +370,21 @@ struct CompressedSequence
         auto cs = CompressedSequence.from(testSequence);
 
         with (CompressedBase)
+        {
             assert(cs.bases!CompressedBase.equal([
                 a, t, g, c, c, a, a, c, t, a, c, t, t, t, g, a, a, c, g, c, g, c,
                 c, g, c, a, a, g, g, c, a, c, a, g, g, t, g, c, g, c, c, t,
             ]));
+            assert(cs.bases!(CompressedBase, Yes.reverse).equal([
+                t, c, c, g, c, g, t, g, g, a, c, a, c, g, g, a, a, c, g, c, c, g, c, g, c, a, a,
+                g, t, t, t, c, a, t, c, a, a, c, c, g, t, a,
+            ]));
+        }
     }
 
-    @property auto bases(C)() const pure nothrow if (isSomeChar!C)
+    @property auto bases(C, Flag!"reverse" reverse = No.reverse)() const pure nothrow if (isSomeChar!C)
     {
-        return bases!CompressedBase.map!(convert!C);
+        return bases!(CompressedBase, reverse).map!(cb => convert!C(cb));
     }
 
     unittest
@@ -358,7 +394,8 @@ struct CompressedSequence
         enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
         auto cs = CompressedSequence.from(testSequence);
 
-        assert(cs.bases!dchar.equal(testSequence));
+        assert(cs.bases!dchar.equal(testSequence.toLower));
+        assert(cs.bases!(dchar, Yes.reverse).equal(testSequence.toLower.retro));
     }
 
     S to(S)() if (isSomeString!S)
@@ -468,7 +505,7 @@ struct CompressedSequence
         }
     }
 
-    static C convert(C)(in CompressedBase compressedBase) if (isSomeChar!C)
+    static C convert(C)(in CompressedBase compressedBase)
     {
         final switch (compressedBase)
         {
