@@ -35,6 +35,7 @@ import std.range :
     ElementType,
     empty,
     front,
+    hasLength,
     isForwardRange,
     isInputRange,
     popFront,
@@ -261,7 +262,7 @@ struct InsertionDb
     }
 
     static void write(R)(in string dbFile, R insertions)
-            if (isForwardRange!R && is(ElementType!R : const(Insertion)))
+            if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
     {
         auto writer = InsertionDbFileWriter!R(File(dbFile, "wb"), insertions);
         writer.file.lock();
@@ -304,7 +305,7 @@ unittest
 }
 
 private struct InsertionDbFileWriter(R)
-        if (isForwardRange!R && is(ElementType!R : const(Insertion)))
+        if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
 {
     File file;
     R insertions;
@@ -437,13 +438,13 @@ private struct InsertionDbIndex
     @property alias spliceSites = arrayStorage!SpliceSite;
 
     static InsertionDbIndex from(R)(R insertions) nothrow pure
-            if (isInputRange!R && is(ElementType!R : const(Insertion)))
+            if (isInputRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
     {
         InsertionDbIndex index;
 
         index.beginPtr!Insertion = InsertionDbIndex.sizeof;
         index.endPtr!Insertion = StorageType!Insertion.sizeof * insertions.length;
-        foreach (ref insertion; insertions)
+        foreach (insertion; insertions)
         {
             index.endPtr!CompressedBaseQuad += StorageType!CompressedBaseQuad.sizeof *
                     insertion.payload.sequence.compressedLength;
