@@ -112,6 +112,11 @@ unittest
 
     auto origStderr = stderr;
     stderr = File.tmpfile();
+    scope (exit)
+    {
+        stderr.close();
+        stderr = origStderr;
+    }
 
     logJsonError("error", "mysterious observation", "secret", 42);
 
@@ -227,4 +232,88 @@ enum LogLevel
     error,
     fatal,
     none
+}
+
+string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
+{
+    import std.conv : to;
+    import std.string : replace;
+    import std.traits : moduleName;
+
+    return q"{
+        import std.datetime.stopwatch : $prefix__StopWatch = StopWatch;
+
+        $prefix__StopWatch $prefix__enter() {
+            import $thisModule : LogLevel;
+            import std.traits : fullyQualifiedName;
+            import std.typecons : Yes;
+
+            logJson(
+                $logLevel,
+                `state`, `enter`,
+                `function`, $function,
+            );
+
+            return $prefix__StopWatch(Yes.autoStart);
+        }
+
+        void $prefix__exit($prefix__StopWatch timer) {
+            import $thisModule : LogLevel;
+            import std.traits : fullyQualifiedName;
+
+            timer.stop();
+            logJson(
+                $logLevel,
+                `state`, `exit`,
+                `function`, $function,
+                `timeElapsed`, timer.peek().total!`hnsecs`,
+            );
+        }
+
+        auto $prefix__timer = $prefix__enter();
+
+        scope (exit)
+            $prefix__exit($prefix__timer);
+    }"
+        .replace("$thisModule", moduleName!LogLevel)
+        .replace("$function", "fullyQualifiedName!(__traits(parent, $prefix__enter))")
+        .replace("$logLevel", "LogLevel." ~ logLevel.to!string)
+        .replace("$prefix", `__traceExecution`);
+}
+
+unittest
+{
+    import std.regex : ctRegex, matchFirst;
+    import std.stdio : File, stderr;
+
+    auto origStderr = stderr;
+    stderr = File.tmpfile();
+    scope (exit)
+    {
+        stderr.close();
+        stderr = origStderr;
+    }
+
+    void doSomething()
+    {
+        mixin(traceExecution!(LogLevel.error));
+
+        import core.thread : Thread;
+        import core.time : dur;
+
+        Thread.getThis.sleep(dur!"hnsecs"(50));
+    }
+
+    doSomething();
+    stderr.rewind();
+
+    auto expected1 = ctRegex!
+            `\{"state":"enter","function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","timestamp":[0-9]+\}`;
+    auto expected2 = ctRegex!
+            `\{"state":"exit","timeElapsed":[0-9]{2,},"function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","timestamp":[0-9]+\}`;
+    auto observed1 = stderr.readln;
+    auto observed2 = stderr.readln;
+
+    assert(matchFirst(observed1, expected1), "got unexpected output `" ~ observed1 ~ "`");
+    assert(matchFirst(observed2, expected2), "got unexpected output `" ~ observed2 ~ "`");
 }
