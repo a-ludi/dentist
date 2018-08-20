@@ -12,8 +12,20 @@ import std.algorithm : count, equal, joiner, startsWith;
 import std.array : appender, array;
 import std.conv : to;
 import std.format : format, formattedRead;
-import std.range : chain, chunks, drop, ElementType, isBidirectionalRange, only,
-    take, walkLength;
+import std.range :
+    back,
+    chain,
+    chunks,
+    drop,
+    ElementType,
+    empty,
+    front,
+    isBidirectionalRange,
+    only,
+    popBack,
+    popFront,
+    take,
+    walkLength;
 import std.string : indexOf, lineSplitter, outdent;
 import std.traits : isSomeChar, isSomeString;
 import std.typecons : tuple, Tuple;
@@ -408,6 +420,30 @@ unittest
 }
 
 /**
+    Get the complement of a DNA base. Only bases A, T, C, G will be translated;
+    all other characters are left as is. Replacement preserves casing of
+    the characters.
+*/
+C complement(C)(C base) if (isSomeChar!C)
+{
+    import std.range : zip;
+
+    enum from = `AGTCagtc`;
+    enum to = `TCAGtcag`;
+
+    switch (base)
+    {
+        static foreach (conv; zip(from, to))
+        {
+            case conv[0]:
+                return conv[1];
+        }
+        default:
+            return base;
+    }
+}
+
+/**
     Compute the reverse complement of a DNA sequence. Only bases A, T, C, G
     will be translated; all other characters are left as is. Replacement
     preserves casing of the characters.
@@ -415,23 +451,12 @@ unittest
 auto reverseComplementer(Range)(Range sequence)
         if (isBidirectionalRange!Range && isSomeChar!(ElementType!Range))
 {
-    import std.algorithm : substitute;
+    import std.algorithm : map;
     import std.range : retro;
 
-    // dfmt off
     return sequence
         .retro
-        .substitute!(
-            "A", "T",
-            "G", "C",
-            "T", "A",
-            "C", "G",
-            "a", "t",
-            "g", "c",
-            "t", "a",
-            "c", "g",
-        );
-    // dfmt on
+        .map!complement;
 }
 
 /// ditto
