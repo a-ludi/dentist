@@ -32,6 +32,22 @@ import std.traits :
 import std.typecons : BitFlags, Yes;
 
 
+void lockIfPossible(File file) pure nothrow
+{
+    try
+    {
+        file.tryLock();
+    }
+    catch (ErrnoException e)
+    {
+        logJsonDebug(
+            "info", "could not lock file `%s`",
+            "file", file.name,
+            "error", e.message().to!string,
+        );
+    }
+}
+
 mixin template DbIndex(T...)
 {
     static struct EOF;

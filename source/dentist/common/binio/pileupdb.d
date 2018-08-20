@@ -23,6 +23,7 @@ import dentist.common.alignments :
 import dentist.common.binio :
     ArrayStorage,
     DbIndex,
+    lockIfPossible,
     readRecord,
     readRecordAt,
     readRecords;
@@ -31,7 +32,7 @@ import std.conv : to;
 import std.exception : assertThrown, enforce, ErrnoException;
 import std.format : format;
 import std.typecons : tuple, Tuple;
-import std.stdio : File, LockType;
+import std.stdio : File;
 
 version (unittest) import dentist.common.binio._testdata :
     getPileUpsTestData,
@@ -90,7 +91,7 @@ struct PileUpDb
     static PileUpDb parse(in string dbFile)
     {
         auto pileUpDb = File(dbFile, "rb");
-        pileUpDb.lock(LockType.read);
+        lockIfPossible(pileUpDb);
 
         auto db = PileUpDb(pileUpDb);
         db.ensureDbIndex();
@@ -345,9 +346,7 @@ struct PileUpDb
 void writePileUpsDb(in PileUp[] pileUps, in string dbFile)
 {
     auto pileUpDb = File(dbFile, "wb");
-    pileUpDb.lock();
-    scope (exit)
-        pileUpDb.unlock();
+    lockIfPossible(pileUpDb);
 
     writePileUpsDb(pileUps, pileUpDb);
 }

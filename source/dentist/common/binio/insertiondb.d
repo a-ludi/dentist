@@ -17,6 +17,7 @@ import dentist.common.binio :
     CompressedBaseQuad,
     CompressedSequence,
     DbIndex,
+    lockIfPossible,
     readRecord,
     readRecordAt,
     readRecords;
@@ -40,7 +41,7 @@ import std.range :
     isInputRange,
     popFront,
     save;
-import std.stdio : File, LockType;
+import std.stdio : File;
 import std.traits : isArray;
 import std.typecons : tuple, Tuple;
 
@@ -90,8 +91,7 @@ struct InsertionDb
     static InsertionDb parse(in string dbFile)
     {
         auto file = File(dbFile, "rb");
-        file.lock(LockType.read);
-
+        lockIfPossible(file);
         auto db = InsertionDb(file);
         db.ensureDbIndex();
 
@@ -265,10 +265,8 @@ struct InsertionDb
             if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
     {
         auto writer = InsertionDbFileWriter!R(File(dbFile, "wb"), insertions);
-        writer.file.lock();
-        scope (exit)
-            writer.file.unlock();
 
+        lockIfPossible(writer.file);
         writer.writeToFile();
     }
 }
