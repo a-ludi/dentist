@@ -291,3 +291,57 @@ unittest
 
     assertThrown!Exception(iota(2).takeExactly!5);
 }
+
+class WrapLinesImpl(R)
+{
+    R output;
+    size_t lineWidth;
+    size_t column;
+
+    this(R output, size_t lineWidth)
+    {
+        this.output = output;
+        this.lineWidth = lineWidth;
+    }
+
+    void put(inout(char) c)
+    {
+        assert(c == '\n' || column < lineWidth);
+
+        std.range.primitives.put(output, c);
+        ++column;
+
+        if (c == '\n')
+        {
+            column = 0;
+        }
+
+        if (column >= lineWidth)
+        {
+            put('\n');
+        }
+    }
+
+    void put(string chunk)
+    {
+        foreach (c; chunk)
+        {
+            put(c);
+        }
+    }
+}
+
+auto wrapLines(R)(R output, size_t lineWidth)
+{
+    return new WrapLinesImpl!R(output, lineWidth);
+}
+
+unittest
+{
+    auto outputBuffer = new dchar[12];
+    auto output = wrapLines(outputBuffer, 10);
+
+    put(output, "hello world");
+
+    assert(outputBuffer == "hello worl\nd");
+}
