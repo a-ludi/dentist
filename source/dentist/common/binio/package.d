@@ -235,6 +235,11 @@ struct CompressedBaseQuad
     enum length = 4;
     alias opDollar = length;
 
+    CompressedBase[4] opIndex() const pure nothrow
+    {
+        return [_0, _1, _2, _3];
+    }
+
     CompressedBase opIndex(size_t i) const pure nothrow
     {
         switch (i)
@@ -317,6 +322,43 @@ struct CompressedSequence
     @property const(CompressedBaseQuad[]) data() const pure nothrow
     {
         return _data;
+    }
+
+    @property auto bases(T : CompressedBase)() const pure nothrow
+    {
+        return _data
+            .map!(compressedBaseQuad => compressedBaseQuad[]);
+            .joiner
+            .takeExactly(length);
+    }
+
+    unittest
+    {
+        import std.algorithm : equal;
+
+        enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
+        auto cs = CompressedSequence.from(testSequence);
+
+        with (CompressedBase)
+            assert(cs.bases!CompressedBase.equal([
+                a, t, g, c, c, a, a, c, t, a, c, t, t, t, g, a, a, c, g, c, g, c,
+                c, g, c, a, a, g, g, c, a, c, a, g, g, t, g, c, g, c, c, t,
+            ]));
+    }
+
+    @property auto bases(C)() const pure nothrow if (isSomeChar!C)
+    {
+        return bases!CompressedBase.map!(convert!C);
+    }
+
+    unittest
+    {
+        import std.algorithm : equal;
+
+        enum testSequence = "atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT";
+        auto cs = CompressedSequence.from(testSequence);
+
+        assert(cs.bases!dchar.equal(testSequence));
     }
 
     S to(S)() if (isSomeString!S)
