@@ -306,6 +306,8 @@ class WrapLinesImpl(R)
 
     void put(inout(char) c)
     {
+        import std.range.primitives;
+
         assert(c == '\n' || column < lineWidth);
 
         std.range.primitives.put(output, c);
@@ -338,6 +340,8 @@ auto wrapLines(R)(R output, size_t lineWidth)
 
 unittest
 {
+    import std.range.primitives : put;
+
     auto outputBuffer = new dchar[12];
     auto output = wrapLines(outputBuffer, 10);
 
