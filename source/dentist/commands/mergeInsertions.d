@@ -21,6 +21,8 @@ import std.array : array;
 /// Execute the `mergeInsertions` command with `options`.
 void execute(Options)(in Options options)
 {
+    mixin(traceExecution);
+
     auto mergedInsertions = options
         .insertionsFiles
         .map!readFromFile

@@ -100,6 +100,8 @@ class AssemblyWriter
 
     void run()
     {
+        mixin(traceExecution);
+
         init();
         buildAssemblyGraph();
 
@@ -123,6 +125,8 @@ class AssemblyWriter
 
     protected void init()
     {
+        mixin(traceExecution);
+
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
         scaffoldStructure = getScaffoldStructure(options.refDb, options).array;
         contigLengths = scaffoldStructure
@@ -130,13 +134,13 @@ class AssemblyWriter
             .map!(contigPart => contigPart.get!ContigSegment)
             .map!(contigPart => contigPart.end - contigPart.begin + 0)
             .array;
-
-        buildAssemblyGraph();
     }
 
 
     protected void buildAssemblyGraph()
     {
+        mixin(traceExecution);
+
         auto insertionDb = InsertionDb.parse(options.insertionsFile);
         auto insertions = insertionDb[];
 
@@ -187,6 +191,8 @@ class AssemblyWriter
 
     void writeNewContig(ContigNode startNode)
     {
+        mixin(traceExecution);
+
         auto globalComplement = false;
         auto insertionBegin = startNode;
 

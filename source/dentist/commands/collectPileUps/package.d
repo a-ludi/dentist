@@ -73,6 +73,8 @@ class PileUpCollector
 
     void run()
     {
+        mixin(traceExecution);
+
         readInputs();
         initUnusedReads();
         assessRepeatStructure();
@@ -84,11 +86,13 @@ class PileUpCollector
         );
         filterAlignments();
         auto pileUps = buildPileUps();
-        writePileUpsDb(pileUps, options.pileUpsFile);
+        writePileUps(pileUps);
     }
 
     protected void readInputs()
     {
+        mixin(traceExecution);
+
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
         numReads = getNumContigs(options.readsDb, options.workdir);
         logJsonInfo(
@@ -113,6 +117,8 @@ class PileUpCollector
 
     protected void initUnusedReads()
     {
+        mixin(traceExecution);
+
         unusedReads.reserveFor(numReads);
         foreach (readId; 1 .. numReads + 1)
         {
@@ -122,6 +128,8 @@ class PileUpCollector
 
     protected void assessRepeatStructure()
     {
+        mixin(traceExecution);
+
         auto selfCoverageInfo = getCoverageInfo(selfAlignment);
         auto readsCoverageInfo = getCoverageInfo(readsAlignment);
         logJsonDebug(
@@ -200,6 +208,8 @@ class PileUpCollector
 
     protected void filterAlignments()
     {
+        mixin(traceExecution);
+
         auto filters = tuple(
             new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
             new ImproperAlignmentChainsFilter(),
@@ -231,8 +241,9 @@ class PileUpCollector
 
     protected PileUp[] buildPileUps()
     {
-        import dentist.commands.collectPileUps.pileups : build;
+        mixin(traceExecution);
 
+        import dentist.commands.collectPileUps.pileups : build;
         auto pileUps = build(numReferenceContigs, readsAlignment);
 
         logJsonDebug("pileUps", pileUps
@@ -248,5 +259,12 @@ class PileUpCollector
         );
 
         return pileUps;
+    }
+
+    protected void writePileUps(PileUp[] pileUps)
+    {
+        mixin(traceExecution);
+
+        writePileUpsDb(pileUps, options.pileUpsFile);
     }
 }

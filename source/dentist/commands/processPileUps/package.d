@@ -84,6 +84,8 @@ class PileUpProcessor
 
     void run()
     {
+        mixin(traceExecution);
+
         readPileUps();
         readRepeatMask();
 
@@ -118,17 +120,21 @@ class PileUpProcessor
             .array
             .toJson);
 
-        InsertionDb.write(options.insertionsFile, insertions);
+        writeInsertions();
     }
 
     protected void readPileUps()
     {
+        mixin(traceExecution);
+
         auto pileUpDb = PileUpDb.parse(options.pileUpsFile);
         pileUps = pileUpDb[options.pileUpBatch[0] .. options.pileUpBatch[1]];
     }
 
     protected void readRepeatMask()
     {
+        mixin(traceExecution);
+
         repeatMask = ReferenceRegion(readMask!ReferenceInterval(
             options.refDb,
             options.repeatMask,
@@ -138,6 +144,8 @@ class PileUpProcessor
 
     protected ref PileUp fetchTracePoints(ref PileUp pileUp)
     {
+        mixin(traceExecution);
+
         auto allAlignmentChains = pileUp.getAlignmentRefs();
         allAlignmentChains.sort!"*a < *b";
         allAlignmentChains.attachTracePoints(
@@ -153,6 +161,8 @@ class PileUpProcessor
 
     protected void processPileUp(PileUp pileUp, Insertion[] insertionsBuffer)
     {
+        mixin(traceExecution);
+
         try
         {
             if (pileUp.length < options.minReadsPerPileUp)
@@ -216,6 +226,13 @@ class PileUpProcessor
     protected void dropEmptyInsertions()
     {
         insertions = insertions.find!(ins => ins.start.contigId != 0);
+    }
+
+    protected void writeInsertions()
+    {
+        mixin(traceExecution);
+
+        InsertionDb.write(options.insertionsFile, insertions);
     }
 
     protected size_t bestReadAlignmentIndex(in PileUp pileUp) pure
