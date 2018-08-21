@@ -401,6 +401,16 @@ struct OptionsFor(DentistCommand command)
         string[] insertionsFiles;
     }
 
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Argument("<out:assembly>", Multiplicity.optional)
+        @Help("write output assembly to <assembly> (default: stdout)")
+        @Validate!validateFileWritable
+        string assemblyFile;
+    }
+
     mixin HelpOption;
 
     static if (command.among(
