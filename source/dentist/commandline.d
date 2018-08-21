@@ -434,7 +434,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("daccord-threads")
-        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <--threads>) )")
+        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <threads>) )")
         uint numDaccordThreads;
 
         @PostValidate(Priority.low)
@@ -528,7 +528,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("fasta-line-width", "w")
-        @Help("line width for ouput FASTA")
+        @Help(format!"line width for ouput FASTA (default: %d)"(defaultValue!fastaLineWidth))
         @Validate!(value => enforce!CLIException(value > 0, "fasta line width must be greater than zero"))
         size_t fastaLineWidth = 50;
     }
@@ -538,7 +538,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("good-anchor-length")
-        @Help("alignment anchors with at least this length will get no penalty")
+        @Help(format!q"{
+            alignment anchors with at least this length will get no penalty (default: %d)
+        }"(defaultValue!goodAnchorLength))
         @Validate!(value => enforce!CLIException(value > 0, "good anchor length must be greater than zero"))
         size_t goodAnchorLength = 1000;
     }
@@ -547,10 +549,10 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("input-provide-method", "p")
         @MetaVar(format!"{%-(%s,%)}"([provideMethods]))
-        @Help(q"{
+        @Help(format!q"{
             use the given method to provide the input files in the working
-            directory (default: `symlink`)
-        }")
+            directory (default: `%s`)
+        }"(defaultValue!provideMethod))
         ProvideMethod provideMethod = ProvideMethod.symlink;
     }
 
@@ -559,14 +561,15 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("join-policy")
-        @Help(q"{
+        @Help(format!q"{
             allow only joins (gap filling) in the given mode:
             `scaffoldGaps` (only join gaps inside of scaffolds –
             marked by `n`s in FASTA),
             `scaffolds` (join gaps inside of scaffolds and try to join scaffolds),
             `contigs` (break input into contigs and re-scaffold everything;
             maintains scaffold gaps where new scaffolds are consistent)
-        }")
+            (default: `%s`)
+        }"(defaultValue!joinPolicy))
         JoinPolicy joinPolicy = JoinPolicy.scaffoldGaps;
     }
 
@@ -584,7 +587,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("min-anchor-length")
-        @Help("alignment need to have at least this length of unique anchoring sequence")
+        @Help(format!q"{
+            alignment need to have at least this length of unique anchoring sequence (default: %d)
+        }"(defaultValue!minAnchorLength))
         @Validate!(value => enforce!CLIException(value > 0, "minimum anchor length must be greater than zero"))
         size_t minAnchorLength = 200;
     }
@@ -594,7 +599,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("min-extension-length")
-        @Help("extensions must have at least <ulong> bps of processPileUps to be inserted")
+        @Help(format!q"{
+            extensions must have at least <ulong> bps of processPileUps to be inserted (default: %d)
+        }"(defaultValue!minExtensionLength))
         @Validate!(value => enforce!CLIException(value > 0, "good extension length must be greater than zero"))
         size_t minExtensionLength = 100;
     }
@@ -604,7 +611,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("min-reads-per-pile-up")
-        @Help("alignment anchors with at least this length will get no penalty")
+        @Help(format!q"{
+            alignment anchors with at least this length will get no penalty (default: %d)
+        }"(defaultValue!minReadsPerPileUp))
         @Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero"))
         size_t minReadsPerPileUp = 5;
     }
