@@ -9,18 +9,22 @@
 module dentist.commands.showInsertions;
 
 import dentist.common.binio : InsertionDb;
-import std.algorithm : max;
+import dentist.util.log;
+import std.algorithm : map, max;
+import std.array : array;
 import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
 import std.stdio : writefln, writeln;
 import std.typecons : tuple;
+import vibe.data.json : toJson = serializeToJson;
 
 /// Execute the `showInsertions` command with `options`.
 void execute(Options)(in Options options)
 {
     size_t totalDbSize = options.insertionsFile.getSize();
     auto insertionDb = InsertionDb.parse(options.insertionsFile);
-    insertionDb.releaseDb();
+    if (!shouldLog(LogLevel.debug_))
+        insertionDb.releaseDb();
 
     auto stats = tuple(
         totalDbSize,
@@ -38,4 +42,17 @@ void execute(Options)(in Options options)
     writefln!"numInsertions:          %*,d"(numWidth, stats[1]);
     writefln!"numCompressedBaseQuads: %*,d"(numWidth, stats[2]);
     writefln!"numSpliceSites:         %*,d"(numWidth, stats[3]);
+
+    logJsonDebug("insertions", insertionDb[]
+        .map!(join => [
+            "start": join.start.toJson,
+            "end": join.end.toJson,
+            "payload": [
+                "sequence": join.payload.sequence.to!string.toJson,
+                "contigLength": join.payload.contigLength.toJson,
+                "spliceSites": join.payload.spliceSites.toJson,
+            ].toJson,
+        ])
+        .array
+        .toJson);
 }
