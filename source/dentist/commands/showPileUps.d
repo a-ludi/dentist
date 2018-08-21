@@ -9,18 +9,24 @@
 module dentist.commands.showPileUps;
 
 import dentist.common.binio : PileUpDb;
-import std.algorithm : max;
+import dentist.common.alignments : getType;
+import dentist.util.log;
+import std.algorithm : map, max;
+import std.array : array;
+import std.conv : to;
 import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
 import std.stdio : writefln, writeln;
 import std.typecons : tuple;
+import vibe.data.json : toJson = serializeToJson;
 
 /// Execute the `showPileUps` command with `options`.
 void execute(Options)(in Options options)
 {
     size_t totalDbSize = options.pileUpsFile.getSize();
     auto pileUpDb = PileUpDb.parse(options.pileUpsFile);
-    pileUpDb.releaseDb();
+    if (!shouldLog(LogLevel.debug_))
+        pileUpDb.releaseDb();
 
     auto stats = tuple(
         totalDbSize,
@@ -42,4 +48,12 @@ void execute(Options)(in Options options)
     writefln!"numSeededAlignments: %*,d"(numWidth, stats[3]);
     writefln!"numLocalAlignments:  %*,d"(numWidth, stats[4]);
     writefln!"numTracePoints:      %*,d"(numWidth, stats[5]);
+
+    logJsonDebug("pileUps", pileUpDb[]
+        .map!(pileUp => [
+            "type": pileUp.getType.to!string.toJson,
+            "readAlignments": pileUp.map!"a[]".array.toJson,
+        ].toJson)
+        .array
+        .toJson);
 }
