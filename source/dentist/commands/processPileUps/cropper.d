@@ -250,16 +250,12 @@ private long getCommonTracePoint(
     auto commonAlignmentRegion = alignments
         .map!(to!(ReferenceRegion, "contigA"))
         .fold!"a & b";
-    auto relevantContigHalf = locationSeed == AlignmentLocationSeed.front
-        ? ReferenceRegion(contigA.id, 0, contigA.length / 2)
-        : ReferenceRegion(contigA.id, contigA.length / 2, contigA.length);
-    auto allowedTracePointRegion = (relevantContigHalf & commonAlignmentRegion) - mask;
+    auto allowedTracePointRegion = commonAlignmentRegion - mask;
 
     assert(alignments.all!(a => a.contigA == contigA && a.seed == locationSeed));
     debug logJsonDebug(
         "alignments", alignments.toJson,
         "commonAlignmentRegion", commonAlignmentRegion.toJson,
-        "relevantContigHalf", relevantContigHalf.toJson,
         "allowedTracePointRegion", allowedTracePointRegion.toJson,
     );
 
