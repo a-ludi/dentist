@@ -122,14 +122,12 @@ struct AlignmentChain
                 // TODO remove logging if fixed in LAdump (issue #23)
                 if (la.numDiffs != traceDiffs)
                 {
-                    // dfmt off
                     debug logJsonDebug(
                         "contigA", contigA.id,
                         "contigB", contigB.id,
                         "la.numDiffs", la.numDiffs,
                         "traceDiffs", traceDiffs,
                     );
-                    // dfmt on
                 }
                 // TODO make equality assertion if fixed in LAdump (issue #23)
                 assert(la.numDiffs <= traceDiffs, "missing trace points");
@@ -212,7 +210,6 @@ struct AlignmentChain
     /// This alignment is called proper iff it starts and ends at a read boundary.
     @property bool isProper() const pure nothrow
     {
-        // dfmt off
         return (
             first.contigA.begin == 0 ||
             first.contigB.begin == 0
@@ -222,7 +219,6 @@ struct AlignmentChain
             last.contigA.end == contigA.length ||
             last.contigB.end == contigB.length
         );
-        // dfmt on
     }
 
     /**
@@ -350,12 +346,10 @@ struct AlignmentChain
 
     @property size_t totalGapLength() const pure
     {
-        // dfmt off
         return localAlignments
             .chunks(2)
             .map!(las => las.length < 2 ? 0 : las[1].contigA.begin - las[0].contigA.end)
             .sum;
-        // dfmt on
     }
 
     unittest
@@ -406,13 +400,11 @@ struct AlignmentChain
 
     int compareIds(ref const AlignmentChain other) const pure nothrow
     {
-        // dfmt off
         return cmpLexicographically!(
             typeof(this),
             ac => ac.contigA.id,
             ac => ac.contigB.id,
         )(this, other);
-        // dfmt on
     }
 
     unittest
@@ -420,14 +412,12 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
-                // dfmt off
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
                     AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
                 ];
-                // dfmt on
 
                 foreach (i; 0 .. acs.length)
                     foreach (j; 0 .. acs.length)
@@ -448,7 +438,6 @@ struct AlignmentChain
 
     int opCmp(ref const AlignmentChain other) const pure nothrow
     {
-        // dfmt off
         return cmpLexicographically!(
             typeof(this),
             ac => ac.contigA.id,
@@ -458,7 +447,6 @@ struct AlignmentChain
             ac => ac.last.contigA.end,
             ac => ac.last.contigB.end,
         )(this, other);
-        // dfmt on
     }
 
     unittest
@@ -467,14 +455,12 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
-                // dfmt off
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
                     AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
                 ];
-                // dfmt on
 
                 foreach (i; 0 .. acs.length)
                     foreach (j; 0 .. acs.length)
@@ -495,7 +481,6 @@ struct AlignmentChain
         // test non-id-related comparison
         with (Complement) with (LocalAlignment)
             {
-                // dfmt off
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [
                         LocalAlignment(Locus(0, 2), Locus(0, 2), 1),
@@ -526,7 +511,6 @@ struct AlignmentChain
                         LocalAlignment(Locus(3, 6), Locus(3, 6), 1)
                     ]),
                 ];
-                // dfmt on
 
                 foreach (i; 0 .. acs.length)
                     foreach (j; 0 .. acs.length)
@@ -558,14 +542,12 @@ unittest
     with (AlignmentChain) with (LocalAlignment) with (Complement)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
-                // dfmt off
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
                     AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
                     AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
                 ];
-                // dfmt on
 
                 foreach (i; 0 .. acs.length)
                     foreach (j; 0 .. acs.length)
@@ -593,7 +575,6 @@ unittest
 {
     with (AlignmentChain) with (Complement) with (LocalAlignment)
             {
-                // dfmt off
                 auto sortedTestChains = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 10), Locus(0, 1), 0)]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 10), Locus(0, 2), 0)]),
@@ -616,20 +597,17 @@ unittest
                     sortedTestChains[7..8],
                     sortedTestChains[8..9],
                 ]));
-                // dfmt on
             }
 }
 
 auto equalIdsRange(in AlignmentChain[] acList, in id_t contigAID, in id_t contigBID) pure
 {
     assert(isSorted!idsPred(acList));
-    // dfmt off
     AlignmentChain needle = {
         contigA: AlignmentChain.Contig(contigAID, 1),
         contigB: AlignmentChain.Contig(contigBID, 1),
         localAlignments: [AlignmentChain.LocalAlignment(AlignmentChain.LocalAlignment.Locus(0, 1), AlignmentChain.LocalAlignment.Locus(0, 1))],
     };
-    // dfmt on
 
     return acList.assumeSorted!idsPred.equalRange(needle);
 }
@@ -638,7 +616,6 @@ unittest
 {
     with (AlignmentChain) with (Complement) with (LocalAlignment)
             {
-                // dfmt off
                 auto sortedTestChains = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 1), Locus(0, 1), 0)]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 2), Locus(0, 2), 0)]),
@@ -650,7 +627,6 @@ unittest
                     AlignmentChain(7, Contig(3, 30), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 8), Locus(0, 8), 0)]),
                     AlignmentChain(8, Contig(3, 30), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 9), Locus(0, 9), 0)]),
                 ];
-                // dfmt on
 
                 assert(sortedTestChains.equalIdsRange(1, 1).equal(sortedTestChains[0 .. 1]));
                 assert(sortedTestChains.equalIdsRange(2, 1).equal(sortedTestChains[3 .. 5]));
@@ -683,7 +659,6 @@ unittest
 {
     with (AlignmentChain) with (Flag) with (LocalAlignment)
             {
-                // dfmt off
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(1, 6), Locus(0, 1), 0)]),
                     AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(complement), [LocalAlignment(Locus(2, 6), Locus(0, 1), 0)]),
@@ -691,7 +666,6 @@ unittest
                     AlignmentChain(3, Contig(1, 10), Contig(4, 10), Flags(complement), [LocalAlignment(Locus(4, 6), Locus(0, 1), 0)]),
                     AlignmentChain(4, Contig(1, 10), Contig(5, 10), emptyFlags, [LocalAlignment(Locus(5, 6), Locus(0, 1), 0)]),
                 ];
-                // dfmt on
 
                 foreach (i; 0 .. acs.length)
                     foreach (j; 0 .. acs.length)
@@ -718,7 +692,6 @@ double alignmentCoverage(in AlignmentChain[] alignments)
     }
 
     auto alignmentsPerContig = alignments.chunkBy!"a.contigA.id == b.contigA.id";
-    // dfmt off
     auto totalContigLength = alignmentsPerContig
         .save
         .map!"a.front.contigA.length"
@@ -727,14 +700,12 @@ double alignmentCoverage(in AlignmentChain[] alignments)
         .save
         .map!coveredBases
         .sum;
-    // dfmt on
 
     return totalCoveredBases.to!double / totalContigLength.to!double;
 }
 
 unittest
 {
-    // dfmt off
     auto alignments = [
         AlignmentChain(
             0,
@@ -794,7 +765,6 @@ unittest
             ],
         ),
     ];
-    // dfmt on
 
     assert(alignmentCoverage(alignments) == 80.0 / 100.0);
 }
@@ -824,13 +794,11 @@ struct SeededAlignment
 
     int opCmp(ref const SeededAlignment other) const pure nothrow
     {
-        // dfmt off
         return cmpLexicographically!(
             typeof(this),
             "a.alignment",
             "a.seed",
         )(this, other);
-        // dfmt on
     }
 
     static InputRange!SeededAlignment from(AlignmentChain alignmentChain)
@@ -839,12 +807,10 @@ struct SeededAlignment
 
         if (isFrontExtension(alignmentChain) && isBackExtension(alignmentChain))
         {
-            // dfmt off
             return inputRangeObject(only(
                 SeededAlignment(alignmentChain, Seed.front),
                 SeededAlignment(alignmentChain, Seed.back),
             ));
-            // dfmt on
         }
         else if (isFrontExtension(alignmentChain) && !isBackExtension(alignmentChain))
         {
@@ -909,12 +875,10 @@ struct ReadAlignment
         }
         else
         {
-            // dfmt off
             logJsonDebug(
                 "info", format!"creating invalid read alignment with %d local alignments"(alignments.length),
                 "alignments", alignments.toJson,
             );
-            // dfmt on
 
             this._length = 0;
         }
@@ -1109,36 +1073,29 @@ struct ReadAlignment
 
     private @property bool joinsTwoContigs() const pure nothrow
     {
-        // dfmt off
         return _length == 2 &&
             _alignments[0].contigA.id != _alignments[1].contigA.id &&
             _alignments[0].contigB.id == _alignments[1].contigB.id;
-        // dfmt on
     }
 
     @property bool isParallel() const pure nothrow
     {
-        // dfmt off
         return joinsTwoContigs &&
             _alignments[0].seed != _alignments[1].seed &&
             _alignments[0].complement == _alignments[1].complement;
-        // dfmt on
     }
 
     @property bool isAntiParallel() const pure nothrow
     {
-        // dfmt off
         return joinsTwoContigs &&
             _alignments[0].seed == _alignments[1].seed &&
             _alignments[0].complement != _alignments[1].complement;
-        // dfmt on
     }
 
     unittest
     {
         with (AlignmentChain) with (LocalAlignment) with (Flag)
                 {
-                    // dfmt off
                     auto testData = [
                         // TODO drop this case?
                         //"innerAlignment": ReadAlignment(
@@ -1438,18 +1395,15 @@ struct ReadAlignment
                         "gapEnd2End":               "++G...+.+",
                         "gapBegin2Begin":           ".+G...+.+",
                     ];
-                    // dfmt on
 
                     alias getFailureMessage = (testCase, testFunction, expectedValue) => format!"expected %s.%s to be %s"(
                             testCase, testFunction, expectedValue);
                     alias toBool = (c) => c == '+' ? true : false;
-                    // dfmt off
                     alias toRAT = (c) => c == 'F'
                         ? ReadAlignmentType.front
                         : c == 'B'
                             ? ReadAlignmentType.back
                             : ReadAlignmentType.gap;
-                    // dfmt on
 
                     foreach (testCase, expectations; testCases)
                     {
@@ -1503,7 +1457,6 @@ J makeJoin(J)(ReadAlignment readAlignment)
     final switch (readAlignment.type)
     {
     case ReadAlignmentType.front:
-        // dfmt off
         return J(
             ContigNode(
                 readAlignment[0].contigA.id,
@@ -1514,9 +1467,7 @@ J makeJoin(J)(ReadAlignment readAlignment)
                 ContigPart.begin,
             ),
         );
-        // dfmt on
     case ReadAlignmentType.gap:
-        // dfmt off
         alias contigPart = (locationSeed) => locationSeed == AlignmentLocationSeed.front
                     ? ContigPart.begin
                     : ContigPart.end;
@@ -1531,9 +1482,7 @@ J makeJoin(J)(ReadAlignment readAlignment)
                 contigPart(readAlignment[1].seed),
             ),
         );
-        // dfmt on
     case ReadAlignmentType.back:
-        // dfmt off
         return J(
             ContigNode(
                 readAlignment[0].contigA.id,
@@ -1544,7 +1493,6 @@ J makeJoin(J)(ReadAlignment readAlignment)
                 ContigPart.post,
             ),
         );
-        // dfmt on
     }
 }
 
@@ -1562,7 +1510,6 @@ unittest
 {
     with (AlignmentChain) with (LocalAlignment) with (Flag)
             {
-                // dfmt off
                 auto frontExtension = ReadAlignment(
                     SeededAlignment.from(AlignmentChain(
                         3,
@@ -1641,7 +1588,6 @@ unittest
                         ],
                     )).front,
                 );
-                // dfmt on
 
                 auto join1 = frontExtension.to!(Join!(ReadAlignment[]));
                 auto join2 = backExtension.to!(Join!(ReadAlignment[]));
@@ -1684,11 +1630,9 @@ ReadAlignmentType getType(in PileUp pileUp) pure nothrow
     else
     {
         assert(pileUp.isExtension);
-        // dfmt off
         return pileUp[0].isFrontExtension
             ? ReadAlignmentType.front
             : ReadAlignmentType.back;
-        // dfmt on
     }
 }
 
@@ -1720,22 +1664,18 @@ bool isGap(in PileUp pileUp) pure nothrow
 
 auto isParallel(in PileUp pileUp) pure nothrow
 {
-    // dfmt off
     return pileUp.isGap && pileUp
         .filter!(readAlignment => readAlignment.isGap)
         .front
         .isParallel;
-    // dfmt on
 }
 
 auto isAntiParallel(in PileUp pileUp) pure nothrow
 {
-    // dfmt off
     return pileUp.isGap && pileUp
         .filter!(readAlignment => readAlignment.isGap)
         .front
         .isAntiParallel;
-    // dfmt on
 }
 
 /// Returns a list of pointers to all involved alignment chains.

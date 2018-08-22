@@ -331,7 +331,6 @@ void attachTracePoints(
 
 auto fingerprint(AlignmentChain* alignmentChain) pure nothrow
 {
-    // dfmt off
     return tuple(
         alignmentChain.contigA.id,
         alignmentChain.contigB.id,
@@ -340,7 +339,6 @@ auto fingerprint(AlignmentChain* alignmentChain) pure nothrow
         alignmentChain.last.contigA.end + 0,
         alignmentChain.last.contigB.end + 0,
     );
-    // dfmt on
 }
 
 private id_t attachTracePoints(AlignmentChain*[] alignmentChains,
@@ -361,12 +359,10 @@ private id_t attachTracePoints(AlignmentChain*[] alignmentChains,
         auto acFingerprint = alignmentChain.fingerprint;
         auto tpFingerprint = acWithTracePoints.fingerprint;
 
-        // dfmt off
         debug logJsonDebug(
             "acFingerprint", acFingerprint.toJson,
             "tpFingerprint", tpFingerprint.toJson,
         );
-        // dfmt on
 
         if (acFingerprint == tpFingerprint)
         {
@@ -398,8 +394,7 @@ private id_t attachTracePoints(AlignmentChain*[] alignmentChains,
 unittest
 {
     with (AlignmentChain) with (LocalAlignment)
-        {
-            // dfmt off
+    {
         auto alignmentChains = [
             new AlignmentChain(
                 1,
@@ -528,11 +523,10 @@ unittest
                 101
             ),
         ];
-        // dfmt on
 
-            assert(alignmentChains.attachTracePoints(acsWithTracePoints, 101) == 3);
-            assert(alignmentChains.map!"*a".array == expectedAlignmentChains);
-        }
+        assert(alignmentChains.attachTracePoints(acsWithTracePoints, 101) == 3);
+        assert(alignmentChains.map!"*a".array == expectedAlignmentChains);
+    }
 }
 
 private struct LasDumpLineFormatTuple
@@ -592,7 +586,6 @@ public:
         this.lasDump = getDumpLines(lasDump);
         debug with (LasDumpLineFormat)
         {
-            // dfmt off
             this.allowedLineTypes = [
                 totalChainPartsCount.indicator,
                 totalTracePointsCount.indicator,
@@ -601,7 +594,6 @@ public:
                 maxTracePointCount.indicator,
                 chainPart.indicator,
             ];
-            // dfmt on
         }
         this.popFront();
     }
@@ -674,13 +666,11 @@ private:
                     }
                     else
                     {
-                        // dfmt off
                         debug allowedLineTypes = [
                             chainPart.indicator,
                             lengths.indicator,
                             coordinates.indicator,
                         ];
-                        // dfmt on
                         break;
                     }
                 case lengths.indicator:
@@ -692,12 +682,10 @@ private:
                     debug
                     {
                         disallowCurrentLineType();
-                        // dfmt off
                         allowedLineTypes ~= [
                             numDiffs.indicator,
                             tracePointBegin.indicator,
                         ];
-                        // dfmt on
                     }
                     break;
                 case numDiffs.indicator:
@@ -777,14 +765,12 @@ private:
         char rawComplement;
         char rawChainPartType;
 
-        // dfmt off
         currentDumpLine[].formattedRead!chainPartFormat(
             contigAID,
             contigBID,
             rawComplement,
             rawChainPartType,
         );
-        // dfmt on
 
         auto flags = rawComplement == 'c' ? yesComplement : noComplement;
         auto chainPartType = rawChainPartType.to!ChainPartType;
@@ -816,11 +802,9 @@ private:
 
     bool isChainContinuation(in size_t contigAID, in size_t contigBID, in ChainPartType chainPartType)
     {
-        // dfmt off
         return currentAC.contigA.id == contigAID &&
                currentAC.contigB.id == contigBID &&
                chainPartType == ChainPartType.continuation;
-        // dfmt on
     }
 
     void finishCurrentLA()
@@ -850,26 +834,22 @@ private:
     {
         immutable lengthsFormat = LasDumpLineFormat.lengths.format;
 
-        // dfmt off
         currentDumpLine[].formattedRead!lengthsFormat(
             currentAC.contigA.length,
             currentAC.contigB.length,
         );
-        // dfmt on
     }
     void readCoordinates()
     {
         immutable coordinatesFormat = LasDumpLineFormat.coordinates.format;
         LocalAlignment currentLA;
 
-        // dfmt off
         currentDumpLine[].formattedRead!coordinatesFormat(
             currentLA.contigA.begin,
             currentLA.contigA.end,
             currentLA.contigB.begin,
             currentLA.contigB.end,
         );
-        // dfmt on
 
         localAlignmentsAcc ~= currentLA;
     }
@@ -878,11 +858,9 @@ private:
     {
         immutable numDiffsFormat = LasDumpLineFormat.numDiffs.format;
 
-        // dfmt off
         currentDumpLine[].formattedRead!numDiffsFormat(
             localAlignmentsAcc.data[$ - 1].numDiffs,
         );
-        // dfmt on
     }
 
     void readTracePointBegin()
@@ -901,24 +879,18 @@ private:
         immutable tracePointFormat = LasDumpLineFormat.tracePoint.format;
         TracePoint currentTP;
 
-        // dfmt off
         currentDumpLine[].formattedRead!tracePointFormat(
             currentTP.numDiffs,
             currentTP.numBasePairs,
         );
-        // dfmt on
 
         tracePointsAcc ~= currentTP;
     }
 
-    debug {
-        void disallowCurrentLineType() {
-            // dfmt off
-            allowedLineTypes = allowedLineTypes
-                .filter!(type => type != currentLineType)
-                .array;
-            // dfmt on
-        }
+    debug void disallowCurrentLineType() {
+        allowedLineTypes = allowedLineTypes
+            .filter!(type => type != currentLineType)
+            .array;
     }
 
     void error(in string reason)
@@ -941,7 +913,6 @@ unittest
 {
     import std.algorithm : equal;
 
-    // dfmt off
     immutable testLasDump = [
         "+ P 9",
         "% P 9",
@@ -1013,12 +984,10 @@ unittest
         "   9 108",
         "   7 105",
     ];
-    // dfmt on
 
     with (AlignmentChain) with (Flag) with (LocalAlignment)
     {
         auto alignmentChains = readLasDump(testLasDump).array;
-        // dfmt off
         auto expectedResult = [
             AlignmentChain(
                 0,
@@ -1171,7 +1140,6 @@ unittest
                 ],
             ),
         ];
-        // dfmt on
 
         assert(alignmentChains == expectedResult);
     }
@@ -1198,7 +1166,6 @@ unittest
     {
         assert(getTracePointDistance([]) == 100);
         assert(getTracePointDistance([identity]) == 100);
-        // dfmt off
         assert(getTracePointDistance([
             tracePointDistance ~ "42",
             averageCorrelationRate ~ ".8",
@@ -1214,7 +1181,6 @@ unittest
             identity,
             tracePointDistance ~ "42",
         ]) == 42);
-        // dfmt on
     }
 }
 
@@ -1293,13 +1259,11 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
             isSomeString!(typeof(options.workdir)) &&
             isInputRange!Range && is(ElementType!Range : size_t))
 {
-    // dfmt off
     string[] dbdumpOptions = [
         DBdumpOptions.readNumber,
         DBdumpOptions.originalHeader,
         DBdumpOptions.sequenceString,
     ];
-    // dfmt on
 
     return readDbDump(dbdump(dbFile, recordNumbers, dbdumpOptions,
             options.workdir), recordNumbers, options.fastaLineWidth);
@@ -1333,7 +1297,6 @@ private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineL
 
         auto joinedLines = recordLines.joiner(only(subrecordSeparator)).array;
 
-        // dfmt off
         int numMatches = joinedLines
             .formattedRead!recordFormat(
                 recordNumber,
@@ -1345,18 +1308,16 @@ private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineL
                 sequenceLength,
                 sequence,
             );
-        // dfmt on
         assert(numMatches == 8, format!"%d matches in chunk: `%s`"(numMatches, joinedLines.array));
 
         bool isSkipping = recordNumbers.length > 0 && !recordNumbers.canFind(recordNumber);
-        // dfmt off
+
         debug logJsonDebug(
             "isSkipping", isSkipping,
             "wantedRecordNumbers", recordNumbers.toJson,
             "recordNumber", recordNumber,
             "headerLine", headerLine,
         );
-        // dfmt on
 
         // skip unwanted records
         if (isSkipping)
@@ -1411,7 +1372,6 @@ EOF".outdent;
     {
         size_t[] recordIds = [];
         auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
-        // dfmt off
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/2/0_9 RQ=0.975\ncacattgtg",
@@ -1419,17 +1379,14 @@ EOF".outdent;
             ">Sim/4/0_4 RQ=0.975\ngagc",
             ">Sim/5/0_60 RQ=0.975\ngagcgagcgagcgagcgagcgagcgagcgagcgagcgagcgagcgagcga\ngcgagcgagc",
         ], fastaEntries.to!string);
-        // dfmt on
     }
     {
         size_t[] recordIds = [1, 3];
         auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
-        // dfmt off
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/3/0_11 RQ=0.975\ngagtgcagtgg",
         ], fastaEntries.to!string);
-        // dfmt on
     }
 }
 
@@ -1535,7 +1492,6 @@ private void computeErrorProfile(Options)(in string dbFile, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
             isSomeString!(typeof(options.workdir)))
 {
-    // dfmt off
     auto eProfOptions = options
         .daccordOptions
         .filter!(option => !option.startsWith(
@@ -1546,7 +1502,6 @@ private void computeErrorProfile(Options)(in string dbFile, in Options options)
         ))
         .chain(only(DaccordOptions.computeErrorProfileOnly))
         .array;
-    // dfmt on
     auto lasFile = getLasFile(dbFile, options.workdir);
     enforce!DazzlerCommandException(!lasEmpty(lasFile, dbFile, null,
             options.workdir), "empty pre-consensus alignment");
@@ -1560,14 +1515,12 @@ unittest
     import dentist.util.tempfile : mkdtemp;
     import std.file : rmdirRecurse, isFile;
 
-    // dfmt off
     auto fastaRecords = [
         ">Sim/1/0_1050 RQ=0.975\nattTgaggcatcagccactgcacccagccttgtgccctttctgagagccgggaagatgctcccaggagccctcg\nggaggcttccctccggtcgtcgtggccagaattgtctcctgctcgtgtggagtcggtggcgggccaggcgaatg\nggagctaccggggctgccgctttggactgctcggcatttgccccatggggctgcacaggggcccaggctggctg\nagaatgtccctgggtccaggaggcagacggaggtacagcccagcagccaggaggtgttcaggatgttccccagt\ncagcacccgtggaggggagggaggaggcagggtgggcgaggaaggtccaacagtggacggcctgcccacaagag\nagctctgagctgggagctggcagagttgctgcaagtgggtgtgggccaggactgactgggcctgtgcacctgcc\ntggatgcatcagtggtcgtggtgctgcccgggaagggcgtgaagctccctgcagccaaggatcctggaggtgca\ngacatcacccagcccaccggacaacagcctgccctacttcgaggagctctgggcagcccagccccatgtccccc\ntcacgccccaccccacactgacaaaaagaccacaggattccaacagtccaaccagggggaggccgttgaattcg\nggggacaaccagaaacgcctgaaacagagataaagagactgatatggaaaagactgggctggcatggtggctcc\ncaactgggatcccagtgcttgtgagaggccgaggcgggaggatcacttgagcccagaagttcaagaccagcgtg\nggcaacatagtgagaccccgtctcttttaaaaatccttttttaattaggcaggcataggtagttgcgtgcctgc\nttttcccagctgctagggaggtagaggcaggagaatcacgggagtttcgaagtccaaggtcacagtgagctgtg\nattgcaccactgcactccagcctgggcaacatggcaagaccccatctctaaaagaaagaaacaagaagacatgg\nagagaaatatccaa",
         ">Sim/2/0_1050 RQ=0.975\nattagagCcatcagccactgcacccagccttgtgccctttctgagagccgggaagatgctcccaggagccctcg\nggaggcttccctccggtcgtcgtggccagaattgtctcctgctcgtgtggagtcggtggcgggccaggcgaatg\nggagctaccggggctgccgctttggactgctcggcatttgccccatggggctgcacaggggcccaggctggctg\nagaatgtccctgggtccaggaggcagacggaggtacagcccagcagccaggaggtgttcaggatgttccccagt\ncagcacccgtggaggggagggaggaggcagggtgggcgaggaaggtccaacagtggacggcctgcccacaagag\nagctctgagctgggagctggcagagttgctgcaagtgggtgtgggccaggactgactgggcctgtgcacctgcc\ntggatgcatcagtggtcgtggtgctgcccgggaagggcgtgaagctccctgcagccaaggatcctggaggtgca\ngacatcacccagcccaccggacaacagcctgccctacttcgaggagctctgggcagcccagccccatgtccccc\ntcacgccccaccccacactgacaaaaagaccacaggattccaacagtccaaccagggggaggccgttgaattcg\nggggacaaccagaaacgcctgaaacagagataaagagactgatatggaaaagactgggctggcatggtggctcc\ncaactgggatcccagtgcttgtgagaggccgaggcgggaggatcacttgagcccagaagttcaagaccagcgtg\nggcaacatagtgagaccccgtctcttttaaaaatccttttttaattaggcaggcataggtagttgcgtgcctgc\nttttcccagctgctagggaggtagaggcaggagaatcacgggagtttcgaagtccaaggtcacagtgagctgtg\nattgcaccactgcactccagcctgggcaacatggcaagaccccatctctaaaagaaagaaacaagaagacatgg\nagagaaatatccaa",
         ">Sim/3/0_1050 RQ=0.975\nattagaggcatcagccactgcacccagccttgtgccctttctgagagccgggaagatgctcccaggagccctcg\nggaggcttccctccggtcgtcgtggccagaattgtctcctgctcgtgtggagtcggtggcgggccaggcgaatg\nggagctaccggggctgccgctttggactgctcggcatttgccccatggggctgcacaggggcccaggctggctg\nagaatgtccctgggtccaggaggcagacggaggtacagcccagcagccaggaggtgttcaggatgttccccagt\ncagcacccgtggaggggagggaggaggcagggtgggcgaggaaggtccaacagtggacggcctgcccacaagag\nagctctgagctgggagctggcagagttgctgcaagtgggtgtgggccaggactgactgggcctgtgcacctgcc\ntggatgcatcagtggtcgtggtgctgcccgggaagggcgtgaagctccctgcagccaaggatcctggaggtgca\ngacatcacccagcccaccggacaacagcctgccctacttcgaggagctctgggcagcccagccccatgtccccc\ntcacgccccaccccacactgacaaaaagaccacaggattccaacagtccaaccagggggaggccgttgaattcg\nggggacaaccagaaacgcctgaaacagagataaagagactgatatggaaaagactgggctggcatggtggctcc\ncaactgggatcccagtgcttgtgagaggccgaggcgggaggatcacttgagcccagaagttcaagaccagcgtg\nggcaacatagtgagaccccgtctcttttaaaaatccttttttaattaggcaggcataggtagttgcgtgcctgc\nttttcccagctgctagggaggtagaggcaggagaatcacgggagtttcgaagtccaaggtcacagtgagctgtg\nattgcaccactgcactccagcctgggcaacatggcaagaccccatctctaaaagaaagaaacaagaagacatgg\nagagaaatatccaa",
     ];
 
-    // dfmt on
     struct Options
     {
         string[] dbsplitOptions;
@@ -1578,7 +1531,6 @@ unittest
     }
 
     auto tmpDir = mkdtemp("./.unittest-XXXXXX");
-    // dfmt off
     auto options = Options(
         [],
         [DalignerOptions.minAlignmentLength ~ "15"],
@@ -1586,7 +1538,6 @@ unittest
         74,
         tmpDir,
     );
-    // dfmt on
     scope (exit)
         rmdirRecurse(tmpDir);
 
@@ -1658,11 +1609,9 @@ size_t getNumContigs(in string damFile, in string workdir)
     immutable contigNumFormatStart = contigNumFormat[0 .. 4];
     size_t numContigs;
     size_t[] empty;
-    // dfmt off
     auto matchingLine = dbdump(damFile, empty, [], workdir)
         .filter!(line => line.startsWith(contigNumFormatStart))
         .front;
-    // dfmt on
 
     if (!matchingLine)
     {
@@ -1769,14 +1718,12 @@ private struct ScaffoldStructureReader
 
         auto nextContigPart = ContigSegment(lastContigPart.globalContigId + 1);
 
-        // dfmt off
         rawScaffoldInfo.front.formattedRead!scaffoldInfoLineFormat(
             nextContigPart.header,
             nextContigPart.contigId,
             nextContigPart.begin,
             nextContigPart.end,
         );
-        // dfmt on
         if (lastContigPart.contigId >= nextContigPart.contigId)
         {
             nextContigPart.scaffoldId = lastContigPart.scaffoldId + 1;
@@ -1794,7 +1741,6 @@ private struct ScaffoldStructureReader
         }
         else
         {
-            // dfmt off
             currentPart = GapSegment(
                 lastContigPart.globalContigId,
                 nextContigPart.globalContigId,
@@ -1804,7 +1750,6 @@ private struct ScaffoldStructureReader
                 lastContigPart.end,
                 nextContigPart.begin,
             );
-            // dfmt on
         }
     }
 
@@ -1850,7 +1795,6 @@ EOS";
     auto reader = ScaffoldStructureReader(exampleDump);
     auto scaffoldStructure = reader.array;
 
-    // dfmt off
     assert(scaffoldStructure == [
         ScaffoldSegment(ContigSegment(
             1, 0, 0, 0, 8300,
@@ -1901,7 +1845,6 @@ EOS";
             ">reference_mod/2/0_1450 RQ=0.850",
         )),
     ]);
-    // dfmt on
 }
 
 /**
@@ -2344,7 +2287,6 @@ private
         alias esc = escapeShellCommand;
         string daccordedDb = dbFile.stripExtension.to!string ~ "-daccord.dam";
 
-        // dfmt off
         executeShell(chain(
             only("daccord"),
             only(esc(daccordOpts)),
@@ -2354,7 +2296,6 @@ private
             only("fasta2DAM", Fasta2DazzlerOptions.fromStdin),
             only(esc(daccordedDb.relativeToWorkdir(workdir))),
         ), workdir);
-        // dfmt on
 
         return daccordedDb;
     }
@@ -2362,27 +2303,22 @@ private
     void silentDaccord(in string dbFile, in string lasFile, in string[] daccordOpts,
             in string workdir)
     {
-        // dfmt off
         executeCommand(chain(
             only("daccord"),
             daccordOpts,
             only(lasFile.relativeToWorkdir(workdir)),
             only(dbFile.stripBlock.relativeToWorkdir(workdir)),
         ), workdir);
-        // dfmt on
     }
 
     void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir)
     {
         alias esc = escapeShellCommand;
-        // dfmt off
         auto escapedReadIds = readIds
             .map!(to!size_t)
             .map!(to!string)
             .map!esc;
-        // dfmt on
 
-        // dfmt off
         executeShell(chain(
             only("DBshow"),
             only(esc(inDbFile.relativeToWorkdir(workdir))),
@@ -2391,7 +2327,6 @@ private
             only("fasta2DAM", Fasta2DazzlerOptions.fromStdin),
             only(esc(outDbFile.relativeToWorkdir(workdir))),
         ), workdir);
-        // dfmt on
     }
 
     void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir)
@@ -2469,7 +2404,6 @@ private
     auto ladump(in string lasFile, in string dbA, in string dbB, in id_t[] readIds,
             in string[] ladumpOpts, in string workdir)
     {
-        // dfmt off
         return executePipe(chain(
             only("LAdump"),
             ladumpOpts,
@@ -2480,21 +2414,18 @@ private
             ),
             readIds.map!(to!string),
         ), workdir);
-        // dfmt on
     }
 
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
             in string[] dbdumpOptions, in string workdir)
             if (isForwardRange!Range && is(ElementType!Range : size_t))
     {
-        // dfmt off
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
             only(dbFile.relativeToWorkdir(workdir)),
             recordNumbers.map!(to!string)
         ), workdir);
-        // dfmt on
     }
 
     string dbshow(in string dbFile, in string contigId, in string workdir)
@@ -2551,14 +2482,12 @@ private
                 if (!(process.pid is null))
                     return;
 
-                // dfmt off
                 logJsonDiagnostic(
                     "action", "execute",
                     "type", "pipe",
                     "command", command.toJson,
                     "state", "pre",
                 );
-                // dfmt on
                 process = pipeProcess(command, Redirect.stdout, null, Config.none, workdir);
 
                 if (!empty)
@@ -2617,7 +2546,6 @@ private
         import std.range : take;
 
         auto cheers = executePipe(only("yes", "Cheers!"), ".");
-        // dfmt off
         assert(cheers.take(5).equal([
             "Cheers!",
             "Cheers!",
@@ -2625,7 +2553,6 @@ private
             "Cheers!",
             "Cheers!",
         ]));
-        // dfmt on
 
         auto helloWorld = executePipe(only("echo", "Hello World!"), ".");
         assert(helloWorld.equal(["Hello World!"]));
@@ -2672,16 +2599,13 @@ private
 
         auto sanitizedCommand = command.filter!"a != null".array;
 
-        // dfmt off
         logJsonDiagnostic(
             "action", "execute",
             "type", type,
             "command", sanitizedCommand.map!Json.array,
             "state", "pre",
         );
-        // dfmt on
         auto result = execCall(sanitizedCommand);
-        // dfmt off
         logJsonDiagnostic(
             "action", "execute",
             "type", type,
@@ -2694,7 +2618,6 @@ private
             "exitStatus", result.status,
             "state", "post",
         );
-        // dfmt on
         if (result.status > 0)
         {
             throw new DazzlerCommandException(

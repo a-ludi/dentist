@@ -26,7 +26,6 @@ S indent(S)(S str, in size_t indentSize = 4) if (isSomeString!S)
     immutable lineSep = "\n";
     alias indentLine = (line) => chain(" ".cycle.take(line.length == 0 ? 0 : indentSize), line);
 
-    // dfmt off
     return str[]
         .lineSplitter
         .map!indentLine
@@ -34,7 +33,6 @@ S indent(S)(S str, in size_t indentSize = 4) if (isSomeString!S)
         .chain(str[$ - lineSep.length .. $] == lineSep ? lineSep : "")
         .array
         .to!S;
-    // dfmt on
 }
 
 ///

@@ -138,14 +138,12 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
     {
         assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
 
-        // dfmt off
         return alignmentChains
             .filter!"!a.flags.disabled"
             .chunkBy!haveEqualIds
             .filter!isAmgiguouslyAlignedRead
             .joiner
             .inputRangeObject;
-        // dfmt on
     }
 
     static bool isAmgiguouslyAlignedRead(Chunk)(Chunk readAlignments)

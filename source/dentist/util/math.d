@@ -93,11 +93,9 @@ unittest
 Integer ceil(Integer)(in Integer x, in Integer base) pure nothrow
         if (isIntegral!Integer)
 {
-    // dfmt off
     return x % base == 0
         ? x
         : (x / base + 1) * base;
-    // dfmt on
 }
 
 ///
@@ -131,11 +129,9 @@ unittest
 /// Returns the absolute difference between two numbers.
 Num absdiff(Num)(in Num a, in Num b) pure nothrow if (isNumeric!Num)
 {
-    // dfmt off
     return a > b
         ? a - b
         : b - a;
-    // dfmt on
 }
 
 ///
@@ -349,36 +345,30 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         {
             static if (isWeighted)
             {
-                // dfmt off
                 return cmpLexicographically!(
                     typeof(this),
                     "a.start",
                     "a.end",
                     "a.weight",
                 )(this, other);
-                // dfmt on
             }
             else
             {
-                // dfmt off
                 return cmpLexicographically!(
                     typeof(this),
                     "a.start",
                     "a.end",
                 )(this, other);
-                // dfmt on
             }
         }
 
         private int compareNodes(in Edge other) const pure nothrow
         {
-            // dfmt off
             return cmpLexicographically!(
                 typeof(this),
                 "a.start",
                 "a.end",
             )(this, other);
-            // dfmt on
         }
 
         /**
@@ -502,13 +492,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         static assert(is(ReturnType!merge == Edge), "expected `Edge merge(Edge[] multiEdge)`");
         bulkAddForce(edges);
 
-        // dfmt off
         auto bufferRest = _edges
             .data
             .sliceBy!groupByNodes
             .map!(unaryFun!merge)
             .copy(_edges.data);
-        // dfmt on
         _edges.shrinkTo(_edges.data.length - bufferRest.length);
     }
 
@@ -526,7 +514,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             return mergedEdge;
         }
 
-        // dfmt off
         auto edges = [
             g1.edge(1, 2, 1),
             g1.edge(1, 2, 1),
@@ -541,7 +528,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             g1.edge(2, 3, 4),
             g1.edge(3, 4, 3),
         ]);
-        // dfmt on
     }
 
     /// Add an edge to this graph and handle existing edges with `handleConflict`.
@@ -714,12 +700,10 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
     void filterEdges(alias pred)()
     {
-        // dfmt off
         auto bufferRest = _edges
             .data
             .filter!pred
             .copy(_edges.data);
-        // dfmt on
         _edges.shrinkTo(_edges.data.length - bufferRest.length);
     }
 
@@ -845,7 +829,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             g1 ~= g1.edge(2, 2);
             g1 ~= g1.edge(2, 3);
 
-            // dfmt off
             assert(g1.inEdges(1).equal([
                 g1.edge(1, 1),
             ]));
@@ -865,7 +848,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 g1.edge(2, 3),
             ]));
             assert(g1.outEdges(3).empty);
-            // dfmt on
         }
 
         /// Get the in/out degree of node `n`.
@@ -930,7 +912,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             g1 ~= g1.edge(2, 2);
             g1 ~= g1.edge(2, 3);
 
-            // dfmt off
             assert(g1.incidentEdges(1).equal([
                 g1.edge(1, 1),
                 g1.edge(1, 2),
@@ -943,7 +924,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             assert(g1.incidentEdges(3).equal([
                 g1.edge(2, 3),
             ]));
-            // dfmt on
         }
 
         /// Get the degree of node `n`.

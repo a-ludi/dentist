@@ -108,7 +108,6 @@ unittest
         AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTG
         TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
 EOF".outdent);
-    // dfmt off
     auto fasta1Records = [
         q"EOF
             >sequence1
@@ -121,7 +120,6 @@ EOF".outdent.parseFastaRecord,
             TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
 EOF".outdent.parseFastaRecord,
     ];
-    // dfmt on
 
     assert(fasta1.length == 2, fasta1.length.to!string);
     assert(fasta1[0] == fasta1Records[0]);
@@ -146,7 +144,6 @@ unittest
         TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
 EOF".outdent;
     auto fasta = fastaData.parseFasta();
-    // dfmt off
     auto fastaRecords = [
         FastaRecord!string(q"EOF
             >sequence1
@@ -159,7 +156,6 @@ EOF".outdent),
             TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
 EOF".outdent),
     ];
-    // dfmt on
 
     assert(fasta.length == 2, fasta.length.to!string);
     assert(fasta[0] == fastaRecords[0]);
@@ -258,13 +254,11 @@ template FastaRecord(T) if (isSomeString!T)
 ///
 unittest
 {
-    // dfmt off
     auto fastaRecord1 = q"EOF
         >sequence1
         CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
         AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
 EOF".outdent.parseFastaRecord;
-    // dfmt on
 
     assert(fastaRecord1.header == ">sequence1");
     assert(fastaRecord1[].equal("CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC"));
@@ -281,13 +275,11 @@ EOF".outdent.parseFastaRecord;
         CCCTAACCC
 EOF".outdent));
 
-    // dfmt off
     auto fastaRecord2 = q"EOF
         >sequence2
         AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTG
         TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
 EOF".outdent.parseFastaRecord;
-    // dfmt on
 
     assert(fastaRecord2.header == ">sequence2");
     assert(fastaRecord2[].equal("AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTGTAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC"));
@@ -353,7 +345,6 @@ template PacBioHeader(T) if (isSomeString!T)
 
         private T buildHeader() const
         {
-            // dfmt off
             return format!headerFormat(
                 name,
                 well,
@@ -361,12 +352,10 @@ template PacBioHeader(T) if (isSomeString!T)
                 qualityRegionEnd,
                 additionalInformation,
             );
-            // dfmt on
         }
 
         private void parse(in T header)
         {
-            // dfmt off
             auto numMatches = header[].formattedRead!headerFormat(
                 name,
                 well,
@@ -374,7 +363,6 @@ template PacBioHeader(T) if (isSomeString!T)
                 qualityRegionEnd,
                 additionalInformation,
             );
-            // dfmt on
 
             assert(numMatches == 5);
         }
@@ -493,13 +481,11 @@ unittest
     assert(seq.reverseComplement == revComp);
     assert(seq.reverseComplementer.equal(revComp));
 
-    // dfmt off
     auto fastaRecord1 = q"EOF
         >sequence1
         CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
         AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
 EOF".outdent.parseFastaRecord;
-    // dfmt on
     auto fastaRecord1RevComp = fastaRecord1.reverseComplement;
 
     assert(fastaRecord1RevComp.header == ">sequence1");

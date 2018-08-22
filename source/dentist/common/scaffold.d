@@ -46,7 +46,6 @@ unittest
     alias S = Scaffold!int;
     alias CN = ContigNode;
     alias CP = ContigPart;
-    // dfmt off
     auto scaffold = buildScaffold!(sumPayloads!int, int)(5, [
         J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
         J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
@@ -60,7 +59,6 @@ unittest
         J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
         J(CN(4, CP.end), CN(1, CP.begin), 1), // e10
     ]).discardAmbiguousJoins!int;
-    // dfmt on
     //
     //   contig 1      contig 2
     //
@@ -131,11 +129,9 @@ Join!T sumPayloads(T)(Join!T[] joins...) nothrow
 
     auto mergedJoin = joins[0];
 
-    // dfmt off
     mergedJoin.payload = joins
         .map!"a.payload"
         .sum;
-    // dfmt on
 
     return mergedJoin;
 }
@@ -146,12 +142,10 @@ Join!T concatenatePayloads(T)(Join!T[] joins...) nothrow
 
     auto mergedJoin = joins[0];
 
-    // dfmt off
     mergedJoin.payload = joins
         .map!"a.payload"
         .joiner
         .array;
-    // dfmt on
 
     return mergedJoin;
 }
@@ -166,33 +160,27 @@ J dontJoin(J)(J j1, J j2) pure nothrow
 /// Returns true iff join is a default edge of the scaffold graph.
 bool isDefault(J)(in J join) pure nothrow
 {
-    // dfmt off
     return join.start.contigPart == ContigPart.begin &&
            join.end.contigPart == ContigPart.end &&
            join.start.contigId == join.end.contigId;
-    // dfmt on
 }
 
 /// Returns true iff join is a unkown edge, ie. an edge for unkown sequence
 /// (`n`s) of the scaffold graph.
 bool isUnkown(J)(in J join) pure nothrow
 {
-    // dfmt off
     return join.start.contigId != join.end.contigId &&
         (join.start.contigPart != join.end.contigPart) &&
         join.start.contigPart.isTranscendent &&
         join.end.contigPart.isTranscendent;
-    // dfmt on
 }
 
 /// Returns true iff join is a gap edge of the scaffold graph.
 bool isGap(J)(in J join) pure nothrow
 {
-    // dfmt off
     return join.start.contigId != join.end.contigId &&
         (join.start.contigPart.isReal) &&
         (join.end.contigPart.isReal);
-    // dfmt on
 }
 
 /// Returns true iff join is a gap edge and anti-parallel.
@@ -216,21 +204,17 @@ bool isExtension(J)(in J join) pure nothrow
 /// Returns true iff join is a front extension edge of the scaffold graph.
 bool isFrontExtension(J)(in J join) pure nothrow
 {
-    // dfmt off
     return join.start.contigId == join.end.contigId &&
         join.start.contigPart == ContigPart.pre &&
         join.end.contigPart == ContigPart.begin;
-    // dfmt on
 }
 
 /// Returns true iff join is a back extension edge of the scaffold graph.
 bool isBackExtension(J)(in J join) pure nothrow
 {
-    // dfmt off
     return join.start.contigId == join.end.contigId &&
         join.start.contigPart == ContigPart.end &&
         join.end.contigPart == ContigPart.post;
-    // dfmt on
 }
 
 /// Returns true iff join is a valid edge of the scaffold graph.
@@ -243,10 +227,8 @@ bool isValid(J)(in J join) pure nothrow
 /// inserts the rawJoins.
 Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceContigs, R rawJoins)
 {
-    // dfmt off
     auto scaffold = initScaffold!T(numReferenceContigs)
         .addJoins!(mergeMultiEdges, T)(rawJoins);
-    // dfmt on
 
     return scaffold;
 }
@@ -257,7 +239,6 @@ Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceCont
 /// See_Also: `getDefaultJoin`
 Scaffold!T initScaffold(alias getPayload, T)(in size_t numReferenceContigs)
 {
-    // dfmt off
     auto contigIds = iota(1, numReferenceContigs + 1);
     auto contigNodes = contigIds
         .map!(contigId => only(
@@ -268,7 +249,6 @@ Scaffold!T initScaffold(alias getPayload, T)(in size_t numReferenceContigs)
         ))
         .joiner
         .array;
-    // dfmt on
     auto initialScaffold = Scaffold!T(contigNodes);
 
     static if (__traits(compiles, getPayload is null) && (getPayload is null))
@@ -297,24 +277,20 @@ Scaffold!T initScaffold(T)(in size_t numReferenceContigs)
 */
 Join!T getDefaultJoin(T)(size_t contigId) pure nothrow
 {
-    // dfmt off
     return Join!T(
         ContigNode(contigId, ContigPart.begin),
         ContigNode(contigId, ContigPart.end),
     );
-    // dfmt on
 }
 
 /// ditto
 Join!T getDefaultJoin(alias getPayload, T)(size_t contigId) pure nothrow
 {
-    // dfmt off
     return Join!T(
         ContigNode(contigId, ContigPart.begin),
         ContigNode(contigId, ContigPart.end),
         getPayload(contigId),
     );
-    // dfmt on
 }
 
 private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R rawJoins) if (isForwardRange!R)
@@ -345,13 +321,11 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
 
             if (incidentGapJoins.length > 1)
             {
-                // dfmt off
                 logJsonDebug(
                     "info", "skipping ambiguous gap joins",
                     "sourceContigNode", contigNode.toJson,
                     "joins", incidentGapJoins.toJson,
                 );
-                // dfmt on
 
                 foreach (join; incidentGapJoins)
                 {
@@ -369,13 +343,11 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
 Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure nothrow
 {
     assert(preContigId != postContigId);
-    // dfmt off
     return Join!T(
         ContigNode(preContigId, ContigPart.post),
         ContigNode(postContigId, ContigPart.pre),
         payload,
     );
-    // dfmt on
 }
 
 /// Normalizes unkown joins such that they join contigs or are removed as
@@ -396,57 +368,47 @@ Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
         auto postContigBegin = ContigNode(postContigId, ContigPart.begin);
 
         bool isPreContigUnconnected = scaffold.degree(preContigEnd) == 1;
-        // dfmt off
         bool hasPreContigExtension = scaffold.has(Join!T(
             preContigEnd,
             unkownJoin.start,
         ));
-        // dfmt on
         bool hasPreContigGap = !isPreContigUnconnected && !hasPreContigExtension;
         bool isPostContigUnconnected = scaffold.degree(postContigBegin) == 1;
-        // dfmt off
         bool hasPostContigExtension = scaffold.has(Join!T(
             unkownJoin.end,
             postContigBegin,
         ));
-        // dfmt on
         bool hasPostContigGap = !isPostContigUnconnected && !hasPostContigExtension;
 
         if (isPreContigUnconnected && isPostContigUnconnected)
         {
-            // dfmt off
             newJoins ~= Join!T(
                 preContigEnd,
                 postContigBegin,
                 unkownJoin.payload,
             );
-            // dfmt on
 
             unkownJoin.payload = T.init;
             removalAcc ~= unkownJoin;
         }
         else if (isPreContigUnconnected && hasPostContigExtension)
         {
-            // dfmt off
             newJoins ~= Join!T(
                 preContigEnd,
                 unkownJoin.end,
                 unkownJoin.payload,
             );
-            // dfmt on
 
             unkownJoin.payload = T.init;
             removalAcc ~= unkownJoin;
         }
         else if (hasPreContigExtension && isPostContigUnconnected)
         {
-            // dfmt off
             newJoins ~= Join!T(
                 unkownJoin.start,
                 postContigBegin,
                 unkownJoin.payload,
             );
-            // dfmt on
 
             unkownJoin.payload = T.init;
             removalAcc ~= unkownJoin;
@@ -480,11 +442,9 @@ unittest
     //      o        oxxxxo        o   =>   o        o    o        o
     //                                 =>
     //        o -- o        o -- o     =>     o -- oxxxxxxxxo -- o
-    // dfmt off
     auto scaffold1 = buildScaffold!(sumPayloads!int, int)(2, [
         getUnkownJoin!int(1, 2, 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold1);
     assert(getDefaultJoin!int(2) in scaffold1);
     assert(J(CN(1, CP.end), CN(2, CP.begin)) in scaffold1);
@@ -495,12 +455,10 @@ unittest
     //      o        oxxxxo        o  =>  o        o   xxxo        o
     //                     \          =>              /    \
     //        o -- o        o -- o    =>    o -- oxxxx      o -- o
-    // dfmt off
     auto scaffold2 = buildScaffold!(sumPayloads!int, int)(2, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(2, CP.pre), CN(2, CP.begin), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold2);
     assert(getDefaultJoin!int(2) in scaffold2);
     assert(J(CN(1, CP.end), CN(2, CP.pre)) in scaffold2);
@@ -516,12 +474,10 @@ unittest
     //                      o -- o    =>                  o -- o
     //                                =>
     //                    o        o  =>                o        o
-    // dfmt off
     auto scaffold3 = buildScaffold!(sumPayloads!int, int)(3, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(2, CP.begin), CN(3, CP.begin), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold3);
     assert(getDefaultJoin!int(2) in scaffold3);
     assert(getDefaultJoin!int(3) in scaffold3);
@@ -533,12 +489,10 @@ unittest
     //      o        oxxxxo        o  =>  o        oxxx   o        o
     //              /                 =>          /    \
     //        o -- o        o -- o    =>    o -- o      xxxxo -- o
-    // dfmt off
     auto scaffold4 = buildScaffold!(sumPayloads!int, int)(2, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(1, CP.post), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold4);
     assert(getDefaultJoin!int(2) in scaffold4);
     assert(J(CN(1, CP.post), CN(2, CP.begin)) in scaffold4);
@@ -550,13 +504,11 @@ unittest
     //      o        oxxxxo        o
     //              /      \
     //        o -- o        o -- o
-    // dfmt off
     auto scaffold5 = buildScaffold!(sumPayloads!int, int)(2, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(1, CP.post), 1),
         J(CN(2, CP.pre), CN(2, CP.begin), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold5);
     assert(getDefaultJoin!int(2) in scaffold5);
     assert(getUnkownJoin!int(1, 2, 1) in scaffold5);
@@ -573,13 +525,11 @@ unittest
     //                      o -- o    =>                  o -- o
     //                                =>
     //                    o        o  =>                o        o
-    // dfmt off
     auto scaffold6 = buildScaffold!(sumPayloads!int, int)(3, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(1, CP.post), 1),
         J(CN(2, CP.begin), CN(3, CP.begin), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold6);
     assert(getDefaultJoin!int(2) in scaffold6);
     assert(getDefaultJoin!int(3) in scaffold6);
@@ -596,12 +546,10 @@ unittest
     //        o -- o                  =>    o -- o
     //                                =>
     //      o        o                =>  o        o
-    // dfmt off
     auto scaffold7 = buildScaffold!(sumPayloads!int, int)(3, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(3, CP.end), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold7);
     assert(getDefaultJoin!int(2) in scaffold7);
     assert(getDefaultJoin!int(3) in scaffold7);
@@ -617,13 +565,11 @@ unittest
     //        o -- o                  =>    o -- o
     //                                =>
     //      o        o                =>  o        o
-    // dfmt off
     auto scaffold8 = buildScaffold!(sumPayloads!int, int)(3, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(3, CP.end), 1),
         J(CN(2, CP.pre), CN(2, CP.begin), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold8);
     assert(getDefaultJoin!int(2) in scaffold8);
     assert(getDefaultJoin!int(3) in scaffold8);
@@ -640,13 +586,11 @@ unittest
     //             o ------ o         =>         o ------ o
     //                                =>
     //           o            o       =>       o            o
-    // dfmt off
     auto scaffold9 = buildScaffold!(sumPayloads!int, int)(3, [
         getUnkownJoin!int(1, 2, 1),
         J(CN(1, CP.end), CN(3, CP.begin), 1),
         J(CN(2, CP.begin), CN(3, CP.end), 1),
     ]).normalizeUnkownJoins!int;
-    // dfmt on
     assert(getDefaultJoin!int(1) in scaffold9);
     assert(getDefaultJoin!int(2) in scaffold9);
     assert(getDefaultJoin!int(3) in scaffold9);
@@ -681,7 +625,6 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
 
     assert(joinPolicy == JoinPolicy.scaffoldGaps || joinPolicy == JoinPolicy.scaffolds);
 
-    // dfmt off
     auto allowedJoins = scaffold
         .edges
         .filter!isUnkown
@@ -700,7 +643,6 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
             ),
         ))
         .joiner;
-    // dfmt on
     auto gapJoins = scaffold.edges.filter!isGap;
     auto forbiddenJoins = setDifference!orderByNodes(gapJoins, allowedJoins).array;
 
@@ -729,7 +671,6 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
         }
     }
 
-    // dfmt off
     logJsonInfo("forbiddenJoins", forbiddenJoins
         .filter!(gapJoin => scaffold.degree(gapJoin.start) == 1 && scaffold.degree(gapJoin.end) == 1)
         .map!(join => [
@@ -739,7 +680,6 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
         ])
         .array
         .toJson);
-    // dfmt on
 
     return scaffold;
 }
@@ -822,7 +762,6 @@ unittest
     //
     //   contig 5       contig 4      contig 3
     //
-    // dfmt off
     auto scaffold = buildScaffold!(sumPayloads!int, int)(5, [
         J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
         J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
@@ -833,7 +772,6 @@ unittest
         J(CN(3, CP.pre), CN(3, CP.begin), 1), // e8
         J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
     ]).mergeExtensionsWithGaps!("a + b", int);
-    // dfmt on
 
     assert(J(CN(1, CP.end), CN(1, CP.post)) !in scaffold); // e1
     assert(J(CN(2, CP.pre), CN(2, CP.begin)) !in scaffold); // e2
@@ -896,7 +834,6 @@ unittest
     //
     //   contig 5       contig 4      contig 3
     //
-    // dfmt off
     auto joins1 = [
         J(CN(1, CP.end), CN(2, CP.begin), 1), // e3
         J(CN(2, CP.end), CN(2, CP.post ), 1), // e4
@@ -904,9 +841,7 @@ unittest
         J(CN(3, CP.pre), CN(3, CP.begin), 1), // e8
         J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
     ];
-    // dfmt on
     auto scaffold1 = buildScaffold!(sumPayloads!Payload, Payload)(5, joins1);
-    // dfmt off
     auto walks1 = [
         [
             getDefaultJoin!Payload(1),
@@ -924,7 +859,6 @@ unittest
             joins1[4],
         ],
     ];
-    // dfmt on
 
     alias getWalkStart = (walk) => walk[0].source(walk[0].getConnectingNode(walk[1]));
 
@@ -949,21 +883,17 @@ unittest
     //     \_________________/
     //              e2
     //
-    // dfmt off
     auto joins2 = [
         J(CN(1, CP.end), CN(2, CP.begin), 1), // e1
         J(CN(2, CP.end), CN(1, CP.begin ), 1), // e2
     ];
-    // dfmt on
     auto scaffold2 = buildScaffold!(sumPayloads!Payload, Payload)(2, joins2);
-    // dfmt off
     auto walk2 = [
         getDefaultJoin!Payload(1),
         joins2[0],
         getDefaultJoin!Payload(2),
         joins2[1],
     ];
-    // dfmt on
 
     {
         auto computedWalk = linearWalk!Payload(scaffold2, getWalkStart(walk2), walk2[0]);
@@ -1021,11 +951,9 @@ struct LinearWalk(T)
             return endOfWalk();
         }
 
-        // dfmt off
         auto candidateEdges = scaffold
             .incidentEdges(currentNode)
             .filter!(join => !visitedNodes.has(scaffold.indexOf(join.target(currentNode))));
-        // dfmt on
         bool noSuccessorNodes = candidateEdges.empty;
 
         if (noSuccessorNodes)
@@ -1064,12 +992,10 @@ struct LinearWalk(T)
     {
         isCyclic = Yes.isCyclic;
         // Find the missing edge.
-        // dfmt off
         currentJoin = scaffold
             .incidentEdges(currentNode)
             .filter!(join => join != currentJoin)
             .front;
-        // dfmt on
     }
 
     private void endOfWalk()
@@ -1144,7 +1070,6 @@ auto contigStarts(T)(Scaffold!T scaffold)
             // Ignore unconnected nodes.
             if (unvisitedNodeOutDegree > 0)
             {
-                // dfmt off
                 auto endNodes = scaffold
                     .outEdges(unvisitedNode)
                     .map!(firstEdge => linearWalk!T(scaffold, unvisitedNode, firstEdge)
@@ -1153,7 +1078,6 @@ auto contigStarts(T)(Scaffold!T scaffold)
                     // If the start node has only one edge it is itself an end node.
                     ? minElement(endNodes, unvisitedNode)
                     : minElement(endNodes);
-                // dfmt on
             }
             else
             {
@@ -1197,7 +1121,6 @@ unittest
     //
     //   contig 5       contig 4      contig 3
     //
-    // dfmt off
     auto scaffold1 = buildScaffold!(sumPayloads!Payload, Payload)(5, [
         J(CN(1, CP.end), CN(2, CP.begin), 1), // e3
         J(CN(2, CP.end), CN(2, CP.post ), 1), // e4
@@ -1212,7 +1135,6 @@ unittest
         CN(4, CP.begin),
         CN(5, CP.begin),
     ]));
-    // dfmt on
 
     //   contig 1      contig 2
     //
@@ -1223,7 +1145,6 @@ unittest
     //     \_________________/
     //              e2
     //
-    // dfmt off
     auto scaffold2 = buildScaffold!(sumPayloads!Payload, Payload)(2, [
         J(CN(1, CP.end), CN(2, CP.begin), 1), // e1
         J(CN(2, CP.end), CN(1, CP.begin ), 1), // e2
@@ -1232,5 +1153,4 @@ unittest
     assert(equal(contigStarts!Payload(scaffold2), [
         CN(1, CP.begin),
     ]));
-    // dfmt on
 }

@@ -219,14 +219,12 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
         return [];
     }
 
-    // dfmt off
     auto orderedAlignments = pileUp
         .map!"a[]"
         .joiner
         .array
         .sort
         .release;
-    // dfmt on
     auto alignmentsByContig = orderedAlignments.sliceBy!"a.contigA.id == b.contigA.id";
 
     return array(alignmentsByContig);

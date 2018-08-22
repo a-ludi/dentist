@@ -216,11 +216,9 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                 }
             }
 
-            // dfmt off
             return convexHullInterval.empty
                 ? TaggedInterval()
                 : convexHullInterval;
-            // dfmt on
         }
 
         ///
@@ -255,13 +253,11 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                 return TaggedInterval();
             }
 
-            // dfmt off
             return TaggedInterval(
                 tag,
                 newBegin,
                 newEnd,
             );
-            // dfmt on
         }
 
         /// ditto
@@ -304,7 +300,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                 return Region(this.empty ? [] : [thisCopy]);
             }
 
-            // dfmt off
             return Region(only(
                 TaggedInterval(
                     tag,
@@ -317,7 +312,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                     this.end,
                 ),
             ).filter!"!a.empty".array);
-            // dfmt on
         }
 
         ///
@@ -337,12 +331,10 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
 
         int opCmp(in TaggedInterval other) const pure nothrow
         {
-            // dfmt off
             return cmp(
                 only(this.tag, this.begin, this.end),
                 only(other.tag, other.begin, other.end),
             );
-            // dfmt on
         }
 
         ///
@@ -633,7 +625,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         alias R = Region!(int, int);
         alias TI = R.TaggedInterval;
 
-        // dfmt off
         auto region = R([
             TI(3, 8349, 8600),
             TI(3, 8349, 8349),
@@ -663,7 +654,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         auto normalizedRegion = R([
             TI(3, 8349, 10800),
         ]);
-        // dfmt on
 
         assert(region == normalizedRegion);
     }
@@ -764,7 +754,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert((R(0, 10, 20) & R(0, 15, 25)) == R(0, 15, 20));
         assert((R(0, 10, 20) & R(0, 25, 30)) == R([]));
         assert((R(0, 10, 20) & R(1, 25, 30)) == R([]));
-        // dfmt off
         // R1:       [-------)   [-------)   [-------)
         // R2:             [-------)   [-------)   [-------)
         // R1 & R2:        [-)   [-)   [-)   [-)   [-)
@@ -783,7 +772,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             TI(0, 80, 90),
             TI(0, 100, 110),
         ]));
-        // dfmt on
     }
 
     Region opBinary(string op)(in TaggedInterval interval) const if (op == "-")
@@ -796,11 +784,9 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         auto differenceAcc = appender!(TaggedInterval[]);
         differenceAcc.reserve(_intervals.length + 1);
 
-        // dfmt off
         auto trisection = _intervals
             .assumeSorted!"a.isStrictlyBefore(b)"
             .trisect(interval);
-        // dfmt on
         auto copyHeadEnd = trisection[0].length;
         auto copyTailBegin = trisection[0].length + trisection[1].length;
 
@@ -908,7 +894,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         alias TI = R.TaggedInterval;
 
         R accRegion;
-        // dfmt off
         auto inputRegion1 = R([
             TI(3, 8349, 8600),
             TI(3, 8349, 8850),
@@ -936,7 +921,6 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         auto expectedResult = R([
             TI(3, 2297, 11371),
         ]);
-        // dfmt on
 
         accRegion |= inputRegion1;
 
@@ -1042,11 +1026,9 @@ auto union_(Range)(Range regions)
 {
     alias Region = Unqual!(ElementType!Range);
 
-    // dfmt off
     return Region(regions
         .map!"a._intervals.dup"
         .join);
-    // dfmt on
 }
 
 ///

@@ -11,7 +11,7 @@ module dentist.swinfo;
 import std.string : wrap;
 
 enum executableName = "dentist";
-enum version_ = "v0.0.0-19-g682a3d1";
+enum version_ = "v0.0.0-44-gbfcdcf7-dirty";
 enum description = "Close assembly gaps using long-reads with focus on correctness.".wrap;
 enum copyright = "Copyright © 2018, Arne Ludwig <arne.ludwig@posteo.de>".wrap;
 enum license = q"{
