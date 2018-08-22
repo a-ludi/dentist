@@ -11,6 +11,7 @@ module dentist.util.log;
 import std.array;
 import std.datetime;
 import std.format;
+import std.process;
 import std.range;
 import std.stdio;
 import core.thread;
@@ -74,6 +75,7 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
     import std.traits : isSomeString;
     import vibe.data.json : Json;
 
+    immutable threadKey = "thread";
     immutable timestampKey = "timestamp";
 
     if (level < minLevel)
@@ -89,6 +91,7 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
         }
 
         json[timestampKey] = Clock.currStdTime;
+        json[threadKey] = thisThreadID;
 
         foreach (keyValuePair; args.chunks!2)
         {
@@ -122,7 +125,7 @@ unittest
 
     stderr.rewind();
     auto expected = ctRegex!(
-            `\{"secret":42,"error":"mysterious observation","timestamp":[0-9]+\}` ~ '\n');
+            `\{"secret":42,"error":"mysterious observation","thread":[0-9]+,"timestamp":[0-9]+\}` ~ '\n');
     auto observed = stderr.readln;
 
     assert(matchFirst(observed, expected), "got unexpected output `" ~ observed ~ "`");
@@ -208,7 +211,7 @@ void log(T...)(LogLevel level, string fmt, lazy T args) nothrow
         {
             File output = stderr;
 
-            if (output.isOpen)
+            synchronized if (output.isOpen)
             {
                 output.writeln(txt.data);
                 output.flush();
@@ -308,9 +311,9 @@ unittest
     stderr.rewind();
 
     auto expected1 = ctRegex!
-            `\{"state":"enter","function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","timestamp":[0-9]+\}`;
+            `\{"state":"enter","function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
     auto expected2 = ctRegex!
-            `\{"state":"exit","timeElapsed":[0-9]{2,},"function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","timestamp":[0-9]+\}`;
+            `\{"state":"exit","timeElapsed":[0-9]{2,},"function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
     auto observed1 = stderr.readln;
     auto observed2 = stderr.readln;
 
