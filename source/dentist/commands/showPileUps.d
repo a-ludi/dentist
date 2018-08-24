@@ -18,7 +18,7 @@ import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
 import std.stdio : writefln, writeln;
 import std.typecons : tuple;
-import vibe.data.json : toJson = serializeToJson;
+import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
 
 /// Execute the `showPileUps` command with `options`.
 void execute(Options)(in Options options)
@@ -28,7 +28,7 @@ void execute(Options)(in Options options)
     if (!shouldLog(LogLevel.debug_))
         pileUpDb.releaseDb();
 
-    auto stats = tuple(
+    auto stats = Stats(
         totalDbSize,
         pileUpDb.pileUps.length,
         pileUpDb.readAlignments.length,
@@ -37,17 +37,10 @@ void execute(Options)(in Options options)
         pileUpDb.tracePoints.length,
     );
 
-    FloatingPointControl fpCtrl;
-    fpCtrl.rounding = FloatingPointControl.roundUp;
-    auto numWidth = lrint(log10(max(stats.expand)));
-    numWidth += numWidth / 3;
-
-    writefln!"totalDbSize:         %*,d bytes"(numWidth, stats[0]);
-    writefln!"numPileUps:          %*,d"(numWidth, stats[1]);
-    writefln!"numReadAlignments:   %*,d"(numWidth, stats[2]);
-    writefln!"numSeededAlignments: %*,d"(numWidth, stats[3]);
-    writefln!"numLocalAlignments:  %*,d"(numWidth, stats[4]);
-    writefln!"numTracePoints:      %*,d"(numWidth, stats[5]);
+    if (options.useJson)
+        writeln(stats.toJsonString);
+    else
+        writeTabular(stats);
 
     logJsonDebug("pileUps", pileUpDb[]
         .map!(pileUp => [
@@ -56,4 +49,43 @@ void execute(Options)(in Options options)
         ].toJson)
         .array
         .toJson);
+}
+
+struct Stats
+{
+    size_t totalDbSize;
+    size_t numPileUps;
+    size_t numReadAlignments;
+    size_t numSeededAlignments;
+    size_t numLocalAlignments;
+    size_t numTracePoints;
+
+    size_t columnWidth() const nothrow
+    {
+        FloatingPointControl fpCtrl;
+        fpCtrl.rounding = FloatingPointControl.roundUp;
+        auto numWidth = lrint(log10(max(
+            totalDbSize,
+            numPileUps,
+            numReadAlignments,
+            numSeededAlignments,
+            numLocalAlignments,
+            numTracePoints,
+        )));
+        numWidth += numWidth / 3;
+
+        return numWidth;
+    }
+}
+
+void writeTabular(Stats stats)
+{
+    auto columnWidth = stats.columnWidth();
+
+    writefln!"totalDbSize:         %*d bytes"(columnWidth, stats.totalDbSize);
+    writefln!"numPileUps:          %*d"(columnWidth, stats.numPileUps);
+    writefln!"numReadAlignments:   %*d"(columnWidth, stats.numReadAlignments);
+    writefln!"numSeededAlignments: %*d"(columnWidth, stats.numSeededAlignments);
+    writefln!"numLocalAlignments:  %*d"(columnWidth, stats.numLocalAlignments);
+    writefln!"numTracePoints:      %*d"(columnWidth, stats.numTracePoints);
 }

@@ -16,7 +16,7 @@ import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
 import std.stdio : writefln, writeln;
 import std.typecons : tuple;
-import vibe.data.json : toJson = serializeToJson;
+import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
 
 /// Execute the `showInsertions` command with `options`.
 void execute(Options)(in Options options)
@@ -26,22 +26,17 @@ void execute(Options)(in Options options)
     if (!shouldLog(LogLevel.debug_))
         insertionDb.releaseDb();
 
-    auto stats = tuple(
+    auto stats = Stats(
         totalDbSize,
         insertionDb.insertions.length,
         insertionDb.compressedBaseQuads.length,
         insertionDb.spliceSites.length,
     );
 
-    FloatingPointControl fpCtrl;
-    fpCtrl.rounding = FloatingPointControl.roundUp;
-    auto numWidth = lrint(log10(max(stats.expand)));
-    numWidth += numWidth / 3;
-
-    writefln!"totalDbSize:            %*,d bytes"(numWidth, stats[0]);
-    writefln!"numInsertions:          %*,d"(numWidth, stats[1]);
-    writefln!"numCompressedBaseQuads: %*,d"(numWidth, stats[2]);
-    writefln!"numSpliceSites:         %*,d"(numWidth, stats[3]);
+    if (options.useJson)
+        writeln(stats.toJsonString);
+    else
+        writeTabular(stats);
 
     logJsonDebug("insertions", insertionDb[]
         .map!(join => [
@@ -55,4 +50,37 @@ void execute(Options)(in Options options)
         ])
         .array
         .toJson);
+}
+
+struct Stats
+{
+    size_t totalDbSize;
+    size_t numInsertions;
+    size_t numCompressedBaseQuads;
+    size_t numSpliceSites;
+
+    size_t columnWidth() const nothrow
+    {
+        FloatingPointControl fpCtrl;
+        fpCtrl.rounding = FloatingPointControl.roundUp;
+        auto numWidth = lrint(log10(max(
+            totalDbSize,
+            numInsertions,
+            numCompressedBaseQuads,
+            numSpliceSites,
+        )));
+        numWidth += numWidth / 3;
+
+        return numWidth;
+    }
+}
+
+void writeTabular(Stats stats)
+{
+    auto columnWidth = stats.columnWidth();
+
+    writefln!"totalDbSize:            %*d bytes"(columnWidth, stats.totalDbSize);
+    writefln!"numInsertions:          %*d"(columnWidth, stats.numInsertions);
+    writefln!"numCompressedBaseQuads: %*d"(columnWidth, stats.numCompressedBaseQuads);
+    writefln!"numSpliceSites:         %*d"(columnWidth, stats.numSpliceSites);
 }

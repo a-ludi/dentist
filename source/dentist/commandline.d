@@ -594,6 +594,16 @@ struct OptionsFor(DentistCommand command)
         JoinPolicy joinPolicy = JoinPolicy.scaffoldGaps;
     }
 
+    static if (command.among(
+        DentistCommand.showPileUps,
+        DentistCommand.showInsertions,
+    ))
+    {
+        @Option("json", "j")
+        @Help("if given write the information in JSON format")
+        OptionFlag useJson;
+    }
+
     static if (needWorkdir)
     {
         @Option("keep-temp", "k")
