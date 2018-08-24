@@ -118,6 +118,10 @@ ReturnCode run(in string[] args)
         printBaseHelp();
 
         return ReturnCode.ok;
+    case "--usage":
+        stderr.write(usageString!BaseOptions(executableName));
+
+        return ReturnCode.ok;
     default:
         break;
     }
@@ -171,6 +175,7 @@ unittest
     }
 
     assert(run([executableName, "--help"]) == ReturnCode.ok);
+    assert(run([executableName, "--usage"]) == ReturnCode.ok);
     assert(run([executableName, "--version"]) == ReturnCode.ok);
     assert(run([executableName, "foobar"]) == ReturnCode.commandlineError);
     assert(run([executableName, "--foo"]) == ReturnCode.commandlineError);
@@ -217,6 +222,22 @@ mixin template HelpOption()
     @Option("help", "h")
     @Help("Prints this help.")
     OptionFlag help;
+
+    @Option("usage")
+    @Help("Print a short command summary.")
+    void requestUsage() pure
+    {
+        enforce!UsageRequested(false, "usage requested");
+    }
+}
+
+class UsageRequested : Exception
+{
+    pure nothrow @nogc @safe this(string msg, string file = __FILE__,
+            size_t line = __LINE__, Throwable nextInChain = null)
+    {
+        super(msg, file, line, nextInChain);
+    }
 }
 
 /// Options for the different commands.
@@ -946,6 +967,12 @@ private
             stderr.writeln(commandSummary!command);
             stderr.writeln();
             stderr.write(helpString!Options);
+
+            return ReturnCode.ok;
+        }
+        catch (UsageRequested e)
+        {
+            stderr.write(usage);
 
             return ReturnCode.ok;
         }
