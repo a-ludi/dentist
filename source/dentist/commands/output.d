@@ -376,6 +376,7 @@ class AssemblyWriter
 /// Remove contig cropping where no new sequence is to be inserted.
 OutputScaffold fixContigCropping(OutputScaffold scaffold)
 {
+    mixin(traceExecution);
 
     alias replace = OutputScaffold.ConflictStrategy.replace;
     auto contigJoins = scaffold.edges.filter!isDefault;

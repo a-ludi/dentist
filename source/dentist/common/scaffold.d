@@ -354,6 +354,8 @@ Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure
 /// applicable.
 Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
 {
+    mixin(traceExecution);
+
     auto numUnkownJoins = scaffold.edges.count!isUnkown;
     auto newJoins = appender!(Join!T[]);
     newJoins.reserve(numUnkownJoins);
@@ -615,6 +617,8 @@ enum JoinPolicy
 /// Enforce joinPolicy in scaffold.
 Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
 {
+    mixin(traceExecution);
+
     if (joinPolicy == JoinPolicy.contigs)
     {
         // Just do nothing; this is the default mode of operation.
