@@ -807,15 +807,24 @@ unittest
     Throws: MissingNodeException if any node is encountered that is not part
             of the graph.
 */
-LinearWalk!T linearWalk(T)(Scaffold!T scaffold, ContigNode startNode)
+LinearWalk!T linearWalk(T)(
+    Scaffold!T scaffold,
+    ContigNode startNode,
+    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+)
 {
-    return LinearWalk!T(scaffold, startNode);
+    return LinearWalk!T(scaffold, startNode, incidentEdgesCache);
 }
 
 /// ditto
-LinearWalk!T linearWalk(T)(Scaffold!T scaffold, ContigNode startNode, Join!T firstJoin)
+LinearWalk!T linearWalk(T)(
+    Scaffold!T scaffold,
+    ContigNode startNode,
+    Join!T firstJoin,
+    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+)
 {
-    return LinearWalk!T(scaffold, startNode, firstJoin);
+    return LinearWalk!T(scaffold, startNode, firstJoin, incidentEdgesCache);
 }
 
 ///
@@ -915,7 +924,11 @@ unittest
 
 struct LinearWalk(T)
 {
+    alias IncidentEdgesCache = Scaffold!T.IncidentEdgesCache;
+    static enum emptyIncidentEdgesCache = IncidentEdgesCache.init;
+
     private Scaffold!T scaffold;
+    private IncidentEdgesCache incidentEdgesCache;
     private size_t currentNodeIdx;
     private Join!T currentJoin;
     private bool isEmpty = false;
@@ -923,9 +936,16 @@ struct LinearWalk(T)
     private NaturalNumberSet visitedNodes;
 
     /// Start linear walk through a scaffold graph in startNode.
-    this(Scaffold!T scaffold, ContigNode startNode)
+    this(
+        Scaffold!T scaffold,
+        ContigNode startNode,
+        IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache,
+    )
     {
         this.scaffold = scaffold;
+        this.incidentEdgesCache = incidentEdgesCache == emptyIncidentEdgesCache
+            ? scaffold.allIncidentEdges()
+            : incidentEdgesCache;
         this.currentNode = startNode;
         this.visitedNodes.reserveFor(this.scaffold.nodes.length - 1);
         this.markVisited(this.currentNodeIdx);
@@ -933,9 +953,17 @@ struct LinearWalk(T)
     }
 
     /// Start linear walk through a scaffold graph in startNode.
-    this(Scaffold!T scaffold, ContigNode startNode, Join!T firstJoin)
+    this(
+        Scaffold!T scaffold,
+        ContigNode startNode,
+        Join!T firstJoin,
+        IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache,
+    )
     {
         this.scaffold = scaffold;
+        this.incidentEdgesCache = incidentEdgesCache == emptyIncidentEdgesCache
+            ? scaffold.allIncidentEdges()
+            : incidentEdgesCache;
         this.currentNode = startNode;
         this.visitedNodes.reserveFor(this.scaffold.nodes.length - 1);
         this.markVisited(this.currentNodeIdx);
@@ -956,8 +984,7 @@ struct LinearWalk(T)
             return endOfWalk();
         }
 
-        auto candidateEdges = scaffold
-            .incidentEdges(currentNode)
+        auto candidateEdges = incidentEdgesCache[currentNode]
             .filter!(join => !visitedNodes.has(scaffold.indexOf(join.target(currentNode))));
         bool noSuccessorNodes = candidateEdges.empty;
 
@@ -1026,18 +1053,28 @@ struct LinearWalk(T)
 }
 
 /// Get a range of `ContigNode`s where full contig walks should start.
-auto contigStarts(T)(Scaffold!T scaffold)
+auto contigStarts(T)(
+    Scaffold!T scaffold,
+    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+)
 {
     static struct ContigStarts
     {
+        alias IncidentEdgesCache = Scaffold!T.IncidentEdgesCache;
+        static enum emptyIncidentEdgesCache = IncidentEdgesCache.init;
+
         Scaffold!T scaffold;
+        IncidentEdgesCache incidentEdgesCache;
         bool _empty = false;
         NaturalNumberSet unvisitedNodes;
         ContigNode currentContigStart;
 
-        this(Scaffold!T scaffold)
+        this(Scaffold!T scaffold, IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache)
         {
             this.scaffold = scaffold;
+            this.incidentEdgesCache = incidentEdgesCache == emptyIncidentEdgesCache
+                ? scaffold.allIncidentEdges()
+                : incidentEdgesCache;
             unvisitedNodes.reserveFor(scaffold.nodes.length);
 
             foreach (nodeIdx; iota(scaffold.nodes.length))
@@ -1069,17 +1106,16 @@ auto contigStarts(T)(Scaffold!T scaffold)
 
             auto unvisitedNodeIdx = unvisitedNodes.minElement();
             auto unvisitedNode = scaffold.nodes[unvisitedNodeIdx];
-            auto unvisitedNodeOutDegree = scaffold.outDegree(unvisitedNode);
+            auto unvisitedNodeDegree = incidentEdgesCache[unvisitedNode].length;
             unvisitedNodes.remove(unvisitedNodeIdx);
 
             // Ignore unconnected nodes.
-            if (unvisitedNodeOutDegree > 0)
+            if (unvisitedNodeDegree > 0)
             {
-                auto endNodes = scaffold
-                    .outEdges(unvisitedNode)
-                    .map!(firstEdge => linearWalk!T(scaffold, unvisitedNode, firstEdge)
+                auto endNodes = incidentEdgesCache[unvisitedNode]
+                    .map!(firstEdge => linearWalk!T(scaffold, unvisitedNode, firstEdge, incidentEdgesCache)
                         .fold!walkToEndNode(unvisitedNode));
-                currentContigStart = unvisitedNodeOutDegree == 1
+                currentContigStart = unvisitedNodeDegree == 1
                     // If the start node has only one edge it is itself an end node.
                     ? minElement(endNodes, unvisitedNode)
                     : minElement(endNodes);
@@ -1102,7 +1138,7 @@ auto contigStarts(T)(Scaffold!T scaffold)
         }
     }
 
-    return ContigStarts(scaffold);
+    return ContigStarts(scaffold, incidentEdgesCache);
 }
 
 ///

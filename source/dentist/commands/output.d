@@ -87,6 +87,7 @@ class AssemblyWriter
     size_t numReferenceContigs;
     size_t[] contigLengths;
     OutputScaffold assemblyGraph;
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     File assemblyFile;
     FastaWriter writer;
 
@@ -106,12 +107,12 @@ class AssemblyWriter
         init();
         buildAssemblyGraph();
 
-        foreach (startNode; contigStarts!InsertionInfo(assemblyGraph))
+        foreach (startNode; contigStarts!InsertionInfo(assemblyGraph, incidentEdgesCache))
             writeNewContig(startNode);
 
         debug logJsonDebug(
-            "insertionWalks", contigStarts!InsertionInfo(assemblyGraph)
-                .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode)
+            "insertionWalks", contigStarts!InsertionInfo(assemblyGraph, incidentEdgesCache)
+                .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)
                     .map!(join => [
                         "start": join.start.toJson,
                         "end": join.end.toJson,
@@ -161,6 +162,8 @@ class AssemblyWriter
             .enforceJoinPolicy!InsertionInfo(options.joinPolicy)
             .normalizeUnkownJoins!InsertionInfo()
             .fixContigCropping();
+
+        incidentEdgesCache = assemblyGraph.allIncidentEdges();
     }
 
 
@@ -198,7 +201,7 @@ class AssemblyWriter
         auto insertionBegin = startNode;
 
         writeHeader(startNode);
-        foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode))
+        foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
         {
             writeInsertion(
                 insertionBegin,

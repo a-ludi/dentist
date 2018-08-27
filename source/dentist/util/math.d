@@ -927,7 +927,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         }
 
 
-        IncidentEdgesCache allIncidentEdges() const
+        IncidentEdgesCache allIncidentEdges()
         {
             return IncidentEdgesCache(this);
         }
@@ -935,10 +935,10 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         static struct IncidentEdgesCache
         {
             alias G = Graph!(Node, Weight, isDirected, EdgePayload);
-            const(G) graph;
-            const(Edge)[][] incidentEdges;
+            G graph;
+            Edge[][] incidentEdges;
 
-            this(in G graph)
+            this(G graph)
             {
                 this.graph = graph;
                 collectAllIncidentEdges();
@@ -971,7 +971,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             void preallocateMemory()
             {
                 auto degreesCache = graph.allDegrees();
-                const(Edge)[] buffer;
+                Edge[] buffer;
                 buffer.length = degreesCache.degrees.sum;
                 incidentEdges.length = degreesCache.degrees.length;
 
@@ -987,12 +987,12 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 }
             }
 
-            const(Edge)[] opIndex(in Node node) const
+            Edge[] opIndex(in Node node)
             {
                 return incidentEdges[graph.indexOf(node)];
             }
 
-            int opApply(scope int delegate(const(Edge)[]) yield) const
+            int opApply(scope int delegate(Edge[]) yield)
             {
                 int result = 0;
 
@@ -1006,7 +1006,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return result;
             }
 
-            int opApply(scope int delegate(Node, const(Edge)[]) yield) const
+            int opApply(scope int delegate(Node, Edge[]) yield)
             {
                 int result = 0;
 
