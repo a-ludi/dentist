@@ -22,6 +22,7 @@ import dentist.common.insertions :
     SpliceSite;
 import dentist.common.scaffold :
     ContigNode,
+    ContigPart,
     contigStarts,
     enforceJoinPolicy,
     getUnkownJoin,
@@ -45,7 +46,7 @@ import dentist.util.fasta : complement, reverseComplementer;
 import dentist.util.log;
 import dentist.util.range : wrapLines;
 import std.algorithm :
-    map,
+    canFind,
     copy,
     filter,
     joiner,
@@ -309,11 +310,6 @@ class AssemblyWriter
             assert(0, "too many spliceSites");
         }
 
-        logJsonError(
-            "globalComplement", globalComplement,
-            "begin", begin.toJson,
-            "insertionTargetBegin", insertion.target(begin).toJson,
-        );
         assert(globalComplement != (begin < insertion.target(begin)));
 
         auto contigSequence = getFastaSequences(options.refDb, [contigId], options.workdir).front;
@@ -377,13 +373,10 @@ class AssemblyWriter
 }
 
 
-/// Remove conti cropping where no new sequence is to be inserted.
+/// Remove contig cropping where no new sequence is to be inserted.
 OutputScaffold fixContigCropping(OutputScaffold scaffold)
 {
-    import dentist.common.scaffold : ContigPart;
-    import std.algorithm;
 
-    // FIXME move to scaffold or so
     alias replace = OutputScaffold.ConflictStrategy.replace;
     auto contigJoins = scaffold.edges.filter!isDefault;
 
