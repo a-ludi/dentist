@@ -361,6 +361,7 @@ Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
     newJoins.reserve(numUnkownJoins);
     auto removalAcc = appender!(Join!T[]);
     removalAcc.reserve(numUnkownJoins);
+    auto degreesCache = scaffold.allDegrees();
 
     foreach (unkownJoin; scaffold.edges.filter!isUnkown)
     {
@@ -369,13 +370,13 @@ Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
         auto postContigId = unkownJoin.end.contigId;
         auto postContigBegin = ContigNode(postContigId, ContigPart.begin);
 
-        bool isPreContigUnconnected = scaffold.degree(preContigEnd) == 1;
+        bool isPreContigUnconnected = degreesCache[preContigEnd] == 1;
         bool hasPreContigExtension = scaffold.has(Join!T(
             preContigEnd,
             unkownJoin.start,
         ));
         bool hasPreContigGap = !isPreContigUnconnected && !hasPreContigExtension;
-        bool isPostContigUnconnected = scaffold.degree(postContigBegin) == 1;
+        bool isPostContigUnconnected = degreesCache[postContigBegin] == 1;
         bool hasPostContigExtension = scaffold.has(Join!T(
             unkownJoin.end,
             postContigBegin,

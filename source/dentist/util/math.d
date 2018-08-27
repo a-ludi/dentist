@@ -937,6 +937,81 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
         /// ditto
         alias outDegree = degree;
+
+        DegreesCache allDegrees() const
+        {
+            return DegreesCache(this);
+        }
+
+        static struct DegreesCache
+        {
+            alias G = Graph!(Node, Weight, isDirected, EdgePayload);
+            const(G) graph;
+            size_t[] degrees;
+
+            this(in G graph)
+            {
+                this.graph = graph;
+                collectAllDegrees();
+            }
+
+            private void collectAllDegrees()
+            {
+                degrees.length = graph._nodes.length;
+
+                size_t startIdx;
+                size_t endIdx;
+                foreach (edge; graph._edges.data)
+                {
+                    if (graph._nodes[startIdx] < edge.start)
+                        endIdx = startIdx;
+                    while (graph._nodes[startIdx] < edge.start)
+                        ++startIdx;
+                    if (endIdx < startIdx)
+                        endIdx = startIdx;
+                    while (graph._nodes[endIdx] < edge.end)
+                        ++endIdx;
+
+                    ++degrees[startIdx];
+                    // Avoid double-counting of loops
+                    if (startIdx != endIdx)
+                        ++degrees[endIdx];
+                }
+            }
+
+            size_t opIndex(in Node node) const
+            {
+                return degrees[graph.indexOf(node)];
+            }
+
+            int opApply(scope int delegate(size_t) yield) const
+            {
+                int result = 0;
+
+                foreach (degree; degrees)
+                {
+                    result = yield(degree);
+                    if (result)
+                        break;
+                }
+
+                return result;
+            }
+
+            int opApply(scope int delegate(Node, size_t) yield) const
+            {
+                int result = 0;
+
+                foreach (i, degree; degrees)
+                {
+                    result = yield(graph._nodes[i], degree);
+                    if (result)
+                        break;
+                }
+
+                return result;
+            }
+        }
     }
 }
 
@@ -956,6 +1031,7 @@ unittest
     assert(g1.edge(1, 2) in g1);
     assert(g1.edge(2, 1) in g1);
     assert(g1.has(g1.edge(2, 2)));
+    assert(g1.allDegrees() == [2, 2]);
 
     //   0.5     0.5
     //   +-+     +-+
@@ -972,6 +1048,7 @@ unittest
     assert(g2.edge(1, 2) in g2);
     assert(g2.edge(2, 1) in g2);
     assert(g2.has(g2.edge(2, 2)));
+    assert(g2.allDegrees() == [2, 2]);
 
     //   0.5     0.5
     //   +-+     +-+
@@ -1024,6 +1101,7 @@ unittest
     assert(g5.get(g5.edge(2, 1)).payload == [2]);
     assert(g5.has(g5.edge(2, 2)));
     assert(g5.get(g5.edge(2, 2)).payload == [3]);
+    assert(g5.allDegrees() == [2, 2]);
 }
 
 ///
@@ -1042,6 +1120,7 @@ unittest
     {
         assert(contigGraph.degree(contig) <= 2);
     }
+    assert(contigGraph.allDegrees() == [1, 2, 1, 1, 1, 0]);
 }
 
 class EmptySetException : Exception
