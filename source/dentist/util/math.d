@@ -926,6 +926,101 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             ]));
         }
 
+
+        IncidentEdgesCache allIncidentEdges() const
+        {
+            return IncidentEdgesCache(this);
+        }
+
+        static struct IncidentEdgesCache
+        {
+            alias G = Graph!(Node, Weight, isDirected, EdgePayload);
+            const(G) graph;
+            const(Edge)[][] incidentEdges;
+
+            this(in G graph)
+            {
+                this.graph = graph;
+                collectAllIncidentEdges();
+            }
+
+            private void collectAllIncidentEdges()
+            {
+                preallocateMemory();
+
+                size_t startIdx;
+                size_t endIdx;
+                foreach (edge; graph._edges.data)
+                {
+                    if (graph._nodes[startIdx] < edge.start)
+                        endIdx = startIdx;
+                    while (graph._nodes[startIdx] < edge.start)
+                        ++startIdx;
+                    if (endIdx < startIdx)
+                        endIdx = startIdx;
+                    while (graph._nodes[endIdx] < edge.end)
+                        ++endIdx;
+
+                    incidentEdges[startIdx] ~= edge;
+                    // Avoid double-counting of loops
+                    if (startIdx != endIdx)
+                        incidentEdges[endIdx] ~= edge;
+                }
+            }
+
+            void preallocateMemory()
+            {
+                auto degreesCache = graph.allDegrees();
+                const(Edge)[] buffer;
+                buffer.length = degreesCache.degrees.sum;
+                incidentEdges.length = degreesCache.degrees.length;
+
+                size_t sliceBegin;
+                size_t startIdx;
+                foreach (degree; degreesCache)
+                {
+                    incidentEdges[startIdx] = buffer[sliceBegin .. sliceBegin + degree];
+                    incidentEdges[startIdx].length = 0;
+
+                    sliceBegin += degree;
+                    ++startIdx;
+                }
+            }
+
+            const(Edge)[] opIndex(in Node node) const
+            {
+                return incidentEdges[graph.indexOf(node)];
+            }
+
+            int opApply(scope int delegate(const(Edge)[]) yield) const
+            {
+                int result = 0;
+
+                foreach (currentIncidentEdges; incidentEdges)
+                {
+                    result = yield(currentIncidentEdges);
+                    if (result)
+                        break;
+                }
+
+                return result;
+            }
+
+            int opApply(scope int delegate(Node, const(Edge)[]) yield) const
+            {
+                int result = 0;
+
+                foreach (i, currentIncidentEdges; incidentEdges)
+                {
+                    result = yield(graph._nodes[i], currentIncidentEdges);
+                    if (result)
+                        break;
+                }
+
+                return result;
+            }
+        }
+
         /// Get the degree of node `n`.
         size_t degree(Node n) const nothrow pure
         {
@@ -1031,7 +1126,11 @@ unittest
     assert(g1.edge(1, 2) in g1);
     assert(g1.edge(2, 1) in g1);
     assert(g1.has(g1.edge(2, 2)));
-    assert(g1.allDegrees() == [2, 2]);
+    assert(g1.allDegrees().degrees == [2, 2]);
+    assert(g1.allIncidentEdges().incidentEdges == [
+        [g1.edge(1, 1), g1.edge(1, 2)],
+        [g1.edge(1, 2), g1.edge(2, 2)],
+    ]);
 
     //   0.5     0.5
     //   +-+     +-+
@@ -1048,7 +1147,11 @@ unittest
     assert(g2.edge(1, 2) in g2);
     assert(g2.edge(2, 1) in g2);
     assert(g2.has(g2.edge(2, 2)));
-    assert(g2.allDegrees() == [2, 2]);
+    assert(g2.allDegrees().degrees == [2, 2]);
+    assert(g2.allIncidentEdges().incidentEdges == [
+        [g2.edge(1, 1, 0.5), g2.edge(1, 2, 1.0)],
+        [g2.edge(1, 2, 1.0), g2.edge(2, 2, 0.5)],
+    ]);
 
     //   0.5     0.5
     //   +-+     +-+
@@ -1101,7 +1204,11 @@ unittest
     assert(g5.get(g5.edge(2, 1)).payload == [2]);
     assert(g5.has(g5.edge(2, 2)));
     assert(g5.get(g5.edge(2, 2)).payload == [3]);
-    assert(g5.allDegrees() == [2, 2]);
+    assert(g5.allDegrees().degrees == [2, 2]);
+    assert(g5.allIncidentEdges().incidentEdges == [
+        [g5.edge(1, 1), g5.edge(1, 2)],
+        [g5.edge(1, 2), g5.edge(2, 2)],
+    ]);
 }
 
 ///
@@ -1120,7 +1227,15 @@ unittest
     {
         assert(contigGraph.degree(contig) <= 2);
     }
-    assert(contigGraph.allDegrees() == [1, 2, 1, 1, 1, 0]);
+    assert(contigGraph.allDegrees().degrees == [1, 2, 1, 1, 1, 0]);
+    assert(contigGraph.allIncidentEdges().incidentEdges == [
+        [contigGraph.edge(1, 2, -1)],
+        [contigGraph.edge(1, 2, -1), contigGraph.edge(2, 3, 1)],
+        [contigGraph.edge(2, 3, 1)],
+        [contigGraph.edge(4, 5, 1)],
+        [contigGraph.edge(4, 5, 1)],
+        [],
+    ]);
 }
 
 class EmptySetException : Exception

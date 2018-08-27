@@ -380,6 +380,7 @@ OutputScaffold fixContigCropping(OutputScaffold scaffold)
 
     alias replace = OutputScaffold.ConflictStrategy.replace;
     auto contigJoins = scaffold.edges.filter!isDefault;
+    auto incidentEdgesCache = scaffold.allIncidentEdges();
 
     foreach (contigJoin; contigJoins)
     {
@@ -387,8 +388,7 @@ OutputScaffold fixContigCropping(OutputScaffold scaffold)
 
         foreach (contigNode; [contigJoin.start, contigJoin.end])
         {
-            auto shouldInsertNewSequence = scaffold
-                .incidentEdges(contigNode)
+            auto shouldInsertNewSequence = incidentEdgesCache[contigNode]
                 .canFind!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension));
 
             if (!shouldInsertNewSequence)
