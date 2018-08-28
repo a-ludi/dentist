@@ -1053,7 +1053,7 @@ struct LinearWalk(T)
 }
 
 /// Get a range of `ContigNode`s where full contig walks should start.
-auto contigStarts(T)(
+auto scaffoldStarts(T)(
     Scaffold!T scaffold,
     Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
 )
@@ -1170,7 +1170,7 @@ unittest
         J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
     ]);
 
-    assert(equal(contigStarts!Payload(scaffold1), [
+    assert(equal(scaffoldStarts!Payload(scaffold1), [
         CN(1, CP.begin),
         CN(3, CP.pre),
         CN(4, CP.begin),
@@ -1191,7 +1191,7 @@ unittest
         J(CN(2, CP.end), CN(1, CP.begin ), 1), // e2
     ]);
 
-    assert(equal(contigStarts!Payload(scaffold2), [
+    assert(equal(scaffoldStarts!Payload(scaffold2), [
         CN(1, CP.begin),
     ]));
 }

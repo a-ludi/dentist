@@ -23,7 +23,7 @@ import dentist.common.insertions :
 import dentist.common.scaffold :
     ContigNode,
     ContigPart,
-    contigStarts,
+    scaffoldStarts,
     enforceJoinPolicy,
     getUnkownJoin,
     initScaffold,
@@ -107,11 +107,11 @@ class AssemblyWriter
         init();
         buildAssemblyGraph();
 
-        foreach (startNode; contigStarts!InsertionInfo(assemblyGraph, incidentEdgesCache))
-            writeNewContig(startNode);
+        foreach (startNode; scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache))
+            writeNewScaffold(startNode);
 
         debug logJsonDebug(
-            "insertionWalks", contigStarts!InsertionInfo(assemblyGraph, incidentEdgesCache)
+            "insertionWalks", scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache)
                 .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)
                     .map!(join => [
                         "start": join.start.toJson,
@@ -193,7 +193,7 @@ class AssemblyWriter
         assemblyGraph.bulkAddForce(unkownJoins);
     }
 
-    void writeNewContig(ContigNode startNode)
+    void writeNewScaffold(ContigNode startNode)
     {
         mixin(traceExecution);
 
@@ -243,7 +243,7 @@ class AssemblyWriter
 
     protected void writeHeader(in ContigNode begin)
     {
-        format!"> contig %d\n"(begin.contigId).copy(writer);
+        format!"> scaffold-%d\n"(begin.contigId).copy(writer);
     }
 
     protected void writeInsertion(
