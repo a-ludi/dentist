@@ -177,7 +177,7 @@ class AssemblyWriter
                 gapPart.endGlobalContigId,
                 InsertionInfo(
                     CompressedSequence(),
-                    gapPart.end - gapPart.begin,
+                    gapPart.length,
                     [
                         SpliceSite(ReferencePoint(
                             gapPart.beginGlobalContigId,

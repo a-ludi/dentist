@@ -1766,7 +1766,7 @@ private struct ScaffoldStructureReader
             nextContigPart.begin,
             nextContigPart.end,
         );
-        if (lastContigPart.contigId >= nextContigPart.contigId)
+        if (lastContigPart.header != nextContigPart.header)
         {
             nextContigPart.scaffoldId = lastContigPart.scaffoldId + 1;
         }
