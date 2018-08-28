@@ -18,6 +18,7 @@ import std.algorithm :
     among,
     cache,
     canFind,
+    copy,
     countUntil,
     endsWith,
     filter,
@@ -1218,6 +1219,47 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string w
     }
 
     return generate!countedSequences.takeExactly(numRecords);
+}
+
+/**
+    Get the FASTA sequence of the designated record with prefetching to reduce `fork`s.
+
+    Throws: DazzlerCommandException if recordNumber is not in dbFile
+*/
+auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in id_t cacheSize = 1024)
+{
+    // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
+    // requirements of this function
+    static id_t _firstRecord;
+    static string _dbFile;
+    static id_t _numRecords;
+    static string[] _cache;
+
+    if (dbFile != _dbFile)
+    {
+        _dbFile = dbFile;
+        _numRecords = cast(id_t) getNumContigs(dbFile, workdir);
+        _cache.length = 0;
+    }
+
+    if (recordNumber >= _firstRecord + _cache.length || recordNumber < _firstRecord)
+    {
+        enum string[] dbdumpOptions = [DBdumpOptions.sequenceString];
+        _cache.length = cacheSize;
+        auto bufferRest = readSequences(dbdump(
+            dbFile,
+            recordNumber,
+            min(recordNumber + cacheSize, _numRecords),
+            dbdumpOptions,
+            workdir,
+        )).copy(_cache);
+        _cache = _cache[0 .. $ - bufferRest.length];
+        _firstRecord = recordNumber;
+        enforce!DazzlerCommandException(_cache.length > 0, "cannot read sequence: empty dump");
+    }
+
+
+    return _cache[recordNumber - _firstRecord];
 }
 
 private auto readSequences(R)(R dbdump)
@@ -2425,6 +2467,24 @@ private
             dbdumpOptions,
             only(dbFile.relativeToWorkdir(workdir)),
             recordNumbers.map!(to!string)
+        ), workdir);
+    }
+
+    auto dbdump(
+        in string dbFile,
+        id_t firstRecord,
+        id_t lastRecord,
+        in string[] dbdumpOptions,
+        in string workdir,
+    )
+    {
+        return executePipe(chain(
+            only("DBdump"),
+            dbdumpOptions,
+            only(
+                dbFile.relativeToWorkdir(workdir),
+                format!"%d-%d"(firstRecord, lastRecord),
+            ),
         ), workdir);
     }
 

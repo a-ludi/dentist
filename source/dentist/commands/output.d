@@ -39,7 +39,7 @@ import dentist.dazzler :
     ContigSegment,
     GapSegment,
     getNumContigs,
-    getFastaSequences,
+    getFastaSequence,
     getScaffoldStructure,
     ScaffoldSegment;
 import dentist.util.fasta : complement, reverseComplementer;
@@ -269,7 +269,7 @@ class AssemblyWriter
     )
     {
         auto spliceSites = insertion.payload.spliceSites;
-        auto contigId = begin.contigId;
+        auto contigId = cast(id_t) begin.contigId;
         auto contigLength = insertion.payload.contigLength;
         size_t spliceStart;
         size_t spliceEnd;
@@ -315,7 +315,7 @@ class AssemblyWriter
 
         assert(globalComplement != (begin < insertion.target(begin)));
 
-        auto contigSequence = getFastaSequences(options.refDb, [contigId], options.workdir).front;
+        auto contigSequence = getFastaSequence(options.refDb, contigId, options.workdir);
         contigSequence = contigSequence[spliceStart .. spliceEnd];
 
         logJsonDebug(
