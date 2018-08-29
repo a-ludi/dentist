@@ -107,11 +107,16 @@ class AssemblyWriter
         init();
         buildAssemblyGraph();
 
-        foreach (startNode; scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache))
+        auto startNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
+        logJsonDiagnostic(
+            "numOutputInsertions", assemblyGraph.edges.length,
+            "numOutputScaffolds", startNodes.length,
+        );
+        foreach (startNode; startNodes)
             writeNewScaffold(startNode);
 
         debug logJsonDebug(
-            "insertionWalks", scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache)
+            "insertionWalks", startNodes
                 .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)
                     .map!(join => [
                         "start": join.start.toJson,

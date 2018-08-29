@@ -681,7 +681,6 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
         .map!(join => [
             "start": join.start.toJson,
             "end": join.end.toJson,
-            "payload": join.payload.toJson,
         ])
         .array
         .toJson);
