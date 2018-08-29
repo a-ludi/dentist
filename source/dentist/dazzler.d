@@ -1249,7 +1249,7 @@ auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in
         auto bufferRest = readSequences(dbdump(
             dbFile,
             recordNumber,
-            min(recordNumber + cacheSize, _numRecords),
+            min(recordNumber + cacheSize - 1, _numRecords),
             dbdumpOptions,
             workdir,
         )).copy(_cache);
