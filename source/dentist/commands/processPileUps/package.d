@@ -140,6 +140,13 @@ class PileUpProcessor
             options.repeatMask,
             options.workdir,
         ));
+
+        foreach (mask; options.additionalMasks)
+            repeatMask |= ReferenceRegion(readMask!ReferenceInterval(
+                options.refDb,
+                mask,
+                options.workdir,
+            ));
     }
 
     protected ref PileUp fetchTracePoints(ref PileUp pileUp)

@@ -1,35 +1,167 @@
 /**
-    This is a collection of helpers for the assessment of the repeat mask.
+    This is the `maskRepetitiveRegions` command of `dentist`.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
-module dentist.commands.collectPileUps.maskassessment;
+module dentist.commands.maskRepetitiveRegions;
 
+import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.common :
+    ReferenceInterval,
+    ReferenceRegion;
 import dentist.common.alignments :
-    id_t,
+    AlignmentChain,
     coord_t,
-    AlignmentChain;
-import dentist.common : ReferenceInterval, ReferenceRegion;
+    id_t;
+import dentist.dazzler :
+    getAlignments,
+    writeMask;
+import dentist.util.log;
 import std.algorithm :
-    equal,
     joiner,
     map,
     sort,
     uniq;
 import std.array : appender, array;
-import std.exception : enforce;
-import std.typecons : Tuple;
+import std.format : format;
 import std.range :
     chain,
-    empty,
+    only;
+import std.range.primitives :
     ElementType,
-    front,
-    isInputRange,
-    only,
-    popFront;
+    isInputRange;
+import std.typecons : Tuple;
+import vibe.data.json : toJson = serializeToJson;
+
+/// Options for the `collectPileUps` command.
+alias Options = OptionsFor!(DentistCommand.maskRepetitiveRegions);
+
+/// Execute the `collectPileUps` command with `options`.
+void execute(in Options options)
+{
+    auto assessor = new RepeatMaskAssessor(options);
+
+    assessor.run();
+}
+
+/// This class comprises the `collectPileUps` step of the `dentist` algorithm
+class RepeatMaskAssessor
+{
+    protected const Options options;
+    protected AlignmentChain[] selfAlignment;
+    protected AlignmentChain[] readsAlignment;
+    protected ReferenceRegion repetitiveRegions;
+
+    this(in ref Options options)
+    {
+        this.options = options;
+    }
+
+    void run()
+    {
+        mixin(traceExecution);
+
+        readInputs();
+        assessRepeatStructure();
+        writeRepeatMask();
+    }
+
+    protected void readInputs()
+    {
+        mixin(traceExecution);
+
+        selfAlignment = getAlignments(
+            options.refDb,
+            options.selfAlignmentFile,
+            options.workdir,
+        );
+        readsAlignment = getAlignments(
+            options.refDb,
+            options.readsDb,
+            options.readsAlignmentFile,
+            options.workdir,
+        );
+
+        if (selfAlignment.length > 0)
+            logJsonWarn("info", "empty self-alignment");
+        if (readsAlignment.length > 0)
+            logJsonWarn("info", "empty ref vs. reads alignment");
+    }
+
+    void assessRepeatStructure()
+    {
+        mixin(traceExecution);
+
+        auto assessmentStages = [
+            assessmentStage(
+                "self-alignment",
+                new BadAlignmentCoverageAssessor(
+                    options.coverageBoundsSelf[0],
+                    options.coverageBoundsSelf[1]
+                ),
+                selfAlignment,
+            ),
+            assessmentStage(
+                "reads-alignment",
+                new BadAlignmentCoverageAssessor(
+                    options.coverageBoundsReads[0],
+                    options.coverageBoundsReads[1]
+                ),
+                readsAlignment,
+            ),
+        ];
+
+        foreach (stage; assessmentStages)
+        {
+            auto repetitiveRegions = stage.assessor(stage.input);
+
+            logJsonDiagnostic(
+                "assessor", stage.name,
+                "repetitiveRegions", shouldLog(LogLevel.debug_)
+                    ? repetitiveRegions.intervals.toJson
+                    : toJson(null),
+                "numRepetitiveRegions", repetitiveRegions.intervals.length,
+            );
+
+            if (shouldLog(LogLevel.debug_))
+            {
+                auto maskName = format!"%s-%s"(options.repeatMask, stage.name);
+
+                writeMask(
+                    options.refDb,
+                    maskName,
+                    repetitiveRegions.intervals,
+                    options.workdir,
+                );
+            }
+
+            this.repetitiveRegions |= repetitiveRegions;
+        }
+
+        logJsonDiagnostic(
+            "assessor", "finalResult",
+            "repetitiveRegions", shouldLog(LogLevel.debug_)
+                ? this.repetitiveRegions.intervals.toJson
+                : toJson(null),
+            "numRepetitiveRegions", this.repetitiveRegions.intervals.length,
+        );
+    }
+
+    protected void writeRepeatMask()
+    {
+        mixin(traceExecution);
+
+        writeMask(
+            options.refDb,
+            options.repeatMask,
+            repetitiveRegions.intervals,
+            options.workdir,
+        );
+    }
+}
 
 // see `assessmentStage` below.
 alias MaskAssessmentStage(Assessor : RepeatAssessor) = Tuple!(
@@ -414,6 +546,8 @@ CoverageChangeRange coverageChanges(Range)(Range alignments)
 
 unittest
 {
+    import std.algorithm : equal;
+
     auto alignments = BadAlignmentCoverageAssessor.getTestAlignments();
 
     alias CoverageChange = CoverageChangeRange.CoverageChange;
