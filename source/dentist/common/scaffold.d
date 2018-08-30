@@ -855,6 +855,7 @@ unittest
         J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
     ];
     auto scaffold1 = buildScaffold!(sumPayloads!Payload, Payload)(5, joins1);
+    auto scaffold1Cache = scaffold1.allIncidentEdges();
     auto walks1 = [
         [
             getDefaultJoin!Payload(1),
@@ -887,6 +888,18 @@ unittest
         assert(!computedReverseWalk.isCyclic);
     }
 
+    foreach (walk; walks1)
+    {
+        auto reverseWalk = walk.retro.array;
+        auto computedWalk = linearWalk!Payload(scaffold1, getWalkStart(walk), scaffold1Cache);
+        auto computedReverseWalk = linearWalk!Payload(scaffold1, getWalkStart(reverseWalk), scaffold1Cache);
+
+        assert(equal(walk[], refRange(&computedWalk)));
+        assert(!computedWalk.isCyclic);
+        assert(equal(reverseWalk[], refRange(&computedReverseWalk)));
+        assert(!computedReverseWalk.isCyclic);
+    }
+
     //   contig 1      contig 2
     //
     //  o        o     o        o
@@ -901,6 +914,7 @@ unittest
         J(CN(2, CP.end), CN(1, CP.begin ), 1), // e2
     ];
     auto scaffold2 = buildScaffold!(sumPayloads!Payload, Payload)(2, joins2);
+    auto scaffold2Cache = scaffold2.allIncidentEdges();
     auto walk2 = [
         getDefaultJoin!Payload(1),
         joins2[0],
@@ -913,6 +927,18 @@ unittest
         auto reverseWalk2 = walk2.retro.array;
         auto computedReverseWalk2 = linearWalk!Payload(scaffold2,
                 getWalkStart(reverseWalk2), reverseWalk2[0]);
+
+        assert(equal(walk2[], refRange(&computedWalk)));
+        assert(computedWalk.isCyclic);
+        assert(equal(reverseWalk2[], refRange(&computedReverseWalk2)));
+        assert(computedWalk.isCyclic);
+    }
+
+    {
+        auto computedWalk = linearWalk!Payload(scaffold2, getWalkStart(walk2), walk2[0], scaffold2Cache);
+        auto reverseWalk2 = walk2.retro.array;
+        auto computedReverseWalk2 = linearWalk!Payload(scaffold2,
+                getWalkStart(reverseWalk2), reverseWalk2[0], scaffold2Cache);
 
         assert(equal(walk2[], refRange(&computedWalk)));
         assert(computedWalk.isCyclic);
