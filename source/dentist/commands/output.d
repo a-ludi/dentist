@@ -48,6 +48,7 @@ import dentist.util.range : wrapLines;
 import std.algorithm :
     canFind,
     copy,
+    count,
     filter,
     joiner,
     map,
@@ -88,6 +89,7 @@ class AssemblyWriter
     size_t[] contigLengths;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
+    ContigNode[] scaffoldStartNodes;
     File assemblyFile;
     FastaWriter writer;
 
@@ -106,28 +108,11 @@ class AssemblyWriter
 
         init();
         buildAssemblyGraph();
+        scaffoldStartNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
+        logStatistics();
 
-        auto startNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
-        logJsonDiagnostic(
-            "numOutputInsertions", assemblyGraph.edges.length,
-            "numOutputScaffolds", startNodes.length,
-        );
-        foreach (startNode; startNodes)
+        foreach (startNode; scaffoldStartNodes)
             writeNewScaffold(startNode);
-
-        debug logJsonDebug(
-            "insertionWalks", startNodes
-                .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)
-                    .map!(join => [
-                        "start": join.start.toJson,
-                        "end": join.end.toJson,
-                        "payload": join.payload.toJson,
-                    ])
-                    .array
-                )
-                .array
-                .toJson
-        );
     }
 
     protected void init()
@@ -183,22 +168,46 @@ class AssemblyWriter
             .map!(gapPart => getUnkownJoin(
                 gapPart.beginGlobalContigId,
                 gapPart.endGlobalContigId,
-                InsertionInfo(
-                    CompressedSequence(),
-                    gapPart.length,
-                    [
-                        SpliceSite(ReferencePoint(
-                            gapPart.beginGlobalContigId,
-                            gapPart.begin,
-                        ), AlignmentChain.emptyFlags),
-                        SpliceSite(ReferencePoint(
-                            gapPart.beginGlobalContigId,
-                            gapPart.end,
-                        ), AlignmentChain.emptyFlags),
-                    ]
-                ),
+                InsertionInfo(CompressedSequence(), gapPart.length, []),
             ));
         assemblyGraph.bulkAddForce(unkownJoins);
+    }
+
+    void logStatistics()
+    {
+        // Due to several transformations of the assembly graph the predicates
+        // for "join types" must be combined to yield the expected result.
+        alias _isSpannedGap = j => j.isGap && !(j.isOutputGap || j.isDefault);
+        alias _isExtension = j => !j.isGap && !(j.isOutputGap || j.isDefault);
+        alias _isRemaingGap = isOutputGap;
+        alias _isExistingContig = isDefault;
+
+        logJsonInfo(
+            "numGraphEdges", assemblyGraph.edges.length,
+            "numScaffolds", scaffoldStartNodes.length,
+            "numSpannedGaps", assemblyGraph.edges.count!_isSpannedGap,
+            "numExtensions", assemblyGraph.edges.count!_isExtension,
+            "numRemainingGaps", assemblyGraph.edges.count!_isRemaingGap,
+            "numExistingContigs", assemblyGraph.edges.count!_isExistingContig,
+        );
+
+        debug logJsonDebug(
+            "insertionWalks", scaffoldStartNodes
+                .map!(startNode => linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)
+                    .map!(join => [
+                        "start": join.start.toJson,
+                        "end": join.end.toJson,
+                        "payload": [
+                            "sequence": join.payload.sequence.to!string.toJson,
+                            "contigLength": join.payload.contigLength.toJson,
+                            "spliceSites": join.payload.spliceSites.toJson,
+                        ].toJson,
+                    ])
+                    .array
+                )
+                .array
+                .toJson
+        );
     }
 
     void writeNewScaffold(ContigNode startNode)
@@ -207,6 +216,11 @@ class AssemblyWriter
 
         auto globalComplement = false;
         auto insertionBegin = startNode;
+
+        logJsonDebug(
+            "info", "writing scaffold",
+            "scaffoldId", startNode.contigId,
+        );
 
         writeHeader(startNode);
         foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
@@ -333,6 +347,8 @@ class AssemblyWriter
             "spliceStart", spliceStart,
             "spliceEnd", spliceEnd,
             "spliceSites", spliceSites.toJson,
+            "start", insertion.start.toJson,
+            "end", insertion.end.toJson,
         );
 
         if (globalComplement)
@@ -345,11 +361,11 @@ class AssemblyWriter
         in Insertion insertion,
     )
     {
-        assert(insertion.payload.spliceSites.length == 2);
-
         logJsonDebug(
             "info", "writing gap",
             "gapLength", insertion.payload.contigLength,
+            "start", insertion.start.toJson,
+            "end", insertion.end.toJson,
         );
 
         enum char unkownBase = 'n';
@@ -374,6 +390,16 @@ class AssemblyWriter
         );
 
         auto newSequence = insertion.payload.sequence;
+
+        logJsonDebug(
+            "info", "writing new sequence insertion",
+            "type", insertion.isGap ? "gap" : "extension",
+            "insertionLength", insertion.payload.sequence.length,
+            "isAntiParallel", insertion.isAntiParallel,
+            "localComplement", spliceSites[0].flags.complement,
+            "start", insertion.start.toJson,
+            "end", insertion.end.toJson,
+        );
 
         if (effectiveComplement)
             newSequence.bases!(char, Yes.reverse).map!(complement!char).copy(writer);
