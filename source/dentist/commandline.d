@@ -83,6 +83,7 @@ enum DentistCommand
 {
     generateDazzlerOptions,
     maskRepetitiveRegions,
+    showMask,
     collectPileUps,
     showPileUps,
     processPileUps,
@@ -247,6 +248,7 @@ struct OptionsFor(DentistCommand command)
 {
     static enum needWorkdir = command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
@@ -254,6 +256,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
@@ -357,6 +360,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -442,6 +446,7 @@ struct OptionsFor(DentistCommand command)
     mixin HelpOption;
 
     static if (command.among(
+        DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -646,6 +651,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.showMask,
         DentistCommand.showPileUps,
         DentistCommand.showInsertions,
     ))
@@ -941,6 +947,10 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.maskRepetitiveRegions)
         enum commandSummary = q"{
             Mask regions that have a alignment coverage that is out of bounds.
+        }".wrap;
+    else static if (command == DentistCommand.showMask)
+        enum commandSummary = q"{
+            Show a short summary of the mask.
         }".wrap;
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{
