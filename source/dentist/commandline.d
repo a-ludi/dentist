@@ -446,89 +446,10 @@ struct OptionsFor(DentistCommand command)
     mixin HelpOption;
 
     static if (command.among(
-        DentistCommand.showMask,
-        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
     {
-        @Option("mask", "m")
-        @MetaVar("<string>...")
-        @Help("additional masks (see <in:repeat-mask>)")
-        void addMask(string mask) pure
-        {
-            additionalMasks ~= mask;
-        }
-
-        @Option()
-        @Validate!((values, options) => validateInputMasks(options.refFile, values))
-        string[] additionalMasks;
-    }
-
-    static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("coverage-reads", "C")
-        @MetaVar("<from>..<to>")
-        @Help(q"{
-            this is used to derive a repeat mask from the ref vs. reads alignment;
-            if the alignment coverage is out of the interval [<from>, <to>]
-            it will be considered repetitive
-        }")
-        void parseCoverageBoundsReads(string rangeString) pure
-        {
-            parseRange!coverageBoundsReads(rangeString);
-        }
-
-        @Option()
-        @Validate!(validateCoverageBounds!"reads")
-        id_t[2] coverageBoundsReads;
-    }
-
-    static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("coverage-self", "c")
-        @MetaVar("<from>..<to>")
-        @Help(q"{
-            this is used to derive a repeat mask from the self alignment;
-            if the alignment coverage is out of the interval [<from>, <to>]
-            it will be considered repetitive
-        }")
-        void parseCoverageBoundsSelf(string rangeString) pure
-        {
-            parseRange!coverageBoundsSelf(rangeString);
-        }
-
-        @Option()
-        @Validate!(validateCoverageBounds!"self")
-        id_t[2] coverageBoundsSelf;
-    }
-
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("daccord-threads")
-        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <threads>) )")
-        uint numDaccordThreads;
-
-        @PostValidate(Priority.low)
-        void hookInitDaccordThreads()
-        {
-            if (numDaccordThreads == 0)
-            {
-                numDaccordThreads = totalCPUs / numThreads;
-            }
-        }
-    }
-
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("pile-up-batch", "batch", "b")
+        @Option("batch", "b")
         @MetaVar("<from>..<to>")
         @Help(q"{
             process only a subset of the pile ups in the given range (excluding <to>);
@@ -588,6 +509,66 @@ struct OptionsFor(DentistCommand command)
         @property id_t pileUpBatchSize() const pure nothrow
         {
             return pileUpBatch[1] - pileUpBatch[0];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("coverage-reads", "C")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            this is used to derive a repeat mask from the ref vs. reads alignment;
+            if the alignment coverage is out of the interval [<from>, <to>]
+            it will be considered repetitive
+        }")
+        void parseCoverageBoundsReads(string rangeString) pure
+        {
+            parseRange!coverageBoundsReads(rangeString);
+        }
+
+        @Option()
+        @Validate!(validateCoverageBounds!"reads")
+        id_t[2] coverageBoundsReads;
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("coverage-self", "c")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            this is used to derive a repeat mask from the self alignment;
+            if the alignment coverage is out of the interval [<from>, <to>]
+            it will be considered repetitive
+        }")
+        void parseCoverageBoundsSelf(string rangeString) pure
+        {
+            parseRange!coverageBoundsSelf(rangeString);
+        }
+
+        @Option()
+        @Validate!(validateCoverageBounds!"self")
+        id_t[2] coverageBoundsSelf;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daccord-threads")
+        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <threads>) )")
+        uint numDaccordThreads;
+
+        @PostValidate(Priority.low)
+        void hookInitDaccordThreads()
+        {
+            if (numDaccordThreads == 0)
+            {
+                numDaccordThreads = totalCPUs / numThreads;
+            }
         }
     }
 
@@ -669,6 +650,25 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.showMask,
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("mask", "m")
+        @MetaVar("<string>...")
+        @Help("additional masks (see <in:repeat-mask>)")
+        void addMask(string mask) pure
+        {
+            additionalMasks ~= mask;
+        }
+
+        @Option()
+        @Validate!((values, options) => validateInputMasks(options.refFile, values))
+        string[] additionalMasks;
+    }
+
+    static if (command.among(
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -707,6 +707,35 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("reads-error")
+        @Help("estimated error rate in reads")
+        @Validate!(value => enforce!CLIException(
+            0.0 < value && value < 1.0,
+            "reads error rate must be in (0, 1)"
+        ))
+        double readsErrorRate = .15;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("reference-error")
+        @Help("estimated error rate in reference")
+        @Validate!(value => enforce!CLIException(
+            0.0 < value && value < 1.0,
+            "reference error rate must be in (0, 1)"
+        ))
+        double referenceErrorRate = .01;
+    }
+
+    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -742,6 +771,19 @@ struct OptionsFor(DentistCommand command)
             tracePointDistance = getTracePointDistance();
         }
     }
+
+    @Option("verbose", "v")
+    @Help("increase output to help identify problems; use up to three times")
+    void increaseVerbosity() pure
+    {
+        ++verbosity;
+    }
+    @Option()
+    @Validate!(value => enforce!CLIException(
+        0 <= value && value <= 3,
+        "verbosity must used 0-3 times"
+    ))
+    size_t verbosity = 0;
 
     static if (needWorkdir)
     {
@@ -788,48 +830,6 @@ struct OptionsFor(DentistCommand command)
             }
         }
     }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("reads-error")
-        @Help("estimated error rate in reads")
-        @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reads error rate must be in (0, 1)"
-        ))
-        double readsErrorRate = .15;
-    }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-    ))
-    {
-        @Option("reference-error")
-        @Help("estimated error rate in reference")
-        @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reference error rate must be in (0, 1)"
-        ))
-        double referenceErrorRate = .01;
-    }
-
-    @Option("verbose", "v")
-    @Help("increase output to help identify problems; use up to three times")
-    void increaseVerbosity() pure
-    {
-        ++verbosity;
-    }
-    @Option()
-    @Validate!(value => enforce!CLIException(
-        0 <= value && value <= 3,
-        "verbosity must used 0-3 times"
-    ))
-    size_t verbosity = 0;
 
     @PostValidate()
     void hookInitLogLevel()
