@@ -18,6 +18,7 @@ import dentist.common.insertions :
     Insertion,
     InsertionInfo,
     isOutputGap,
+    isValidInsertion,
     OutputScaffold,
     SpliceSite;
 import dentist.common.scaffold :
@@ -31,7 +32,6 @@ import dentist.common.scaffold :
     isDefault,
     isExtension,
     isGap,
-    isValid,
     linearWalk,
     normalizeUnkownJoins,
     removeExtensions;
@@ -260,7 +260,7 @@ class AssemblyWriter
         in bool globalComplement,
     )
     {
-        assert(insertion.isValid, "invalid insertion");
+        assert(insertion.isValidInsertion, "invalid insertion");
 
         if (insertion.isDefault)
             writeExistingContig(begin, insertion, globalComplement);

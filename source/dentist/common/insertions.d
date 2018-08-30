@@ -45,7 +45,21 @@ alias Insertion = OutputScaffold.Edge;
 /// Returns true iff a sequence of `n`s should be written.
 bool isOutputGap(in Insertion insertion)
 {
-    return insertion.payload.sequence.length == 0;
+    return !insertion.hasSequence && !insertion.isDefault;
+}
+
+bool isValidInsertion(in Insertion insertion)
+{
+    return
+        insertion.isDefault ^
+        insertion.isOutputGap ^
+        (insertion.isGap && insertion.hasSequence) ^
+        (insertion.isExtension && insertion.hasSequence);
+}
+
+bool hasSequence(in Insertion insertion)
+{
+    return insertion.payload.sequence.length > 0;
 }
 
 Insertion concatenateSpliceSites(Insertion existingJoin, Insertion newJoin)
