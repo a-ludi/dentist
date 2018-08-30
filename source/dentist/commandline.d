@@ -754,7 +754,7 @@ struct OptionsFor(DentistCommand command)
         @Help("use <uint> threads (defaults to the number of cores)")
         uint numThreads;
 
-        @PostValidate()
+        @PostValidate(Priority.high)
         void hookInitThreads()
         {
             if (numThreads > 0)
