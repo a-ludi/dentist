@@ -576,6 +576,17 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.output,
     ))
     {
+        @Option("debug-graph")
+        @MetaVar("<file>")
+        @Help("write the assembly graph to <file>; use `show-insertions` to inspect the result")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string assemblyGraphFile;
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
         @Option("extend-contigs")
         @Help("if given extend contigs even if no spanning reads can be found")
         OptionFlag shouldExtendContigs;
@@ -1393,5 +1404,17 @@ private
                 );
             }
         }
+    }
+
+    void execIf(alias fun)(bool test)
+    {
+        if (test)
+            fun();
+    }
+
+    void execUnless(alias fun)(bool test)
+    {
+        if (!test)
+            fun();
     }
 }

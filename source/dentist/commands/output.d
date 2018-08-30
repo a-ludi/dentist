@@ -169,6 +169,9 @@ class AssemblyWriter
             .fixContigCropping();
 
         incidentEdgesCache = assemblyGraph.allIncidentEdges();
+
+        if (options.assemblyGraphFile !is null)
+            InsertionDb.write(options.assemblyGraphFile, assemblyGraph.edges);
     }
 
 
