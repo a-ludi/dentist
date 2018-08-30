@@ -14,9 +14,12 @@ import std.algorithm : map, max;
 import std.array : array;
 import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
-import std.stdio : writefln, writeln;
+import std.stdio : stderr, writefln, writeln;
 import std.typecons : tuple;
-import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import vibe.data.json :
+    serializeToJsonString,
+    toJson = serializeToJson,
+    toJsonString = serializeToPrettyJson;
 
 /// Execute the `showInsertions` command with `options`.
 void execute(Options)(in Options options)
@@ -38,18 +41,21 @@ void execute(Options)(in Options options)
     else
         writeTabular(stats);
 
-    logJsonDebug("insertions", insertionDb[]
-        .map!(join => [
-            "start": join.start.toJson,
-            "end": join.end.toJson,
-            "payload": [
-                "sequence": join.payload.sequence.to!string.toJson,
-                "contigLength": join.payload.contigLength.toJson,
-                "spliceSites": join.payload.spliceSites.toJson,
-            ].toJson,
-        ])
-        .array
-        .toJson);
+    if (shouldLog(LogLevel.debug_))
+    {
+        foreach (join; insertionDb[])
+        {
+            stderr.writeln(serializeToJsonString([
+                "start": join.start.toJson,
+                "end": join.end.toJson,
+                "payload": [
+                    "sequence": join.payload.sequence.to!string.toJson,
+                    "contigLength": join.payload.contigLength.toJson,
+                    "spliceSites": join.payload.spliceSites.toJson,
+                ].toJson,
+            ]));
+        }
+    }
 }
 
 struct Stats
