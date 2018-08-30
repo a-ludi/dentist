@@ -72,7 +72,6 @@ struct Stats
             numLocalAlignments,
             numTracePoints,
         )));
-        numWidth += numWidth / 3;
 
         return numWidth;
     }

@@ -69,7 +69,6 @@ struct Stats
             numCompressedBaseQuads,
             numSpliceSites,
         )));
-        numWidth += numWidth / 3;
 
         return numWidth;
     }
