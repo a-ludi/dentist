@@ -85,9 +85,9 @@ class RepeatMaskAssessor
             options.workdir,
         );
 
-        if (selfAlignment.length > 0)
+        if (selfAlignment.length == 0)
             logJsonWarn("info", "empty self-alignment");
-        if (readsAlignment.length > 0)
+        if (readsAlignment.length == 0)
             logJsonWarn("info", "empty ref vs. reads alignment");
     }
 
