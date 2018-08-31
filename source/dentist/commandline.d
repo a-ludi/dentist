@@ -77,19 +77,44 @@ enum ReturnCode
     runtimeError,
 }
 
+private template testingOnly(alias value)
+{
+    version (Testing)
+        enum testingOnly = value;
+    else
+        enum testingOnly = typeof(value).init;
+}
+
+version (Testing)
+    enum isTesting = true;
+else
+    enum isTesting = false;
 
 /// Possible returns codes of the command line execution.
-enum DentistCommand
+mixin("enum DentistCommand {" ~
+    testingOnly!"translocateGaps," ~
+    "generateDazzlerOptions," ~
+    "maskRepetitiveRegions," ~
+    "showMask," ~
+    "collectPileUps," ~
+    "showPileUps," ~
+    "processPileUps," ~
+    "showInsertions," ~
+    "mergeInsertions," ~
+    "output," ~
+"}");
+
+struct TestingCommand
 {
-    generateDazzlerOptions,
-    maskRepetitiveRegions,
-    showMask,
-    collectPileUps,
-    showPileUps,
-    processPileUps,
-    showInsertions,
-    mergeInsertions,
-    output,
+    @disable this();
+
+    static DentistCommand opDispatch(string command)() pure nothrow
+    {
+        version (Testing)
+            return mixin("DentistCommand." ~ command);
+        else
+            return cast(DentistCommand) size_t.max;
+    }
 }
 
 enum dashCase(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
@@ -247,6 +272,7 @@ class UsageRequested : Exception
 struct OptionsFor(DentistCommand command)
 {
     static enum needWorkdir = command.among(
+        TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -255,6 +281,25 @@ struct OptionsFor(DentistCommand command)
     );
 
     static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Argument("<in:short-read-assembly>")
+        @Help("short read assembly in .dam format")
+        @Validate!(validateDB!".dam")
+        string shortReadAssemblyFile;
+        @Option()
+        string shortReadAssemblyDb;
+
+        @PostValidate()
+        void hookProvideShortReadAssemblyFileInWorkDir()
+        {
+            shortReadAssemblyDb = provideDamFileInWorkdir(shortReadAssemblyFile, provideMethod, workdir);
+        }
+    }
+
+    static if (command.among(
+        TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -293,6 +338,31 @@ struct OptionsFor(DentistCommand command)
         void hookProvideReadsFileInWorkDir()
         {
             readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
+        }
+    }
+
+    static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Argument("<in:ref-vs-short-read-alignment>")
+        @Help(q"{
+            locals alignments of the short read assembly against the reference
+            in form of a .las file as produced by `daligner`
+        }")
+        @Validate!((value, options) => validateLasFile(value, options.refFile, options.shortReadAssemblyFile))
+        string shortReadAssemblyAlignmentInputFile;
+        @Option()
+        string shortReadAssemblyAlignmentFile;
+
+        @PostValidate()
+        void hookProvideShortReadAssemblyAlignmentInWorkDir()
+        {
+            shortReadAssemblyAlignmentFile = provideLasFileInWorkdir(
+                shortReadAssemblyAlignmentInputFile,
+                provideMethod,
+                workdir,
+            );
         }
     }
 
@@ -434,12 +504,13 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
         DentistCommand.output,
     ))
     {
         @Argument("<out:assembly>", Multiplicity.optional)
         @Help("write output assembly to <assembly> (default: stdout)")
-        @Validate!validateFileWritable
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string assemblyFile;
     }
 
@@ -573,6 +644,23 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Option("debug-mask")
+        @MetaVar("<file>")
+        @Help(q"{
+            write regions that were kept aka. output contigs into a Dazzler
+            mask to visualize the result. Given a path-like string without
+            extension: the `dirname` designates the directory to write the
+            mask to. The mask comprises two hidden files
+            `.[REFERENCE].[MASK].{anno,data}`.
+        }")
+        @Validate!((value, options) => (value is null).execUnless!(() => validateOutputMask(options.refFile, value)))
+        string mappedRegionsMask;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -593,6 +681,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
         DentistCommand.output,
     ))
     {
@@ -950,7 +1039,11 @@ unittest
 /// A short summary for each command to be output underneath the usage.
 template commandSummary(DentistCommand command)
 {
-    static if (command == DentistCommand.generateDazzlerOptions)
+    static if (isTesting && command == DentistCommand.translocateGaps)
+        enum commandSummary = q"{
+            Translocate gaps from first assembly to second assembly.
+        }".wrap;
+    else static if (command == DentistCommand.generateDazzlerOptions)
         enum commandSummary = q"{
             Generate a set of options to pass to `daligner` and `damapper`
             needed for the input alignments.

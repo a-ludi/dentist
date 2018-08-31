@@ -8,7 +8,14 @@ dependency  "darg"               version="~>0.1.0"
 dependency  "string-transform-d" version="~>1.0.0"
 dependency  "vibe-d:data"        version="~>0.8.4-alpha.1"
 
+targetType  "executable"
 // NOTE: fixes deprecation warning in `std.typecons.BitFlags`
-dflags "-transition=intpromote"
+dflags      "-transition=intpromote"
 
 preBuildCommands "./update-swinfo.sh"
+
+configuration "default"
+
+configuration "testing" {
+    versions "Testing"
+}
