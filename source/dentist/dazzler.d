@@ -1620,13 +1620,13 @@ bool lasFileGenerated(in string dbA, in string dbB, in string baseDirectory)
     return getLasFile(dbA, dbB, baseDirectory).exists;
 }
 
-size_t getNumBlocks(in string damFile)
+id_t getNumBlocks(in string damFile)
 {
     // see also in dazzler's DB.h:394
     //     #define DB_NBLOCK "blocks = %9d\n"  //  number of blocks
     immutable blockNumFormat = "blocks = %d";
     immutable blockNumFormatStart = blockNumFormat[0 .. 6];
-    size_t numBlocks;
+    id_t numBlocks;
     auto matchingLine = File(damFile.stripBlock).byLine.filter!(
             line => line.startsWith(blockNumFormatStart)).front;
 
@@ -1645,12 +1645,12 @@ size_t getNumBlocks(in string damFile)
     return numBlocks;
 }
 
-size_t getNumContigs(in string damFile, in string workdir)
+id_t getNumContigs(in string damFile, in string workdir)
 {
     immutable contigNumFormat = "+ R %d";
     immutable contigNumFormatStart = contigNumFormat[0 .. 4];
-    size_t numContigs;
-    size_t[] empty;
+    id_t numContigs;
+    id_t[] empty;
     auto matchingLine = dbdump(damFile, empty, [], workdir)
         .filter!(line => line.startsWith(contigNumFormatStart))
         .front;
