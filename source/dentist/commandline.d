@@ -280,6 +280,25 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.output,
     );
 
+
+    static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Argument("<in:true-assembly>")
+        @Help("the 'true' assembly in .dam format")
+        @Validate!(validateDB!".dam")
+        string trueAssemblyFile;
+        @Option()
+        string trueAssemblyDb;
+
+        @PostValidate()
+        void hookProvideTrueAssemblyFileInWorkDir()
+        {
+            trueAssemblyDb = provideDamFileInWorkdir(trueAssemblyFile, provideMethod, workdir);
+        }
+    }
+
     static if (command.among(
         TestingCommand.translocateGaps,
     ))
@@ -299,7 +318,6 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -345,12 +363,12 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.translocateGaps,
     ))
     {
-        @Argument("<in:ref-vs-short-read-alignment>")
+        @Argument("<in:short-vs-true-read-alignment>")
         @Help(q"{
-            locals alignments of the short read assembly against the reference
-            in form of a .las file as produced by `daligner`
+            locals alignments of the short read assembly against the 'true'
+            assembly in form of a .las file as produced by `daligner`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.refFile, options.shortReadAssemblyFile))
+        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.shortReadAssemblyFile))
         string shortReadAssemblyAlignmentInputFile;
         @Option()
         string shortReadAssemblyAlignmentFile;
@@ -463,7 +481,7 @@ struct OptionsFor(DentistCommand command)
             designates the directory to write the mask to. The mask comprises
             two hidden files `.[REFERENCE].[MASK].{anno,data}`.
         }")
-        @Validate!((value, options) => validateOutputMask(options.refFile, value))
+        @Validate!((value, options) => validateOutputMask(options.trueAssemblyFile, value))
         string mappedRegionsMask;
     }
 

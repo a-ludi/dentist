@@ -92,7 +92,7 @@ private struct Translocator
         mixin(traceExecution);
 
         alignments = getAlignments(
-            options.refDb,
+            options.trueAssemblyDb,
             options.shortReadAssemblyDb,
             options.shortReadAssemblyAlignmentFile,
             options.workdir,
@@ -104,7 +104,7 @@ private struct Translocator
             .joiner
             .array);
         writeMask(
-            options.refDb,
+            options.trueAssemblyDb,
             options.mappedRegionsMask,
             mappedRegions.intervals,
             options.workdir,
@@ -116,7 +116,7 @@ private struct Translocator
         mixin(traceExecution);
 
         immutable dchar unknownBase = 'n';
-        auto numRefContigs = getNumContigs(options.refDb, options.workdir);
+        auto numRefContigs = getNumContigs(options.trueAssemblyDb, options.workdir);
         auto mappedRegions = mappedRegions.intervals.assumeSorted!"a.contigId < b.contigId";
         ReferenceInterval needle;
 
@@ -125,7 +125,7 @@ private struct Translocator
             getScaffoldHeader(contigId).copy(writer);
 
             auto contigSequence = getFastaSequence(
-                options.refDb,
+                options.trueAssemblyDb,
                 contigId,
                 options.workdir,
             );
