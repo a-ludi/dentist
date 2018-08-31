@@ -453,6 +453,21 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Argument("<out:mapped-regions-mask>")
+        @Help(q"{
+            write regions that were kept aka. output contigs into a Dazzler
+            mask. Given a path-like string without extension: the `dirname`
+            designates the directory to write the mask to. The mask comprises
+            two hidden files `.[REFERENCE].[MASK].{anno,data}`.
+        }")
+        @Validate!((value, options) => validateOutputMask(options.refFile, value))
+        string mappedRegionsMask;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {
@@ -641,23 +656,6 @@ struct OptionsFor(DentistCommand command)
                 numDaccordThreads = totalCPUs / numThreads;
             }
         }
-    }
-
-    static if (command.among(
-        TestingCommand.translocateGaps,
-    ))
-    {
-        @Option("debug-mask")
-        @MetaVar("<file>")
-        @Help(q"{
-            write regions that were kept aka. output contigs into a Dazzler
-            mask to visualize the result. Given a path-like string without
-            extension: the `dirname` designates the directory to write the
-            mask to. The mask comprises two hidden files
-            `.[REFERENCE].[MASK].{anno,data}`.
-        }")
-        @Validate!((value, options) => (value is null).execUnless!(() => validateOutputMask(options.refFile, value)))
-        string mappedRegionsMask;
     }
 
     static if (command.among(

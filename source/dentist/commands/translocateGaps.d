@@ -103,14 +103,12 @@ private struct Translocator
             .map!"a.intervals.dup"
             .joiner
             .array);
-
-        if (options.mappedRegionsMask !is null)
-            writeMask(
-                options.refDb,
-                options.mappedRegionsMask,
-                mappedRegions.intervals,
-                options.workdir,
-            );
+        writeMask(
+            options.refDb,
+            options.mappedRegionsMask,
+            mappedRegions.intervals,
+            options.workdir,
+        );
     }
 
     protected void writeOutputAssembly()
