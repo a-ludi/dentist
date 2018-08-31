@@ -8,6 +8,8 @@
 */
 module dentist.commands.translocateGaps;
 
+version (Testing):
+
 import dentist.commandline : TestingCommand, OptionsFor;
 import dentist.common :
     ReferenceInterval,
@@ -45,27 +47,17 @@ import std.stdio : File, stdout;
 import std.typecons : No;
 import vibe.data.json : toJson = serializeToJson;
 
-version (Testing)
-{
-    /// Execute the `translocateGaps` command with `options`.
-    void execute(in Options options)
-    {
-        auto translocator = Translocator(options);
-
-        return translocator.run();
-    }
-}
-else
-{
-    // dummy
-    void execute(Options)(in Options options) { }
-}
-
-
-version (Testing):
 
 /// Options for the `collectPileUps` command.
 alias Options = OptionsFor!(TestingCommand.translocateGaps);
+
+/// Execute the `translocateGaps` command with `options`.
+void execute(in Options options)
+{
+    auto translocator = Translocator(options);
+
+    return translocator.run();
+}
 
 private struct Translocator
 {

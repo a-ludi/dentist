@@ -1039,7 +1039,7 @@ unittest
 /// A short summary for each command to be output underneath the usage.
 template commandSummary(DentistCommand command)
 {
-    static if (isTesting && command == DentistCommand.translocateGaps)
+    static if (command == TestingCommand.translocateGaps)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
         }".wrap;
