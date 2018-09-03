@@ -31,6 +31,7 @@ import dentist.common.scaffold :
     isAntiParallel,
     isDefault,
     isExtension,
+    isFrontExtension,
     isGap,
     linearWalk,
     normalizeUnkownJoins,
@@ -58,11 +59,12 @@ import std.array : array;
 import std.conv : to;
 import std.format : format;
 import std.range :
+    enumerate,
     only,
     repeat,
     takeExactly;
 import std.range.primitives : empty, front, popFront, save;
-import std.stdio : File, stdout;
+import std.stdio : File, stderr, stdout;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -175,6 +177,8 @@ class AssemblyWriter
 
     void logStatistics()
     {
+        mixin(traceExecution);
+
         // Due to several transformations of the assembly graph the predicates
         // for "join types" must be combined to yield the expected result.
         alias _isSpannedGap = j => j.isGap && !(j.isOutputGap || j.isDefault);
@@ -190,6 +194,9 @@ class AssemblyWriter
             "numRemainingGaps", assemblyGraph.edges.count!_isRemaingGap,
             "numExistingContigs", assemblyGraph.edges.count!_isExistingContig,
         );
+
+        if (shouldLog(LogLevel.diagnostic))
+            logSparseInsertionWalks();
 
         debug logJsonDebug(
             "insertionWalks", scaffoldStartNodes
@@ -208,6 +215,51 @@ class AssemblyWriter
                 .array
                 .toJson
         );
+    }
+
+    void logSparseInsertionWalks()
+    {
+        stderr.write(`{"scaffolds":[`);
+
+        foreach (i, startNode; scaffoldStartNodes)
+        {
+            if (i == 0)
+                stderr.write(`[`);
+            else
+                stderr.write(`,[`);
+
+            foreach (enumJoin; enumerate(linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)))
+            {
+                auto j = enumJoin.index;
+                auto join = enumJoin.value;
+
+                if (j > 0)
+                    stderr.write(`,`);
+
+                if (join.isDefault)
+                    stderr.writef!`{"action":"copy","contigId":%d}`(join.start.contigId);
+                else if (join.isOutputGap)
+                    stderr.writef!`{"action":"gap","length":%d}`(join.payload.contigLength);
+                else if (join.isGap)
+                    stderr.writef!`{"action":"insert","contigIds":[%d,%d],"length":%d}`(
+                        join.start.contigId,
+                        join.end.contigId,
+                        join.payload.sequence.length
+                    );
+                else if (join.isExtension)
+                    stderr.writef!`{"action":"insert","contigIds":[%d],"contigPart":"%s","length":%d}`(
+                        join.start.contigId,
+                        join.isFrontExtension ? "front" : "back",
+                        join.payload.sequence.length
+                    );
+                else
+                    assert(0, "unexpected join type");
+            }
+
+            stderr.write(`]`);
+        }
+
+        stderr.writeln(`]}`);
     }
 
     void writeNewScaffold(ContigNode startNode)
