@@ -491,7 +491,7 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.translateCoords,
     ))
     {
-        @Argument("<coord-string>")
+        @Argument("<coord-string>", Multiplicity.oneOrMore)
         @Help(q"{
             translate coordinate(s) given by <coord-string> of the result into
             coordinates on the reference. Coordinates are always 1-based.
@@ -499,15 +499,17 @@ struct OptionsFor(DentistCommand command)
             which describes a coordinate on `>scaffold-<scaffold-id>` starting
             a the first base pair of the scaffold
         }")
-        @Validate!validateCoordString
-        string coordString;
+        @Validate!validateCoordStrings
+        string[] coordStrings;
 
-        OutputCoordinate outputCoordinate;
+        OutputCoordinate[] outputCoordinates;
 
         @PostValidate()
-        void hookParseCoordString()
+        void hookParseCoordStrings()
         {
-            outputCoordinate = parseCoordString(coordString);
+            outputCoordinates.length = coordStrings.length;
+            foreach (i, coordString; coordStrings)
+                outputCoordinates[i] = parseCoordString(coordString);
         }
     }
 
@@ -1566,9 +1568,10 @@ private
         }
     }
 
-    void validateCoordString(string coordString)
+    void validateCoordStrings(string[] coordStrings)
     {
-        cast(void) parseCoordString(coordString);
+        foreach (coordString; coordStrings)
+            cast(void) parseCoordString(coordString);
     }
 
     OutputCoordinate parseCoordString(string coordString)

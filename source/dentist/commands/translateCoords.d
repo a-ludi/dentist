@@ -39,18 +39,20 @@ import std.algorithm :
     find,
     joiner,
     map,
+    maxElement,
     min,
     sort,
     uniq;
 import std.array : array;
+import std.conv : to;
 import std.exception : enforce;
+import std.format : format;
 import std.range :
     dropExactly,
     only;
 import std.range.primitives;
-import std.stdio : writeln;
+import std.stdio : writefln, writeln;
 import vibe.data.json :
-    serializeToJsonString,
     toJson = serializeToJson,
     toJsonString = serializeToPrettyJson;
 
@@ -88,21 +90,13 @@ class CoordinateTranslator
     alias OriginType = OutputCoordinate.OriginType;
 
     const(Options) options;
-    const(OutputCoordinate) outCoord;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     ContigNode[] scaffoldStartNodes;
-    coord_t numWalkedBasePairs;
-    id_t lastContigId;
-    arithmetic_t lastContigStart;
-    coord_t lastContigLength;
-    SequenceType lastWalkedSequenceType;
-    ReferenceCoordinate refCoord;
 
     this(in Options options)
     {
         this.options = options;
-        this.outCoord = options.outputCoordinate;
     }
 
     void run()
@@ -110,9 +104,37 @@ class CoordinateTranslator
         mixin(traceExecution);
 
         init();
-        walkToCoordinate();
 
-        writeln(refCoord);
+        foreach (i, outputCoordinate; options.outputCoordinates)
+        {
+            try
+            {
+                auto walker = Walker(
+                    outputCoordinate,
+                    assemblyGraph,
+                    incidentEdgesCache,
+                    scaffoldStartNodes,
+                );
+
+                walker.walkToCoordinate();
+
+                if (options.useJson)
+                    writeJson(walker.refCoord);
+                else
+                {
+                    if (i > 0)
+                        writeln();
+                    writeTabular(walker.refCoord);
+                }
+            }
+            catch (DentistException e)
+            {
+                logJsonError(
+                    "info", e.msg,
+                    "coord", outputCoordinate.toString(),
+                );
+            }
+        }
     }
 
     protected void init()
@@ -134,6 +156,57 @@ class CoordinateTranslator
         incidentEdgesCache = assemblyGraph.allIncidentEdges();
         scaffoldStartNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
     }
+
+    protected static void writeTabular(ReferenceCoordinate refCoord)
+    {
+        auto stats = [
+            format!`%d`(refCoord.contigId),
+            format!`%d`(refCoord.contigCoord),
+            format!`%d`(refCoord.contigLength),
+            format!`%-(%d,%)`(refCoord.contigIds),
+            refCoord.isReverseComplement ? "yes" : "no",
+            refCoord.sequenceType.to!string,
+        ];
+        auto columnWidth = stats.map!"a.length".maxElement;
+
+        writefln!"refContigId:        %*s"(columnWidth, stats[0]);
+        writefln!"refContigCoord:     %*s"(columnWidth, stats[1]);
+        writefln!"refContigLength:    %*s"(columnWidth, stats[2]);
+        writefln!"flankingRefContigs: %*s"(columnWidth, stats[3]);
+        writefln!"reverseComplement:  %*s"(columnWidth, stats[4]);
+        writefln!"sequenceType:       %*s"(columnWidth, stats[5]);
+    }
+
+    protected static void writeJson(ReferenceCoordinate refCoord)
+    {
+        writeln(toJsonString([
+            "refContig": [
+                "id": refCoord.contigId,
+                "coord": refCoord.contigCoord,
+                "length": refCoord.contigLength,
+            ].toJson,
+            "flankingRefContigs": refCoord.contigIds.toJson,
+            "isReverseComplement": refCoord.isReverseComplement.toJson,
+            "sequenceType": refCoord.sequenceType.to!string.toJson,
+        ]));
+    }
+}
+
+private struct Walker
+{
+    alias OriginType = OutputCoordinate.OriginType;
+
+    const(OutputCoordinate) outCoord;
+    OutputScaffold assemblyGraph;
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache;
+    ContigNode[] scaffoldStartNodes;
+
+    coord_t numWalkedBasePairs;
+    id_t lastContigId;
+    arithmetic_t lastContigStart;
+    coord_t lastContigLength;
+    SequenceType lastWalkedSequenceType;
+    ReferenceCoordinate refCoord;
 
     protected void walkToCoordinate()
     {
