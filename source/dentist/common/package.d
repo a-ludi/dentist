@@ -13,6 +13,7 @@ import dentist.util.region : Region;
 import std.algorithm : count, fold, map, max, sum;
 import std.array : array;
 import std.conv : to;
+import std.format : format;
 import std.math : floor;
 import std.traits : TemplateOf;
 import std.typecons : Flag;
@@ -91,6 +92,21 @@ struct OutputCoordinate
             return OriginType.scaffold;
         else
             return OriginType.scaffoldContig;
+    }
+
+    string toString() const
+    {
+        final switch(originType)
+        {
+        case OriginType.global:
+            return format!`%d`(coord);
+        case OriginType.contig:
+            return format!`contig/%d/%d`(contigId, coord);
+        case OriginType.scaffold:
+            return format!`scaffold/%d/%d`(scaffoldId, coord);
+        case OriginType.scaffoldContig:
+            return format!`scaffold/%d/contig/%d/%d`(scaffoldId, contigId, coord);
+        }
     }
 }
 
