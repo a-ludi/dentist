@@ -1595,10 +1595,11 @@ private
             enforce!CLIException(coord.scaffoldId > 0, "<scaffold-id> is 1-based");
         }
 
-        enforce!CLIException(
-            coord.originType == OutputCoordinate.OriginType.scaffold,
-            "not yet implemented; use format `scaffold/<uint:scaffold-id>/<uint:coord>`",
-        );
+        version (unittest) { } else
+            enforce!CLIException(
+                coord.originType == OutputCoordinate.OriginType.scaffold,
+                "not yet implemented; use format `scaffold/<uint:scaffold-id>/<uint:coord>`",
+            );
 
         return coord;
     }
