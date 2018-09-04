@@ -15,6 +15,9 @@ import dentist.common.binio :
     InsertionDb;
 import dentist.common.alignments : AlignmentChain, id_t;
 import dentist.common.insertions :
+    getInfoForExistingContig,
+    getInfoForGap,
+    getInfoForNewSequenceInsertion,
     Insertion,
     InsertionInfo,
     isOutputGap,
@@ -342,68 +345,23 @@ class AssemblyWriter
         in bool globalComplement,
     )
     {
-        auto spliceSites = insertion.payload.spliceSites;
-        auto contigId = cast(id_t) begin.contigId;
-        auto contigLength = insertion.payload.contigLength;
-        size_t spliceStart;
-        size_t spliceEnd;
+        auto insertionInfo = getInfoForExistingContig(begin, insertion, globalComplement);
 
-        assert(contigLength > 0);
-
-        switch (spliceSites.length)
-        {
-        case 0:
-            spliceStart = 0;
-            spliceEnd = contigLength;
-            break;
-        case 1:
-            auto splicePosition = spliceSites[0].croppingRefPosition.value;
-
-            if (splicePosition < contigLength / 2)
-            {
-                spliceStart = splicePosition;
-                spliceEnd = contigLength;
-            }
-            else
-            {
-                spliceStart = 0;
-                spliceEnd = splicePosition;
-            }
-            break;
-        case 2:
-            assert(spliceSites.length == 2);
-            assert(spliceSites[0].croppingRefPosition.contigId
-                    == spliceSites[1].croppingRefPosition.contigId);
-
-            spliceStart = spliceSites[0].croppingRefPosition.value;
-            spliceEnd = spliceSites[1].croppingRefPosition.value;
-
-            if (spliceEnd < spliceStart)
-            {
-                swap(spliceStart, spliceEnd);
-            }
-            break;
-        default:
-            assert(0, "too many spliceSites");
-        }
-
-        assert(globalComplement != (begin < insertion.target(begin)));
-
-        auto contigSequence = getFastaSequence(options.refDb, contigId, options.workdir);
-        contigSequence = contigSequence[spliceStart .. spliceEnd];
+        auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
+        contigSequence = contigSequence[insertionInfo.spliceStart .. insertionInfo.spliceEnd];
 
         logJsonDebug(
             "info", "writing contig insertion",
-            "contigId", contigId,
-            "contigLength", contigLength,
-            "spliceStart", spliceStart,
-            "spliceEnd", spliceEnd,
-            "spliceSites", spliceSites.toJson,
+            "contigId", insertionInfo.contigId,
+            "contigLength", insertion.payload.contigLength,
+            "spliceStart", insertionInfo.spliceStart,
+            "spliceEnd", insertionInfo.spliceEnd,
+            "spliceSites", insertion.payload.spliceSites.toJson,
             "start", insertion.start.toJson,
             "end", insertion.end.toJson,
         );
 
-        if (globalComplement)
+        if (insertionInfo.complement)
             contigSequence.reverseComplementer.copy(writer);
         else
             contigSequence.copy(writer);
@@ -413,9 +371,11 @@ class AssemblyWriter
         in Insertion insertion,
     )
     {
+        auto insertionInfo = getInfoForGap(insertion);
+
         logJsonDebug(
             "info", "writing gap",
-            "gapLength", insertion.payload.contigLength,
+            "gapLength", insertionInfo.length,
             "start", insertion.start.toJson,
             "end", insertion.end.toJson,
         );
@@ -423,7 +383,7 @@ class AssemblyWriter
         enum char unkownBase = 'n';
         unkownBase
             .repeat
-            .takeExactly(insertion.payload.contigLength)
+            .takeExactly(insertionInfo.length)
             .copy(writer);
     }
 
@@ -433,30 +393,22 @@ class AssemblyWriter
         in bool globalComplement,
     )
     {
-        auto spliceSites = insertion.payload.spliceSites;
-        auto effectiveComplement = spliceSites[0].flags.complement ^ globalComplement;
-
-        assert(
-            (insertion.isExtension && spliceSites.length == 1) ^
-            (insertion.isGap && spliceSites.length == 2)
-        );
-
-        auto newSequence = insertion.payload.sequence;
+        auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
 
         logJsonDebug(
             "info", "writing new sequence insertion",
             "type", insertion.isGap ? "gap" : "extension",
             "insertionLength", insertion.payload.sequence.length,
             "isAntiParallel", insertion.isAntiParallel,
-            "localComplement", spliceSites[0].flags.complement,
+            "localComplement", insertion.payload.spliceSites[0].flags.complement,
             "start", insertion.start.toJson,
             "end", insertion.end.toJson,
         );
 
-        if (effectiveComplement)
-            newSequence.bases!(char, Yes.reverse).map!(complement!char).copy(writer);
+        if (insertionInfo.complement)
+            insertionInfo.sequence.bases!(char, Yes.reverse).map!(complement!char).copy(writer);
         else
-            newSequence.bases!char.copy(writer);
+            insertionInfo.sequence.bases!char.copy(writer);
 
     }
 }

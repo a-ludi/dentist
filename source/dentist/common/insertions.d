@@ -9,9 +9,10 @@
 module dentist.common.insertions;
 
 import dentist.common : ReferencePoint;
-import dentist.common.alignments : AlignmentChain;
+import dentist.common.alignments : AlignmentChain, id_t;
 import dentist.common.binio : CompressedSequence;
 import dentist.common.scaffold :
+    ContigNode,
     ContigPart,
     isDefault,
     isExtension,
@@ -19,9 +20,10 @@ import dentist.common.scaffold :
     Scaffold;
 import std.algorithm :
     canFind,
-    filter;
+    filter,
+    swap;
 import std.array : array;
-import std.typecons : Flag, Tuple;
+import std.typecons : Flag, tuple, Tuple;
 
 /// Information about the point where the two sequences should be spliced.
 alias SpliceSite = Tuple!(
@@ -114,4 +116,100 @@ OutputScaffold fixContigCropping(OutputScaffold scaffold)
     }
 
     return scaffold;
+}
+
+auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bool globalComplement)
+{
+    auto spliceSites = insertion.payload.spliceSites;
+    auto contigId = cast(id_t) begin.contigId;
+    auto contigLength = insertion.payload.contigLength;
+    size_t spliceStart;
+    size_t spliceEnd;
+
+    assert(contigLength > 0);
+
+    switch (spliceSites.length)
+    {
+    case 0:
+        spliceStart = 0;
+        spliceEnd = contigLength;
+        break;
+    case 1:
+        auto splicePosition = spliceSites[0].croppingRefPosition.value;
+
+        if (splicePosition < contigLength / 2)
+        {
+            spliceStart = splicePosition;
+            spliceEnd = contigLength;
+        }
+        else
+        {
+            spliceStart = 0;
+            spliceEnd = splicePosition;
+        }
+        break;
+    case 2:
+        assert(spliceSites.length == 2);
+        assert(spliceSites[0].croppingRefPosition.contigId
+                == spliceSites[1].croppingRefPosition.contigId);
+
+        spliceStart = spliceSites[0].croppingRefPosition.value;
+        spliceEnd = spliceSites[1].croppingRefPosition.value;
+
+        if (spliceEnd < spliceStart)
+        {
+            swap(spliceStart, spliceEnd);
+        }
+        break;
+    default:
+        assert(0, "too many spliceSites");
+    }
+
+    assert(globalComplement != (begin < insertion.target(begin)));
+
+    return tuple!(
+        "contigId",
+        "contigLength",
+        "spliceStart",
+        "spliceEnd",
+        "length",
+        "complement",
+    )(
+        contigId,
+        contigLength,
+        spliceStart,
+        spliceEnd,
+        spliceEnd - spliceStart,
+        globalComplement,
+    );
+}
+
+auto getInfoForGap(in Insertion insertion)
+{
+    return tuple!("length")(insertion.payload.contigLength);
+}
+
+auto getInfoForNewSequenceInsertion(
+    in ContigNode begin,
+    in Insertion insertion,
+    in bool globalComplement,
+)
+{
+    auto spliceSites = insertion.payload.spliceSites;
+    auto effectiveComplement = spliceSites[0].flags.complement ^ globalComplement;
+
+    assert(
+        (insertion.isExtension && spliceSites.length == 1) ^
+        (insertion.isGap && spliceSites.length == 2)
+    );
+
+    return tuple!(
+        "sequence",
+        "length",
+        "complement",
+    )(
+        insertion.payload.sequence,
+        insertion.payload.sequence.length,
+        effectiveComplement,
+    );
 }
