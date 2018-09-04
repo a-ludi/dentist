@@ -149,7 +149,9 @@ ReturnCode run(in string[] args)
     }
     catch (Exception e)
     {
-        stderr.writeln("Error: " ~ e.msg);
+        stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
+            ? e.to!string
+            : e.msg));
         stderr.writeln();
         stderr.write(usageString!BaseOptions(executableName));
 
@@ -172,7 +174,9 @@ ReturnCode run(in string[] args)
     }
     catch (Exception e)
     {
-        stderr.writeln(e.to!string);
+        stderr.writeln(shouldLog(LogLevel.diagnostic)
+            ? e.to!string
+            : e.msg);
 
         return ReturnCode.runtimeError;
     }
@@ -1161,7 +1165,9 @@ private
         }
         catch (Exception e)
         {
-            stderr.writeln("Error: " ~ e.msg);
+            stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
+                ? e.to!string
+                : e.msg));
             stderr.writeln();
             stderr.write(usage);
 
@@ -1182,7 +1188,9 @@ private
         }
         catch (Exception e)
         {
-            stderr.writeln("Error: " ~ e.to!string);
+            stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
+                ? e.to!string
+                : e.msg));
 
             return ReturnCode.runtimeError;
         }
