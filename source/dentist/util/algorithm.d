@@ -8,6 +8,7 @@
 */
 module dentist.util.algorithm;
 
+import std.algorithm : copy, min, uniq;
 import std.conv : to;
 import std.functional : binaryFun, unaryFun;
 import std.traits : isDynamicArray;
@@ -170,4 +171,27 @@ private struct SliceByImpl(alias pred, Array)
 
         return array[sliceStart .. sliceEnd];
     }
+}
+
+/// Returns array `uniq`ified in-place.
+Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
+{
+    auto bufferRest = array.uniq.copy(array);
+
+    array = array[0 .. $ - bufferRest.length];
+
+    return array;
+}
+
+///
+unittest
+{
+    auto arr = [1, 2, 2, 2, 3, 3, 4];
+
+    assert(uniqInPlace(arr) == [1, 2, 3, 4]);
+    // The input array gets modified.
+    assert(arr == [1, 2, 3, 4]);
+
+    // Can be called with non-lvalues
+    assert(uniqInPlace([1, 2, 2, 2, 3, 3, 4]) == [1, 2, 3, 4]);
 }
