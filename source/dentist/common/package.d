@@ -61,6 +61,39 @@ alias ReadInterval = ReadRegion.TaggedInterval;
 /// A point on a read.
 alias ReadPoint = ReadRegion.TaggedPoint;
 
+/// A point on the output assembly.
+struct OutputCoordinate
+{
+    static enum OriginType : ubyte
+    {
+        global,
+        contig,
+        scaffold,
+        scaffoldContig,
+    }
+
+    id_t scaffoldId;
+    id_t contigId;
+    coord_t coord;
+
+    @property coord_t idx() const pure nothrow
+    {
+        return coord - 1;
+    }
+
+    @property OriginType originType() const pure nothrow
+    {
+        if (scaffoldId == 0 && contigId == 0)
+            return OriginType.global;
+        else if (scaffoldId == 0 && contigId > 0)
+            return OriginType.contig;
+        else if (scaffoldId > 0 && contigId == 0)
+            return OriginType.scaffold;
+        else
+            return OriginType.scaffoldContig;
+    }
+}
+
 /// Returns the alignment region of alignmentChain.
 R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
         if (__traits(isSame, TemplateOf!R, Region))

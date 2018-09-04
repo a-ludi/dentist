@@ -19,7 +19,10 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
-import dentist.common : isTesting, testingOnly;
+import dentist.common :
+    isTesting,
+    OutputCoordinate,
+    testingOnly;
 import dentist.common.alignments :
     id_t,
     trace_point_t;
@@ -45,7 +48,14 @@ import dentist.swinfo :
     version_;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
-import std.algorithm : among, each, endsWith, filter, find, map, startsWith;
+import std.algorithm :
+    among,
+    each,
+    endsWith,
+    filter,
+    find,
+    map,
+    startsWith;
 import std.conv;
 import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
@@ -54,6 +64,7 @@ import std.meta : AliasSeq, staticMap, staticSort;
 import std.parallelism : defaultPoolThreads, totalCPUs;
 import std.path : absolutePath, buildPath;
 import std.range : only, takeOne;
+import std.regex : ctRegex, matchFirst;
 import std.stdio : File, stderr;
 import std.string : join, tr, wrap;
 import std.traits :
@@ -90,6 +101,7 @@ mixin("enum DentistCommand {" ~
     "showInsertions," ~
     "mergeInsertions," ~
     "output," ~
+    testingOnly!"translateCoords," ~
 "}");
 
 struct TestingCommand
@@ -463,6 +475,43 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.translateCoords,
+    ))
+    {
+        @Argument("<in:debug-graph>")
+        @Help(q"{
+            read the assembly graph from <debug-graph> generate
+            (see `--debug-graph` of the `output` command)
+        }")
+        @Validate!validateFileExists
+        string assemblyGraphFile;
+    }
+
+    static if (command.among(
+        TestingCommand.translateCoords,
+    ))
+    {
+        @Argument("<coord-string>")
+        @Help(q"{
+            translate coordinate(s) given by <coord-string> of the result into
+            coordinates on the reference. Coordinates are always 1-based.
+            A <coord-string> the format `scaffold/<uint:scaffold-id>/<uint:coord>`
+            which describes a coordinate on `>scaffold-<scaffold-id>` starting
+            a the first base pair of the scaffold
+        }")
+        @Validate!validateCoordString
+        string coordString;
+
+        OutputCoordinate outputCoordinate;
+
+        @PostValidate()
+        void hookParseCoordString()
+        {
+            outputCoordinate = parseCoordString(coordString);
+        }
+    }
+
+    static if (command.among(
         TestingCommand.translocateGaps,
     ))
     {
@@ -743,6 +792,7 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.showMask,
         DentistCommand.showPileUps,
         DentistCommand.showInsertions,
+        TestingCommand.translateCoords,
     ))
     {
         @Option("json", "j")
@@ -1087,6 +1137,11 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.output)
         enum commandSummary = q"{
             Write output.
+        }".wrap;
+    else static if (command == TestingCommand.translateCoords)
+        enum commandSummary = q"{
+            Translate coordinates of result assembly to coordinates of
+            input assembly.
         }".wrap;
     else
         static assert(0, "missing commandSummary for " ~ command.to!string);
@@ -1508,6 +1563,91 @@ private
                     "file", fileName,
                 );
             }
+        }
+    }
+
+    void validateCoordString(string coordString)
+    {
+        cast(void) parseCoordString(coordString);
+    }
+
+    OutputCoordinate parseCoordString(string coordString)
+    {
+        enum coordRegex = ctRegex!`^(scaffold/(?P<scaffoldId>\d+)/)?(contig/(?P<contigId>\d+)/)?(?P<coord>\d+)$`;
+        OutputCoordinate coord;
+
+        auto matches = coordString.matchFirst(coordRegex);
+
+        enforce!CLIException(cast(bool) matches, "ill-formatted coord-string");
+
+        coord.coord = matches["coord"].to!(typeof(coord.coord));
+        enforce!CLIException(coord.coord > 0, "<coord> is 1-based");
+
+        if (matches["contigId"] != "")
+        {
+            coord.contigId = matches["contigId"].to!(typeof(coord.contigId));
+            enforce!CLIException(coord.contigId > 0, "<contig-id> is 1-based");
+        }
+
+        if (matches["scaffoldId"] != "")
+        {
+            coord.scaffoldId = matches["scaffoldId"].to!(typeof(coord.scaffoldId));
+            enforce!CLIException(coord.scaffoldId > 0, "<scaffold-id> is 1-based");
+        }
+
+        enforce!CLIException(
+            coord.originType == OutputCoordinate.OriginType.scaffold,
+            "not yet implemented; use format `scaffold/<uint:scaffold-id>/<uint:coord>`",
+        );
+
+        return coord;
+    }
+
+    unittest
+    {
+        import std.exception : assertThrown;
+
+        {
+            auto coord = parseCoordString(`scaffold/1125/42`);
+            assert(coord.scaffoldId == 1125);
+            assert(coord.contigId == 0);
+            assert(coord.coord == 42);
+            assert(coord.idx == 41);
+            assert(coord.originType == OutputCoordinate.OriginType.scaffold);
+        }
+        {
+            auto coord = parseCoordString(`scaffold/1125/contig/13/42`);
+            assert(coord.scaffoldId == 1125);
+            assert(coord.contigId == 13);
+            assert(coord.coord == 42);
+            assert(coord.idx == 41);
+            assert(coord.originType == OutputCoordinate.OriginType.scaffoldContig);
+        }
+        {
+            auto coord = parseCoordString(`contig/7/42`);
+            assert(coord.scaffoldId == 0);
+            assert(coord.contigId == 7);
+            assert(coord.coord == 42);
+            assert(coord.idx == 41);
+            assert(coord.originType == OutputCoordinate.OriginType.contig);
+        }
+        {
+            auto coord = parseCoordString(`42`);
+            assert(coord.scaffoldId == 0);
+            assert(coord.contigId == 0);
+            assert(coord.coord == 42);
+            assert(coord.idx == 41);
+            assert(coord.originType == OutputCoordinate.OriginType.global);
+        }
+        {
+            assertThrown!CLIException(parseCoordString(`scaffold/0/42`));
+            assertThrown!CLIException(parseCoordString(`scaffold/1125/0`));
+            assertThrown!CLIException(parseCoordString(`scaffold/0/contig/1/42`));
+            assertThrown!CLIException(parseCoordString(`scaffold/1125/contig/0/42`));
+            assertThrown!CLIException(parseCoordString(`scaffold/1125/contig/1/0`));
+            assertThrown!CLIException(parseCoordString(`contig/0/42`));
+            assertThrown!CLIException(parseCoordString(`contig/7/0`));
+            assertThrown!CLIException(parseCoordString(`0`));
         }
     }
 
