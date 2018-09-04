@@ -317,7 +317,7 @@ class AssemblyWriter
 
     protected void writeHeader(in ContigNode begin)
     {
-        format!"> scaffold-%d\n"(begin.contigId).copy(writer);
+        format!">scaffold-%d\n"(begin.contigId).copy(writer);
     }
 
     protected void writeInsertion(
