@@ -21,6 +21,23 @@ public import dentist.common.alignments;
 public import dentist.common.binio;
 public import dentist.common.scaffold;
 
+
+/// True iff building with testing command.
+version (DentistTesting)
+    enum isTesting = true;
+else
+    enum isTesting = false;
+
+/// Evaluate to `value` if building with testing command;
+/// otherwise to `typeof(value).init`.
+template testingOnly(alias value)
+{
+    static if (isTesting)
+        enum testingOnly = value;
+    else
+        enum testingOnly = typeof(value).init;
+}
+
 /// Thrown if some runtime error in the `dentist` algorithm occurs.
 class DentistException : Exception
 {

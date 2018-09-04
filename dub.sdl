@@ -18,5 +18,5 @@ preBuildCommands "./update-swinfo.sh"
 configuration "default"
 
 configuration "testing" {
-    versions     "Testing"
+    versions     "DentistTesting"
 }

@@ -19,6 +19,7 @@ import darg :
     OptionFlag,
     parseArgs,
     usageString;
+import dentist.common : isTesting, testingOnly;
 import dentist.common.alignments :
     id_t,
     trace_point_t;
@@ -77,19 +78,6 @@ enum ReturnCode
     runtimeError,
 }
 
-private template testingOnly(alias value)
-{
-    version (Testing)
-        enum testingOnly = value;
-    else
-        enum testingOnly = typeof(value).init;
-}
-
-version (Testing)
-    enum isTesting = true;
-else
-    enum isTesting = false;
-
 /// Possible returns codes of the command line execution.
 mixin("enum DentistCommand {" ~
     testingOnly!"translocateGaps," ~
@@ -110,7 +98,7 @@ struct TestingCommand
 
     static DentistCommand opDispatch(string command)() pure nothrow
     {
-        version (Testing)
+        static if (isTesting)
             return mixin("DentistCommand." ~ command);
         else
             return cast(DentistCommand) size_t.max;

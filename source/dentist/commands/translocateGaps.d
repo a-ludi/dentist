@@ -8,7 +8,9 @@
 */
 module dentist.commands.translocateGaps;
 
-version (Testing):
+import dentist.common : isTesting;
+
+static if (isTesting):
 
 import dentist.commandline : TestingCommand, OptionsFor;
 import dentist.common :
