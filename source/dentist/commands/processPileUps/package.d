@@ -166,7 +166,7 @@ class PileUpProcessor
         return pileUp;
     }
 
-    protected void processPileUp(PileUp pileUp, Insertion[] insertionsBuffer)
+    protected void processPileUp(PileUp pileUp, Insertion[] insertionsBuffer) const
     {
         mixin(traceExecution);
 
@@ -242,7 +242,7 @@ class PileUpProcessor
         InsertionDb.write(options.insertionsFile, insertions);
     }
 
-    protected size_t bestReadAlignmentIndex(in PileUp pileUp) pure
+    protected size_t bestReadAlignmentIndex(in PileUp pileUp) const pure
     {
         auto pileUpType = pileUp.getType;
 
@@ -261,7 +261,7 @@ class PileUpProcessor
         T croppingResult,
         in string insertSequence,
         in ReadAlignment referenceRead,
-    )
+    ) const
     {
         assert(croppingResult.referencePositions.length == 1);
 
@@ -274,7 +274,7 @@ class PileUpProcessor
         return extensionLength < options.minExtensionLength;
     }
 
-    protected Insertion makeInsertions(
+    protected static Insertion makeInsertions(
         ReadAlignment referenceRead,
         CompressedSequence compressedSequence,
         ReferencePoint[] referencePositions,
@@ -292,7 +292,7 @@ class PileUpProcessor
         return insertion;
     }
 
-    protected Insertion[] makeFlankingContigSlices(ref ReferencePoint[] referencePositions)
+    protected static Insertion[] makeFlankingContigSlices(ref ReferencePoint[] referencePositions)
     {
         return referencePositions
             .map!(referencePosition => {
