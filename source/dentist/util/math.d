@@ -162,25 +162,37 @@ unittest
 
 class EdgeExistsException : Exception
 {
-    this()
+    pure nothrow @nogc @safe this(
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable nextInChain = null,
+    )
     {
-        super("edge cannot be inserted: edge already exists");
+        super("edge cannot be inserted: edge already exists", file, line, nextInChain);
     }
 }
 
 class MissingEdgeException : Exception
 {
-    this()
+    pure nothrow @nogc @safe this(
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable nextInChain = null,
+    )
     {
-        super("edge not found");
+        super("edge not found", file, line, nextInChain);
     }
 }
 
 class MissingNodeException : Exception
 {
-    this()
+    pure nothrow @nogc @safe this(
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable nextInChain = null,
+    )
     {
-        super("node not found");
+        super("node not found", file, line, nextInChain);
     }
 }
 
