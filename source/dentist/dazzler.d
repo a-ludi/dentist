@@ -61,8 +61,14 @@ import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writeln;
 
-/// File suffixes of hidden DB files.
-private immutable hiddenDbFileSuffixes = [".bps", ".hdr", ".idx"];
+/// File suffixes of hidden .db files.
+private immutable hiddenDbFileSuffixes = [".bps", ".idx"];
+
+/// File suffixes of hidden .dam files.
+private immutable hiddenDamFileSuffixes = [".bps", ".hdr", ".idx"];
+
+/// Constant holding the .db file extension.
+immutable dbFileExtension = ".db";
 
 /// Constant holding the .dam file extension.
 immutable damFileExtension = ".dam";
@@ -81,7 +87,12 @@ auto getHiddenDbFiles(string dbFile)
 {
     import std.algorithm : map;
 
-    return hiddenDbFileSuffixes.map!(suffix => buildPath(dbFile.dirName,
+    assert(dbFile.endsWith(dbFileExtension, damFileExtension), "must use with Dazzler DB");
+    auto suffixes = dbFile.endsWith(dbFileExtension)
+        ? hiddenDbFileSuffixes
+        : hiddenDamFileSuffixes;
+
+    return suffixes.map!(suffix => buildPath(dbFile.dirName,
             "." ~ dbFile.baseName.withExtension(suffix).to!string));
 }
 
