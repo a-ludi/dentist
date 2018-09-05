@@ -18,6 +18,7 @@ import dentist.common.scaffold :
     isExtension,
     isGap,
     Scaffold;
+import dentist.util.math : add;
 import std.algorithm :
     canFind,
     filter,

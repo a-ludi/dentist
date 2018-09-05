@@ -48,6 +48,7 @@ import dentist.dazzler :
     ScaffoldSegment;
 import dentist.util.fasta : complement, reverseComplementer;
 import dentist.util.log;
+import dentist.util.math : add, bulkAdd;
 import dentist.util.range : wrapLines;
 import std.algorithm :
     canFind,

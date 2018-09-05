@@ -9,12 +9,33 @@
 module dentist.common.scaffold;
 
 import dentist.util.log;
-import dentist.util.math : Graph, MissingNodeException, NaturalNumberSet;
-import std.algorithm : count, equal, filter, fold, joiner, map, minElement,
-    setDifference, sum;
+import dentist.util.math :
+    add,
+    bulkAdd,
+    filterEdges,
+    Graph,
+    MissingNodeException,
+    NaturalNumberSet;
+import std.algorithm :
+    count,
+    equal,
+    filter,
+    fold,
+    joiner,
+    map,
+    minElement,
+    setDifference,
+    sum;
 import std.array : appender, array;
 import std.functional : binaryFun;
-import std.range : iota, isForwardRange, only, refRange, retro, save, walkLength;
+import std.range :
+    iota,
+    isForwardRange,
+    only,
+    refRange,
+    retro,
+    save,
+    walkLength;
 import std.typecons : Flag, No, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -23,6 +44,7 @@ debug
     import std.conv : to;
     import std.stdio : writeln;
 }
+
 
 ///
 unittest

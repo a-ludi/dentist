@@ -16,7 +16,7 @@ import std.exception : assertThrown;
 import std.functional : binaryFun, unaryFun;
 import std.range : assumeSorted, chain, ElementType, enumerate, isForwardRange,
     retro, save, walkLength;
-import std.traits : isIntegral, isNumeric, ReturnType;
+import std.traits : isCallable, isIntegral, isNumeric;
 import std.typecons : Flag, No, Yes;
 
 debug import std.stdio : writeln;
@@ -482,7 +482,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         _edges.reserve(edges.length);
         foreach (edge; edges)
         {
-            this.add(edge);
+            add(this, edge);
         }
     }
 
@@ -498,108 +498,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         _edges.data.sort;
     }
 
-    /// Add a set of edges to this graph and merge mutli-edges using `merge`.
-    void bulkAdd(alias merge, R)(R edges) if (isForwardRange!R && is(ElementType!R == Edge))
-    {
-        static assert(is(ReturnType!merge == Edge), "expected `Edge merge(Edge[] multiEdge)`");
-        bulkAddForce(edges);
-
-        auto bufferRest = _edges
-            .data
-            .sliceBy!groupByNodes
-            .map!(unaryFun!merge)
-            .copy(_edges.data);
-        _edges.shrinkTo(_edges.data.length - bufferRest.length);
-    }
-
-    ///
-    unittest
-    {
-        auto g1 = Graph!(int, int)([1, 2]);
-
-        static g1.Edge sumWeights(g1.Edge[] multiEdge)
-        {
-            auto sumOfWeights = multiEdge.map!"a.weight".sum;
-            auto mergedEdge = multiEdge[0];
-            mergedEdge.weight = sumOfWeights;
-
-            return mergedEdge;
-        }
-
-        auto edges = [
-            g1.edge(1, 2, 1),
-            g1.edge(1, 2, 1),
-            g1.edge(1, 2, 1),
-            g1.edge(2, 3, 2),
-            g1.edge(2, 3, 2),
-            g1.edge(3, 4, 3),
-        ];
-        g1.bulkAdd!sumWeights(edges);
-        assert(g1.edges == [
-            g1.edge(1, 2, 3),
-            g1.edge(2, 3, 4),
-            g1.edge(3, 4, 3),
-        ]);
-    }
-
-    /// Add an edge to this graph and handle existing edges with `handleConflict`.
-    /// The handler must have this signature `Edge handleConflict(Edge, Edge)`.
-    Edge add(alias handleConflict = ConflictStrategy.error)(Edge edge)
-    {
-        if (!has(edge.start) || !has(edge.end))
-        {
-            throw new MissingNodeException();
-        }
-
-        auto sortedEdges = assumeSorted!orderByNodes(_edges.data);
-        auto trisectedEdges = sortedEdges.trisect(edge);
-        auto existingEdges = trisectedEdges[1];
-        auto existingEdgeIdx = trisectedEdges[0].length;
-
-        if (existingEdges.empty)
-        {
-            return forceAdd(edge);
-        }
-        else
-        {
-            auto newEdge = binaryFun!handleConflict(existingEdges.front, edge);
-
-            return replaceEdge(existingEdgeIdx, newEdge);
-        }
-    }
-
-    /// ditto
+    /// Add an edge to this graph.
+    /// See_Also: `Edge add(Graph, Edge)`
     void opOpAssign(string op)(Edge edge) if (op == "~")
     {
-        add(edge);
-    }
-
-    ///
-    unittest
-    {
-        auto g1 = Graph!(int, int)([1, 2]);
-
-        auto e1 = g1.edge(1, 2, 1);
-        auto e2 = g1.edge(1, 2, 2);
-
-        g1 ~= e1;
-
-        assertThrown!EdgeExistsException(g1.add(e2));
-
-        with (g1.ConflictStrategy)
-        {
-            g1.add!replace(e2);
-
-            assert(g1.get(g1.edge(1, 2)) == e2);
-
-            g1.add!keep(e1);
-
-            assert(g1.get(g1.edge(1, 2)) == e2);
-
-            g1.add!sumWeights(e2);
-
-            assert(g1.get(g1.edge(1, 2)).weight == 2 * e2.weight);
-        }
+        add(this, edge);
     }
 
     /// Some pre-defined conflict handlers for `add`.
@@ -708,15 +611,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         }
 
         return newEdge;
-    }
-
-    void filterEdges(alias pred)()
-    {
-        auto bufferRest = _edges
-            .data
-            .filter!pred
-            .copy(_edges.data);
-        _edges.shrinkTo(_edges.data.length - bufferRest.length);
     }
 
     /// Check if edge/node exists in this graph. Ignores the weight if weighted.
@@ -1248,6 +1142,125 @@ unittest
         [contigGraph.edge(4, 5, 1)],
         [],
     ]);
+}
+
+/// Add a set of edges to this graph and merge mutli-edges using `merge`.
+void bulkAdd(alias merge, G, R)(ref G graph, R edges)
+        if (is(G : Graph!Params, Params...) && isForwardRange!R && is(ElementType!R == G.Edge))
+{
+    alias Edge = G.Edge;
+    alias ReturnTypeMerge = typeof(merge(new Edge[0]));
+    static assert(is(ReturnTypeMerge == Edge), "expected `Edge merge(Edge[] multiEdge)`");
+
+    graph.bulkAddForce(edges);
+
+    auto bufferRest = graph
+        ._edges
+        .data
+        .sliceBy!(G.groupByNodes)
+        .map!(unaryFun!merge)
+        .copy(graph._edges.data);
+    graph._edges.shrinkTo(graph._edges.data.length - bufferRest.length);
+}
+
+///
+unittest
+{
+    auto g1 = Graph!(int, int)([1, 2]);
+
+    static g1.Edge sumWeights(g1.Edge[] multiEdge)
+    {
+        auto sumOfWeights = multiEdge.map!"a.weight".sum;
+        auto mergedEdge = multiEdge[0];
+        mergedEdge.weight = sumOfWeights;
+
+        return mergedEdge;
+    }
+
+    auto edges = [
+        g1.edge(1, 2, 1),
+        g1.edge(1, 2, 1),
+        g1.edge(1, 2, 1),
+        g1.edge(2, 3, 2),
+        g1.edge(2, 3, 2),
+        g1.edge(3, 4, 3),
+    ];
+    g1.bulkAdd!sumWeights(edges);
+    assert(g1.edges == [
+        g1.edge(1, 2, 3),
+        g1.edge(2, 3, 4),
+        g1.edge(3, 4, 3),
+    ]);
+}
+
+/// Add an edge to this graph and handle existing edges with `handleConflict`.
+/// The handler must have this signature `Edge handleConflict(Edge, Edge)`.
+G.Edge add(alias handleConflict = 1337, G)(ref G graph, G.Edge edge)
+        if (is(G : Graph!Params, Params...))
+{
+    static if (isCallable!handleConflict)
+        alias handleConflict_ = binaryFun!handleConflict;
+    else
+        alias handleConflict_ = binaryFun!(G.ConflictStrategy.error);
+
+    if (!graph.has(edge.start) || !graph.has(edge.end))
+    {
+        throw new MissingNodeException();
+    }
+
+    auto sortedEdges = assumeSorted!(G.orderByNodes)(graph._edges.data);
+    auto trisectedEdges = sortedEdges.trisect(edge);
+    auto existingEdges = trisectedEdges[1];
+    auto existingEdgeIdx = trisectedEdges[0].length;
+
+    if (existingEdges.empty)
+    {
+        return graph.forceAdd(edge);
+    }
+    else
+    {
+        auto newEdge = handleConflict_(existingEdges.front, edge);
+
+        return graph.replaceEdge(existingEdgeIdx, newEdge);
+    }
+}
+
+///
+unittest
+{
+    auto g1 = Graph!(int, int)([1, 2]);
+
+    auto e1 = g1.edge(1, 2, 1);
+    auto e2 = g1.edge(1, 2, 2);
+
+    g1 ~= e1;
+
+    assertThrown!EdgeExistsException(g1.add(e2));
+
+    with (g1.ConflictStrategy)
+    {
+        g1.add!replace(e2);
+
+        assert(g1.get(g1.edge(1, 2)) == e2);
+
+        g1.add!keep(e1);
+
+        assert(g1.get(g1.edge(1, 2)) == e2);
+
+        g1.add!sumWeights(e2);
+
+        assert(g1.get(g1.edge(1, 2)).weight == 2 * e2.weight);
+    }
+}
+
+void filterEdges(alias pred, G)(ref G graph) if (is(G : Graph!Params, Params...))
+{
+    auto bufferRest = graph
+        ._edges
+        .data
+        .filter!pred
+        .copy(graph._edges.data);
+    graph._edges.shrinkTo(graph._edges.data.length - bufferRest.length);
 }
 
 class EmptySetException : Exception
