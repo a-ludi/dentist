@@ -23,7 +23,7 @@ public import dentist.common.binio;
 public import dentist.common.scaffold;
 
 
-/// True iff building with testing command.
+/// True iff building with testing commands.
 version (DentistTesting)
     enum isTesting = true;
 else
