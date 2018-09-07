@@ -19,8 +19,11 @@ import std.algorithm :
     maxElement,
     sum;
 import std.math : log10, lrint, FloatingPointControl;
-import std.stdio : writefln, writeln;
-import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import std.stdio : writefln, writeln, stderr;
+import vibe.data.json :
+    serializeToJsonString,
+    toJson = serializeToJson,
+    toJsonString = serializeToPrettyJson;
 
 /// Execute the `showMask` command with `options`.
 void execute(Options)(in Options options)
@@ -37,6 +40,7 @@ void execute(Options)(in Options options)
             options.workdir,
         ));
 
+        stderr.writeln(serializeToJsonString(maskRegion.intervals));
         statsList ~= statsFor(mask, maskRegion);
 
         if (masks.length > 1)
@@ -44,7 +48,10 @@ void execute(Options)(in Options options)
     }
 
     if (masks.length > 1)
+    {
+        stderr.writeln(serializeToJsonString(mergedMask.intervals));
         statsList ~= statsFor("__merged__", mergedMask);
+    }
 
     if (options.useJson)
         writeln(statsList.toJsonString);
