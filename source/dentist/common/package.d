@@ -129,18 +129,14 @@ R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
 
 size_t insertionScore(Options)(
     in ReadAlignment readAlignment,
-    in ReadAlignmentType pileUpType,
     in ReferenceRegion repeatMask,
-    in Flag!"preferSpanning" preferSpanning,
     in Options options,
 ) pure
 {
     immutable shortAnchorPenaltyMagnitude = AlignmentChain.maxScore / 512;
-    immutable notSpanningPenaltyMagnitude = AlignmentChain.maxScore / 2;
     immutable improperAlignmentPenaltyMagnitude = AlignmentChain.maxScore / 8;
 
     long numAlignments = readAlignment.length;
-    long expectedAlignmentCount = pileUpType == ReadAlignmentType.gap ? 2 : 1;
     auto alignmentAnchor = readAlignment[].map!(to!(ReferenceRegion, "contigA"))
         .fold!"a | b" - repeatMask;
     long avgAnchorSize = alignmentAnchor.size / numAlignments;
@@ -149,15 +145,11 @@ size_t insertionScore(Options)(
     long avgAlignmentScore = readAlignment[].map!"a.score".sum / numAlignments;
     long shortAnchorPenalty = floor(shortAnchorPenaltyMagnitude * (
             (options.goodAnchorLength + 1) / avgAnchorSize.to!float) ^^ 2).to!size_t;
-    long notSpanningPenalty = preferSpanning
-        ? (expectedAlignmentCount - numAlignments) * notSpanningPenaltyMagnitude
-        : 0;
     long improperAlignmentPenalty = readAlignment[].count!"!a.isProper"
         * improperAlignmentPenaltyMagnitude / numAlignments;
     size_t score = max(0, (
           avgAlignmentScore
         - shortAnchorPenalty
-        - notSpanningPenalty
         - improperAlignmentPenalty
     ));
 
@@ -168,7 +160,6 @@ size_t insertionScore(Options)(
         debug logJsonDebug(
             "readId", readId,
             "contigIds", contigIds.toJson,
-            "expectedAlignmentCount", expectedAlignmentCount,
             "avgAnchorSize", avgAnchorSize,
             "avgAlignmentLength", avgAlignmentLength,
             "avgAlignmentScore", avgAlignmentScore,

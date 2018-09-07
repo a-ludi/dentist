@@ -39,6 +39,8 @@ import dentist.dazzler :
     getFastaSequences,
     readMask;
 import std.algorithm :
+    equal,
+    filter,
     find,
     joiner,
     map,
@@ -182,8 +184,10 @@ class PileUpProcessor
                 options.tracePointDistance,
                 options.workdir,
             ));
-            auto referenceReadIdx = bestReadAlignmentIndex(pileUp);
+            auto referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingResult.referencePositions);
             auto referenceRead = pileUp[referenceReadIdx];
+            assert(referenceRead.length == croppingResult.referencePositions.length);
+
             auto consensusDb = getConsensus(
                 croppingResult.db,
                 referenceReadIdx + 1,
@@ -242,16 +246,18 @@ class PileUpProcessor
         InsertionDb.write(options.insertionsFile, insertions);
     }
 
-    protected size_t bestReadAlignmentIndex(in PileUp pileUp) const pure
+    protected size_t bestReadAlignmentIndex(
+        in PileUp pileUp,
+        in ReferencePoint[] referencePositions,
+    ) const pure
     {
-        auto pileUpType = pileUp.getType;
-
         return pileUp
+            .filter!(readAlignment =>
+                readAlignment.length == referencePositions.length &&
+                readAlignment[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
             .map!(readAlignment => insertionScore(
                 readAlignment,
-                pileUpType,
                 repeatMask,
-                Yes.preferSpanning,
                 options,
             ))
             .maxIndex;
