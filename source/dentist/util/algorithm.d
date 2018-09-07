@@ -12,6 +12,7 @@ import std.algorithm : copy, min, uniq;
 import std.conv : to;
 import std.functional : binaryFun, unaryFun;
 import std.traits : isDynamicArray;
+import std.range.primitives;
 
 /**
     Order `a` and `b` lexicographically by applying each `fun` to them. For
@@ -194,4 +195,103 @@ unittest
 
     // Can be called with non-lvalues
     assert(uniqInPlace([1, 2, 2, 2, 3, 3, 4]) == [1, 2, 3, 4]);
+}
+
+/// Get the first element in range assuming it to be non-empty.
+ElementType!Range first(Range)(Range range) if (isInputRange!Range)
+{
+    assert(!range.empty, "must not call first on an empty range");
+
+    return range.front;
+}
+
+///
+unittest
+{
+    assert(first([1, 2, 3]) == 1);
+    assert(first("abcd") == 'a');
+}
+
+/// Get the last element in range assuming it to be non-empty.
+ElementType!Range last(Range)(Range range) if (isInputRange!Range)
+{
+    import std.stdio;
+    assert(!range.empty, "must not call last on an empty range");
+
+    static if (isBidirectionalRange!Range)
+    {
+        return range.back;
+    }
+    else static if (hasLength!Range)
+    {
+        foreach (i; 0 .. range.length - 1)
+            range.popFront();
+
+        return range.front;
+    }
+    else static if (isForwardRange!Range)
+    {
+        auto checkpoint = range;
+
+        while (!range.empty)
+        {
+            checkpoint = range.save;
+            range.popFront();
+        }
+
+        return checkpoint.front;
+    }
+    else
+    {
+        typeof(return) lastElement;
+
+        while (!range.empty)
+        {
+            lastElement = range.front;
+            range.popFront();
+        }
+
+        return lastElement;
+    }
+
+}
+
+///
+unittest
+{
+    import std.algorithm : filter;
+    import std.range : take, takeExactly;
+
+    struct PowersOfTwo(bool shouldSave)
+    {
+        size_t i = 1;
+
+        void popFront() pure nothrow
+        {
+            i *= 2;
+        }
+
+        @property size_t front() const pure nothrow
+        {
+            return i + 0;
+        }
+
+        @property bool empty() const pure nothrow
+        {
+            return false;
+        }
+
+        static if (shouldSave)
+        {
+            @property PowersOfTwo save() const pure nothrow
+            {
+                return cast(typeof(return)) this;
+            }
+        }
+    }
+
+    assert(last([1, 2, 3]) == 3);
+    assert(last(PowersOfTwo!true(1).takeExactly(5)) == 16);
+    assert(last(PowersOfTwo!true(1).take(5)) == 16);
+    assert(last(PowersOfTwo!false(1).take(5)) == 16);
 }
