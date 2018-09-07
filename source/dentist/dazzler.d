@@ -1955,10 +1955,14 @@ Region[] readMask(Region)(in string dbFile, in string maskDestination, in string
 
     size_t currentContig = 1;
 
-    _enforce(maskHeader.numReads == numReads, "mask does not match DB");
+    if (maskHeader.numReads != numReads)
+        logJsonWarn(
+            "info",
+            "mask does not match DB: number of reads does not match",
+        );
     _enforce(maskHeader.size == 0, "corrupted mask: expected 0");
-    _enforce(maskHeader.dataPointers.length == numReads + 1,
-            "corrupted mask: unexpected number of data pointers");
+    _enforce(maskHeader.dataPointers.length == maskHeader.numReads + 1,
+             "corrupted mask: unexpected number of data pointers");
 
     foreach (dataPtrRange; maskHeader.dataPointers[].slide!(No.withPartial)(2))
     {
