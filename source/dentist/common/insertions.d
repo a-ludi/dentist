@@ -9,7 +9,10 @@
 module dentist.common.insertions;
 
 import dentist.common : ReferencePoint;
-import dentist.common.alignments : AlignmentChain, id_t;
+import dentist.common.alignments :
+    AlignmentChain,
+    AlignmentLocationSeed,
+    id_t;
 import dentist.common.binio : CompressedSequence;
 import dentist.common.scaffold :
     ContigNode,
@@ -29,6 +32,7 @@ import std.typecons : Flag, tuple, Tuple;
 /// Information about the point where the two sequences should be spliced.
 alias SpliceSite = Tuple!(
     ReferencePoint, "croppingRefPosition",
+    AlignmentLocationSeed, "alignmentSeed",
     AlignmentChain.Flags, "flags",
 );
 
@@ -137,8 +141,9 @@ auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bo
         break;
     case 1:
         auto splicePosition = spliceSites[0].croppingRefPosition.value;
+        auto spliceSeed = spliceSites[0].alignmentSeed;
 
-        if (splicePosition < contigLength / 2)
+        if (spliceSeed == AlignmentLocationSeed.front)
         {
             spliceStart = splicePosition;
             spliceEnd = contigLength;
@@ -150,17 +155,19 @@ auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bo
         }
         break;
     case 2:
-        assert(spliceSites.length == 2);
         assert(spliceSites[0].croppingRefPosition.contigId
                 == spliceSites[1].croppingRefPosition.contigId);
 
         spliceStart = spliceSites[0].croppingRefPosition.value;
         spliceEnd = spliceSites[1].croppingRefPosition.value;
 
+        assert(
+            (spliceStart < spliceEnd)
+            ==
+            (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed)
+        );
         if (spliceEnd < spliceStart)
-        {
             swap(spliceStart, spliceEnd);
-        }
         break;
     default:
         assert(0, "too many spliceSites");

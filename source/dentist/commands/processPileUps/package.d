@@ -212,7 +212,7 @@ class PileUpProcessor
                 croppingResult.referencePositions,
             );
             insertionsBuffer[1 .. 1 + croppingResult.referencePositions.length] =
-                makeFlankingContigSlices(croppingResult.referencePositions)[];
+                makeFlankingContigSlices(referenceRead, croppingResult.referencePositions)[];
         }
         catch(Exception e)
         {
@@ -290,7 +290,7 @@ class PileUpProcessor
         insertion.payload = InsertionInfo(
             compressedSequence,
             0,
-            zip(referencePositions, referenceRead[].map!"a.flags")
+            zip(referencePositions, referenceRead[].map!"a.alignmentSeed", referenceRead[].map!"a.flags")
                 .map!(spliceSite => cast(SpliceSite) spliceSite)
                 .array,
         );
@@ -298,13 +298,16 @@ class PileUpProcessor
         return insertion;
     }
 
-    protected static Insertion[] makeFlankingContigSlices(ref ReferencePoint[] referencePositions)
+    protected static Insertion[] makeFlankingContigSlices(
+        ReadAlignment referenceRead,
+        ReferencePoint[] referencePositions,
+    )
     {
-        return referencePositions
-            .map!(referencePosition => {
-                auto contigEdge = getDefaultJoin!InsertionInfo(referencePosition.contigId);
+        return zip(referencePositions, referenceRead[])
+            .map!(args => {
+                auto contigEdge = getDefaultJoin!InsertionInfo(args[0].contigId);
                 contigEdge.payload.spliceSites = [
-                    SpliceSite(referencePosition, AlignmentChain.emptyFlags)
+                    SpliceSite(args[0], args[1].alignmentSeed, AlignmentChain.emptyFlags),
                 ];
 
                 return contigEdge;
