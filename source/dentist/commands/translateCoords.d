@@ -37,7 +37,6 @@ import dentist.util.algorithm : uniqInPlace;
 import dentist.util.log;
 import std.algorithm :
     find,
-    joiner,
     map,
     maxElement,
     min,
@@ -48,6 +47,7 @@ import std.conv : to;
 import std.exception : enforce;
 import std.format : format;
 import std.range :
+    chain,
     dropExactly,
     only;
 import std.range.primitives;
@@ -143,9 +143,10 @@ class CoordinateTranslator
 
         auto insertionDb = InsertionDb.parse(options.assemblyGraphFile);
         auto insertions = insertionDb[];
-        auto nodes = insertions
-            .map!(ins => only(ins.start, ins.end))
-            .joiner
+        auto nodes = chain(
+            insertions.map!"a.start".uniq,
+            insertions.map!"a.end".uniq,
+        )
             .array
             .sort
             .release;
