@@ -110,7 +110,7 @@ unittest
 }
 
 /// Each contig has four designated parts where joins can start or end.
-static enum ContigPart
+static enum ContigPart : ubyte
 {
     /// Designates a transcendent point *before* the contig where
     /// front extensions end.
