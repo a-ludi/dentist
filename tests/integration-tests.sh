@@ -47,7 +47,7 @@ DENTIST_OUTPUT_OPTS=(
     --join-policy=contigs
     --debug-graph=graph.db
 )
-BUILD_OPTS=(--build=debug)
+BUILD_OPTS=(--build=debug --config=testing)
 # TODO generate with dentist generate-dazzler-options
 RESULT_TO_REFERENCE_DALIGNER_OPTS=(
     -e.95
