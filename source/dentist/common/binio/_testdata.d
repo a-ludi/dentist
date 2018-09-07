@@ -44,6 +44,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(1, 200),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]
@@ -58,6 +59,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(1, 700),
+                                AlignmentLocationSeed.back,
                                 emptyFlags,
                             ),
                         ]
@@ -72,10 +74,12 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(1, 200),
+                                AlignmentLocationSeed.front,
                                 Flags(complement),
                             ),
                             SpliceSite(
                                 ReferencePoint(206, 3900),
+                                AlignmentLocationSeed.back,
                                 Flags(complement),
                             ),
                         ]
@@ -90,10 +94,12 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(1, 700),
+                                AlignmentLocationSeed.back,
                                 emptyFlags,
                             ),
                             SpliceSite(
                                 ReferencePoint(110, 200),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]
@@ -108,6 +114,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(4, 3300),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]
@@ -122,6 +129,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(4, 3400),
+                                AlignmentLocationSeed.back,
                                 emptyFlags,
                             ),
                         ]
@@ -136,6 +144,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(4, 3400),
+                                AlignmentLocationSeed.back,
                                 Flags(complement),
                             ),
                         ]
@@ -150,6 +159,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(4, 3300),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]
@@ -164,6 +174,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(5, 2600),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]
@@ -178,6 +189,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(5, 2700),
+                                AlignmentLocationSeed.back,
                                 emptyFlags,
                             ),
                         ]
@@ -192,6 +204,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(5, 2700),
+                                AlignmentLocationSeed.back,
                                 Flags(complement),
                             ),
                         ]
@@ -206,6 +219,7 @@ version (unittest)
                         [
                             SpliceSite(
                                 ReferencePoint(5, 2600),
+                                AlignmentLocationSeed.front,
                                 emptyFlags,
                             ),
                         ]

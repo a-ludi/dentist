@@ -20,7 +20,7 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment,
     trace_point_t;
-import dentist.common.binio :
+import dentist.common.binio._base :
     ArrayStorage,
     DbIndex,
     lockIfPossible,

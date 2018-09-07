@@ -12,7 +12,7 @@ module dentist.common.binio.insertiondb;
 import core.exception : AssertError;
 import dentist.common : ReferencePoint;
 import dentist.common.alignments : AlignmentChain;
-import dentist.common.binio :
+import dentist.common.binio._base :
     ArrayStorage,
     CompressedBaseQuad,
     CompressedSequence,
@@ -234,6 +234,7 @@ struct InsertionDb
                         compressedBaseQuads[
                             compressedBaseQuadsSlice[0] .. compressedBaseQuadsSlice[1]
                         ],
+                        insertionStorage.baseOffset,
                         insertionStorage.sequenceLength,
                     ),
                     insertionStorage.contigLength,
@@ -339,6 +340,7 @@ private struct InsertionDbFileWriter(R)
             auto insertionStorage = InsertionStorage(
                 insertion.start,
                 insertion.end,
+                insertion.payload.sequence.baseOffset,
                 insertion.payload.sequence.length,
                 compressedBaseQuads,
                 insertion.payload.contigLength,
@@ -545,6 +547,7 @@ private struct InsertionStorage
 {
     ContigNode start;
     ContigNode end;
+    ubyte baseOffset;
     size_t sequenceLength;
     StorageType!(CompressedBaseQuad[]) sequence;
     size_t contigLength;
