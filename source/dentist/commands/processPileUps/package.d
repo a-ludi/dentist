@@ -290,7 +290,7 @@ class PileUpProcessor
         insertion.payload = InsertionInfo(
             compressedSequence,
             0,
-            zip(referencePositions, referenceRead[].map!"a.alignmentSeed", referenceRead[].map!"a.flags")
+            zip(referencePositions, referenceRead[].map!"a.seed", referenceRead[].map!"a.flags")
                 .map!(spliceSite => cast(SpliceSite) spliceSite)
                 .array,
         );
@@ -307,7 +307,7 @@ class PileUpProcessor
             .map!(args => {
                 auto contigEdge = getDefaultJoin!InsertionInfo(args[0].contigId);
                 contigEdge.payload.spliceSites = [
-                    SpliceSite(args[0], args[1].alignmentSeed, AlignmentChain.emptyFlags),
+                    SpliceSite(args[0], args[1].seed, AlignmentChain.emptyFlags),
                 ];
 
                 return contigEdge;
