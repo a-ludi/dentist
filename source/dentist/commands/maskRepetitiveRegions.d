@@ -317,7 +317,7 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
             return ReferenceRegion();
         }
 
-        static immutable OK = CoverageZone.ok;
+        static enum OK = CoverageZone.ok;
         auto maskAcc = appender!(ReferenceInterval[]);
         auto masker = Masker();
         auto changeEvents = coverageChanges(alignments);

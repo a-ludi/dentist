@@ -62,19 +62,19 @@ import vibe.data.json : Json, toJson = serializeToJson;
 debug import std.stdio : writeln;
 
 /// File suffixes of hidden .db files.
-private immutable hiddenDbFileSuffixes = [".bps", ".idx"];
+private enum hiddenDbFileSuffixes = [".bps", ".idx"];
 
 /// File suffixes of hidden .dam files.
-private immutable hiddenDamFileSuffixes = [".bps", ".hdr", ".idx"];
+private enum hiddenDamFileSuffixes = [".bps", ".hdr", ".idx"];
 
 /// Constant holding the .db file extension.
-immutable dbFileExtension = ".db";
+enum dbFileExtension = ".db";
 
 /// Constant holding the .dam file extension.
-immutable damFileExtension = ".dam";
+enum damFileExtension = ".dam";
 
 /// The Dazzler tools require sequence of a least minSequenceLength base pairs.
-immutable minSequenceLength = 14;
+enum minSequenceLength = 14;
 
 enum isOptionsList(T) = isArray!T && isSomeString!(ElementType!T);
 
@@ -187,7 +187,7 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
-    immutable outDbNameTemplate = "subset-XXXXXX";
+    enum outDbNameTemplate = "subset-XXXXXX";
 
     auto outDbTemplate = buildPath(options.workdir, outDbNameTemplate);
     auto outDb = mkstemp(outDbTemplate, damFileExtension);
@@ -760,7 +760,7 @@ private:
 
     void readMaxTracePointCount()
     {
-        immutable maxTracePointCountFormat = LasDumpLineFormat.maxTracePointCount.format;
+        enum maxTracePointCountFormat = LasDumpLineFormat.maxTracePointCount.format;
 
         currentDumpLine[].formattedRead!maxTracePointCountFormat(maxTracePointCount);
 
@@ -769,9 +769,9 @@ private:
 
     Flag!"wasDumpPartConsumed" readChainPart()
     {
-        immutable chainPartFormat = LasDumpLineFormat.chainPart.format;
-        immutable yesComplement = AlignmentChain.Flags(AlignmentChain.Flag.complement);
-        immutable noComplement = AlignmentChain.emptyFlags;
+        enum chainPartFormat = LasDumpLineFormat.chainPart.format;
+        enum yesComplement = AlignmentChain.Flags(AlignmentChain.Flag.complement);
+        enum noComplement = AlignmentChain.emptyFlags;
         id_t contigAID;
         id_t contigBID;
         char rawComplement;
@@ -844,7 +844,7 @@ private:
 
     void readLengths()
     {
-        immutable lengthsFormat = LasDumpLineFormat.lengths.format;
+        enum lengthsFormat = LasDumpLineFormat.lengths.format;
 
         currentDumpLine[].formattedRead!lengthsFormat(
             currentAC.contigA.length,
@@ -853,7 +853,7 @@ private:
     }
     void readCoordinates()
     {
-        immutable coordinatesFormat = LasDumpLineFormat.coordinates.format;
+        enum coordinatesFormat = LasDumpLineFormat.coordinates.format;
         LocalAlignment currentLA;
 
         currentDumpLine[].formattedRead!coordinatesFormat(
@@ -868,7 +868,7 @@ private:
 
     void readNumDiffs()
     {
-        immutable numDiffsFormat = LasDumpLineFormat.numDiffs.format;
+        enum numDiffsFormat = LasDumpLineFormat.numDiffs.format;
 
         currentDumpLine[].formattedRead!numDiffsFormat(
             localAlignmentsAcc.data[$ - 1].numDiffs,
@@ -877,7 +877,7 @@ private:
 
     void readTracePointBegin()
     {
-        immutable tracePointBeginFormat = LasDumpLineFormat.tracePointBegin.format;
+        enum tracePointBeginFormat = LasDumpLineFormat.tracePointBegin.format;
         size_t numTracePoints;
 
         currentDumpLine[].formattedRead!tracePointBeginFormat(numTracePoints);
@@ -888,7 +888,7 @@ private:
 
     void readTracePoint()
     {
-        immutable tracePointFormat = LasDumpLineFormat.tracePoint.format;
+        enum tracePointFormat = LasDumpLineFormat.tracePoint.format;
         TracePoint currentTP;
 
         currentDumpLine[].formattedRead!tracePointFormat(
@@ -925,7 +925,7 @@ unittest
 {
     import std.algorithm : equal;
 
-    immutable testLasDump = [
+    enum testLasDump = [
         "+ P 9",
         "% P 9",
         "+ T 12",
@@ -1159,7 +1159,7 @@ unittest
 
 trace_point_t getTracePointDistance(in string[] dazzlerOptions = []) pure
 {
-    immutable defaultTracePointDistance = 100;
+    enum defaultTracePointDistance = 100;
 
     foreach (option; dazzlerOptions)
     {
@@ -1286,7 +1286,7 @@ unittest
 {
     import std.algorithm : equal;
 
-    immutable testDbDump = q"EOF
+    enum testDbDump = q"EOF
         + R 2
         + M 0
         + S 100
@@ -1330,10 +1330,10 @@ private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineL
     import std.array : appender;
     import std.range : chunks, drop;
 
-    immutable lineSeparator = '\n';
-    immutable subrecordSeparator = ';';
-    immutable recordFormat = "R %d;H %d %s;L %d %d %d;S %d %s";
-    immutable numRecordLines = recordFormat.count(subrecordSeparator) + 1;
+    enum lineSeparator = '\n';
+    enum subrecordSeparator = ';';
+    enum recordFormat = "R %d;H %d %s;L %d %d %d;S %d %s";
+    enum numRecordLines = recordFormat.count(subrecordSeparator) + 1;
 
     /// Build chunks of numRecordLines lines.
     alias byRecordSplitter = dbDump => dbDump.drop(6).arrayChunks(numRecordLines);
@@ -1393,7 +1393,7 @@ private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineL
 
 unittest
 {
-    immutable testDbDump = q"EOF
+    enum testDbDump = q"EOF
         + R 4
         + M 0
         + H 104539
@@ -1447,7 +1447,7 @@ EOF".outdent;
 string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
-    immutable tempDbNameTemplate = "auxiliary-XXXXXX";
+    enum tempDbNameTemplate = "auxiliary-XXXXXX";
 
     auto tempDbTemplate = buildPath(workdir, tempDbNameTemplate);
     auto tempDb = mkstemp(tempDbTemplate, damFileExtension);
@@ -1614,7 +1614,7 @@ string getLasFile(in string dbA, in string dbB, in string baseDirectory)
 {
     alias dbName = dbFile => dbFile.baseName.stripExtension;
 
-    immutable fileTemplate = "%s/%s.%s.las";
+    enum fileTemplate = "%s/%s.%s.las";
     auto dbAName = dbName(dbA);
     auto dbBName = dbB is null ? dbAName : dbName(dbB);
 
@@ -1635,8 +1635,8 @@ id_t getNumBlocks(in string damFile)
 {
     // see also in dazzler's DB.h:394
     //     #define DB_NBLOCK "blocks = %9d\n"  //  number of blocks
-    immutable blockNumFormat = "blocks = %d";
-    immutable blockNumFormatStart = blockNumFormat[0 .. 6];
+    enum blockNumFormat = "blocks = %d";
+    enum blockNumFormatStart = blockNumFormat[0 .. 6];
     id_t numBlocks;
     auto matchingLine = File(damFile.stripBlock).byLine.filter!(
             line => line.startsWith(blockNumFormatStart)).front;
@@ -1658,8 +1658,8 @@ id_t getNumBlocks(in string damFile)
 
 id_t getNumContigs(in string damFile, in string workdir)
 {
-    immutable contigNumFormat = "+ R %d";
-    immutable contigNumFormatStart = contigNumFormat[0 .. 4];
+    enum contigNumFormat = "+ R %d";
+    enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
     auto matchingLine = dbdump(damFile, empty, [], workdir)
@@ -1684,7 +1684,7 @@ id_t getNumContigs(in string damFile, in string workdir)
 auto getScaffoldStructure(Options)(in string damFile, in Options options)
         if (isSomeString!(typeof(options.workdir)))
 {
-    immutable string[] dbshowOptions = [DBshowOptions.noSequence];
+    enum string[] dbshowOptions = [DBshowOptions.noSequence];
 
     auto rawScaffoldInfo = dbshow(damFile, dbshowOptions, options.workdir);
 
@@ -1736,7 +1736,7 @@ struct GapSegment
 
 private struct ScaffoldStructureReader
 {
-    static immutable scaffoldInfoLineFormat = "%s:: Contig %d[%d,%d]";
+    static enum scaffoldInfoLineFormat = "%s:: Contig %d[%d,%d]";
     alias RawScaffoldInfo = typeof("".lineSplitter);
 
     private RawScaffoldInfo rawScaffoldInfo;
@@ -2393,7 +2393,7 @@ private
         import std.process : Config, pipeProcess, Redirect, wait;
         import std.range : chunks;
 
-        immutable writeChunkSize = 1024 * 1024;
+        enum writeChunkSize = 1024 * 1024;
         auto outFileArg = outFile.relativeToWorkdir(workdir);
         auto command = ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFileArg];
 
@@ -2519,7 +2519,7 @@ private
     {
         static struct LinesPipe
         {
-            static immutable lineTerminator = "\n";
+            static enum lineTerminator = "\n";
 
             private const string[] command;
             private const string workdir;
@@ -2712,7 +2712,7 @@ private
     {
         import std.regex : ctRegex, replaceFirst;
 
-        immutable blockNumRegex = ctRegex!(`\.[1-9][0-9]*\.(dam|db)$`);
+        enum blockNumRegex = ctRegex!(`\.[1-9][0-9]*\.(dam|db)$`);
 
         return fileName.replaceFirst(blockNumRegex, `.$1`);
     }

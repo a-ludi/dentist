@@ -133,8 +133,8 @@ size_t insertionScore(Options)(
     in Options options,
 ) pure
 {
-    immutable shortAnchorPenaltyMagnitude = AlignmentChain.maxScore / 512;
-    immutable improperAlignmentPenaltyMagnitude = AlignmentChain.maxScore / 8;
+    enum shortAnchorPenaltyMagnitude = AlignmentChain.maxScore / 512;
+    enum improperAlignmentPenaltyMagnitude = AlignmentChain.maxScore / 8;
 
     long numAlignments = readAlignment.length;
     auto alignmentAnchor = readAlignment[].map!(to!(ReferenceRegion, "contigA"))

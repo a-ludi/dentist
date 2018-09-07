@@ -76,8 +76,8 @@ struct AlignmentChain
         coord_t length;
     }
 
-    static immutable maxScore = 2 ^^ 16;
-    static immutable Flags emptyFlags;
+    static enum maxScore = 2 ^^ 16;
+    static enum emptyFlags = Flags();
 
     id_t id;
     Contig contigA;

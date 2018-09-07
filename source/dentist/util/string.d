@@ -23,7 +23,7 @@ import std.traits : isSomeString;
 */
 S indent(S)(S str, in size_t indentSize = 4) if (isSomeString!S)
 {
-    immutable lineSep = "\n";
+    enum lineSep = "\n";
     alias indentLine = (line) => chain(" ".cycle.take(line.length == 0 ? 0 : indentSize), line);
 
     return str[]

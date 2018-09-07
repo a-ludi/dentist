@@ -202,8 +202,8 @@ class MissingNodeException : Exception
 /// set of edges is mutable.
 struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, EdgePayload = void)
 {
-    static immutable isWeighted = !is(Weight == void);
-    static immutable hasEdgePayload = !is(EdgePayload == void);
+    static enum isWeighted = !is(Weight == void);
+    static enum hasEdgePayload = !is(EdgePayload == void);
 
     static struct Edge
     {
@@ -1273,11 +1273,11 @@ class EmptySetException : Exception
 
 struct NaturalNumberSet
 {
-    private static immutable partSize = 8 * size_t.sizeof;
-    private static immutable size_t firstBit = 1;
-    private static immutable size_t lastBit = firstBit << (partSize - 1);
-    private static immutable size_t emptyPart = 0;
-    private static immutable size_t fullPart = ~emptyPart;
+    private static enum partSize = 8 * size_t.sizeof;
+    private static enum size_t firstBit = 1;
+    private static enum size_t lastBit = firstBit << (partSize - 1);
+    private static enum size_t emptyPart = 0;
+    private static enum size_t fullPart = ~emptyPart;
 
     private size_t[] parts;
     private size_t nMax;

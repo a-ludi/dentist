@@ -37,7 +37,7 @@ template Fasta(T) if (isSomeString!T)
 {
     struct Fasta
     {
-        static immutable headerIndicator = '>';
+        static enum headerIndicator = '>';
         const T data;
         private size_t[] recordIndex;
 
@@ -169,7 +169,7 @@ template FastaRecord(T) if (isSomeString!T)
 {
     struct FastaRecord
     {
-        static immutable lineSep = "\n";
+        static enum lineSep = "\n";
         alias Slice = Tuple!(int, int);
 
         const T data;
@@ -317,7 +317,7 @@ template PacBioHeader(T) if (isSomeString!T)
 {
     struct PacBioHeader
     {
-        static immutable headerFormat = ">%s/%d/%d_%d %s";
+        static enum headerFormat = ">%s/%d/%d_%d %s";
 
         T name;
         size_t well;
@@ -457,7 +457,7 @@ T reverseComplement(T)(in T sequence) if (isSomeString!T)
 
 FastaRecord!T reverseComplement(T)(in FastaRecord!T fastaRecord) if (isSomeString!T)
 {
-    immutable lineSep = FastaRecord!T.lineSep;
+    enum lineSep = FastaRecord!T.lineSep;
     auto header = fastaRecord.header;
     auto sequence = fastaRecord[].array.reverseComplement;
     auto builder = appender!T;

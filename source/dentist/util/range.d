@@ -121,7 +121,7 @@ unittest
 
     assert(c2 == tuple(tuple(false, "1", 2.0), tuple(3, '4', 5)));
 
-    immutable c4 = chunks!4(false, "1", 2.0, 3, '4', 5);
+    enum c4 = chunks!4(false, "1", 2.0, 3, '4', 5);
 
     static assert(c4 == tuple(tuple(false, "1", 2.0, 3), tuple('4', 5)));
 }

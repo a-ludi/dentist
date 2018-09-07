@@ -117,7 +117,7 @@ private struct Translocator
     {
         mixin(traceExecution);
 
-        immutable dchar unknownBase = 'n';
+        enum dchar unknownBase = 'n';
         auto numRefContigs = getNumContigs(options.trueAssemblyDb, options.workdir);
         auto mappedRegions = mappedRegions.intervals.assumeSorted!"a.contigId < b.contigId";
         ReferenceInterval needle;

@@ -114,7 +114,7 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
         arithmetic hence AlignmentChain.maxScore corresponds to 1 in the above
         equation.
     */
-    static immutable maxRelativeDiff = AlignmentChain.maxScore / 20; // 5% of larger value
+    static enum maxRelativeDiff = AlignmentChain.maxScore / 20; // 5% of larger value
     /**
         Two scores are considered similar if the absolute "error" of them is
         smaller than defaulMaxAbsoluteDiff.
@@ -127,7 +127,7 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
         arithmetic hence all scores are lower than or equal to
         AlignmentChain.maxScore .
     */
-    static immutable maxAbsoluteDiff = AlignmentChain.maxScore / 100; // 1% wrt. score
+    static enum maxAbsoluteDiff = AlignmentChain.maxScore / 100; // 1% wrt. score
 
     this(NaturalNumberSet* unusedReads)
     {
@@ -168,9 +168,9 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
 
     unittest
     {
-        immutable eps = 1;
-        immutable refValueSmall = 2 * maxAbsoluteDiff;
-        immutable refValueLarge = AlignmentChain.maxScore / 2;
+        enum eps = 1;
+        enum refValueSmall = 2 * maxAbsoluteDiff;
+        enum refValueLarge = AlignmentChain.maxScore / 2;
 
         // test absolute part
         assert(similarScore(refValueSmall, refValueSmall));

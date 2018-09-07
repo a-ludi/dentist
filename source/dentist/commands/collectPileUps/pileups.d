@@ -114,9 +114,9 @@ unittest
             ReadAlignment getDummyRead(id_t beginContigId, arithmetic_t beginIdx,
                     id_t endContigId, arithmetic_t endIdx, Complement complement)
             {
-                static immutable contigLength = 16;
-                static immutable gapLength = 9;
-                static immutable numDiffs = 0;
+                static enum contigLength = 16;
+                static enum gapLength = 9;
+                static enum numDiffs = 0;
 
                 alignmentChainId += 2;
                 auto readId = ++contReadId;
@@ -331,8 +331,8 @@ unittest
 {
     alias Contig = AlignmentChain.Contig;
     alias Flags = AlignmentChain.Flags;
-    immutable emptyFlags = AlignmentChain.emptyFlags;
-    immutable complement = AlignmentChain.Flag.complement;
+    enum emptyFlags = AlignmentChain.emptyFlags;
+    enum complement = AlignmentChain.Flag.complement;
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias Locus = LocalAlignment.Locus;
     alias Seed = AlignmentLocationSeed;

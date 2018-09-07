@@ -75,8 +75,8 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
     import std.traits : isSomeString;
     import vibe.data.json : Json;
 
-    immutable threadKey = "thread";
-    immutable timestampKey = "timestamp";
+    enum threadKey = "thread";
+    enum timestampKey = "timestamp";
 
     if (level < minLevel)
         return;

@@ -112,11 +112,11 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
 
     static if (__traits(compiles, Number.infinity))
     {
-        static immutable numberSup = Number.infinity;
+        static enum numberSup = Number.infinity;
     }
     else
     {
-        static immutable numberSup = Number.max;
+        static enum numberSup = Number.max;
     }
 
     /**
@@ -419,7 +419,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
     ///
     unittest
     {
-        static immutable emptyTag = 42;
+        static enum emptyTag = 42;
         alias R = Region!(int, int, "bucketId", emptyTag);
         alias TI = R.TaggedInterval;
 
