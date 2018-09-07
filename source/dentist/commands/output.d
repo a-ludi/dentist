@@ -9,11 +9,15 @@
 module dentist.commands.output;
 
 import dentist.commandline : DentistCommand, OptionsFor;
-import dentist.common : ReferencePoint;
+import dentist.common : ReferenceInterval, ReferencePoint;
+import dentist.common.alignments :
+    AlignmentChain,
+    AlignmentLocationSeed,
+    id_t,
+    trace_point_t;
 import dentist.common.binio :
     CompressedSequence,
     InsertionDb;
-import dentist.common.alignments : AlignmentChain, id_t;
 import dentist.common.insertions :
     getInfoForExistingContig,
     getInfoForGap,
@@ -48,13 +52,20 @@ import dentist.dazzler :
     ScaffoldSegment;
 import dentist.util.fasta : complement, reverseComplementer;
 import dentist.util.log;
-import dentist.util.math : add, bulkAdd;
+import dentist.util.math :
+    absdiff,
+    add,
+    bulkAdd,
+    floor,
+    mean;
 import dentist.util.range : wrapLines;
 import std.algorithm :
+    all,
     canFind,
     copy,
     count,
     filter,
+    find,
     joiner,
     map,
     maxElement,
@@ -69,7 +80,7 @@ import std.range :
     takeExactly;
 import std.range.primitives : empty, front, popFront, save;
 import std.stdio : File, stderr, stdout;
-import std.typecons : Yes;
+import std.typecons : Flag, No, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -146,7 +157,7 @@ class AssemblyWriter
             contigId => InsertionInfo(CompressedSequence(), contigLengths[contigId - 1], []),
             InsertionInfo,
         )(numReferenceContigs);
-        assemblyGraph.bulkAdd!mergeInsertions(insertions);
+        assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
         if (!options.shouldExtendContigs)
@@ -157,8 +168,7 @@ class AssemblyWriter
         assemblyGraph = assemblyGraph
             .enforceJoinPolicy!InsertionInfo(options.joinPolicy)
             .normalizeUnkownJoins!InsertionInfo()
-            .fixContigCropping();
-
+            .fixCropping(options.tracePointDistance);
         incidentEdgesCache = assemblyGraph.allIncidentEdges();
 
         if (options.assemblyGraphFile !is null)
@@ -294,16 +304,20 @@ class AssemblyWriter
         "\n".copy(writer);
     }
 
-    static Insertion mergeInsertions(Insertion[] insertionsChunk)
+    Insertion mergeInsertions(Insertion[] insertionsChunk)
     {
         assert(insertionsChunk.length > 0);
 
         if (insertionsChunk[0].isDefault)
         {
             auto merged = insertionsChunk[0];
+
             merged.payload.contigLength = insertionsChunk
                 .map!"a.payload.contigLength"
                 .maxElement;
+            assert(insertionsChunk
+                .all!(a => a.payload.contigLength == 0 ||
+                           a.payload.contigLength == merged.payload.contigLength));
             merged.payload.spliceSites = insertionsChunk
                 .map!"a.payload.spliceSites"
                 .joiner
@@ -415,8 +429,12 @@ class AssemblyWriter
 }
 
 
-/// Remove contig cropping where no new sequence is to be inserted.
-OutputScaffold fixContigCropping(OutputScaffold scaffold)
+/// Remove contig cropping where no new sequence is to be inserted and adjust
+/// cropping where cropped regions overlap.
+OutputScaffold fixCropping(
+    OutputScaffold scaffold,
+    trace_point_t tracePointDistance,
+)
 {
     mixin(traceExecution);
 
@@ -426,36 +444,103 @@ OutputScaffold fixContigCropping(OutputScaffold scaffold)
 
     foreach (contigJoin; contigJoins)
     {
-        bool insertionUpdated;
+        auto insertionUpdated1 = removeDegradingCropping(contigJoin, incidentEdgesCache);
+        auto insertionUpdated2 = resolveCroppingConflicts(scaffold, contigJoin, incidentEdgesCache,
+                                                         tracePointDistance);
 
-        foreach (contigNode; [contigJoin.start, contigJoin.end])
-        {
-            auto shouldInsertNewSequence = incidentEdgesCache[contigNode]
-                .canFind!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension));
-
-            if (!shouldInsertNewSequence)
-            {
-                auto contigLength = contigJoin.payload.contigLength;
-                auto newSpliceSites = contigJoin
-                    .payload
-                    .spliceSites
-                    .filter!(spliceSite => contigNode.contigPart == ContigPart.begin
-                        ? !(spliceSite.croppingRefPosition.value < contigLength / 2)
-                        : !(spliceSite.croppingRefPosition.value >= contigLength / 2))
-                    .array;
-                if (newSpliceSites.length < contigJoin.payload.spliceSites.length)
-                {
-                    contigJoin.payload.spliceSites = newSpliceSites;
-                    insertionUpdated = true;
-                }
-            }
-        }
-
-        if (insertionUpdated)
-        {
+        if (insertionUpdated1 || insertionUpdated2)
             scaffold.add!replace(contigJoin);
-        }
     }
 
     return scaffold;
+}
+
+Flag!"insertionUpdated" removeDegradingCropping(
+    ref Insertion contigJoin,
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
+)
+{
+    typeof(return) insertionUpdated;
+
+    foreach (contigNode; [contigJoin.start, contigJoin.end])
+    {
+        auto shouldInsertNewSequence = incidentEdgesCache[contigNode]
+            .canFind!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension));
+
+        if (!shouldInsertNewSequence)
+        {
+            auto contigLength = contigJoin.payload.contigLength;
+            auto newSpliceSites = contigJoin
+                .payload
+                .spliceSites
+                .filter!(spliceSite =>
+                    (contigNode.contigPart == ContigPart.begin) ^
+                    (spliceSite.alignmentSeed == AlignmentLocationSeed.front))
+                .array;
+            if (newSpliceSites.length < contigJoin.payload.spliceSites.length)
+            {
+                contigJoin.payload.spliceSites = newSpliceSites;
+                insertionUpdated = Yes.insertionUpdated;
+            }
+        }
+    }
+
+    return insertionUpdated;
+}
+
+Flag!"insertionUpdated" resolveCroppingConflicts(
+    ref OutputScaffold scaffold,
+    ref Insertion contigJoin,
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
+    trace_point_t tracePointDistance,
+)
+{
+    auto spliceSites = contigJoin.payload.spliceSites;
+
+    if (spliceSites.length <= 1)
+        return No.insertionUpdated;
+
+    assert(spliceSites.length == 2, "FIXME please examine this case");
+    if ((spliceSites[0].croppingRefPosition.value < spliceSites[1].croppingRefPosition.value)
+        ==
+        (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed))
+        return No.insertionUpdated;
+
+    auto soleCroppingPostition = ReferencePoint(
+        spliceSites[0].croppingRefPosition.contigId,
+        spliceSites
+            .map!"a.croppingRefPosition.value"
+            .mean
+            .floor(tracePointDistance),
+    );
+
+    assert(0, "FIXME following code is untested");
+    //foreach (ref spliceSite; spliceSites)
+    //{
+    //    auto croppingDiff = absdiff(
+    //        soleCroppingPostition.value,
+    //        spliceSite.croppingRefPosition.value,
+    //    );
+
+    //    if (croppingDiff > 0)
+    //    {
+    //        alias replace = OutputScaffold.ConflictStrategy.replace;
+
+    //        auto contigNode = spliceSite.alignmentSeed == AlignmentLocationSeed.front
+    //            ? contigJoin.start
+    //            : contigJoin.end;
+    //        auto incidentInsertion = incidentEdgesCache[contigNode]
+    //            .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
+    //            .front;
+    //        incidentInsertion.payload.sequence = spliceSite.alignmentSeed == AlignmentLocationSeed.front
+    //            ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
+    //            : incidentInsertion.payload.sequence[croppingDiff .. $];
+
+    //        scaffold.add!replace(incidentInsertion);
+    //    }
+
+    //    spliceSite.croppingRefPosition = soleCroppingPostition;
+    //}
+
+    //return Yes.insertionUpdated;
 }

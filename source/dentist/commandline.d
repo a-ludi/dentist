@@ -916,6 +916,7 @@ struct OptionsFor(DentistCommand command)
     static if (command.among(
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        DentistCommand.output,
     ))
     {
         @Option("trace-point-spacing", "s")
