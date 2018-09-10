@@ -13,6 +13,7 @@ import dentist.common.alignments :
     coord_t,
     diff_t,
     id_t;
+import dentist.dazzler : provideFileInWorkdir, ProvideMethod;
 import dentist.util.log;
 import std.algorithm :
     endsWith,
@@ -156,6 +157,16 @@ class MummerException : Exception
     mixin basicExceptionCtors;
 }
 
+/**
+    Provide lasFile in `workdir`.
+
+    Returns: Path of the lasFile in `workdir`.
+*/
+string provideDeltaFileInWorkdir(in string deltaFile, ProvideMethod provideMethod, in string workdir)
+{
+    return provideFileInWorkdir(deltaFile, provideMethod, workdir);
+}
+
 AlignmentChain[] getAlignments(in string deltaFile)
 {
     auto alignmentChains = readCoordsDump(showCoords(deltaFile)).array;
@@ -164,7 +175,7 @@ AlignmentChain[] getAlignments(in string deltaFile)
     return alignmentChains;
 }
 
-auto readCoordsDump(Range)(Range coordsDump)
+private auto readCoordsDump(Range)(Range coordsDump)
 {
     id_t numAlignmentChains;
     id_t numAScaffolds = 1;
@@ -190,7 +201,7 @@ auto readCoordsDump(Range)(Range coordsDump)
 
             try
             {
-                line.formattedRead!"%d\t%d\t%d\t%d\t%d\t%d\t%f\t%d\t%d\t%s\t%s\n"(
+                line.formattedRead!"%d\t%d\t%d\t%d\t%d\t%d\t%f\t%d\t%d\t%s\t%s"(
                     alignmentChain.localAlignments[0].contigA.begin,
                     alignmentChain.localAlignments[0].contigA.end,
                     alignmentChain.localAlignments[0].contigB.begin,
@@ -248,9 +259,8 @@ auto readCoordsDump(Range)(Range coordsDump)
 unittest
 {
     import std.string : lineSplitter;
-    import std.typecons : Yes;
 
-    auto alignmentChains = readCoordsDump(testDump.lineSplitter!(Yes.keepTerminator)).array;
+    auto alignmentChains = readCoordsDump(testDump.lineSplitter).array;
 
     assert(alignmentChains == expectedAlignments);
 }

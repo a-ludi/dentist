@@ -139,7 +139,7 @@ string provideLasFileInWorkdir(in string lasFile, ProvideMethod provideMethod, i
 }
 
 /// Provide file in `workdir`.
-private string provideFileInWorkdir(in string file, ProvideMethod provideMethod, in string workdir)
+string provideFileInWorkdir(in string file, ProvideMethod provideMethod, in string workdir)
 {
     import std.file : copy, symlink;
     import std.path : absolutePath;
