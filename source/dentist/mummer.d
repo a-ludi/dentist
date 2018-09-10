@@ -13,6 +13,7 @@ import dentist.common.alignments :
     coord_t,
     diff_t,
     id_t;
+import dentist.dazzler : provideFileInWorkdir, ProvideMethod;
 import dentist.util.log;
 import std.algorithm :
     endsWith,
@@ -156,6 +157,16 @@ class MummerException : Exception
     mixin basicExceptionCtors;
 }
 
+/**
+    Provide lasFile in `workdir`.
+
+    Returns: Path of the lasFile in `workdir`.
+*/
+string provideDeltaFileInWorkdir(in string deltaFile, ProvideMethod provideMethod, in string workdir)
+{
+    return provideFileInWorkdir(deltaFile, provideMethod, workdir);
+}
+
 AlignmentChain[] getAlignments(in string deltaFile)
 {
     auto alignmentChains = readCoordsDump(showCoords(deltaFile)).array;
@@ -164,7 +175,7 @@ AlignmentChain[] getAlignments(in string deltaFile)
     return alignmentChains;
 }
 
-auto readCoordsDump(Range)(Range coordsDump)
+private auto readCoordsDump(Range)(Range coordsDump)
 {
     id_t numAlignmentChains;
     id_t numAScaffolds = 1;
