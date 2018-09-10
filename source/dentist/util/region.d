@@ -741,6 +741,12 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         return Region(intersectionAcc.data);
     }
 
+    /// ditto
+    Region opBinary(string op)(in TaggedInterval other) const if (op == "&")
+    {
+        return this & Region([other]);
+    }
+
     ///
     unittest
     {
