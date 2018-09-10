@@ -56,6 +56,7 @@ import dentist.util.math :
     absdiff,
     add,
     bulkAdd,
+    ceil,
     floor,
     mean;
 import dentist.util.range : wrapLines;
@@ -66,6 +67,7 @@ import std.algorithm :
     count,
     filter,
     find,
+    fold,
     joiner,
     map,
     maxElement,
@@ -77,10 +79,11 @@ import std.range :
     enumerate,
     only,
     repeat,
-    takeExactly;
+    takeExactly,
+    walkLength;
 import std.range.primitives : empty, front, popFront, save;
 import std.stdio : File, stderr, stdout;
-import std.typecons : Flag, No, Yes;
+import std.typecons : Flag, No, tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -500,47 +503,97 @@ Flag!"insertionUpdated" resolveCroppingConflicts(
     if (spliceSites.length <= 1)
         return No.insertionUpdated;
 
-    assert(spliceSites.length == 2, "FIXME please examine this case");
-    if ((spliceSites[0].croppingRefPosition.value < spliceSites[1].croppingRefPosition.value)
-        ==
-        (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed))
-        return No.insertionUpdated;
-
-    auto soleCroppingPostition = ReferencePoint(
-        spliceSites[0].croppingRefPosition.contigId,
-        spliceSites
-            .map!"a.croppingRefPosition.value"
-            .mean
-            .floor(tracePointDistance),
+    auto frontResult = resolveCroppingConflictsAt!(AlignmentLocationSeed.front)(
+        scaffold,
+        contigJoin,
+        incidentEdgesCache,
+        tracePointDistance,
+    );
+    auto backResult = resolveCroppingConflictsAt!(AlignmentLocationSeed.back)(
+        scaffold,
+        contigJoin,
+        incidentEdgesCache,
+        tracePointDistance,
     );
 
-    assert(0, "FIXME following code is untested");
-    //foreach (ref spliceSite; spliceSites)
-    //{
-    //    auto croppingDiff = absdiff(
-    //        soleCroppingPostition.value,
-    //        spliceSite.croppingRefPosition.value,
-    //    );
+    auto newSpliceSites = only(frontResult, backResult)
+        .map!"a[1]"
+        .filter!"a.croppingRefPosition.contigId > 0"
+        .array;
+    auto insertionUpdated = only(frontResult, backResult)
+        .map!"a[0]"
+        .fold!"a | b";
 
-    //    if (croppingDiff > 0)
-    //    {
-    //        alias replace = OutputScaffold.ConflictStrategy.replace;
+    if (insertionUpdated)
+        contigJoin.payload.spliceSites = newSpliceSites;
 
-    //        auto contigNode = spliceSite.alignmentSeed == AlignmentLocationSeed.front
-    //            ? contigJoin.start
-    //            : contigJoin.end;
-    //        auto incidentInsertion = incidentEdgesCache[contigNode]
-    //            .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
-    //            .front;
-    //        incidentInsertion.payload.sequence = spliceSite.alignmentSeed == AlignmentLocationSeed.front
-    //            ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
-    //            : incidentInsertion.payload.sequence[croppingDiff .. $];
+    return insertionUpdated;
+}
 
-    //        scaffold.add!replace(incidentInsertion);
-    //    }
+auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
+    ref OutputScaffold scaffold,
+    ref Insertion contigJoin,
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
+    trace_point_t tracePointDistance,
+)
+{
+    auto seedSpliceSites = contigJoin
+        .payload
+        .spliceSites
+        .filter!(spliceSite => spliceSite.alignmentSeed == seed);
+    auto numSeedSpliceSites = seedSpliceSites.walkLength(2);
 
-    //    spliceSite.croppingRefPosition = soleCroppingPostition;
-    //}
+    if (numSeedSpliceSites == 0)
+        return tuple(No.insertionUpdated, SpliceSite());
+    else if (numSeedSpliceSites == 1)
+        return tuple(No.insertionUpdated, seedSpliceSites.front);
 
-    //return Yes.insertionUpdated;
+    auto commonCroppingPostition = seedSpliceSites
+        .map!"a.croppingRefPosition.value"
+        .mean;
+
+    static if (seed == AlignmentLocationSeed.front)
+        commonCroppingPostition = floor(commonCroppingPostition, tracePointDistance);
+    else
+        commonCroppingPostition = ceil(commonCroppingPostition, tracePointDistance);
+
+    Flag!"insertionUpdated" insertionUpdated;
+
+    foreach (ref spliceSite; seedSpliceSites)
+    {
+        auto croppingDiff = absdiff(
+            commonCroppingPostition,
+            spliceSite.croppingRefPosition.value,
+        );
+
+        if (croppingDiff > 0)
+        {
+            alias replace = OutputScaffold.ConflictStrategy.replace;
+
+            auto contigNode = seed == AlignmentLocationSeed.front
+                ? contigJoin.start
+                : contigJoin.end;
+            auto incidentInsertion = incidentEdgesCache[contigNode]
+                .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
+                .front;
+            incidentInsertion.payload.sequence = seed == AlignmentLocationSeed.front
+                ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
+                : incidentInsertion.payload.sequence[croppingDiff .. $];
+
+            scaffold.add!replace(incidentInsertion);
+            insertionUpdated |= Yes.insertionUpdated;
+        }
+    }
+
+    return tuple(
+        insertionUpdated,
+        SpliceSite(
+            ReferencePoint(
+                seedSpliceSites.front.croppingRefPosition.contigId,
+                commonCroppingPostition,
+            ),
+            seed,
+            seedSpliceSites.front.flags,
+        ),
+    );
 }
