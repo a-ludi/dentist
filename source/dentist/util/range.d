@@ -9,9 +9,10 @@
 module dentist.util.range;
 
 import std.functional : unaryFun;
-import std.meta : AliasSeq;
+import std.meta : AliasSeq, staticMap;
 import std.range : ElementType, isInputRange;
-import std.typecons : tuple;
+import std.traits : rvalueOf;
+import std.typecons : tuple, Tuple;
 
 /**
     This range iterates over fixed-sized chunks of size chunkSize of a source
@@ -348,4 +349,37 @@ unittest
     put(output, "hello world");
 
     assert(outputBuffer == "hello worl\nd");
+}
+
+/// Return a tuple of `fun` applied to each value of `tuple`.
+auto tupleMap(alias fun, Types...)(in Types values)
+{
+    alias mapper = unaryFun!fun;
+    alias MappedValue(V) = typeof(mapper(rvalueOf!V));
+    alias MappedTuple = Tuple!(staticMap!(MappedValue, Types));
+
+    MappedTuple mappedTuple;
+
+    static foreach (i; 0 .. Types.length)
+    {
+        mappedTuple[i] = mapper(values[i]);
+    }
+
+    return mappedTuple;
+}
+
+///
+unittest
+{
+    import std.conv : to;
+    import std.typecons : tuple;
+
+    assert(
+        tupleMap!"2*a"(1, 2, 3.0) ==
+        tuple(2, 4, 6.0)
+    );
+    assert(
+        tupleMap!(x => to!string(x))(1, '2', 3.0) ==
+        tuple("1", "2", "3")
+    );
 }
