@@ -9,13 +9,31 @@
 module dentist.util.math;
 
 import dentist.util.algorithm : cmpLexicographically, sliceBy;
-import std.algorithm : all, copy, filter, map, max, sort, sum, swap, uniq;
+import std.algorithm :
+    all,
+    copy,
+    countUntil,
+    cumulativeFold,
+    filter,
+    map,
+    max,
+    sort,
+    sum,
+    swap,
+    uniq;
 import std.array : Appender, array;
 import std.conv : to;
 import std.exception : assertThrown;
 import std.functional : binaryFun, unaryFun;
-import std.range : assumeSorted, chain, ElementType, enumerate, isForwardRange,
-    retro, save, walkLength;
+import std.range :
+    assumeSorted,
+    chain,
+    ElementType,
+    enumerate,
+    isForwardRange,
+    retro,
+    save,
+    walkLength;
 import std.traits : isCallable, isIntegral, isNumeric;
 import std.typecons : Flag, No, Yes;
 
@@ -81,6 +99,44 @@ unittest
     {
         auto values = [2.0, 1.0, 4.0, 3.0, 5.0];
         assert(values.median == 3.0);
+    }
+}
+
+/// Calculate the Nxx (e.g. N50) of values.
+ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__traits(compiles, sort(values)))
+{
+    static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined for empty set");
+    assert(values.length > 0, "N" ~ xx.to!string ~ " is undefined for empty set");
+    auto xxPercentile = xx/100.0 * totalSize;
+    auto sortedValues = values.sort;
+    auto targetIndex = sortedValues
+        .retro
+        .cumulativeFold!"a + b"(cast(ElementType!Range) 0)
+        .countUntil!"a >= b"(xxPercentile);
+
+    if (targetIndex == values.length)
+        return 0;
+    else
+        return sortedValues[$ - targetIndex - 1];
+}
+
+unittest
+{
+    {
+        auto totalSize = 54;
+        auto values = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+        enum N50 = 8;
+        enum N10 = 10;
+
+        assert(N!50(values, totalSize) == N50);
+        assert(N!10(values, totalSize) == N10);
+    }
+    {
+        auto totalSize = 32;
+        auto values = [2, 2, 2, 3, 3, 4, 8, 8];
+        enum N50 = 8;
+
+        assert(N!50(values, totalSize) == N50);
     }
 }
 
