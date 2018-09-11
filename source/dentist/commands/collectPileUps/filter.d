@@ -148,7 +148,7 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
 
     static bool isAmgiguouslyAlignedRead(Chunk)(Chunk readAlignments)
     {
-        return readAlignments.save.walkLength > 1 && haveSimilarScore(readAlignments);
+        return readAlignments.save.walkLength(2) > 1 && haveSimilarScore(readAlignments);
     }
 
     static bool haveSimilarScore(Chunk)(Chunk readAlignments)
