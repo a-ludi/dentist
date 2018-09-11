@@ -28,9 +28,11 @@ import dentist.dazzler :
     ScaffoldSegment;
 import dentist.util.algorithm : first, last;
 import dentist.util.log;
-import dentist.util.math : ceildiv, mean, median;
+import dentist.util.math : ceildiv, mean, median, N;
+import dentist.util.range : tupleMap;
 import dentist.mummer : getAlignments;
 import std.algorithm :
+    all,
     chunkBy,
     count,
     filter,
@@ -47,11 +49,13 @@ import std.math :
 import std.range :
     assumeSorted,
     enumerate,
+    StoppingPolicy,
     zip;
 import std.range.primitives;
 import std.stdio : writeln;
+import std.string : join;
 import std.typecons : Tuple;
-import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
 
 
 /// Options for the `collectPileUps` command.
@@ -105,11 +109,14 @@ private struct ResultAnalyzer
         stats.numBpsInGaps = getNumBpsInGaps();
         stats.inputN50 = getInputN50();
         stats.resultN50 = getResultN50();
-        stats.gapN50 = getGapN50();
-        stats.closedGapN50 = getClosedGapN50();
+        stats.gapMedian = getGapMedian();
+        stats.closedGapMedian = getClosedGapMedian();
         stats.maxClosedGap = getMaxClosedGap();
         if (options.bucketSize > 0)
+        {
+            stats.closedGapLengthHistogram = getClosedGapLengthHistogram();
             stats.gapLengthHistogram = getGapLengthHistogram();
+        }
 
         return stats;
     }
@@ -387,7 +394,7 @@ private struct ResultAnalyzer
             .filter!(contigPart => contigPart.peek!ContigSegment !is null)
             .map!(contigPart => contigPart.peek!ContigSegment.length)
             .array
-            .median;
+            .N!50(getNumBpsExpected);
     }
 
     size_t getResultN50()
@@ -398,10 +405,10 @@ private struct ResultAnalyzer
             .filter!(contigPart => contigPart.peek!ContigSegment !is null)
             .map!(contigPart => contigPart.peek!ContigSegment.length)
             .array
-            .median;
+            .N!50(getNumBpsExpected);
     }
 
-    size_t getGapN50()
+    size_t getGapMedian()
     {
         mixin(traceExecution);
 
@@ -412,7 +419,7 @@ private struct ResultAnalyzer
             .median;
     }
 
-    size_t getClosedGapN50()
+    size_t getClosedGapMedian()
     {
         mixin(traceExecution);
 
@@ -433,7 +440,7 @@ private struct ResultAnalyzer
             .maxElement!"a.size";
     }
 
-    Histogram!coord_t getGapLengthHistogram()
+    Histogram!coord_t getClosedGapLengthHistogram()
     {
         mixin(traceExecution);
 
@@ -442,6 +449,19 @@ private struct ResultAnalyzer
             zip(referenceGaps.intervals, reconstructedGaps)
                 .filter!(pair => isGapClosed(pair))
                 .map!(pair => cast(coord_t) pair[0].size)
+                .array,
+        );
+    }
+
+    Histogram!coord_t getGapLengthHistogram()
+    {
+        mixin(traceExecution);
+
+        return histogram(
+            options.bucketSize,
+            referenceGaps
+                .intervals
+                .map!(gap => cast(coord_t) gap.size)
                 .array,
         );
     }
@@ -508,9 +528,10 @@ private struct Stats
     size_t numBpsInGaps;
     size_t inputN50;
     size_t resultN50;
-    size_t gapN50;
-    size_t closedGapN50;
+    size_t gapMedian;
+    size_t closedGapMedian;
     ReferenceInterval maxClosedGap;
+    Histogram!coord_t closedGapLengthHistogram;
     Histogram!coord_t gapLengthHistogram;
 
     string toJsonString() const
@@ -531,10 +552,10 @@ private struct Stats
             "numBpsInGaps": numBpsInGaps.toJson,
             "inputN50": inputN50.toJson,
             "resultN50": resultN50.toJson,
-            "gapN50": gapN50.toJson,
-            "closedGapN50": closedGapN50.toJson,
+            "gapMedian": gapMedian.toJson,
+            "closedGapMedian": closedGapMedian.toJson,
             "maxClosedGap": maxClosedGap.toJson,
-            "gapLengthHistogram": gapLengthHistogram.buckets.array.toJson,
+            "gapLengthHistogram": histsToJson(closedGapLengthHistogram, gapLengthHistogram),
         ].toJsonString;
     }
 
@@ -561,11 +582,11 @@ private struct Stats
 
             format!"inputN50:              %*d"(columnWidth, inputN50),
             format!"resultN50:             %*d"(columnWidth, resultN50),
-            format!"gapN50:                %*d"(columnWidth, gapN50),
-            format!"closedGapN50:          %*d"(columnWidth, closedGapN50),
+            format!"gapMedian:             %*d"(columnWidth, gapMedian),
+            format!"closedGapMedian:       %*d"(columnWidth, closedGapMedian),
             format!"maxClosedGap:          %*s"(columnWidth, toString(maxClosedGap)),
             gapLengthHistogram.length > 0
-                ? format!"gapLengthHistogram:\n%s"(toString(gapLengthHistogram))
+                ? format!"gapLengthHistogram:\n    \n%s"(histsToString(closedGapLengthHistogram, gapLengthHistogram))
                 : null,
         ];
 
@@ -577,21 +598,46 @@ private struct Stats
         return format!"[%d, %d) | len=%d"(interval.begin, interval.end, interval.size);
     }
 
-    const string toString(value_t)(in Histogram!value_t hist)
+    const string histsToString(Hists...)(in Hists hists)
     {
-        auto limitsWidth = numWidth(hist.bucketSize * hist.length);
-        auto countWidth = numWidth(max(1, maxElement(hist.histogram)));
+        assert(hists.length >= 1);
+        assert([hists].all!(h => h.bucketSize == hists[0].bucketSize));
+        auto limitsWidth = numWidth(hists[0].bucketSize * [hists].map!"a.length".maxElement);
+        auto countWidths = [hists]
+            .map!(h => numWidth(max(1, maxElement(h.histogram))))
+            .array;
 
-        auto rows = hist
-            .buckets
-            .map!(bucket => format!"    %*d %*d"(
+        auto bucketsList = tupleMap!(h => h.buckets.array)(hists);
+        auto rows = zip(StoppingPolicy.longest, bucketsList.expand)
+            .map!(buckets => format!"    %*d%s"(
                 limitsWidth,
-                bucket.end,
-                countWidth,
-                bucket.count,
-            ));
+                max(tupleMap!"a.end"(buckets.expand).expand),
+                zip(countWidths, [buckets.expand])
+                    .map!(pair => format!" %*d"(pair[0], pair[1].count))
+                    .join,
+            ))
+            .array;
 
         return format!"%-(%s\n%)"(rows);
+    }
+
+    const Json histsToJson(Hists...)(in Hists hists)
+    {
+        assert(hists.length >= 1);
+        assert([hists].all!(h => h.bucketSize == hists[0].bucketSize));
+
+        auto bucketsList = tupleMap!(h => h.buckets.array)(hists);
+        auto rows = zip(StoppingPolicy.longest, bucketsList.expand)
+            .map!(buckets => [
+                "limit": max(tupleMap!"a.end"(buckets.expand).expand).toJson,
+                "counts": [buckets.expand]
+                    .map!"a.count"
+                    .array
+                    .toJson,
+            ])
+            .array;
+
+        return rows.toJson;
     }
 
     protected size_t columnWidth() const
@@ -612,8 +658,8 @@ private struct Stats
             numBpsInGaps,
             inputN50,
             resultN50,
-            gapN50,
-            closedGapN50,
+            gapMedian,
+            closedGapMedian,
         ));
         auto strWidth = max(
             0, // dummy
