@@ -140,7 +140,10 @@ size_t insertionScore(Options)(
     auto alignmentAnchor = readAlignment[].map!(to!(ReferenceRegion, "contigA"))
         .fold!"a | b" - repeatMask;
     long avgAnchorSize = alignmentAnchor.size / numAlignments;
-    debug long avgAlignmentLength = readAlignment[].map!"a.totalLength".sum / numAlignments;
+    debug long avgAlignmentLength = readAlignment[]
+        .map!(to!(ReferenceRegion, "contigA"))
+        .map!"a.size"
+        .sum / numAlignments;
     debug assert(avgAnchorSize <= avgAlignmentLength);
     long avgAlignmentScore = readAlignment[].map!"a.score".sum / numAlignments;
     long shortAnchorPenalty = floor(shortAnchorPenaltyMagnitude * (
