@@ -40,7 +40,8 @@ void execute(Options)(in Options options)
             options.workdir,
         ));
 
-        stderr.writeln(serializeToJsonString(maskRegion.intervals));
+        if (shouldLog(LogLevel.debug_))
+            stderr.writeln(serializeToJsonString(maskRegion.intervals));
         statsList ~= statsFor(mask, maskRegion);
 
         if (masks.length > 1)
@@ -49,7 +50,8 @@ void execute(Options)(in Options options)
 
     if (masks.length > 1)
     {
-        stderr.writeln(serializeToJsonString(mergedMask.intervals));
+        if (shouldLog(LogLevel.debug_))
+            stderr.writeln(serializeToJsonString(mergedMask.intervals));
         statsList ~= statsFor("__merged__", mergedMask);
     }
 
