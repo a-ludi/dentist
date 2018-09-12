@@ -287,13 +287,12 @@ private ReadInterval getCroppingSlice(
         .front
         .value;
 
-    size_t croppingTracePointIdx(in AlignmentChain.LocalAlignment localAlignment)
+    size_t numCroppingTracePoints(in AlignmentChain.LocalAlignment localAlignment)
     {
-        auto firstTracePointRefPos = ceil(localAlignment.contigA.begin, tracePointDistance);
-        auto openInterval = locationSeed == AlignmentLocationSeed.front;
+        auto firstTracePointRefPos = localAlignment.contigA.begin;
         assert(croppingRefPos >= firstTracePointRefPos);
 
-        return (croppingRefPos - firstTracePointRefPos) / tracePointDistance + (openInterval ? 0 : 1);
+        return ceildiv(croppingRefPos - firstTracePointRefPos, tracePointDistance);
     }
 
     bool coversCroppingRefPos(in AlignmentChain.LocalAlignment localAlignment)
@@ -309,7 +308,7 @@ private ReadInterval getCroppingSlice(
     auto readCroppingPos =
         coveringLocalAlignment.contigB.begin +
         coveringLocalAlignment
-            .tracePoints[0 .. croppingTracePointIdx(coveringLocalAlignment)]
+            .tracePoints[0 .. numCroppingTracePoints(coveringLocalAlignment)]
             .map!"a.numBasePairs"
             .sum;
     size_t readBeginIdx;
@@ -343,4 +342,106 @@ private ReadInterval getCroppingSlice(
     );
 
     return croppingSlice;
+}
+
+unittest
+{
+    alias Contig = AlignmentChain.Contig;
+    alias Flags = AlignmentChain.Flags;
+    alias emptyFlags = AlignmentChain.emptyFlags;
+    alias complement = AlignmentChain.Flag.complement;
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias Locus = LocalAlignment.Locus;
+    alias TracePoint = LocalAlignment.TracePoint;
+    enum tracePointDistance = 100;
+
+    {
+        enum alignment = SeededAlignment(
+            AlignmentChain(
+                0,
+                Contig(1, 2584),
+                Contig(58024, 10570),
+                Flags(complement),
+                [LocalAlignment(
+                    Locus(579, 2584),
+                    Locus(0, 2158),
+                    292,
+                    [
+                        TracePoint( 2,  23),
+                        TracePoint(11, 109),
+                        TracePoint(13, 109),
+                        TracePoint(15, 107),
+                        TracePoint(18, 107),
+                        TracePoint(14, 103),
+                        TracePoint(16, 106),
+                        TracePoint(17, 106),
+                        TracePoint( 9, 106),
+                        TracePoint(14, 112),
+                        TracePoint(16, 105),
+                        TracePoint(16, 114),
+                        TracePoint(10, 103),
+                        TracePoint(14, 110),
+                        TracePoint(15, 110),
+                        TracePoint(15, 101),
+                        TracePoint(17, 108),
+                        TracePoint(17, 109),
+                        TracePoint(15, 111),
+                        TracePoint(17, 111),
+                        TracePoint(11,  88),
+                    ],
+                )],
+                tracePointDistance,
+            ),
+            AlignmentLocationSeed.back,
+        );
+
+        assert(
+            getCroppingSlice(alignment, [ReferencePoint(1, 600)]) ==
+            ReadInterval(58024, 0, 10547)
+        );
+        assert(
+            getCroppingSlice(alignment, [ReferencePoint(1, 800)]) ==
+            ReadInterval(58024, 0, 10329)
+        );
+    }
+    {
+        enum alignment = SeededAlignment(
+            AlignmentChain(
+                0,
+                Contig(1, 2584),
+                Contig(7194, 9366),
+                emptyFlags,
+                [LocalAlignment(
+                    Locus(0, 724),
+                    Locus(8612, 9366),
+                    76,
+                    [
+                        TracePoint( 7, 107),
+                        TracePoint(17, 106),
+                        TracePoint(12,  96),
+                        TracePoint( 9, 107),
+                        TracePoint( 7, 102),
+                        TracePoint(11, 105),
+                        TracePoint(11, 105),
+                        TracePoint( 2,  26),
+                    ],
+                )],
+                tracePointDistance,
+            ),
+            AlignmentLocationSeed.front,
+        );
+
+        assert(
+            getCroppingSlice(alignment, [ReferencePoint(1, 0)]) ==
+            ReadInterval(7194, 0, 8612)
+        );
+        assert(
+            getCroppingSlice(alignment, [ReferencePoint(1, 100)]) ==
+            ReadInterval(7194, 0, 8719)
+        );
+        assert(
+            getCroppingSlice(alignment, [ReferencePoint(1, 200)]) ==
+            ReadInterval(7194, 0, 8825)
+        );
+    }
 }
