@@ -888,7 +888,6 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             ]));
         }
 
-
         IncidentEdgesCache allIncidentEdges()
         {
             return IncidentEdgesCache(this);
@@ -954,6 +953,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return incidentEdges[graph.indexOf(node)];
             }
 
+            Edge[] opIndex(in size_t nodeIdx)
+            {
+                return incidentEdges[nodeIdx];
+            }
+
             int opApply(scope int delegate(Edge[]) yield)
             {
                 int result = 0;
@@ -981,6 +985,49 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
                 return result;
             }
+        }
+
+        /// Get the `adjacencyList` of this graph where nodes are represented
+        /// by their index in the nodes list.
+        size_t[][] adjacencyList() const
+        {
+            size_t[][] _adjacencyList;
+            _adjacencyList.length = nodes.length;
+            size_t[] targetsBuffer;
+            targetsBuffer.length = 2 * edges.length;
+
+            foreach (i, node; _nodes)
+            {
+                auto bufferRest = edges
+                    .filter!(e => e.start == node || e.end == node)
+                    .map!(edge => indexOf(edge.target(node)))
+                    .copy(targetsBuffer);
+                _adjacencyList[i] = targetsBuffer[0 .. $ - bufferRest.length];
+                _adjacencyList[i].sort;
+                targetsBuffer = bufferRest;
+            }
+
+            return _adjacencyList;
+        }
+
+        ///
+        unittest
+        {
+            auto g1 = Graph!int([1, 2, 3, 4]);
+
+            g1 ~= g1.edge(1, 1);
+            g1 ~= g1.edge(1, 2);
+            g1 ~= g1.edge(2, 2);
+            g1 ~= g1.edge(2, 3);
+            g1 ~= g1.edge(2, 4);
+            g1 ~= g1.edge(3, 4);
+
+            assert(g1.adjacencyList() == [
+                [0, 1],
+                [0, 1, 2, 3],
+                [1, 3],
+                [1, 2],
+            ]);
         }
 
         /// Get the degree of node `n`.
@@ -1039,6 +1086,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             size_t opIndex(in Node node) const
             {
                 return degrees[graph.indexOf(node)];
+            }
+
+            size_t opIndex(in size_t nodeIdx) const
+            {
+                return degrees[nodeIdx];
             }
 
             int opApply(scope int delegate(size_t) yield) const
@@ -1338,6 +1390,19 @@ struct NaturalNumberSet
     private size_t[] parts;
     private size_t nMax;
 
+    this(size_t initialNumElements, Flag!"addAll" addAll = No.addAll)
+    {
+        reserveFor(initialNumElements);
+
+        if (addAll)
+        {
+            foreach (i; 0 .. initialNumElements / partSize)
+                parts[i] = fullPart;
+            foreach (i; initialNumElements / partSize .. initialNumElements)
+                add(i);
+        }
+    }
+
     this(this)
     {
         parts = parts.dup;
@@ -1622,5 +1687,109 @@ unittest
         {
             assert(!set.has(i));
         }
+    }
+}
+
+/**
+    Find all maximal cliques in a graph represented by `adjacencyList`.
+    The implementation is based on version 1 of the Bron-Kerbosch algorithm [1].
+
+    [1]: Bron, C.; Kerbosch, J. (1973), "Algorithm 457: finding all cliques
+         of an undirected graph", Communications of the ACM, 16 (9): 575–577,
+         doi:10.1145/362342.362367.
+
+    Returns: list of sets of nodes each representing a maximal clique
+*/
+auto findAllCliques(in size_t[][] adjacencyList)
+{
+    return BronKerboschVersion1(adjacencyList);
+}
+
+///
+unittest
+{
+    auto g = Graph!int([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    g.add(g.edge(0, 1));
+    g.add(g.edge(0, 2));
+    g.add(g.edge(1, 2));
+    g.add(g.edge(1, 7));
+    g.add(g.edge(1, 8));
+    g.add(g.edge(2, 3));
+    g.add(g.edge(3, 4));
+    g.add(g.edge(3, 5));
+    g.add(g.edge(3, 6));
+    g.add(g.edge(4, 5));
+    g.add(g.edge(4, 6));
+    g.add(g.edge(5, 6));
+    g.add(g.edge(6, 7));
+    g.add(g.edge(7, 8));
+
+    auto cliques = array(findAllCliques(g.adjacencyList()));
+
+    assert(cliques == [
+        [0, 1, 2],
+        [1, 7, 8],
+        [2, 3],
+        [3, 4, 5, 6],
+        [6, 7],
+        [9],
+    ]);
+}
+
+private struct BronKerboschVersion1
+{
+    const size_t[][] adjacencyList;
+
+    int opApply(scope int delegate(size_t[]) yield)
+    {
+        size_t[] clique;
+        clique.reserve(adjacencyList.length);
+
+        auto candidates = NaturalNumberSet(adjacencyList.length, Yes.addAll);
+        auto not = NaturalNumberSet(adjacencyList.length);
+
+        return extendClique(clique, candidates, not, yield);
+    }
+
+    private int extendClique(
+        size_t[] clique,
+        NaturalNumberSet candidates,
+        NaturalNumberSet not,
+        scope int delegate(size_t[]) yield,
+    )
+    {
+        import std.stdio;
+
+        if (not.empty && candidates.empty)
+            return clique.length == 0 ? 0 : yield(clique);
+
+        int result;
+
+        foreach (candidate; candidates.elements)
+        {
+            clique ~= candidate;
+
+            auto reducedCandidates = NaturalNumberSet(adjacencyList.length);
+            auto reducedNot = NaturalNumberSet(adjacencyList.length);
+
+            foreach (neighbourNode; adjacencyList[candidate])
+            {
+                if (candidates.has(neighbourNode))
+                    reducedCandidates.add(neighbourNode);
+                if (not.has(neighbourNode))
+                    reducedNot.add(neighbourNode);
+            }
+
+            result = extendClique(clique, reducedCandidates, reducedNot, yield);
+
+            if (result)
+                return result;
+
+            candidates.remove(candidate);
+            not.add(candidate);
+            --clique.length;
+        }
+
+        return result;
     }
 }
