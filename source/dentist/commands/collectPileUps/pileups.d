@@ -14,6 +14,7 @@ import dentist.common.alignments :
     arithmetic_t,
     id_t,
     coord_t,
+    getType,
     isValid,
     PileUp,
     ReadAlignment,
@@ -25,7 +26,8 @@ import dentist.common.scaffold :
     concatenatePayloads,
     discardAmbiguousJoins,
     Join,
-    mergeExtensionsWithGaps;
+    mergeExtensionsWithGaps,
+    Scaffold;
 import dentist.util.algorithm : orderLexicographically;
 import dentist.util.log;
 import std.algorithm :
@@ -44,7 +46,31 @@ import std.array : array;
 import std.conv : to;
 import std.range : chain, iota, only, slide, walkLength, zip;
 import std.typecons : No;
+import vibe.data.json : toJson = serializeToJson;
 
+
+private auto collectPileUps(Scaffold!(ReadAlignment[]) scaffold)
+{
+    return scaffold
+        .edges
+        .filter!"a.payload.length > 0"
+        .map!"a.payload"
+        .filter!(pileUp => pileUp.isValid);
+}
+
+private void debugLogPileUps(string state, Scaffold!(ReadAlignment[]) scaffold)
+{
+    logJsonDebug(
+        "state", state,
+        "pileUps", collectPileUps(scaffold)
+            .map!(pileUp => [
+                "type": pileUp.getType.to!string.toJson,
+                "readAlignments": pileUp.map!"a[]".array.toJson,
+            ].toJson)
+            .array
+            .toJson,
+    );
+}
 
 PileUp[] build(in size_t numReferenceContigs, AlignmentChain[] candidates)
 {
@@ -62,15 +88,13 @@ PileUp[] build(in size_t numReferenceContigs, AlignmentChain[] candidates)
         .filter!"a.isValid"
         .map!"a.getInOrder()"
         .map!(to!ReadAlignmentJoin);
-    auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins)
-        .discardAmbiguousJoins!Payload
-        .mergeExtensionsWithGaps!("a ~ b", Payload);
-    auto pileUps = alignmentsScaffold
-        .edges
-        .filter!"a.payload.length > 0"
-        .map!"a.payload"
-        .filter!(pileUp => pileUp.isValid)
-        .array;
+    auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins);
+    debugLogPileUps("raw", alignmentsScaffold);
+    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!Payload;
+    debugLogPileUps("unambiguous", alignmentsScaffold);
+    alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!("a ~ b", Payload);
+    debugLogPileUps("extensionsMerged", alignmentsScaffold);
+    auto pileUps = collectPileUps(alignmentsScaffold).array;
 
     return pileUps;
 }
