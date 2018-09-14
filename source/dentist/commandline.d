@@ -916,7 +916,7 @@ struct OptionsFor(DentistCommand command)
             alignment need to have at least this length of unique anchoring sequence (default: %d)
         }"(defaultValue!minAnchorLength))
         @Validate!(value => enforce!CLIException(value > 0, "minimum anchor length must be greater than zero"))
-        size_t minAnchorLength = 200;
+        size_t minAnchorLength = 1000;
     }
 
     static if (command.among(
