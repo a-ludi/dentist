@@ -950,7 +950,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("min-reads-per-pile-up")
         @Help(format!q"{
-            alignment anchors with at least this length will get no penalty (default: %d)
+            pile ups must have at least <ulong> reads to be processed (default: %d)
         }"(defaultValue!minReadsPerPileUp))
         @Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero"))
         size_t minReadsPerPileUp = 5;

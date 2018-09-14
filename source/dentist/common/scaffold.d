@@ -330,7 +330,7 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
     return scaffold;
 }
 
-/// This removes ambiguous gap insertion for removal.
+/// This removes ambiguous gap insertions.
 Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
 {
     foreach (contigNode; scaffold.nodes)
@@ -343,7 +343,7 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
 
             if (incidentGapJoins.length > 1)
             {
-                logJsonDebug(
+                logJsonDiagnostic(
                     "info", "skipping ambiguous gap joins",
                     "sourceContigNode", contigNode.toJson,
                     "joins", incidentGapJoins.toJson,
