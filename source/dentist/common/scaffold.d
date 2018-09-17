@@ -187,7 +187,7 @@ bool isDefault(J)(in J join) pure nothrow
            join.start.contigId == join.end.contigId;
 }
 
-/// Returns true iff join is a unkown edge, ie. an edge for unkown sequence
+/// Returns true iff join is a unknown edge, ie. an edge for unknown sequence
 /// (`n`s) of the scaffold graph.
 bool isUnkown(J)(in J join) pure nothrow
 {
@@ -361,7 +361,7 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
     return removeNoneJoins!T(scaffold);
 }
 
-/// Get join for a stretch of unkown sequence (`n`s).
+/// Get join for a stretch of unknown sequence (`n`s).
 Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure nothrow
 {
     assert(preContigId != postContigId);
@@ -372,7 +372,7 @@ Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure
     );
 }
 
-/// Normalizes unkown joins such that they join contigs or are removed as
+/// Normalizes unknown joins such that they join contigs or are removed as
 /// applicable.
 Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
 {
