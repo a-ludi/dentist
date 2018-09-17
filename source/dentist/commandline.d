@@ -807,6 +807,20 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("best-pile-up-margin")
+        @Help(q"{
+            given a set of possibly of conflicting pile ups, if the largest
+            has <double> times more reads than the second largest it is
+            considered unique
+        }")
+        @Validate!(value => enforce!CLIException(value > 1.0, "--best-pile-up-margin must be greater than 1.0"))
+        double bestPileUpMargin = 3.0;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -954,6 +968,17 @@ struct OptionsFor(DentistCommand command)
         }"(defaultValue!minReadsPerPileUp))
         @Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero"))
         size_t minReadsPerPileUp = 5;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("min-spanning-reads", "s")
+        @Help(q"{
+            require at least <uint> spanning reads to close a gap (default: %d)
+        }")
+        size_t minSpanningReads = 3;
     }
 
     static if (command.among(

@@ -25,10 +25,12 @@ import std.algorithm :
     map,
     minElement,
     setDifference,
+    sort,
     sum;
 import std.array : appender, array;
 import std.functional : binaryFun;
 import std.range :
+    enumerate,
     iota,
     isForwardRange,
     only,
@@ -55,7 +57,7 @@ unittest
     //                    / e1 e2 \      / e4
     //              o -- o ------- o -- o
     //               \        e3         \
-    //                \                   \ e5
+    //                \                   \ e5 (strong evidence)
     //             e10 \   ____________   /
     //                  \ /   e6       \ /
     //    o -- o         o -- o         o -- o
@@ -64,23 +66,24 @@ unittest
     //
     //   contig 5       contig 4      contig 3
     //
-    alias J = Join!int;
-    alias S = Scaffold!int;
+    alias Payload = int[];
+    alias J = Join!Payload;
+    alias S = Scaffold!Payload;
     alias CN = ContigNode;
     alias CP = ContigPart;
-    auto scaffold = buildScaffold!(sumPayloads!int, int)(5, [
-        J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
-        J(CN(1, CP.end), CN(1, CP.post ), 1), // e1
-        J(CN(2, CP.pre), CN(2, CP.begin), 1), // e2
-        J(CN(1, CP.end), CN(2, CP.begin), 1), // e3
-        J(CN(2, CP.end), CN(2, CP.post ), 1), // e4
-        J(CN(2, CP.end), CN(3, CP.end  ), 1), // e5
-        J(CN(4, CP.end), CN(3, CP.end  ), 1), // e6
-        J(CN(4, CP.end), CN(4, CP.post ), 1), // e7
-        J(CN(3, CP.pre), CN(3, CP.begin), 1), // e8
-        J(CN(3, CP.end), CN(3, CP.post ), 1), // e9
-        J(CN(4, CP.end), CN(1, CP.begin), 1), // e10
-    ]).discardAmbiguousJoins!int;
+    auto scaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(5, [
+        J(CN(1, CP.end), CN(1, CP.post ), [1]), // e1
+        J(CN(1, CP.end), CN(1, CP.post ), [1]), // e1
+        J(CN(2, CP.pre), CN(2, CP.begin), [1]), // e2
+        J(CN(1, CP.end), CN(2, CP.begin), [1]), // e3
+        J(CN(2, CP.end), CN(2, CP.post ), [1]), // e4
+        J(CN(2, CP.end), CN(3, CP.end  ), [1, 1]), // e5
+        J(CN(4, CP.end), CN(3, CP.end  ), [1]), // e6
+        J(CN(4, CP.end), CN(4, CP.post ), [1]), // e7
+        J(CN(3, CP.pre), CN(3, CP.begin), [1]), // e8
+        J(CN(3, CP.end), CN(3, CP.post ), [1]), // e9
+        J(CN(4, CP.end), CN(1, CP.begin), [1]), // e10
+    ]).discardAmbiguousJoins!Payload(1.5);
     //
     //   contig 1      contig 2
     //
@@ -99,14 +102,14 @@ unittest
     assert(J(CN(2, CP.pre), CN(2, CP.begin)) in scaffold); // e2
     assert(J(CN(1, CP.end), CN(2, CP.begin)) in scaffold); // e3
     assert(J(CN(2, CP.end), CN(2, CP.post)) in scaffold); // e4
-    assert(J(CN(2, CP.end), CN(3, CP.end)) !in scaffold); // e5
+    assert(J(CN(2, CP.end), CN(3, CP.end)) in scaffold); // e5
     assert(J(CN(4, CP.end), CN(3, CP.end)) !in scaffold); // e6
     assert(J(CN(4, CP.end), CN(4, CP.post)) in scaffold); // e7
     assert(J(CN(3, CP.pre), CN(3, CP.begin)) in scaffold); // e8
     assert(J(CN(3, CP.end), CN(3, CP.post)) in scaffold); // e9
     assert(J(CN(4, CP.end), CN(1, CP.begin)) !in scaffold); // e10
 
-    assert(scaffold.get(J(CN(1, CP.end), CN(1, CP.post))).payload == 2); // e1
+    assert(scaffold.get(J(CN(1, CP.end), CN(1, CP.post))).payload == [1, 1]); // e1
 }
 
 /// Each contig has four designated parts where joins can start or end.
@@ -331,34 +334,76 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
 }
 
 /// This removes ambiguous gap insertions.
-Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold)
+Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMargin)
 {
+    auto incidentEdgesCache = scaffold.allIncidentEdges();
+
     foreach (contigNode; scaffold.nodes)
     {
-        assert(!contigNode.contigPart.isTranscendent || scaffold.degree(contigNode) <= 1);
+        assert(!contigNode.contigPart.isTranscendent || incidentEdgesCache[contigNode].length <= 1);
 
-        if (contigNode.contigPart.isReal && scaffold.degree(contigNode) > 2)
+        if (contigNode.contigPart.isReal && incidentEdgesCache[contigNode].length > 2)
         {
-            auto incidentGapJoins = scaffold.incidentEdges(contigNode).filter!isGap.array;
+            auto incidentGapJoins = incidentEdgesCache[contigNode].filter!isGap.array;
+            auto correctGapJoinIdx = incidentGapJoins.findCorrectGapJoin!T(bestPileUpMargin);
 
-            if (incidentGapJoins.length > 1)
+            if (correctGapJoinIdx < incidentGapJoins.length)
+            {
+                // Keep correct gap join for diagnostic output
+                auto correctGapJoin = incidentGapJoins[correctGapJoinIdx];
+
+                // Remove correct gap join from the list
+                incidentGapJoins[correctGapJoinIdx .. $ - 1] =
+                        incidentGapJoins[correctGapJoinIdx + 1 .. $];
+                --incidentGapJoins.length;
+
+                logJsonDiagnostic(
+                    "info", "removing bad gap pile ups",
+                    "sourceContigNode", contigNode.toJson,
+                    "correctGapJoin", correctGapJoin.toJson,
+                    "removedGapJoins", incidentGapJoins.toJson,
+                );
+            }
+            else
             {
                 logJsonDiagnostic(
-                    "info", "skipping ambiguous gap joins",
+                    "info", "skipping ambiguous gap pile ups",
                     "sourceContigNode", contigNode.toJson,
-                    "joins", incidentGapJoins.toJson,
+                    "removedGapJoins", incidentGapJoins.toJson,
                 );
+            }
 
-                foreach (join; incidentGapJoins)
-                {
-                    join.payload = T.init;
-                    scaffold.add!(scaffold.ConflictStrategy.replace)(join);
-                }
+            // Mark bad/ambiguous pile ups for removal
+            foreach (gapJoin; incidentGapJoins)
+            {
+                gapJoin.payload = T.init;
+                scaffold.add!(scaffold.ConflictStrategy.replace)(gapJoin);
             }
         }
     }
 
     return removeNoneJoins!T(scaffold);
+}
+
+size_t findCorrectGapJoin(T)(Join!T[] incidentGapJoins, in double bestPileUpMargin)
+{
+    if (incidentGapJoins.length < 2)
+        // There is no ambiguity in the first place.
+        return 0;
+
+    auto pileUpsLengths = incidentGapJoins
+        .map!"a.payload.length"
+        .map!(to!double)
+        .enumerate
+        .array;
+    pileUpsLengths.sort!"a.value > b.value";
+    auto largestPileUp = pileUpsLengths[0];
+    auto sndLargestPileUp = pileUpsLengths[1];
+
+    if (sndLargestPileUp.value * bestPileUpMargin < largestPileUp.value)
+        return largestPileUp.index;
+    else
+        return size_t.max;
 }
 
 /// Get join for a stretch of unknown sequence (`n`s).

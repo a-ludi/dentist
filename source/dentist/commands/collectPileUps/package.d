@@ -154,7 +154,11 @@ class PileUpCollector
         mixin(traceExecution);
 
         import dentist.commands.collectPileUps.pileups : build;
-        auto pileUps = build(numReferenceContigs, readsAlignment);
+        auto pileUps = build(
+            numReferenceContigs,
+            readsAlignment,
+            options,
+        );
 
         logJsonDebug("pileUps", pileUps
             .map!(pileUp => toJson([

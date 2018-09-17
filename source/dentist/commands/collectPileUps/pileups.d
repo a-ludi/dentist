@@ -25,10 +25,12 @@ import dentist.common.scaffold :
     buildScaffold,
     concatenatePayloads,
     discardAmbiguousJoins,
+    isGap,
     Join,
     mergeExtensionsWithGaps,
     Scaffold;
 import dentist.util.algorithm : orderLexicographically;
+import dentist.util.math : filterEdges;
 import dentist.util.log;
 import std.algorithm :
     any,
@@ -72,7 +74,11 @@ private void debugLogPileUps(string state, Scaffold!(ReadAlignment[]) scaffold)
     );
 }
 
-PileUp[] build(in size_t numReferenceContigs, AlignmentChain[] candidates)
+PileUp[] build(Options)(
+    in size_t numReferenceContigs,
+    AlignmentChain[] candidates,
+    in Options options,
+)
 {
     alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
     alias Payload = ReadAlignment[];
@@ -90,7 +96,9 @@ PileUp[] build(in size_t numReferenceContigs, AlignmentChain[] candidates)
         .map!(to!ReadAlignmentJoin);
     auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins);
     debugLogPileUps("raw", alignmentsScaffold);
-    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!Payload;
+    alignmentsScaffold.filterEdges!(e => !e.isGap || e.payload.length >= options.minSpanningReads);
+    debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
+    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!Payload(options.bestPileUpMargin);
     debugLogPileUps("unambiguous", alignmentsScaffold);
     alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!("a ~ b", Payload);
     debugLogPileUps("extensionsMerged", alignmentsScaffold);
@@ -133,6 +141,12 @@ unittest
 
     with (AlignmentChain) with (LocalAlignment)
         {
+            static struct Options
+            {
+                size_t minSpanningReads = 1;
+                double bestPileUpMargin = 1.0;
+            }
+
             id_t alignmentChainId = 0;
             id_t contReadId = 0;
             ReadAlignment getDummyRead(id_t beginContigId, arithmetic_t beginIdx,
@@ -269,7 +283,7 @@ unittest
                 .joiner
                 .map!"a.alignment"
                 .array;
-            auto computedPileUps = build(3, alignmentChains);
+            auto computedPileUps = build(3, alignmentChains, Options());
 
             foreach (pileUp, computedPileUp; zip(pileUps, computedPileUps))
             {
