@@ -94,6 +94,7 @@ enum ReturnCode
 /// Possible returns codes of the command line execution.
 mixin("enum DentistCommand {" ~
     testingOnly!"translocateGaps," ~
+    testingOnly!"findClosableGaps," ~
     "generateDazzlerOptions," ~
     "maskRepetitiveRegions," ~
     "showMask," ~
@@ -280,6 +281,7 @@ struct OptionsFor(DentistCommand command)
 {
     static enum needWorkdir = command.among(
         TestingCommand.translocateGaps,
+        TestingCommand.findClosableGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -291,6 +293,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (command.among(
         TestingCommand.translocateGaps,
+        TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
     ))
     {
@@ -514,6 +517,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
     ))
     {
@@ -526,6 +530,20 @@ struct OptionsFor(DentistCommand command)
         }")
         @Validate!((value, options) => validateInputMask(options.trueAssemblyFile, value))
         string mappedRegionsMask;
+    }
+
+
+    static if (command.among(
+        TestingCommand.findClosableGaps,
+    ))
+    {
+        @Argument("<in:reads-map>")
+        @Help(q"{
+            true alignment of the reads aka. reads map; this is produced by the
+            `-M` option of the `simulator` utility of the Dazzler tools.
+        }")
+        @Validate!validateFileExists
+        string readsMap;
     }
 
     static if (command.among(
@@ -920,6 +938,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.findClosableGaps,
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -971,6 +990,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.findClosableGaps,
         DentistCommand.collectPileUps,
     ))
     {
@@ -1218,6 +1238,11 @@ template commandSummary(DentistCommand command)
     static if (command == TestingCommand.translocateGaps)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
+        }".wrap;
+    else static if (command == TestingCommand.findClosableGaps)
+        enum commandSummary = q"{
+            Find which gaps are closable, ie. the true alignment of the reads
+            provides sufficient spanning reads.
         }".wrap;
     else static if (command == DentistCommand.generateDazzlerOptions)
         enum commandSummary = q"{
