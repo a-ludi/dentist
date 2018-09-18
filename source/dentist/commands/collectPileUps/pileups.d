@@ -96,10 +96,10 @@ PileUp[] build(Options)(
         .map!(to!ReadAlignmentJoin);
     auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins);
     debugLogPileUps("raw", alignmentsScaffold);
-    alignmentsScaffold.filterEdges!(e => !e.isGap || e.payload.length >= options.minSpanningReads);
-    debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
     alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!Payload(options.bestPileUpMargin);
     debugLogPileUps("unambiguous", alignmentsScaffold);
+    alignmentsScaffold.filterEdges!(e => !e.isGap || e.payload.length >= options.minSpanningReads);
+    debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
     alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!("a ~ b", Payload);
     debugLogPileUps("extensionsMerged", alignmentsScaffold);
     auto pileUps = collectPileUps(alignmentsScaffold).array;
