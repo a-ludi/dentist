@@ -109,6 +109,7 @@ struct ClosableGapsFinder
             {
                 closableGaps[i].fromContig = cast(id_t) i;
                 closableGaps[i].toContig = cast(id_t) (i + 1);
+                closableGaps[i].gapSize = cast(coord_t) gap.size;
 
                 foreach (j, read; trueAlignments)
                     if (
@@ -132,6 +133,7 @@ struct ClosableGap
 {
     id_t fromContig;
     id_t toContig;
+    coord_t gapSize;
     id_t[] spanningReads;
 }
 
