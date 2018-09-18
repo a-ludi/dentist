@@ -162,6 +162,7 @@ auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bo
         spliceEnd = spliceSites[1].croppingRefPosition.value;
 
         assert(
+            spliceStart == spliceEnd ||
             (spliceStart < spliceEnd)
             ==
             (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed)

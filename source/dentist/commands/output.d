@@ -83,7 +83,7 @@ import std.range :
     walkLength;
 import std.range.primitives : empty, front, popFront, save;
 import std.stdio : File, stderr, stdout;
-import std.typecons : Flag, No, tuple, Yes;
+import std.typecons : Flag, No, tuple, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -451,9 +451,24 @@ OutputScaffold fixCropping(
         auto insertionUpdated2 = resolveCroppingConflicts(scaffold, contigJoin, incidentEdgesCache,
                                                          tracePointDistance);
 
+        version (assert)
+        {
+            auto spliceSites = contigJoin.payload.spliceSites;
+
+            assert(spliceSites.length <= 2);
+            if (spliceSites.length == 2)
+                assert(
+                    spliceSites[0].croppingRefPosition.value == spliceSites[1].croppingRefPosition.value ||
+                    (spliceSites[0].croppingRefPosition.value < spliceSites[1].croppingRefPosition.value)
+                    ==
+                    (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed)
+                );
+        }
+
         if (insertionUpdated1 || insertionUpdated2)
             scaffold.add!replace(contigJoin);
     }
+
 
     return scaffold;
 }
@@ -516,12 +531,26 @@ Flag!"insertionUpdated" resolveCroppingConflicts(
         tracePointDistance,
     );
 
+    if (
+        backResult.spliceSite.croppingRefPosition.value
+        <
+        frontResult.spliceSite.croppingRefPosition.value
+    )
+        resolveOverlappingCropping(
+            scaffold,
+            contigJoin,
+            frontResult,
+            backResult,
+            incidentEdgesCache,
+            tracePointDistance,
+        );
+
     auto newSpliceSites = only(frontResult, backResult)
-        .map!"a[1]"
+        .map!"a.spliceSite"
         .filter!"a.croppingRefPosition.contigId > 0"
         .array;
     auto insertionUpdated = only(frontResult, backResult)
-        .map!"a[0]"
+        .map!"a.insertionUpdated"
         .fold!"a | b";
 
     if (insertionUpdated)
@@ -537,6 +566,11 @@ auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
     trace_point_t tracePointDistance,
 )
 {
+    alias Result = Tuple!(
+        Flag!"insertionUpdated", "insertionUpdated",
+        SpliceSite, "spliceSite",
+    );
+
     auto seedSpliceSites = contigJoin
         .payload
         .spliceSites
@@ -544,9 +578,9 @@ auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
     auto numSeedSpliceSites = seedSpliceSites.walkLength(2);
 
     if (numSeedSpliceSites == 0)
-        return tuple(No.insertionUpdated, SpliceSite());
+        return Result(No.insertionUpdated, SpliceSite());
     else if (numSeedSpliceSites == 1)
-        return tuple(No.insertionUpdated, seedSpliceSites.front);
+        return Result(No.insertionUpdated, seedSpliceSites.front);
 
     auto commonCroppingPostition = seedSpliceSites
         .map!"a.croppingRefPosition.value"
@@ -585,7 +619,7 @@ auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
         }
     }
 
-    return tuple(
+    return Result(
         insertionUpdated,
         SpliceSite(
             ReferencePoint(
@@ -596,4 +630,49 @@ auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
             seedSpliceSites.front.flags,
         ),
     );
+}
+
+void resolveOverlappingCropping(Result)(
+    ref OutputScaffold scaffold,
+    ref Insertion contigJoin,
+    ref Result frontResult,
+    ref Result backResult,
+    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
+    trace_point_t tracePointDistance,
+)
+{
+    auto frontCroppingPos = frontResult.spliceSite.croppingRefPosition.value;
+    auto backCroppingPos = backResult.spliceSite.croppingRefPosition.value;
+    assert(backCroppingPos < frontCroppingPos);
+    auto newCroppingPos = floor((frontCroppingPos + backCroppingPos) / 2, tracePointDistance);
+
+    import std.meta : AliasSeq;
+
+    static foreach (alias result; AliasSeq!(frontResult, backResult))
+    {{
+        auto alignmentSeed = result.spliceSite.alignmentSeed;
+        auto croppingDiff = absdiff(
+            newCroppingPos,
+            result.spliceSite.croppingRefPosition.value,
+        );
+
+        if (croppingDiff > 0)
+        {
+            alias replace = OutputScaffold.ConflictStrategy.replace;
+
+            auto contigNode = alignmentSeed == AlignmentLocationSeed.front
+                ? contigJoin.start
+                : contigJoin.end;
+            auto incidentInsertion = incidentEdgesCache[contigNode]
+                .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
+                .front;
+            incidentInsertion.payload.sequence = alignmentSeed == AlignmentLocationSeed.front
+                ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
+                : incidentInsertion.payload.sequence[croppingDiff .. $];
+
+            scaffold.add!replace(incidentInsertion);
+            result.spliceSite.croppingRefPosition.value = newCroppingPos;
+            result.insertionUpdated |= Yes.insertionUpdated;
+        }
+    }}
 }
