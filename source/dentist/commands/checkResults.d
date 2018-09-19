@@ -412,22 +412,30 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return resultScaffoldStructure
+        auto values = resultScaffoldStructure
             .filter!(contigPart => contigPart.peek!GapSegment !is null)
             .map!(contigPart => contigPart.peek!GapSegment.length)
-            .array
-            .median;
+            .array;
+
+        if (values.length == 0)
+            return size_t.max;
+        else
+            return median(values);
     }
 
     size_t getClosedGapMedian()
     {
         mixin(traceExecution);
 
-        return zip(referenceGaps.intervals, reconstructedGaps)
+        auto values = zip(referenceGaps.intervals, reconstructedGaps)
             .filter!(pair => isGapClosed(pair))
             .map!"a[0].size"
-            .array
-            .median;
+            .array;
+
+        if (values.length == 0)
+            return size_t.max;
+        else
+            return median(values);
     }
 
     ReferenceInterval getMaxClosedGap()
