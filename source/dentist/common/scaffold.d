@@ -28,6 +28,7 @@ import std.algorithm :
     sort,
     sum;
 import std.array : appender, array;
+import std.conv : to;
 import std.functional : binaryFun;
 import std.range :
     enumerate,
