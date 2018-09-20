@@ -140,7 +140,7 @@ class AssemblyWriter
         mixin(traceExecution);
 
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
-        scaffoldStructure = getScaffoldStructure(options.refDb, options).array;
+        scaffoldStructure = getScaffoldStructure(options.refDb).array;
         contigLengths = scaffoldStructure
             .filter!(part => part.peek!ContigSegment !is null)
             .map!(contigPart => contigPart.get!ContigSegment)

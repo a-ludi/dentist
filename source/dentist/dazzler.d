@@ -1681,12 +1681,11 @@ id_t getNumContigs(in string damFile, in string workdir)
     return numContigs;
 }
 
-auto getScaffoldStructure(Options)(in string damFile, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+auto getScaffoldStructure(in string damFile)
 {
     enum string[] dbshowOptions = [DBshowOptions.noSequence];
 
-    auto rawScaffoldInfo = dbshow(damFile, dbshowOptions, options.workdir);
+    auto rawScaffoldInfo = dbshow(damFile, dbshowOptions);
 
     return ScaffoldStructureReader(rawScaffoldInfo);
 }
@@ -2503,15 +2502,14 @@ private
         ), workdir);
     }
 
-    string dbshow(in string dbFile, in string contigId, in string workdir)
+    string dbshow(in string dbFile, in string contigId)
     {
-        return executeCommand(only("DBshow", dbFile.relativeToWorkdir(workdir), contigId), workdir);
+        return executeCommand(only("DBshow", dbFile, contigId));
     }
 
-    string dbshow(in string dbFile, in string[] dbshowOptions, in string workdir)
+    string dbshow(in string dbFile, in string[] dbshowOptions)
     {
-        return executeCommand(chain(only("DBshow"), dbshowOptions,
-                only(dbFile.relativeToWorkdir(workdir))), workdir);
+        return executeCommand(chain(only("DBshow"), dbshowOptions, only(dbFile)));
     }
 
     auto executePipe(Range)(Range command, in string workdir = null)

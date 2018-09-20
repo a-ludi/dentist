@@ -123,9 +123,9 @@ private struct ResultAnalyzer
 
     void init()
     {
-        trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb, options).array;
-        refScaffoldStructure = getScaffoldStructure(options.refDb, options).array;
-        resultScaffoldStructure = getScaffoldStructure(options.resultDb, options).array;
+        trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
+        refScaffoldStructure = getScaffoldStructure(options.refDb).array;
+        resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
         resultAlignment = getAlignments(options.resultsAlignmentFile);
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,

@@ -70,7 +70,7 @@ struct ClosableGapsFinder
 
     void init()
     {
-        trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb, options).array;
+        trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
