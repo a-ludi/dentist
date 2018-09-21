@@ -31,6 +31,7 @@ import std.range :
     ElementType,
     enumerate,
     isForwardRange,
+    isRandomAccessRange,
     retro,
     save,
     walkLength;
@@ -1792,4 +1793,137 @@ private struct BronKerboschVersion1
 
         return result;
     }
+}
+
+/**
+    Calculate a longest increasing subsequence of `sequence`. This subsequence
+    is not necessarily contiguous, or unique. Given a `sequence` of `n`
+    elements the algorithm uses `O(n log n)` evaluation of `pred`.
+
+    See_Also: https://en.wikipedia.org/wiki/Longest_increasing_subsequence
+*/
+auto longestIncreasingSubsequence(alias pred = "a < b", Range)(Range sequence)
+        if (isRandomAccessRange!Range)
+{
+    alias lessThan = binaryFun!pred;
+
+    size_t[] subseqEnds;
+    subseqEnds.length = sequence.length;
+    size_t[] predecessors;
+    predecessors.length = sequence.length;
+    size_t subseqLength;
+
+    foreach (i; 0 .. sequence.length)
+    {
+        // Binary search for the largest positive j < subseqLength
+        // such that sequence[subseqEnds[j]] < sequence[i]
+        long lo = 0;
+        long hi = subseqLength - 1;
+        auto pivot = sequence[i];
+        assert(!lessThan(pivot, pivot), "`pred` is not anti-symmetric");
+
+        while (lo <= hi)
+        {
+            auto mid = ceildiv(lo + hi, 2);
+
+            if (lessThan(sequence[subseqEnds[mid]], pivot))
+                lo = mid + 1;
+            else
+                hi = mid - 1;
+        }
+
+        // After searching, lo + 1 is the length of the longest prefix of
+        // sequence[i]
+        auto newSubseqLength = lo + 1;
+
+        // The predecessor of sequence[i] is the last index of
+        // the subsequence of length newSubseqLength - 1
+        subseqEnds[lo] = i;
+        if (lo > 0)
+            predecessors[i] = subseqEnds[lo - 1];
+
+        if (newSubseqLength > subseqLength)
+            // If we found a subsequence longer than any we've
+            // found yet, update subseqLength
+            subseqLength = newSubseqLength;
+    }
+
+    auto subsequenceResult = subseqEnds[0 .. subseqLength];
+
+    if (subseqLength > 0)
+    {
+        // Reconstruct the longest increasing subsequence
+        // Note: reusing memory from now unused subseqEnds
+        auto k = subseqEnds[subseqLength - 1];
+        foreach_reverse (i; 0 .. subseqLength)
+        {
+            subsequenceResult[i] = k;
+            k = predecessors[k];
+        }
+    }
+
+    return subsequenceResult.map!(i => sequence[i]);
+}
+
+/// Example from Wikipedia
+unittest
+{
+    import std.algorithm : equal;
+
+    auto inputSequence = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
+    auto expectedOutput = [0, 2, 6, 9, 11, 15];
+
+    assert(inputSequence.longestIncreasingSubsequence.equal(expectedOutput));
+}
+
+/// Example using a different `pred`
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : retro;
+
+    auto inputSequence = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
+    auto expectedOutput = [12, 10, 9, 5, 3];
+
+    assert(inputSequence.longestIncreasingSubsequence!"a > b".equal(expectedOutput));
+}
+
+unittest
+{
+    import std.algorithm : equal;
+
+    int[] inputSequence = [];
+    int[] expectedOutput = [];
+
+    assert(inputSequence.longestIncreasingSubsequence.equal(expectedOutput));
+}
+
+unittest
+{
+    import std.algorithm : equal;
+
+    auto inputSequence = [1, 2, 3, 4, 5];
+    auto expectedOutput = [1, 2, 3, 4, 5];
+
+    assert(inputSequence.longestIncreasingSubsequence.equal(expectedOutput));
+}
+
+unittest
+{
+    import std.algorithm : equal;
+
+    auto inputSequence = [2, 1, 3, 4, 5];
+    auto expectedOutput = [1, 3, 4, 5];
+
+    assert(inputSequence.longestIncreasingSubsequence.equal(expectedOutput));
+}
+
+unittest
+{
+    import std.algorithm : equal;
+
+    auto inputSequence = [1, 2, 3, 5, 4];
+    auto expectedOutput = [1, 2, 3, 4];
+
+    assert(inputSequence.longestIncreasingSubsequence.equal(expectedOutput));
 }
