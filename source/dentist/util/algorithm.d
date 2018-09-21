@@ -295,3 +295,41 @@ unittest
     assert(last(PowersOfTwo!true(1).take(5)) == 16);
     assert(last(PowersOfTwo!false(1).take(5)) == 16);
 }
+
+/// Returns one of a collection of expressions based on the value of the
+/// switch expression.
+template staticPredSwitch(T...)
+{
+    auto staticPredSwitch(E)(E switchExpression) pure nothrow
+    {
+        static assert (T.length > 0, "missing choices");
+        static assert (T.length % 2 == 1, "missing default clause");
+
+        static foreach (i; 0 .. T.length - 1)
+        {
+            static if (i % 2 == 0)
+            {
+                if (switchExpression == T[i])
+                    return T[i + 1];
+            }
+        }
+
+        return T[$ - 1];
+    }
+}
+
+///
+unittest
+{
+    alias numberName = staticPredSwitch!(
+        1, "one",
+        2, "two",
+        3, "three",
+        "many",
+    );
+
+    static assert("one" == numberName(1));
+    static assert("two" == numberName(2));
+    static assert("three" == numberName(3));
+    static assert("many" == numberName(4));
+}
