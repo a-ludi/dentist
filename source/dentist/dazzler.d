@@ -267,23 +267,31 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
     return getAlignments(dbA, dbB, lasFile, options);
 }
 
-AlignmentChain[] getAlignments(in string dbA, in string lasFile, in string workdir)
+AlignmentChain[] getAlignments(
+    in string dbA,
+    in string lasFile,
+    in string workdir,
+    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+)
 {
-    return getAlignments(dbA, null, lasFile, workdir);
+    return getAlignments(dbA, null, lasFile, workdir, includeTracePoints);
 }
 
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
     in string lasFile,
-    in string workdir
+    in string workdir, Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
 )
 {
-    static enum ladumpOptions = [
+    string[] ladumpOptions = [
         LAdumpOptions.coordinates,
         LAdumpOptions.numDiffs,
         LAdumpOptions.lengths,
     ];
+
+    if (includeTracePoints)
+        ladumpOptions ~= LAdumpOptions.tracePoints;
 
     auto alignmentChains = readLasDump(ladump(
         lasFile,
