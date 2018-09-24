@@ -43,6 +43,7 @@ import std.algorithm :
     copy,
     count,
     filter,
+    find,
     map,
     max,
     maxElement,
@@ -60,7 +61,7 @@ import std.range :
     StoppingPolicy,
     zip;
 import std.range.primitives;
-import std.stdio : writeln;
+import std.stdio : File, writeln;
 import std.string : join;
 import std.typecons : Tuple;
 import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
@@ -99,6 +100,12 @@ private struct ResultAnalyzer
         mixin(traceExecution);
 
         init();
+
+        if (options.alignmentTabular !is null)
+            writeAlignmentTabular(
+                File(options.alignmentTabular, "w"),
+                resultAlignment,
+            );
 
         Stats stats;
 
@@ -182,6 +189,58 @@ private struct ResultAnalyzer
             .intervals
             .map!(gap => reconstructedRegions & gap)
             .array;
+    }
+
+    void writeAlignmentTabular(File tabularFile, AlignmentChain[] alignmentChains)
+    {
+        coord_t contigBId;
+        coord_t contigBOffset;
+        foreach (alignmentChain; alignmentChains)
+        {
+            if (contigBId != alignmentChain.contigB.id)
+            {
+                contigBId = alignmentChain.contigB.id;
+                contigBOffset = getResultContigBegin(contigBId);
+            }
+
+            alias percentSimilarity = (la) => 1.0 - cast(double) la.numDiffs /
+                                                    cast(double) (la.contigA.end - la.contigA.begin);
+
+            foreach (i, localAlignment; alignmentChain.localAlignments)
+            {
+                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
+                    alignmentChain.contigA.id,
+                    alignmentChain.contigB.id,
+                    localAlignment.contigA.begin,
+                    alignmentChain.flags.complement
+                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.end)
+                        : contigBOffset + localAlignment.contigB.begin,
+                    0.0,
+                    alignmentChain.flags.complement ? -1 : 1,
+                );
+                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
+                    alignmentChain.contigA.id,
+                    alignmentChain.contigB.id,
+                    localAlignment.contigA.end,
+                    alignmentChain.flags.complement
+                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.begin)
+                        : contigBOffset + localAlignment.contigB.end,
+                    percentSimilarity(localAlignment),
+                    alignmentChain.flags.complement ? -1 : 1,
+                );
+            }
+            tabularFile.writeln();
+        }
+    }
+
+    coord_t getResultContigBegin(id_t contigId)
+    {
+        return cast(coord_t) (resultScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => contigPart.peek!ContigSegment)
+            .find!(contigPart => contigPart.globalContigId == contigId)
+            .map!(contigPart => contigPart.begin)
+            .front + 0);
     }
 
     size_t getNumBpsExpected()

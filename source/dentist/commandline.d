@@ -823,6 +823,18 @@ struct OptionsFor(DentistCommand command)
         string assemblyGraphFile;
     }
 
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("debug-alignment")
+        @MetaVar("<file>")
+        @Help("write the result alignment to a tabular file <file>; use `show-insertions` to inspect the result")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string alignmentTabular;
+    }
+
     static if (command.among(
         DentistCommand.collectPileUps,
     ))
