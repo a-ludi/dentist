@@ -146,9 +146,9 @@ private struct Translocator
 
                 contigSequence[keepRegions[1].begin .. keepRegions[1].end].copy(writer);
             }
-        }
 
-        "\n".copy(writer);
+            "\n".copy(writer);
+        }
     }
 
     static protected string getScaffoldHeader(in size_t scaffoldId)
