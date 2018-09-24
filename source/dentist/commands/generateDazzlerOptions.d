@@ -8,6 +8,7 @@
 */
 module dentist.commands.generateDazzlerOptions;
 
+import dentist.common : isTesting;
 import std.stdio : writefln, writeln;
 
 /// Execute the `generateDazzlerOptions` command with `options`.
@@ -17,4 +18,10 @@ void execute(Options)(in Options options)
     writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
     writeln("# ref vs reads alignment options (consider using `HPC.damapper`)");
     writefln!"damapper %-(%s %) <reference> <reads>"(options.refVsReadsAlignmentOptions);
+
+    static if (isTesting)
+    {
+        writeln("# true assembly vs result alignment options (consider using `HPC.damapper`)");
+        writefln!"damapper %-(%s %) <true-assembly> <result>"(options.trueAssemblyVsResultAlignmentOptions);
+    }
 }

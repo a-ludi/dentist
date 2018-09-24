@@ -23,23 +23,31 @@ import dentist.common.alignments :
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
+    getAlignments,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm : first, last;
 import dentist.util.log;
-import dentist.util.math : ceildiv, mean, median, N;
+import dentist.util.math :
+    ceildiv,
+    longestIncreasingSubsequence,
+    mean,
+    median,
+    N;
 import dentist.util.range : tupleMap;
-import dentist.mummer : getAlignments;
 import std.algorithm :
     all,
+    among,
     chunkBy,
+    copy,
     count,
     filter,
     map,
     max,
     maxElement,
     min,
+    sort,
     sum;
 import std.array : array;
 import std.format : format;
@@ -126,7 +134,12 @@ private struct ResultAnalyzer
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         refScaffoldStructure = getScaffoldStructure(options.refDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        resultAlignment = getAlignments(options.resultsAlignmentFile);
+        resultAlignment = filterGenomeAlignment(getAlignments(
+            options.trueAssemblyDb,
+            options.resultDb,
+            options.resultsAlignmentFile,
+            options.workdir,
+        )).sort!isStrictlyBefore.release;
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -475,9 +488,33 @@ private struct ResultAnalyzer
     }
 }
 
-bool isStrictlyBefore(in AlignmentChain lhs, in AlignmentChain rhs) pure nothrow
+bool isStrictlyBefore(string contig = "contigA")(
+    in AlignmentChain lhs,
+    in AlignmentChain rhs,
+) pure nothrow if (contig.among("contigA", "contigB"))
 {
-    return lhs.contigA.id != rhs.contigA.id || lhs.last.contigA.end <= rhs.first.contigA.begin;
+    alias lhsContigId = () => mixin("lhs." ~ contig ~ ".id");
+    alias rhsContigId = () => mixin("rhs." ~ contig ~ ".id");
+    alias lhsEnd = () => mixin("lhs.first." ~ contig ~ ".end");
+    alias rhsBegin = () => mixin("rhs.first." ~ contig ~ ".begin");
+
+    if (lhsContigId() < rhsContigId())
+        return true;
+    else if (lhsContigId() > rhsContigId())
+        return false;
+    else
+        return lhsEnd() < rhsBegin();
+}
+
+AlignmentChain[] filterGenomeAlignment(AlignmentChain[] alignmentChains)
+{
+    alignmentChains.sort;
+
+    auto bufferRest = alignmentChains
+        .longestIncreasingSubsequence!(isStrictlyBefore!"contigB")
+        .copy(alignmentChains);
+
+    return alignmentChains[0 .. $ - bufferRest.length];
 }
 
 private struct Histogram(value_t)

@@ -41,13 +41,13 @@ import dentist.dazzler :
     provideLasFileInWorkdir,
     ProvideMethod,
     provideMethods;
-import dentist.mummer : provideDeltaFileInWorkdir;
 import dentist.swinfo :
     copyright,
     executableName,
     description,
     license,
     version_;
+import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
 import std.algorithm :
@@ -476,8 +476,7 @@ struct OptionsFor(DentistCommand command)
             alignments chains of the result assembly against the 'true'
             assembly in form of a .las file as produced by `damapper`
         }")
-        @Validate!validateFileExists
-        @Validate!(validateFileExtension!(null, ".delta"))
+        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.resultFile))
         string resultsAlignmentInputFile;
         @Option()
         string resultsAlignmentFile;
@@ -485,7 +484,7 @@ struct OptionsFor(DentistCommand command)
         @PostValidate()
         void hookProvideResultsAlignmentInWorkDir()
         {
-            resultsAlignmentFile = provideDeltaFileInWorkdir(
+            resultsAlignmentFile = provideLasFileInWorkdir(
                 resultsAlignmentInputFile,
                 provideMethod,
                 workdir,
@@ -1052,11 +1051,15 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
+        TestingCommand.checkResults,
     ))
     {
         @Option("trace-point-spacing", "s")
         @Help("trace point spacing used for the ref vs. reads alignment")
-        trace_point_t tracePointDistance;
+        trace_point_t tracePointDistance = command.staticPredSwitch!(
+            TestingCommand.checkResults, 10,
+            0
+        );
 
         @PostValidate()
         void hookEnsurePresenceOfTracePointDistance()
@@ -1186,6 +1189,19 @@ struct OptionsFor(DentistCommand command)
                 DalignerOptions.identity,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - readsErrorRate)^^2),
+            ];
+        }
+    }
+
+    static if (isTesting)
+    {
+        @property string[] trueAssemblyVsResultAlignmentOptions() const
+        {
+            return [
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                DamapperOptions.averageCorrelationRate ~ ".7",
+                format!(DalignerOptions.tracePointDistance ~ "%d")(OptionsFor!(TestingCommand.checkResults)().tracePointDistance),
             ];
         }
     }
