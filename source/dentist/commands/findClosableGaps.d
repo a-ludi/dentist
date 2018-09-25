@@ -103,22 +103,26 @@ struct ClosableGapsFinder
                 contigPart.length,
             ));
             auto scaffoldGaps = scaffoldRegion - mappedRegionsMask;
-            closableGaps.length += scaffoldGaps.intervals.length;
+            auto firstContigId = this.closableGaps.length;
+            this.closableGaps.length += scaffoldGaps.intervals.length;
+            auto closableGaps = this.closableGaps[$ - scaffoldGaps.intervals.length .. $];
 
             foreach (i, gap; scaffoldGaps.intervals)
             {
-                closableGaps[i].fromContig = cast(id_t) i;
-                closableGaps[i].toContig = cast(id_t) (i + 1);
+                closableGaps[i].fromContig = cast(id_t) (firstContigId + i);
+                closableGaps[i].toContig = cast(id_t) (firstContigId + i + 1);
                 closableGaps[i].gapSize = cast(coord_t) gap.size;
 
-                foreach (j, read; trueAlignments)
+                foreach (read; trueAlignments)
                     if (
+                        read.scaffoldId + 1 == gap.contigId &&
                         read.begin < gap.begin &&
                         (gap.begin - read.begin) >= options.minAnchorLength &&
                         gap.end < read.end &&
                         (read.end - gap.end) >= options.minAnchorLength
                     )
-                        closableGaps[i].spanningReads ~= cast(id_t) (j + 1);
+                        closableGaps[i].spanningReads ~= read.readId;
+                closableGaps[i].spanningReads.sort;
             }
         }
 
@@ -146,6 +150,7 @@ struct TrueAlignment
     coord_t begin;
     coord_t end;
     Flags flags;
+    id_t readId;
 
     static foreach(flagName; __traits(allMembers, Flag))
     {
@@ -171,6 +176,7 @@ struct TrueAlignment
             "a.scaffoldId",
             "a.begin",
             "a.end",
+            "a.readId",
         )(this, other);
     }
 }
@@ -179,6 +185,7 @@ TrueAlignment[] readTrueAlignments(in string readsMap)
 {
     auto trueAlignments = File(readsMap)
         .byLine
+        .enumerate(1)
         .map!parseTrueAlignment
         .array;
     trueAlignments.sort;
@@ -187,9 +194,11 @@ TrueAlignment[] readTrueAlignments(in string readsMap)
 }
 
 // Not meant for public usage.
-TrueAlignment parseTrueAlignment(S)(S line)
+TrueAlignment parseTrueAlignment(EnumLine)(EnumLine enumLine)
 {
+    auto line = enumLine.value;
     TrueAlignment trueAlignment;
+    trueAlignment.readId = enumLine.index;
 
     line.formattedRead!" %d %d %d"(
         trueAlignment.scaffoldId,
