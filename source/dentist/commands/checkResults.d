@@ -44,6 +44,7 @@ import std.algorithm :
     count,
     filter,
     find,
+    joiner,
     map,
     max,
     maxElement,
@@ -63,7 +64,7 @@ import std.range :
 import std.range.primitives;
 import std.stdio : File, writeln;
 import std.string : join;
-import std.typecons : Tuple;
+import std.typecons : Tuple, Yes;
 import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
 
 
@@ -141,12 +142,13 @@ private struct ResultAnalyzer
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         refScaffoldStructure = getScaffoldStructure(options.refDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        resultAlignment = filterGenomeAlignment(getAlignments(
+        resultAlignment = getAlignments(
             options.trueAssemblyDb,
             options.resultDb,
             options.resultsAlignmentFile,
             options.workdir,
-        )).sort!isStrictlyBefore.release;
+            Yes.includeTracePoints,
+        ).sort!isStrictlyBefore.release;
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -161,25 +163,33 @@ private struct ResultAnalyzer
 
     ReferenceRegion getReferenceGaps()
     {
-        return ReferenceRegion(refScaffoldStructure
-            .filter!(contigPart => contigPart.peek!GapSegment !is null)
-            .map!(contigPart => contigPart.get!GapSegment)
-            .map!(gap => ReferenceInterval(
-                gap.scaffoldId + 1,
-                referenceOffset + gap.begin,
-                referenceOffset + gap.end,
-            ))
-            .array);
+        alias scaffoldRegion = (contigPart) => ReferenceRegion(ReferenceInterval(
+            contigPart.globalContigId,
+            0,
+            contigPart.length,
+        ));
+        alias mappedGapsMask = (contigPart) => scaffoldRegion(contigPart) - mappedRegionsMask;
+
+        return ReferenceRegion(trueAssemblyScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => contigPart.get!ContigSegment)
+            .map!(contigPart => cast(ReferenceInterval[]) mappedGapsMask(contigPart).intervals)
+            .joiner
+            .array
+        );
     }
 
     ReferenceRegion getReconstructedRegions()
     {
         return ReferenceRegion(resultAlignment
-            .map!(ac => ReferenceInterval(
-                ac.contigA.id,
-                ac.first.contigA.begin,
-                ac.first.contigA.end,
-            ))
+            .map!(ac => ac
+                .localAlignments
+                .map!(la => ReferenceInterval(
+                    ac.contigA.id,
+                    la.contigA.begin,
+                    la.contigA.end,
+                )))
+            .joiner
             .array);
     }
 
@@ -279,7 +289,10 @@ private struct ResultAnalyzer
         mixin(traceExecution);
 
         return resultAlignment
-            .map!(ac => ac.first.contigA.end - ac.first.contigA.begin - ac.first.numDiffs)
+            .map!(ac => ac
+                .localAlignments
+                .map!(la => la.contigA.end - la.contigA.begin - la.numDiffs))
+            .joiner
             .sum;
     }
 
@@ -484,9 +497,9 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        auto values = resultScaffoldStructure
-            .filter!(contigPart => contigPart.peek!GapSegment !is null)
-            .map!(contigPart => contigPart.peek!GapSegment.length)
+        auto values = referenceGaps
+            .intervals
+            .map!(gap => gap.size)
             .array;
 
         if (values.length == 0)
@@ -563,17 +576,6 @@ bool isStrictlyBefore(string contig = "contigA")(
         return false;
     else
         return lhsEnd() < rhsBegin();
-}
-
-AlignmentChain[] filterGenomeAlignment(AlignmentChain[] alignmentChains)
-{
-    alignmentChains.sort;
-
-    auto bufferRest = alignmentChains
-        .longestIncreasingSubsequence!(isStrictlyBefore!"contigB")
-        .copy(alignmentChains);
-
-    return alignmentChains[0 .. $ - bufferRest.length];
 }
 
 private struct Histogram(value_t)
