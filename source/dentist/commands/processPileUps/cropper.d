@@ -16,6 +16,7 @@ import dentist.common :
 import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
+    coord_t,
     getType,
     PileUp,
     ReadAlignment,
@@ -287,30 +288,7 @@ private ReadInterval getCroppingSlice(
         .front
         .value;
 
-    size_t numCroppingTracePoints(in AlignmentChain.LocalAlignment localAlignment)
-    {
-        auto firstTracePointRefPos = localAlignment.contigA.begin;
-        assert(croppingRefPos >= firstTracePointRefPos);
-
-        return ceildiv(croppingRefPos - firstTracePointRefPos, tracePointDistance);
-    }
-
-    bool coversCroppingRefPos(in AlignmentChain.LocalAlignment localAlignment)
-    {
-        return localAlignment.contigA.begin <= croppingRefPos
-            && croppingRefPos < localAlignment.contigA.end;
-    }
-
-    auto coveringLocalAlignment = alignment
-        .localAlignments
-        .filter!coversCroppingRefPos
-        .front;
-    auto readCroppingPos =
-        coveringLocalAlignment.contigB.begin +
-        coveringLocalAlignment
-            .tracePoints[0 .. numCroppingTracePoints(coveringLocalAlignment)]
-            .map!"a.numBasePairs"
-            .sum;
+    auto readCroppingPos = alignment.translateTracePoint(cast(coord_t) croppingRefPos).contigB;
     size_t readBeginIdx;
     size_t readEndIdx;
 

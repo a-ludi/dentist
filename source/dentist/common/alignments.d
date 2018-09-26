@@ -12,9 +12,25 @@ import dentist.common.scaffold : buildScaffold, concatenatePayloads, ContigNode,
     ContigPart, discardAmbiguousJoins, Join, mergeExtensionsWithGaps;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
 import dentist.util.log;
+import dentist.util.math : floor;
 import core.exception : AssertError;
-import std.algorithm : all, any, canFind, chunkBy, equal, filter, isSorted,
-    joiner, map, mean, min, sort, sum, swap, SwapStrategy;
+import std.algorithm :
+    all,
+    any,
+    canFind,
+    chunkBy,
+    equal,
+    filter,
+    find,
+    isSorted,
+    joiner,
+    map,
+    mean,
+    min,
+    sort,
+    sum,
+    swap,
+    SwapStrategy;
 import std.array : appender, array, minimallyInitializedArray;
 import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
@@ -68,6 +84,20 @@ struct AlignmentChain
         Locus contigB;
         diff_t numDiffs;
         TracePoint[] tracePoints;
+
+        auto tracePointIndex(in coord_t contigAPos, trace_point_t tracePointDistance) const pure nothrow
+        {
+            auto firstTracePointRefPos = contigA.begin;
+            auto secondTracePointRefPos = floor(firstTracePointRefPos, tracePointDistance) + tracePointDistance;
+
+            if (contigAPos == contigA.end)
+                return tracePoints.length - 1;
+
+            assert(contigAPos >= firstTracePointRefPos);
+            return firstTracePointRefPos <= contigAPos && contigAPos < secondTracePointRefPos
+                ? 0
+                : 1 + (contigAPos - secondTracePointRefPos) / tracePointDistance;
+        }
     }
 
     static struct Contig
@@ -527,6 +557,90 @@ struct AlignmentChain
                             assert(compareValue == 0, errorMessage("=="));
                     }
             }
+    }
+
+    auto translateTracePoint(in coord_t contigAPos) const pure
+    {
+        bool coversContigAPos(in AlignmentChain.LocalAlignment localAlignment)
+        {
+            return localAlignment.contigA.begin <= contigAPos
+                && contigAPos <= localAlignment.contigA.end;
+        }
+
+        auto coveringLocalAlignments = localAlignments.find!coversContigAPos;
+        enforce!Exception(
+            coveringLocalAlignments.length > 0,
+            "cannot translate coordinate due to lack of alignment coverage",
+        );
+        auto coveringLocalAlignment = coveringLocalAlignments[0];
+
+        auto tracePointIndex = coveringLocalAlignment.tracePointIndex(contigAPos, tracePointDistance);
+
+        auto contigBPos = coveringLocalAlignment.contigB.begin +
+            coveringLocalAlignment
+                .tracePoints[0 .. tracePointIndex]
+                .map!"a.numBasePairs"
+                .sum;
+        auto matchingContigAPos = tracePointIndex == 0
+            ? coveringLocalAlignment.contigA.begin
+            : floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + tracePointIndex * tracePointDistance;
+
+        return tuple!("contigA", "contigB")(matchingContigAPos, contigBPos);
+    }
+
+    unittest
+    {
+        alias Locus = LocalAlignment.Locus;
+        alias TracePoint = LocalAlignment.TracePoint;
+        enum tracePointDistance = 100;
+        auto ac = AlignmentChain(
+            0,
+            Contig(1, 2584),
+            Contig(58024, 10570),
+            Flags(Flag.complement),
+            [LocalAlignment(
+                Locus(579, 2584),
+                Locus(0, 2158),
+                292,
+                [
+                    TracePoint( 2,  23),
+                    TracePoint(11, 109),
+                    TracePoint(13, 109),
+                    TracePoint(15, 107),
+                    TracePoint(18, 107),
+                    TracePoint(14, 103),
+                    TracePoint(16, 106),
+                    TracePoint(17, 106),
+                    TracePoint( 9, 106),
+                    TracePoint(14, 112),
+                    TracePoint(16, 105),
+                    TracePoint(16, 114),
+                    TracePoint(10, 103),
+                    TracePoint(14, 110),
+                    TracePoint(15, 110),
+                    TracePoint(15, 101),
+                    TracePoint(17, 108),
+                    TracePoint(17, 109),
+                    TracePoint(15, 111),
+                    TracePoint(17, 111),
+                    TracePoint(11,  88),
+                ],
+            )],
+            tracePointDistance,
+        );
+
+        assert(ac.translateTracePoint(579) == tuple(579, 0));
+        assert(ac.translateTracePoint(599) == tuple(579, 0));
+        assert(ac.translateTracePoint(600) == tuple(600, 23));
+        assert(ac.translateTracePoint(699) == tuple(600, 23));
+        assert(ac.translateTracePoint(700) == tuple(700, 23 + 109));
+        assert(ac.translateTracePoint(799) == tuple(700, 23 + 109));
+        assert(ac.translateTracePoint(800) == tuple(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(899) == tuple(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(2500) == tuple(2500, 2070));
+        assert(ac.translateTracePoint(2584) == tuple(2500, 2070));
+        assertThrown!Exception(ac.translateTracePoint(578));
+        assertThrown!Exception(ac.translateTracePoint(2585));
     }
 }
 
