@@ -287,17 +287,18 @@ AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
     in string workdir,
-    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+    in trace_point_t tracePointDistance = 0,
 )
 {
-    return getAlignments(dbA, null, lasFile, workdir, includeTracePoints);
+    return getAlignments(dbA, null, lasFile, workdir, tracePointDistance);
 }
 
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
     in string lasFile,
-    in string workdir, Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+    in string workdir,
+    in trace_point_t tracePointDistance = 0,
 )
 {
     string[] ladumpOptions = [
@@ -306,7 +307,7 @@ AlignmentChain[] getAlignments(
         LAdumpOptions.lengths,
     ];
 
-    if (includeTracePoints)
+    if (tracePointDistance > 0)
         ladumpOptions ~= LAdumpOptions.tracePoints;
 
     auto alignmentChains = readLasDump(ladump(
@@ -317,6 +318,10 @@ AlignmentChain[] getAlignments(
         workdir,
     )).array;
     alignmentChains.sort!("a < b", SwapStrategy.stable);
+
+    if (tracePointDistance > 0)
+        foreach (ref alignmentChain; alignmentChains)
+            alignmentChain.tracePointDistance = tracePointDistance;
 
     return alignmentChains;
 }
@@ -1229,6 +1234,7 @@ auto getExactAlignment(
     in string workdir,
 )
 {
+    assert(ac.tracePointDistance > 0, "trace points required for getExactAlignment");
     assert(beginA < endA);
 
     // Translate input coords to tracepoints to get exact alignments
