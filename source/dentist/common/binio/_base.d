@@ -394,7 +394,7 @@ struct CompressedSequence
         assert(cs.bases!(dchar, Yes.reverse).equal(testSequence.toLower.retro));
     }
 
-    S to(S)() if (isSomeString!S)
+    S to(S)() const pure nothrow if (isSomeString!S)
     {
         cast(void) is(S == Char[], Char);
         alias C = Unqual!Char;
@@ -407,6 +407,8 @@ struct CompressedSequence
 
         return cast(S) fastaSequence;
     }
+
+    alias toString = to!string;
 
     unittest
     {
@@ -472,26 +474,25 @@ struct CompressedSequence
         assert(cs[1 .. $ - 2][$ - 1] == CompressedBase.c);
     }
 
-    CompressedSequence opIndex(size_t[2] slice) pure nothrow
+    inout(CompressedSequence) opIndex(size_t[2] slice) inout pure nothrow
     {
         assert(0 <= slice[0] && slice[0] <= slice[1] && slice[1] <= length, "index out of bounds");
 
-        CompressedSequence sequenceSlice;
 
         if (slice[1] == slice[0])
-            return sequenceSlice;
+            return typeof(return)();
 
         size_t dataStart = slice[0] / 4;
         size_t dataEnd = ceildiv(slice[1], 4);
 
-        sequenceSlice._data = this._data[dataStart .. dataEnd];
-        sequenceSlice._baseOffset = cast(ubyte) slice[0] % 4;
-        sequenceSlice.numBases = slice[1] - slice[0];
-
-        return sequenceSlice;
+        return typeof(return)(
+            this._data[dataStart .. dataEnd],
+            cast(ubyte) slice[0] % 4,
+            slice[1] - slice[0],
+        );
     }
 
-    size_t[2] opSlice(size_t dim)(size_t start, size_t end) const pure nothrow if (dim == 0)
+    size_t[2] opSlice(size_t dim)(in size_t start, in size_t end) const pure nothrow if (dim == 0)
     {
         return [start, end];
     }
