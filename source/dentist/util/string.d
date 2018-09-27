@@ -80,13 +80,107 @@ enum EditOp: byte
 alias score_t = uint;
 
 /// Represents an alignment of two sequences.
-struct SequenceAlignment(S)
+struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 {
+    alias getScore = binaryFun!scoreFun;
+
     score_t score;
     EditOp[] editPath;
     S reference;
     S query;
+    score_t indelPenalty;
 
+    /**
+        Get a partial alignment with respect to `reference`.
+    */
+    auto partial(in size_t begin, in size_t end) inout pure nothrow
+    {
+        assert(0 <= begin && begin <= end && end <= reference.length, "index out of bounds");
+
+        if (end == begin)
+            return typeof(this)(0, [], reference, query, indelPenalty);
+
+        score_t newScore;
+        size_t editBegin, editEnd;
+        size_t queryBegin, queryEnd;
+        size_t i, j;
+        foreach (k, editOp; editPath)
+        {
+            if (i == begin)
+            {
+                newScore = 0;
+                editBegin = k;
+                queryBegin = j;
+            }
+
+            final switch (editOp)
+            {
+            case EditOp.substitution:
+                newScore += getScore(reference[i], query[j]);
+                ++i;
+                ++j;
+                break;
+            case EditOp.deletetion:
+                newScore += indelPenalty;
+                ++i;
+                break;
+            case EditOp.insertion:
+                newScore += indelPenalty;
+                ++j;
+                break;
+            }
+
+            if (i >= end)
+            {
+                editEnd = k + 1;
+                queryEnd = j + 1;
+                break;
+            }
+        }
+
+        return typeof(this)(
+            newScore,
+            editPath[editBegin .. editEnd],
+            reference[begin .. end],
+            query[queryBegin .. queryEnd],
+            indelPenalty,
+        );
+    }
+
+    /// ditto
+    auto opIndex(in size_t[2] slice) const pure nothrow
+    {
+        return partial(slice[0], slice[1]);
+    }
+
+    ///
+    unittest
+    {
+        enum indelPenalty = 1;
+        auto alignment = findAlignment("GCATGCT", "GATTACA", indelPenalty);
+
+        assert(alignment.score == 4);
+        assert(alignment.toString ==
+            "GCAT-GCT\n" ~
+            "| || *|*\n" ~
+            "G-ATTACA");
+
+        auto partialAlignment = alignment[1 .. 5];
+
+        assert(partialAlignment.score == 3);
+        assert(partialAlignment.toString ==
+            "CAT-G\n" ~
+            " || *\n" ~
+            "-ATTA");
+    }
+
+    size_t[2] opSlice(size_t dim)(in size_t begin, in size_t end) const pure nothrow
+    {
+        return [begin, end];
+    }
+
+    /// Get a string representation of this alignment. Visually breaks unless
+    /// elements of the sequences convert to single chars via `to!string`.
     string toString(in size_t width = 0) const pure
     {
         enum matchSymbol = '|';
@@ -196,7 +290,7 @@ struct SequenceAlignment(S)
 
     See_Also: http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm
 */
-SequenceAlignment!(const(S)) findAlignment(
+SequenceAlignment!(const(S), scoreFun) findAlignment(
     alias scoreFun = "a == b ? 0 : 1",
     S,
 )(
@@ -240,6 +334,7 @@ SequenceAlignment!(const(S)) findAlignment(
         tracebackScoringMatrix(F),
         reference,
         query,
+        indelPenalty,
     );
 }
 
