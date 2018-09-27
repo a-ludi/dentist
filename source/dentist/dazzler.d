@@ -9,9 +9,14 @@
 module dentist.dazzler;
 
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
-import dentist.util.fasta : parseFastaRecord;
+import dentist.common.binio : CompressedSequence;
+import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
+import dentist.util.math : floor, ceil;
 import dentist.util.range : arrayChunks, takeExactly;
+import dentist.util.string :
+    findAlignment,
+    SequenceAlignment;
 import dentist.util.tempfile : mkstemp;
 import std.algorithm :
     all,
@@ -20,6 +25,7 @@ import std.algorithm :
     canFind,
     copy,
     countUntil,
+    cumulativeFold,
     endsWith,
     filter,
     find,
@@ -31,7 +37,8 @@ import std.algorithm :
     splitter,
     startsWith,
     SwapStrategy,
-    uniq;
+    uniq,
+    until;
 import std.array : appender, Appender, array, uninitializedArray;
 import std.conv : to;
 import std.exception : enforce;
@@ -42,7 +49,16 @@ import std.path : absolutePath, baseName, buildPath, dirName, relativePath,
     stripExtension, withExtension;
 import std.process : Config, escapeShellCommand, kill, pipeProcess,
     ProcessPipes, Redirect, wait;
-import std.range : chain, chunks, drop, enumerate, generate, only, slide, takeExactly;
+import std.range :
+    chain,
+    chunks,
+    drop,
+    enumerate,
+    generate,
+    only,
+    slide,
+    takeExactly,
+    zip;
 import std.range.primitives :
     ElementType,
     empty,
@@ -1202,6 +1218,271 @@ unittest
             tracePointDistance ~ "42",
         ]) == 42);
     }
+}
+
+auto getExactAlignment(
+    in string dbA,
+    in string dbB,
+    in AlignmentChain ac,
+    in coord_t beginA,
+    in coord_t endA,
+    in string workdir,
+)
+{
+    assert(beginA < endA);
+
+    // Translate input coords to tracepoints to get exact alignments
+    auto begin = ac.translateTracePoint(beginA);
+    auto end = ac.translateTracePoint(endA);
+
+    // Fetch relevant sequences from DBs
+    auto aSequence = getFastaSequences(dbA, only(ac.contigA.id), workdir).front;
+    auto bSequence = getFastaSequences(dbB, only(ac.contigB.id), workdir).front;
+
+    // Slice sequences to translated coordinates
+    aSequence = aSequence[begin.contigA .. end.contigA];
+    if (ac.flags.complement)
+        bSequence = reverseComplement(bSequence[$ - end.contigB .. $ - begin.contigB]);
+    else
+        bSequence = bSequence[begin.contigB .. end.contigB];
+
+    auto paddedAlignment = getPaddedAlignment(
+        ac,
+        begin,
+        end,
+        CompressedSequence.from(aSequence),
+        CompressedSequence.from(bSequence),
+    );
+
+    assert(begin.contigA >= beginA);
+
+    return paddedAlignment[(begin.contigA - beginA) .. (begin.contigA - endA)];
+}
+
+private auto getPaddedAlignment(S, TranslatedTracePoint)(
+    in AlignmentChain ac,
+    in TranslatedTracePoint begin,
+    in TranslatedTracePoint end,
+    in S aSequence,
+    in S bSequence,
+)
+{
+    static struct AlignmentPadder
+    {
+        static enum indelPenalty = 1;
+
+        private const AlignmentChain ac;
+        private const TranslatedTracePoint begin;
+        private const TranslatedTracePoint end;
+        private const S aSequence;
+        private const S bSequence;
+        private SequenceAlignment!(const(S)) _paddedAlignment;
+
+        this(
+            in AlignmentChain ac,
+            in TranslatedTracePoint begin,
+            in TranslatedTracePoint end,
+            in S aSequence,
+            in S bSequence,
+        )
+        {
+            this.ac = ac;
+            this.begin = begin;
+            this.end = end;
+            this.aSequence = aSequence;
+            this.bSequence = bSequence;
+            this._paddedAlignment = typeof(this._paddedAlignment)(
+                0,
+                [],
+                aSequence,
+                bSequence,
+            );
+            this._paddedAlignment.editPath.reserve(aSequence.length + bSequence.length);
+        }
+
+        @property auto paddedAlignment()
+        {
+            if (_paddedAlignment.editPath.length == 0)
+                computePaddedAlignment();
+
+            return _paddedAlignment;
+        }
+
+    private:
+
+        coord_t aSeqPos;
+        coord_t bSeqPos;
+
+        void computePaddedAlignment()
+        {
+            aSeqPos = begin.contigA + 0;
+            bSeqPos = begin.contigB + 0;
+            auto coveringLocalAlignments = ac
+                .localAlignments
+                .find!(la => la.contigA.begin <= begin.contigA)
+                .until!(la => end.contigA < la.contigA.begin);
+            assert(!coveringLocalAlignments.empty);
+
+            foreach (i, localAlignment; coveringLocalAlignments.enumerate)
+            {
+                auto skip = i == 0 ? skipTracePointsToASeqPos(localAlignment) : 0;
+
+                if (i > 0)
+                    addGapAlignment(localAlignment);
+
+                foreach (tracePoint; localAlignment.tracePoints[skip .. $])
+                {
+                    if (aSeqPos >= end.contigA)
+                        return;
+
+                    addTracePointAlignment(localAlignment, tracePoint);
+                }
+            }
+        }
+
+        coord_t skipTracePointsToASeqPos(in AlignmentChain.LocalAlignment localAlignment)
+        {
+            auto tracePointSkips = chain(
+                only(0),
+                localAlignment.tracePoints.map!"a.numBasePairs"
+            );
+
+            return cast(coord_t) tracePointSkips
+                .cumulativeFold!"a + b"
+                .countUntil!"a > b"(aSeqPos);
+        }
+
+        void addTracePointAlignment(
+            in AlignmentChain.LocalAlignment la,
+            in AlignmentChain.LocalAlignment.TracePoint tracePoint,
+        )
+        {
+            auto aSeqBegin = aSeqPos - begin.contigA;
+            auto aSeqEnd = nextTracePoint(la, aSeqPos) - begin.contigA;
+            auto bSeqBegin = bSeqPos - begin.contigB;
+            auto bSeqEnd = bSeqBegin + tracePoint.numBasePairs;
+
+            auto tracePointAlignment = findAlignment(
+                aSequence[aSeqBegin .. min(aSeqEnd, $)],
+                bSequence[bSeqBegin .. bSeqEnd],
+                indelPenalty,
+            );
+            _paddedAlignment.score += tracePointAlignment.score;
+            _paddedAlignment.editPath ~= tracePointAlignment.editPath;
+
+            aSeqPos = nextTracePoint(la, aSeqPos);
+            bSeqPos += tracePoint.numBasePairs;
+        }
+
+        void addGapAlignment(in AlignmentChain.LocalAlignment afterGap)
+        {
+            auto aSeqBegin = aSeqPos - begin.contigA;
+            auto aSeqEnd = afterGap.contigA.begin - begin.contigA;
+            auto bSeqBegin = bSeqPos - begin.contigB;
+            auto bSeqEnd = afterGap.contigB.begin - begin.contigB;
+
+            auto gapAlignment = findAlignment(
+                aSequence[aSeqBegin .. aSeqEnd],
+                bSequence[bSeqBegin .. bSeqEnd],
+                indelPenalty,
+            );
+            _paddedAlignment.score += gapAlignment.score;
+            _paddedAlignment.editPath ~= gapAlignment.editPath;
+
+            aSeqPos = afterGap.contigA.begin;
+            bSeqPos = afterGap.contigB.begin;
+        }
+
+        coord_t nextTracePoint(
+            in AlignmentChain.LocalAlignment la,
+            coord_t contigAPos,
+        )
+        {
+            if (contigAPos % ac.tracePointDistance == 0)
+                return min(la.contigA.end, contigAPos + ac.tracePointDistance);
+            else
+                return ceil(contigAPos, ac.tracePointDistance);
+        }
+    }
+
+    return AlignmentPadder(ac, begin, end, aSequence, bSequence).paddedAlignment;
+}
+
+unittest
+{
+    enum tracePointDistance = 100;
+    enum complement = AlignmentChain.Flag.complement;
+    alias Contig = AlignmentChain.Contig;
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias Flags = AlignmentChain.Flags;
+    alias Locus = AlignmentChain.LocalAlignment.Locus;
+    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
+
+    auto ac = AlignmentChain(
+        0,
+        Contig(1, 1092),
+        Contig(12407, 12767),
+        Flags(complement),
+        [
+            LocalAlignment(
+                Locus(0, 439),
+                Locus(6604, 7076),
+                67,
+                [
+                    TracePoint(16, 105),
+                    TracePoint(17, 106),
+                    TracePoint(11, 108),
+                    TracePoint(19, 111),
+                    TracePoint( 4,  42),
+                ],
+            ),
+            LocalAlignment(
+                Locus(590, 798),
+                Locus(7263, 7475),
+                41,
+                [
+                    TracePoint( 1,  10),
+                    TracePoint(20, 107),
+                    TracePoint(20,  95),
+                ],
+            ),
+        ],
+        tracePointDistance,
+    );
+    auto begin = ac.translateTracePoint(400);
+    auto end = ac.translateTracePoint(600);
+    auto aSequence = "agtgctggccccagtcaagggcatgtacctgggttgcaggttccccagcc" ~
+                     "cccgtaggggtgtgtgtgtggaaggcaaccaattgatgtgtctcctttat" ~
+                     "gttgatgtttctctttctctctccctcctccctgtcttccactctctcta" ~
+                     "gaaatcaatgggaaaaatatcctcaagtgaagattaaaaaaaaaaaaagg";
+    auto bSequence = "agatgatggccccagtgcaagggcatgtacctggtgttgcagcggttcca" ~
+                     "gccagcacccgtacggggcgtgcgtgtggaaagggcaaccaatttgatgt" ~
+                     "ccctacgttttcatgttgatgttttctcttttctctctctctctcccttc" ~
+                     "cttcccacttttcttcccagcttctctctagaaaacaagggaaaagtgtc" ~
+                     "ctttcagtgtaggatttttaaaaaaagccaaaaaaaggg";
+
+    auto exactAlignment = getPaddedAlignment(ac, begin, end, aSequence, bSequence);
+
+    assert(exactAlignment.toString(50) ==
+        "ag-tgctggccccagt-caagggcatgtacctgg-gttgcag-g-ttcc-\n" ~
+        "|| ||*|||||||||| ||||||||||||||||| ||||||| | |||| \n" ~
+        "agatgatggccccagtgcaagggcatgtacctggtgttgcagcggttcca\n" ~
+        "\n" ~
+        "-ccagcccccgta-ggggtgtgtgtgtggaa-gg-caaccaatt-gatgt\n" ~
+        " |||||*|||||| ||||*|||*|||||||| || ||||||||| |||||\n" ~
+        "gccagcacccgtacggggcgtgcgtgtggaaagggcaaccaatttgatgt\n" ~
+        "\n" ~
+        "gtct-ccttt--atgttgatgttt-ctcttt-ctctctc-c-ctcc-t-c\n" ~
+        "**|| |*|||  |||||||||||| |||||| ||||||| | |||| | |\n" ~
+        "ccctacgttttcatgttgatgttttctcttttctctctctctctcccttc\n" ~
+        "\n" ~
+        "c--c----tgt-cttcc-a-ct-ctctctagaaatcaatgggaaaaatat\n" ~
+        "|  |    |*| ||||| | || |||||||||||*||| |||||||*|*|\n" ~
+        "cttcccacttttcttcccagcttctctctagaaaacaa-gggaaaagtgt\n" ~
+        "\n" ~
+        "cct--caagtgaag-att---aaaaa-----aaaaaaaagg\n" ~
+        "|||  || |||*|| |||   |||||     |||||||*||\n" ~
+        "cctttca-gtgtaggatttttaaaaaaagccaaaaaaaggg");
 }
 
 /**
