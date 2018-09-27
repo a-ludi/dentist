@@ -583,7 +583,7 @@ struct AlignmentChain
                 .sum;
         auto matchingContigAPos = tracePointIndex == 0
             ? coveringLocalAlignment.contigA.begin
-            : floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + tracePointIndex * tracePointDistance;
+            : floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance);
 
         return tuple!("contigA", "contigB")(matchingContigAPos, contigBPos);
     }
