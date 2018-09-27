@@ -13,14 +13,21 @@ import std.algorithm :
     min,
     map;
 import std.array :
+    appender,
     array,
     minimallyInitializedArray;
 import std.conv : to;
 import std.exception : basicExceptionCtors, enforce;
 import std.functional : binaryFun;
-import std.range : chain, cycle, take;
+import std.range :
+    chain,
+    chunks,
+    cycle,
+    only,
+    take,
+    zip;
 import std.range.primitives : hasSlicing;
-import std.string : lineSplitter;
+import std.string : join, lineSplitter;
 import std.traits : isSomeString;
 import std.typecons :
     Flag,
@@ -72,9 +79,108 @@ enum EditOp: byte
 
 alias score_t = uint;
 
+/// Represents an alignment of two sequences.
+struct SequenceAlignment(S)
+{
+    score_t score;
+    EditOp[] editPath;
+    S reference;
+    S query;
+
+    string toString(in size_t width = 0) const pure
+    {
+        enum matchSymbol = '|';
+        enum substitutionSymbol = '*';
+        enum indelSymbol = ' ';
+        enum gapSymbol = '-';
+        auto referenceLine = appender!string;
+        referenceLine.reserve(editPath.length);
+        auto compareLine = appender!string;
+        compareLine.reserve(editPath.length);
+        auto queryLine = appender!string;
+        queryLine.reserve(editPath.length);
+
+        size_t i, j;
+        foreach (editOp; editPath)
+        {
+            final switch (editOp)
+            {
+            case EditOp.substitution:
+                referenceLine ~= reference[i].to!string;
+                compareLine ~= reference[i] == query[j]
+                    ? matchSymbol
+                    : substitutionSymbol;
+                queryLine ~= query[j].to!string;
+                ++i;
+                ++j;
+                break;
+            case EditOp.deletetion:
+                referenceLine ~= reference[i].to!string;
+                compareLine ~= indelSymbol;
+                queryLine ~= gapSymbol;
+                ++i;
+                break;
+            case EditOp.insertion:
+                referenceLine ~= gapSymbol;
+                compareLine ~= indelSymbol;
+                queryLine ~= query[j].to!string;
+                ++j;
+                break;
+            }
+        }
+
+        if (width == 0)
+            return only(
+                referenceLine.data.to!string,
+                compareLine.data.to!string,
+                queryLine.data.to!string,
+            ).join('\n');
+        else
+            return zip(
+                referenceLine.data.to!string.chunks(width),
+                compareLine.data.to!string.chunks(width),
+                queryLine.data.to!string.chunks(width),
+            )
+                .map!(lineTriple => only(lineTriple.expand)
+                    .joiner("\n"))
+                .joiner("\n\n")
+                .to!string;
+    }
+
+    ///
+    unittest
+    {
+        auto alignment = findAlignment("ACGTC", "AGTC", 1);
+        assert(alignment.toString ==
+            "ACGTC\n" ~
+            "| |||\n" ~
+            "A-GTC");
+    }
+
+    ///
+    unittest
+    {
+        auto alignment = findAlignment("GCATGCT", "GATTACA", 1);
+
+        assert(alignment.toString ==
+            "GCAT-GCT\n" ~
+            "| || *|*\n" ~
+            "G-ATTACA");
+    }
+}
+
 /**
     Compute an alignment of `query` against `reference` using the
-    Needleman-Wunsch algorithm with non-negative scores.
+    Needleman-Wunsch algorithm with non-negative scores and constant
+    indel penalty. Optionally, the `freeShift` mode may be activated
+    as to allow large indels at the beginning and end of the alignment.
+
+    **Implementation Notes:** The current implementation needs
+    `O(reference.length * query.length)` in time and memory. As the
+    memory requirement easily exceeds available memory it can be
+    limited for now. This may change in future and an implementation
+    using `O(max(reference.length, query.length))` memory will be
+    silently selected for large inputs.
 
     Params:
         scoreFun =     calculate score for a 'substitution' at `i, j` using
@@ -82,6 +188,7 @@ alias score_t = uint;
         reference =    Sequence to compare `query` against
         query =        Sequence to compare against `reference`
         indelPenalty = Penalize each indel with this value
+        freeShift =    Allow indels at the beginning and end of the alignment
         memoryLimit =  throw an error if the calculation would require more
                        than `memoryLimit` bytes.
     Throws: AlignmentException if the calculation would require more than
@@ -89,13 +196,14 @@ alias score_t = uint;
 
     See_Also: http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm
 */
-auto findAlignment(
-    alias scoreFun,
+SequenceAlignment!(const(S)) findAlignment(
+    alias scoreFun = "a == b ? 0 : 1",
     S,
 )(
     in S reference,
     in S query,
     in score_t indelPenalty,
+    Flag!"freeShift" freeShift = No.freeShift,
     size_t memoryLimit = 2^^20,
 )
 {
@@ -114,9 +222,9 @@ auto findAlignment(
 
     // Initialize scoring matrix
     foreach (i; 0 .. reference.length + 1)
-        F[i, 0] = cast(score_t) i * indelPenalty;
+        F[i, 0] = freeShift ? 0 : cast(score_t) i * indelPenalty;
     foreach (j; 0 .. query.length + 1)
-        F[0, j] = cast(score_t) j * indelPenalty;
+        F[0, j] = freeShift ? 0 : cast(score_t) j * indelPenalty;
 
     // Compute scoring matrix by rows in a cache friendly manner
     foreach (i; 1 .. reference.length + 1)
@@ -127,21 +235,18 @@ auto findAlignment(
                 F[i    , j - 1] + indelPenalty,
             );
 
-    // Find the best alignment, ie. its edit path and score
-    return tuple!(
-        "score",
-        "editPath",
-    )(
+    return typeof(return)(
         F[$ - 1, $ - 1],
         tracebackScoringMatrix(F),
+        reference,
+        query,
     );
 }
 
 ///
 unittest
 {
-    alias score = (x, y) => x == y ? 0 : 1;
-    auto alignment = findAlignment!score("ACGTC", "AGTC", 1);
+    auto alignment = findAlignment("ACGTC", "AGTC", 1);
 
         //   - A G T C
         // - 0 1 2 3 4
@@ -168,8 +273,7 @@ unittest
 ///
 unittest
 {
-    alias score = (x, y) => x == y ? 0 : 1;
-    auto alignment = findAlignment!score("GCATGCT", "GATTACA", 1);
+    auto alignment = findAlignment("GCATGCT", "GATTACA", 1);
 
     //   - G A T T A C A
     // - 0 1 2 3 4 5 6 7
@@ -195,6 +299,116 @@ unittest
         EditOp.substitution,
         EditOp.substitution,
     ]);
+}
+
+///
+unittest
+{
+    auto alignment = findAlignment!"a == b ? 0 : 1"(
+        "tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" ~
+        "gttgcaggtttgatctccacctggtcggggcacatgca",
+        "tgaggacagaagggtcatggtttaattctggtcacaggcacattcctggg" ~
+        "ttgtaggctcaattcccacccggtcggggccacatgca",
+        1,
+    );
+
+    assert(alignment.toString(50) ==
+        "tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg\n" ~
+        "|||||||||||||||||| |||||||||||||||||||||||||||||||\n" ~
+        "tgaggacagaagggtcat-ggtttaattctggtcacaggcacattcctgg\n" ~
+        "\n" ~
+        "gttgcaggtttgatctcc-acctggtcggggc-acatgca\n" ~
+        "||||*|||*|**|| ||| |||*||||||||| |||||||\n" ~
+        "gttgtaggctcaat-tcccacccggtcggggccacatgca");
+}
+
+///
+unittest
+{
+    auto alignment = findAlignment(
+        "tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" ~
+        "gttgcaggtttgatctccacctggtcggggcacatgca",
+        "aatgaacagctgaggacagaagggtcatggtttaattctggtcacaggca" ~
+        "cattcctgggttgtaggctcaattcccacccggtcggggccacatgca",
+        1,
+        Yes.freeShift,
+    );
+
+    assert(alignment.toString(50) ==
+        "----------tgaggacagaagggtcataggtttaattctggtcacaggc\n" ~
+        "          |||||||||||||||||| |||||||||||||||||||||\n" ~
+        "aatgaacagctgaggacagaagggtcat-ggtttaattctggtcacaggc\n" ~
+        "\n" ~
+        "acattcctgggttgcaggtttgatctcc-acctggtcggggc-acatgca\n" ~
+        "||||||||||||||*|||*|**|| ||| |||*||||||||| |||||||\n" ~
+        "acattcctgggttgtaggctcaat-tcccacccggtcggggccacatgca");
+}
+
+///
+unittest
+{
+    auto alignment = findAlignment(
+        "tatcctcaggtgaggactaacaacaaatatatatatatttatatctaaca" ~
+        "acatatgatttctaaaatttcaaaaatcttaaggctgaattaat",
+        "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa" ~
+        "caacatatgattctaaaatttcaaaatgcttaaaggtctga",
+        1,
+        Yes.freeShift,
+    );
+
+    assert(alignment.toString(50) ==
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "\n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------");
+}
+
+unittest
+{
+    auto alignment = findAlignment(
+        "tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" ~
+        "gttgcaggtttgatctccacctggtcggggcacatgcaggaggcaaccaa" ~
+        "tcaatgtgtctctttctcagtgatgtttcttctctctgtctctctccccc" ~
+        "ctctcttctactctctctgaaaaatagatggaaaaaatatcctcaggtga" ~
+        "ggactaacaacaaatatatatatatttatatctaacaacatatgatttct" ~
+        "aaaatttcaaaaatcttaaggctgaattaat",
+        "aatgaacagctgaggacagaagggtcatggtttaattctggtcacaggca" ~
+        "cattcctgggttgtaggctcaattcccacccggtcggggccacatgcaga" ~
+        "aggcaaccatcaatgtgtctctttcaagtgatgtttcttctctctgtcta" ~
+        "ctccccctccctatctactctctgggaaacttatggaaaaaatatcctca" ~
+        "ggtgaggcttaacaacaaatatatatatactgtaatatctaacaacatat" ~
+        "gattctaaaatttcaaaatgcttaaaggtctga",
+        1,
+        Yes.freeShift,
+    );
+
+    assert(alignment.toString(50) ==
+        "----------tgaggacagaagggtcataggtttaattctggtcacaggc\n" ~
+        "          |||||||||||||||||| |||||||||||||||||||||\n" ~
+        "aatgaacagctgaggacagaagggtcat-ggtttaattctggtcacaggc\n" ~
+        "\n" ~
+        "acattcctgggttgcaggtttgatctcc-acctggtcggggc-acatgca\n" ~
+        "||||||||||||||*|||*|**|| ||| |||*||||||||| |||||||\n" ~
+        "acattcctgggttgtaggctcaat-tcccacccggtcggggccacatgca\n" ~
+        "\n" ~
+        "ggaggcaaccaatcaatgtgtctctttctcagtgatgtttcttctctctg\n" ~
+        "|*||||||||| |||||||||||||||| *||||||||||||||||||||\n" ~
+        "gaaggcaacca-tcaatgtgtctctttc-aagtgatgtttcttctctctg\n" ~
+        "\n" ~
+        "tctctctcccccctctct-tctactctctctgaaaaatagatggaaaaaa\n" ~
+        "||| *||||||| ||*|| ||||||||||**||||**||  |||||||||\n" ~
+        "tct-actccccc-tccctatctactctctgggaaactta--tggaaaaaa\n" ~
+        "\n" ~
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "\n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------");
 }
 
 // Find edit path of the best alignment
@@ -235,6 +449,20 @@ private EditOp[] tracebackScoringMatrix(in DPMatrix!score_t F)
         default:
             assert(0, "corrupted scoring matrix");
         }
+    }
+
+    while (0 < i)
+    {
+        assert(k > 0);
+        editPath[--k] = EditOp.deletetion;
+        --i;
+    }
+
+    while (0 < j)
+    {
+        assert(k > 0);
+        editPath[--k] = EditOp.insertion;
+        --j;
     }
 
     return editPath[k .. $];
