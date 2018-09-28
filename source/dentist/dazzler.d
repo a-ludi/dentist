@@ -1260,9 +1260,9 @@ auto getExactAlignment(
         CompressedSequence.from(bSequence),
     );
 
-    assert(begin.contigA >= beginA);
+    assert(begin.contigA <= beginA);
 
-    return paddedAlignment[(begin.contigA - beginA) .. (begin.contigA - endA)];
+    return paddedAlignment[(beginA - begin.contigA) .. (endA - begin.contigA)];
 }
 
 private auto getPaddedAlignment(S, TranslatedTracePoint)(
@@ -1346,16 +1346,13 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             }
         }
 
-        coord_t skipTracePointsToASeqPos(in AlignmentChain.LocalAlignment localAlignment)
+        size_t skipTracePointsToASeqPos(in AlignmentChain.LocalAlignment localAlignment)
         {
-            auto tracePointSkips = chain(
-                only(0),
-                localAlignment.tracePoints.map!"a.numBasePairs"
+            return localAlignment.tracePointsUpTo(
+                aSeqPos,
+                ac.tracePointDistance,
+                RoundingMode.floor,
             );
-
-            return cast(coord_t) tracePointSkips
-                .cumulativeFold!"a + b"
-                .countUntil!"a > b"(aSeqPos);
         }
 
         void addTracePointAlignment(
