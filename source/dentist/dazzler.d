@@ -1455,8 +1455,8 @@ unittest
         ],
         tracePointDistance,
     );
-    auto begin = ac.translateTracePoint(400);
-    auto end = ac.translateTracePoint(600);
+    auto begin = ac.translateTracePoint(400, RoundingMode.floor);
+    auto end = ac.translateTracePoint(600, RoundingMode.ceil);
     auto aSequence = "agtgctggccccagtcaagggcatgtacctgggttgcaggttccccagcc" ~
                      "cccgtaggggtgtgtgtgtggaaggcaaccaattgatgtgtctcctttat" ~
                      "gttgatgtttctctttctctctccctcctccctgtcttccactctctcta" ~
