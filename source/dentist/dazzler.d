@@ -1232,6 +1232,7 @@ auto getExactAlignment(
     in coord_t beginA,
     in coord_t endA,
     in string workdir,
+    in size_t memoryLimit = 2^^20,
 )
 {
     assert(ac.tracePointDistance > 0, "trace points required for getExactAlignment");
@@ -1242,8 +1243,8 @@ auto getExactAlignment(
     auto end = ac.translateTracePoint(endA, RoundingMode.ceil);
 
     // Fetch relevant sequences from DBs
-    auto aSequence = getFastaSequences(dbA, only(ac.contigA.id), workdir).front;
-    auto bSequence = getFastaSequences(dbB, only(ac.contigB.id), workdir).front;
+    auto aSequence = getFastaSequence(dbA, ac.contigA.id, workdir);
+    auto bSequence = getFastaSequence(dbB, ac.contigB.id, workdir);
 
     // Slice sequences to translated coordinates
     aSequence = aSequence[begin.contigA .. end.contigA];
@@ -1258,6 +1259,7 @@ auto getExactAlignment(
         end,
         CompressedSequence.from(aSequence),
         CompressedSequence.from(bSequence),
+        memoryLimit,
     );
 
     assert(begin.contigA <= beginA);
@@ -1271,6 +1273,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
     in TranslatedTracePoint end,
     in S aSequence,
     in S bSequence,
+    in size_t memoryLimit = 2^^20,
 )
 {
     static struct AlignmentPadder
@@ -1282,6 +1285,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
         private const TranslatedTracePoint end;
         private const S aSequence;
         private const S bSequence;
+        private const size_t memoryLimit;
         private SequenceAlignment!(const(S)) _paddedAlignment;
 
         this(
@@ -1290,6 +1294,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             in TranslatedTracePoint end,
             in S aSequence,
             in S bSequence,
+           in size_t memoryLimit = 2^^20,
         )
         {
             this.ac = ac;
@@ -1297,6 +1302,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             this.end = end;
             this.aSequence = aSequence;
             this.bSequence = bSequence;
+            this.memoryLimit = memoryLimit;
             this._paddedAlignment = typeof(this._paddedAlignment)(
                 0,
                 [],
@@ -1369,6 +1375,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 aSequence[aSeqBegin .. min(aSeqEnd, $)],
                 bSequence[bSeqBegin .. bSeqEnd],
                 indelPenalty,
+                No.freeShift,
+                memoryLimit,
             );
             _paddedAlignment.score += tracePointAlignment.score;
             _paddedAlignment.editPath ~= tracePointAlignment.editPath;
@@ -1388,6 +1396,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 aSequence[aSeqBegin .. aSeqEnd],
                 bSequence[bSeqBegin .. bSeqEnd],
                 indelPenalty,
+                No.freeShift,
+                memoryLimit,
             );
             _paddedAlignment.score += gapAlignment.score;
             _paddedAlignment.editPath ~= gapAlignment.editPath;
@@ -1408,7 +1418,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
         }
     }
 
-    return AlignmentPadder(ac, begin, end, aSequence, bSequence).paddedAlignment;
+    return AlignmentPadder(ac, begin, end, aSequence, bSequence, memoryLimit).paddedAlignment;
 }
 
 unittest
