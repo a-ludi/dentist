@@ -1068,10 +1068,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("trace-point-spacing", "s")
         @Help("trace point spacing used for the ref vs. reads alignment")
-        trace_point_t tracePointDistance = command.staticPredSwitch!(
-            TestingCommand.checkResults, 10,
-            0
-        );
+        trace_point_t tracePointDistance;
 
         @PostValidate()
         void hookEnsurePresenceOfTracePointDistance()
@@ -1213,7 +1210,6 @@ struct OptionsFor(DentistCommand command)
                 DamapperOptions.symmetric,
                 DamapperOptions.oneDirection,
                 DamapperOptions.averageCorrelationRate ~ ".7",
-                format!(DalignerOptions.tracePointDistance ~ "%d")(OptionsFor!(TestingCommand.checkResults)().tracePointDistance),
             ];
         }
     }
