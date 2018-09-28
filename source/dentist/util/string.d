@@ -133,7 +133,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             if (i >= end)
             {
                 editEnd = k + 1;
-                queryEnd = j + 1;
+                queryEnd = j;
                 break;
             }
         }
