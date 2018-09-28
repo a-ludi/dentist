@@ -25,7 +25,7 @@ import dentist.common.alignments :
 import dentist.dazzler : buildDamFile, getFastaSequences;
 import dentist.util.algorithm : sliceBy;
 import dentist.util.log;
-import dentist.util.math : ceil, ceildiv;
+import dentist.util.math : ceil, ceildiv, RoundingMode;
 import dentist.util.region : min, sup;
 import std.algorithm :
     all,
@@ -288,7 +288,9 @@ private ReadInterval getCroppingSlice(
         .front
         .value;
 
-    auto readCroppingPos = alignment.translateTracePoint(cast(coord_t) croppingRefPos).contigB;
+    auto readCroppingPos = alignment
+        .translateTracePoint(cast(coord_t) croppingRefPos, RoundingMode.floor)
+        .contigB;
     size_t readBeginIdx;
     size_t readEndIdx;
 

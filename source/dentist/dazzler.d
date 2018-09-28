@@ -12,7 +12,7 @@ import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_
 import dentist.common.binio : CompressedSequence;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
-import dentist.util.math : floor, ceil;
+import dentist.util.math : floor, ceil, RoundingMode;
 import dentist.util.range : arrayChunks, takeExactly;
 import dentist.util.string :
     findAlignment,
@@ -1238,8 +1238,8 @@ auto getExactAlignment(
     assert(beginA < endA);
 
     // Translate input coords to tracepoints to get exact alignments
-    auto begin = ac.translateTracePoint(beginA);
-    auto end = ac.translateTracePoint(endA);
+    auto begin = ac.translateTracePoint(beginA, RoundingMode.floor);
+    auto end = ac.translateTracePoint(endA, RoundingMode.ceil);
 
     // Fetch relevant sequences from DBs
     auto aSequence = getFastaSequences(dbA, only(ac.contigA.id), workdir).front;

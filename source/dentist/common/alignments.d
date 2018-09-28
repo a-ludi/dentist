@@ -12,7 +12,7 @@ import dentist.common.scaffold : buildScaffold, concatenatePayloads, ContigNode,
     ContigPart, discardAmbiguousJoins, Join, mergeExtensionsWithGaps;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
 import dentist.util.log;
-import dentist.util.math : floor;
+import dentist.util.math : ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
 import std.algorithm :
     all,
@@ -85,18 +85,37 @@ struct AlignmentChain
         diff_t numDiffs;
         TracePoint[] tracePoints;
 
-        auto tracePointIndex(in coord_t contigAPos, trace_point_t tracePointDistance) const pure nothrow
+        auto tracePointsUpTo(
+            in coord_t contigAPos,
+            trace_point_t tracePointDistance,
+            RoundingMode roundingMode,
+        ) const pure nothrow
         {
+            assert(contigA.begin <= contigAPos && contigAPos <= contigA.end);
+
             auto firstTracePointRefPos = contigA.begin;
             auto secondTracePointRefPos = floor(firstTracePointRefPos, tracePointDistance) + tracePointDistance;
+            auto secondFromLastTracePointRefPos = floor(contigA.end - 1, tracePointDistance);
 
-            if (contigAPos == contigA.end)
-                return tracePoints.length - 1;
-
-            assert(contigAPos >= firstTracePointRefPos);
-            return firstTracePointRefPos <= contigAPos && contigAPos < secondTracePointRefPos
-                ? 0
-                : 1 + (contigAPos - secondTracePointRefPos) / tracePointDistance;
+            final switch (roundingMode)
+            {
+            case RoundingMode.floor:
+                if (contigAPos < secondTracePointRefPos)
+                    return 0;
+                if (contigAPos < contigA.end)
+                    return 1 + (contigAPos - secondTracePointRefPos) / tracePointDistance;
+                else
+                    return tracePoints.length;
+            case RoundingMode.round:
+                assert(0, "unimplemented");
+            case RoundingMode.ceil:
+                if (firstTracePointRefPos == contigAPos)
+                    return 0;
+                else if (contigAPos <= secondFromLastTracePointRefPos)
+                    return 1 + ceildiv(contigAPos - secondTracePointRefPos, tracePointDistance);
+                else
+                    return tracePoints.length;
+            }
         }
     }
 
@@ -559,7 +578,7 @@ struct AlignmentChain
             }
     }
 
-    auto translateTracePoint(in coord_t contigAPos) const pure
+    auto translateTracePoint(in coord_t contigAPos, RoundingMode roundingMode) const pure
     {
         bool coversContigAPos(in AlignmentChain.LocalAlignment localAlignment)
         {
@@ -574,7 +593,7 @@ struct AlignmentChain
         );
         auto coveringLocalAlignment = coveringLocalAlignments[0];
 
-        auto tracePointIndex = coveringLocalAlignment.tracePointIndex(contigAPos, tracePointDistance);
+        auto tracePointIndex = coveringLocalAlignment.tracePointsUpTo(contigAPos, tracePointDistance, roundingMode);
 
         auto contigBPos = coveringLocalAlignment.contigB.begin +
             coveringLocalAlignment
@@ -583,7 +602,9 @@ struct AlignmentChain
                 .sum;
         auto matchingContigAPos = tracePointIndex == 0
             ? coveringLocalAlignment.contigA.begin
-            : floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance);
+            : tracePointIndex < coveringLocalAlignment.tracePoints.length
+                ? floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance)
+                : coveringLocalAlignment.contigA.end;
 
         return tuple!("contigA", "contigB")(matchingContigAPos, contigBPos);
     }
@@ -629,18 +650,23 @@ struct AlignmentChain
             tracePointDistance,
         );
 
-        assert(ac.translateTracePoint(579) == tuple(579, 0));
-        assert(ac.translateTracePoint(599) == tuple(579, 0));
-        assert(ac.translateTracePoint(600) == tuple(600, 23));
-        assert(ac.translateTracePoint(699) == tuple(600, 23));
-        assert(ac.translateTracePoint(700) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(799) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(800) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(899) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(2500) == tuple(2500, 2070));
-        assert(ac.translateTracePoint(2584) == tuple(2500, 2070));
-        assertThrown!Exception(ac.translateTracePoint(578));
-        assertThrown!Exception(ac.translateTracePoint(2585));
+        assert(ac.translateTracePoint(579, RoundingMode.floor) == tuple(579, 0));
+        assert(ac.translateTracePoint(599, RoundingMode.floor) == tuple(579, 0));
+        assert(ac.translateTracePoint(600, RoundingMode.floor) == tuple(600, 23));
+        assert(ac.translateTracePoint(699, RoundingMode.floor) == tuple(600, 23));
+        assert(
+            ac.translateTracePoint(699, RoundingMode.ceil)
+            ==
+            ac.translateTracePoint(701, RoundingMode.floor)
+        );
+        assert(ac.translateTracePoint(700, RoundingMode.floor) == tuple(700, 23 + 109));
+        assert(ac.translateTracePoint(799, RoundingMode.floor) == tuple(700, 23 + 109));
+        assert(ac.translateTracePoint(800, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(899, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(2583, RoundingMode.floor) == tuple(2500, 2070));
+        assert(ac.translateTracePoint(2584, RoundingMode.floor) == tuple(2584, 2158));
+        assertThrown!Exception(ac.translateTracePoint(578, RoundingMode.floor));
+        assertThrown!Exception(ac.translateTracePoint(2585, RoundingMode.floor));
     }
 }
 

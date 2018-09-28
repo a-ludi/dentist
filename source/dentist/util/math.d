@@ -141,6 +141,13 @@ unittest
     }
 }
 
+enum RoundingMode : byte
+{
+    floor,
+    round,
+    ceil,
+}
+
 /**
     Round x upward according to base, ie. returns the next integer larger or
     equal to x which is divisible by base.
