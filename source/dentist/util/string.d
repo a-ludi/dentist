@@ -99,6 +99,8 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 
         if (end == begin)
             return typeof(this)(0, [], reference, query, indelPenalty);
+        else if (0 == begin && end == reference.length)
+            return this;
 
         score_t newScore;
         size_t editBegin, editEnd;
@@ -181,12 +183,13 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 
     /// Get a string representation of this alignment. Visually breaks unless
     /// elements of the sequences convert to single chars via `to!string`.
-    string toString(in size_t width = 0) const pure
+    string toString(
+        alias matchSymbol = '|',
+        alias substitutionSymbol = '*',
+        alias indelSymbol = ' ',
+        alias gapSymbol = '-',
+    )(in size_t width = 0) const pure
     {
-        enum matchSymbol = '|';
-        enum substitutionSymbol = '*';
-        enum indelSymbol = ' ';
-        enum gapSymbol = '-';
         auto referenceLine = appender!string;
         referenceLine.reserve(editPath.length);
         auto compareLine = appender!string;
