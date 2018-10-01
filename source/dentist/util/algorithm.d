@@ -8,10 +8,15 @@
 */
 module dentist.util.algorithm;
 
-import std.algorithm : copy, min, uniq;
+import std.algorithm :
+    copy,
+    min,
+    OpenRight,
+    uniq;
 import std.conv : to;
 import std.functional : binaryFun, unaryFun;
 import std.traits : isDynamicArray;
+import std.typecons : Yes;
 import std.range.primitives;
 
 /**
@@ -172,6 +177,50 @@ private struct SliceByImpl(alias pred, Array)
 
         return array[sliceStart .. sliceEnd];
     }
+}
+
+/// Return the prefix of `haystack` where `pred` is not satisfied.
+Array sliceUntil(alias pred = "a == b", Array, Needle)(
+    Array haystack,
+    Needle needle,
+    OpenRight openRight = Yes.openRight,
+)
+        if (isDynamicArray!Array)
+{
+    alias predFun = binaryFun!pred;
+
+    foreach (i, ref e; haystack)
+        if (predFun(e, needle))
+            return haystack[0 .. (openRight ? i : i + 1)];
+
+    return haystack[0 .. $];
+}
+
+/// ditto
+Array sliceUntil(alias pred = "a", Array)(
+    Array haystack,
+    OpenRight openRight = Yes.openRight,
+)
+        if (isDynamicArray!Array)
+{
+    alias predFun = unaryFun!pred;
+
+    foreach (i, ref e; haystack)
+        if (predFun(e))
+            return haystack[0 .. (openRight ? i : i + 1)];
+
+    return haystack[0 .. $];
+}
+
+///
+unittest
+{
+    import std.typecons : No;
+
+    int[] a = [ 1, 2, 4, 7, 7, 2, 4, 7, 3, 5];
+    assert(a.sliceUntil(7) == [1, 2, 4]);
+    assert(a.sliceUntil!"a == 7" == [1, 2, 4]);
+    assert(a.sliceUntil(7, No.openRight) == [1, 2, 4, 7]);
 }
 
 /// Returns array `uniq`ified in-place.
