@@ -149,8 +149,13 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         );
     }
 
+    auto opDollar() const pure nothrow
+    {
+        return reference.length;
+    }
+
     /// ditto
-    auto opIndex(in size_t[2] slice) const pure nothrow
+    auto opIndex(in size_t[2] slice) inout pure nothrow
     {
         return partial(slice[0], slice[1]);
     }
@@ -598,6 +603,15 @@ private struct DPMatrix(T)
         this.size[0] = n;
         this.size[1] = m;
         this.elements = minimallyInitializedArray!(T[])(n * m);
+    }
+
+    this(in size_t n, in size_t m, ref T[] buffer)
+    {
+        this.size[0] = n;
+        this.size[1] = m;
+        auto numElements = n * m;
+        assert(buffer.length <= numElements);
+        this.elements = buffer;
     }
 
     unittest
