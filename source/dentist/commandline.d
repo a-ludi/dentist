@@ -1043,6 +1043,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (command.among(
         DentistCommand.processPileUps,
+        TestingCommand.checkResults,
     ))
     {
         @Option("threads", "T")

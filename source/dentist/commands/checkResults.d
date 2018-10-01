@@ -12,10 +12,12 @@ import dentist.common : isTesting;
 
 static if (isTesting):
 
+import core.atomic : atomicOp;
 import dentist.commandline : TestingCommand, OptionsFor;
 import dentist.common :
     ReferenceInterval,
-    ReferenceRegion;
+    ReferenceRegion,
+    to;
 import dentist.common.alignments :
     AlignmentChain,
     coord_t,
@@ -24,12 +26,14 @@ import dentist.dazzler :
     ContigSegment,
     GapSegment,
     getAlignments,
+    getExactAlignment,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm : first, last;
 import dentist.util.log;
 import dentist.util.math :
+    absdiff,
     ceildiv,
     longestIncreasingSubsequence,
     mean,
@@ -44,6 +48,7 @@ import std.algorithm :
     count,
     filter,
     find,
+    fold,
     joiner,
     map,
     max,
@@ -56,6 +61,7 @@ import std.format : format;
 import std.math :
     ceil,
     log10;
+import std.parallelism : parallel;
 import std.range :
     assumeSorted,
     enumerate,
@@ -64,7 +70,7 @@ import std.range :
 import std.range.primitives;
 import std.stdio : File, writeln;
 import std.string : join;
-import std.typecons : Tuple, Yes;
+import std.typecons : Tuple;
 import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
 
 
@@ -147,7 +153,7 @@ private struct ResultAnalyzer
             options.resultDb,
             options.resultsAlignmentFile,
             options.workdir,
-            Yes.includeTracePoints,
+            options.tracePointDistance,
         ).sort!isStrictlyBefore.release;
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
@@ -326,40 +332,131 @@ private struct ResultAnalyzer
     size_t getNumCorrectContigs()
     {
         mixin(traceExecution);
+
+        alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
         auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
 
-        // FIXME need detailed alignment for the gap region to compute the
-        // correct local error rate
-        return mappedRegionsMask
-            .intervals
-            .map!getDummyAC
-            .map!(needle => sortedResultAlignment.equalRange(needle))
-            .map!(intersectingAlignments => intersectingAlignments.length == 0
-                ? 0
-                : intersectingAlignments
-                    .map!(ac => (100 * ac.numMatchingBps) / ac.totalLength)
-                    .mean)
-            .count!(alignmentQuality => alignmentQuality >= 99);
+        shared size_t numCorrectContigs;
+        foreach (mappedInterval; parallel(mappedRegionsMask.intervals))
+        {
+            auto overlappingAlignments = sortedResultAlignment
+                .equalRange(getDummyAC(mappedInterval));
+            auto overlappedRegion = overlappingAlignments
+                .map!(to!(ReferenceRegion, "contigA"))
+                .fold!"a | b"(ReferenceRegion());
+            size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
+
+            AlignmentChain lastAC;
+            ExactAlignment exactAlignment;
+            foreach (overlappingAlignment; overlappingAlignments)
+            {
+                auto alignmentBegin = overlappingAlignment.first.contigA.begin;
+                auto alignmentEnd = overlappingAlignment.last.contigA.end;
+
+                if (lastAC != overlappingAlignment)
+                    exactAlignment = getExactAlignment(
+                        options.trueAssemblyDb,
+                        options.resultDb,
+                        overlappingAlignment,
+                        options.workdir,
+                        2^^30,
+                    );
+
+                auto overlappingExactAlignment = exactAlignment.partial(
+                    mappedInterval.begin > alignmentBegin
+                        ? mappedInterval.begin - alignmentBegin
+                        : 0,
+                    mappedInterval.end < alignmentEnd
+                        ? mappedInterval.end - alignmentBegin
+                        : alignmentEnd - alignmentBegin,
+                );
+
+                if (shouldLog(LogLevel.debug_) && exactAlignment.score > 10)
+                    logJsonDebug(
+                        "alignmentChain", overlappingAlignment.toJson,
+                        "alignmentBegin", mappedInterval.begin > alignmentBegin
+                            ? mappedInterval.begin
+                            : alignmentBegin,
+                        "alignmentEnd", mappedInterval.end < alignmentEnd
+                            ? mappedInterval.end
+                            : alignmentEnd,
+                        "mappedInterval", mappedInterval.toJson,
+                        "alignment", overlappingExactAlignment.toString!('|', '*', '·', '-')(50),
+                    );
+
+                numDiffs += overlappingExactAlignment.score;
+            }
+
+            if (100 * numDiffs <= 1 * mappedInterval.size)
+                numCorrectContigs.atomicOp!"+="(1);
+        }
+
+        return numCorrectContigs;
     }
 
     size_t getNumCorrectGaps()
     {
         mixin(traceExecution);
+
+        alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
         auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
 
-        // FIXME need detailed alignment for the gap region to compute the
-        // correct local error rate
-        return zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[0]"
-            .map!getDummyAC
-            .map!(needle => sortedResultAlignment.equalRange(needle))
-            .map!(intersectingAlignments => intersectingAlignments.length == 0
-                ? 0
-                : intersectingAlignments
-                    .map!(ac => (100 * ac.numMatchingBps) / ac.totalLength)
-                    .mean)
-            .count!(alignmentQuality => alignmentQuality >= 99);
+        shared size_t numCorrectGaps;
+        foreach (mappedInterval; parallel(referenceGaps.intervals))
+        {
+            auto overlappingAlignments = sortedResultAlignment
+                .equalRange(getDummyAC(mappedInterval));
+            auto overlappedRegion = overlappingAlignments
+                .map!(to!(ReferenceRegion, "contigA"))
+                .fold!"a | b"(ReferenceRegion());
+            size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
+
+            AlignmentChain lastAC;
+            ExactAlignment exactAlignment;
+            foreach (overlappingAlignment; overlappingAlignments)
+            {
+                auto alignmentBegin = overlappingAlignment.first.contigA.begin;
+                auto alignmentEnd = overlappingAlignment.last.contigA.end;
+
+                if (lastAC != overlappingAlignment)
+                    exactAlignment = getExactAlignment(
+                        options.trueAssemblyDb,
+                        options.resultDb,
+                        overlappingAlignment,
+                        options.workdir,
+                        2^^30,
+                    );
+
+                auto overlappingExactAlignment = exactAlignment.partial(
+                    mappedInterval.begin > alignmentBegin
+                        ? mappedInterval.begin - alignmentBegin
+                        : 0,
+                    mappedInterval.end < alignmentEnd
+                        ? mappedInterval.end - alignmentBegin
+                        : alignmentEnd - alignmentBegin,
+                );
+
+                if (shouldLog(LogLevel.debug_) && exactAlignment.score > 10)
+                    logJsonDebug(
+                        "alignmentChain", overlappingAlignment.toJson,
+                        "alignmentBegin", mappedInterval.begin > alignmentBegin
+                            ? mappedInterval.begin
+                            : alignmentBegin,
+                        "alignmentEnd", mappedInterval.end < alignmentEnd
+                            ? mappedInterval.end
+                            : alignmentEnd,
+                        "gapInterval", mappedInterval.toJson,
+                        "alignment", overlappingExactAlignment.toString!('|', '*', '·', '-')(50),
+                    );
+
+                numDiffs += overlappingExactAlignment.score;
+            }
+
+            if (100 * numDiffs <= 1 * mappedInterval.size)
+                numCorrectGaps.atomicOp!"+="(1);
+        }
+
+        return numCorrectGaps;
     }
 
     static AlignmentChain getDummyAC(in ReferenceInterval refInterval)
