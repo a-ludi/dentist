@@ -16,9 +16,11 @@ import dentist.util.math : ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
 import std.algorithm :
     all,
+    among,
     any,
     canFind,
     chunkBy,
+    cumulativeFold,
     equal,
     filter,
     find,
@@ -36,8 +38,19 @@ import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
 import std.format : format;
 import std.math : sgn;
-import std.range : assumeSorted, chain, chunks, InputRange, inputRangeObject,
-    iota, only, slide, takeNone, zip;
+import std.range :
+    assumeSorted,
+    chain,
+    chunks,
+    enumerate,
+    InputRange,
+    inputRangeObject,
+    iota,
+    only,
+    radial,
+    slide,
+    takeNone,
+    zip;
 import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
@@ -65,6 +78,10 @@ struct AlignmentChain
     }
 
     static alias Flags = BitFlags!Flag;
+    static alias TranslatedTracePoint = Tuple!(
+        coord_t, "contigA",
+        coord_t, "contigB",
+    );
 
     static struct LocalAlignment
     {
@@ -85,11 +102,32 @@ struct AlignmentChain
         diff_t numDiffs;
         TracePoint[] tracePoints;
 
-        auto tracePointsUpTo(
+        TranslatedTracePoint translateTracePoint(string contig = "contigA")(
+            in coord_t contigPos,
+            trace_point_t tracePointDistance,
+            RoundingMode roundingMode,
+        ) const pure if (contig.among("contigA", "contigB"))
+        {
+            assert(mixin(contig ~ `.begin <= contigPos && contigPos <= ` ~ contig ~ `.end`));
+
+            auto tracePointIndex = tracePointsUpTo!contig(contigPos, tracePointDistance, roundingMode);
+            auto contigBPos = contigB.begin + tracePoints[0 .. tracePointIndex]
+                    .map!"a.numBasePairs"
+                    .sum;
+            auto contigAPos = tracePointIndex == 0
+                ? contigA.begin
+                : tracePointIndex < tracePoints.length
+                    ? floor(contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance)
+                    : contigA.end;
+
+            return TranslatedTracePoint(contigAPos, contigBPos);
+        }
+
+        auto tracePointsUpTo(string contig)(
             in coord_t contigAPos,
             trace_point_t tracePointDistance,
             RoundingMode roundingMode,
-        ) const pure nothrow
+        ) const pure nothrow if (contig == "contigA")
         {
             assert(contigA.begin <= contigAPos && contigAPos <= contigA.end);
 
@@ -115,6 +153,40 @@ struct AlignmentChain
                     return 1 + ceildiv(contigAPos - secondTracePointRefPos, tracePointDistance);
                 else
                     return tracePoints.length;
+            }
+        }
+
+        auto tracePointsUpTo(string contig)(
+            in coord_t contigBPos,
+            trace_point_t tracePointDistance,
+            RoundingMode roundingMode,
+        ) const pure nothrow if (contig == "contigB")
+        {
+            assert(contigB.begin <= contigBPos && contigBPos <= contigB.end);
+
+            if (contigBPos == contigB.begin)
+                return 0;
+            else if (contigBPos == contigB.end)
+                return tracePoints.length;
+
+            auto tracePointPositions = chain(only(contigB.begin), tracePoints.map!"a.numBasePairs")
+                .cumulativeFold!"a + b"
+                .enumerate;
+
+            final switch (roundingMode)
+            {
+            case RoundingMode.floor:
+                return tracePointPositions
+                    .find!(pair => contigBPos < pair.value)
+                    .front
+                    .index - 1;
+            case RoundingMode.round:
+                assert(0, "unimplemented");
+            case RoundingMode.ceil:
+                return tracePointPositions
+                    .find!(pair => contigBPos <= pair.value)
+                    .front
+                    .index;
             }
         }
     }
@@ -578,35 +650,30 @@ struct AlignmentChain
             }
     }
 
-    auto translateTracePoint(in coord_t contigAPos, RoundingMode roundingMode) const pure
+    TranslatedTracePoint translateTracePoint(string contig = "contigA")(
+        in coord_t contigPos,
+        RoundingMode roundingMode,
+    ) const pure if (contig.among("contigA", "contigB"))
     {
-        bool coversContigAPos(in AlignmentChain.LocalAlignment localAlignment)
+        bool coversContigPos(in AlignmentChain.LocalAlignment localAlignment)
         {
-            return localAlignment.contigA.begin <= contigAPos
-                && contigAPos <= localAlignment.contigA.end;
+            return mixin(`localAlignment.` ~ contig ~ `.begin <= contigPos
+                && contigPos <= localAlignment.` ~ contig ~ `.end`);
         }
 
-        auto coveringLocalAlignments = localAlignments.find!coversContigAPos;
+        enum otherContig = contig == "contigA" ? "contigB" : "contigA";
+        auto coveringLocalAlignments = localAlignments.find!coversContigPos;
         enforce!Exception(
             coveringLocalAlignments.length > 0,
             "cannot translate coordinate due to lack of alignment coverage",
         );
         auto coveringLocalAlignment = coveringLocalAlignments[0];
 
-        auto tracePointIndex = coveringLocalAlignment.tracePointsUpTo(contigAPos, tracePointDistance, roundingMode);
-
-        auto contigBPos = coveringLocalAlignment.contigB.begin +
-            coveringLocalAlignment
-                .tracePoints[0 .. tracePointIndex]
-                .map!"a.numBasePairs"
-                .sum;
-        auto matchingContigAPos = tracePointIndex == 0
-            ? coveringLocalAlignment.contigA.begin
-            : tracePointIndex < coveringLocalAlignment.tracePoints.length
-                ? floor(coveringLocalAlignment.contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance)
-                : coveringLocalAlignment.contigA.end;
-
-        return tuple!("contigA", "contigB")(matchingContigAPos, contigBPos);
+        return coveringLocalAlignment.translateTracePoint!contig(
+            contigPos,
+            tracePointDistance,
+            roundingMode,
+        );
     }
 
     unittest
