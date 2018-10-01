@@ -10,6 +10,7 @@ module dentist.dazzler;
 
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.common.binio : CompressedSequence;
+import dentist.util.algorithm : sliceUntil;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
 import dentist.util.math : floor, ceil, RoundingMode;
@@ -32,7 +33,10 @@ import std.algorithm :
     isSorted,
     joiner,
     map,
+    max,
+    maxElement,
     min,
+    minElement,
     sort,
     splitter,
     startsWith,
@@ -370,7 +374,7 @@ void attachTracePoints(
     }
 }
 
-auto fingerprint(AlignmentChain* alignmentChain) pure nothrow
+auto fingerprint(in AlignmentChain* alignmentChain) pure nothrow
 {
     return tuple(
         alignmentChain.contigA.id,
@@ -1229,6 +1233,25 @@ auto getExactAlignment(
     in string dbA,
     in string dbB,
     in AlignmentChain ac,
+    in string workdir,
+    in size_t memoryLimit = 2^^20,
+)
+{
+    return getExactAlignment(
+        dbA,
+        dbB,
+        ac,
+        ac.first.contigA.begin,
+        ac.last.contigA.end,
+        workdir,
+        memoryLimit,
+    );
+}
+
+auto getExactAlignment(
+    in string dbA,
+    in string dbB,
+    in AlignmentChain ac,
     in coord_t beginA,
     in coord_t endA,
     in string workdir,
@@ -1257,8 +1280,8 @@ auto getExactAlignment(
         ac,
         begin,
         end,
-        CompressedSequence.from(aSequence),
-        CompressedSequence.from(bSequence),
+        aSequence,
+        bSequence,
         memoryLimit,
     );
 
@@ -1271,8 +1294,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
     in AlignmentChain ac,
     in TranslatedTracePoint begin,
     in TranslatedTracePoint end,
-    in S aSequence,
-    in S bSequence,
+    S aSequence,
+    S bSequence,
     in size_t memoryLimit = 2^^20,
 )
 {
@@ -1283,17 +1306,17 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
         private const AlignmentChain ac;
         private const TranslatedTracePoint begin;
         private const TranslatedTracePoint end;
-        private const S aSequence;
-        private const S bSequence;
+        private S aSequence;
+        private S bSequence;
         private const size_t memoryLimit;
-        private SequenceAlignment!(const(S)) _paddedAlignment;
+        private SequenceAlignment!S _paddedAlignment;
 
         this(
             in AlignmentChain ac,
             in TranslatedTracePoint begin,
             in TranslatedTracePoint end,
-            in S aSequence,
-            in S bSequence,
+            S aSequence,
+            S bSequence,
            in size_t memoryLimit = 2^^20,
         )
         {
@@ -1332,16 +1355,26 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             auto coveringLocalAlignments = ac
                 .localAlignments
                 .find!(la => la.contigA.begin <= begin.contigA)
-                .until!(la => end.contigA < la.contigA.begin);
+                .sliceUntil!(la => end.contigA < la.contigA.begin);
             assert(!coveringLocalAlignments.empty);
 
             foreach (i, localAlignment; coveringLocalAlignments.enumerate)
             {
-                auto skip = i == 0 ? skipTracePointsToASeqPos(localAlignment) : 0;
-
                 if (i > 0)
-                    addGapAlignment(localAlignment);
+                {
+                    if (
+                        aSeqPos < localAlignment.contigA.begin &&
+                        bSeqPos < localAlignment.contigB.begin
+                    )
+                        addGapAlignment(localAlignment);
+                    else
+                        resolveOverlappingAlignments(
+                            coveringLocalAlignments[i - 1],
+                            localAlignment,
+                        );
+                }
 
+                auto skip = skipTracePointsToASeqPos(localAlignment);
                 foreach (tracePoint; localAlignment.tracePoints[skip .. $])
                 {
                     if (aSeqPos >= end.contigA)
@@ -1354,7 +1387,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
 
         size_t skipTracePointsToASeqPos(in AlignmentChain.LocalAlignment localAlignment)
         {
-            return localAlignment.tracePointsUpTo(
+            return localAlignment.tracePointsUpTo!"contigA"(
                 aSeqPos,
                 ac.tracePointDistance,
                 RoundingMode.floor,
@@ -1378,8 +1411,11 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 No.freeShift,
                 memoryLimit,
             );
+
             _paddedAlignment.score += tracePointAlignment.score;
             _paddedAlignment.editPath ~= tracePointAlignment.editPath;
+            _paddedAlignment.reference = aSequence[0 .. aSeqEnd];
+            _paddedAlignment.query = bSequence[0 .. bSeqEnd];
 
             aSeqPos = nextTracePoint(la, aSeqPos);
             bSeqPos += tracePoint.numBasePairs;
@@ -1396,7 +1432,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 aSequence[aSeqBegin .. aSeqEnd],
                 bSequence[bSeqBegin .. bSeqEnd],
                 indelPenalty,
-                No.freeShift,
+                Yes.freeShift,
                 memoryLimit,
             );
             _paddedAlignment.score += gapAlignment.score;
@@ -1404,6 +1440,87 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
 
             aSeqPos = afterGap.contigA.begin;
             bSeqPos = afterGap.contigB.begin;
+        }
+
+        void resolveOverlappingAlignments(
+            in AlignmentChain.LocalAlignment lhs,
+            in AlignmentChain.LocalAlignment rhs,
+        )
+        {
+            auto overlap = getNonOverlappingCoordinates(lhs, rhs);
+
+            assert(aSeqPos >= overlap.begin.contigA);
+            assert(bSeqPos >= overlap.begin.contigB);
+            auto alignmentCutBack = aSeqPos - overlap.begin.contigA;
+            _paddedAlignment = _paddedAlignment[0 .. $ - alignmentCutBack];
+
+            auto aSeqBegin = overlap.begin.contigA - begin.contigA;
+            auto aSeqEnd = overlap.end.contigA - begin.contigA;
+            auto bSeqBegin = overlap.begin.contigB - begin.contigB;
+            auto bSeqEnd = overlap.end.contigB - begin.contigB;
+            auto overlapAlignment = findAlignment(
+                aSequence[aSeqBegin .. aSeqEnd],
+                bSequence[bSeqBegin .. bSeqEnd],
+                indelPenalty,
+                Yes.freeShift,
+                memoryLimit,
+            );
+            _paddedAlignment.score += overlapAlignment.score;
+            _paddedAlignment.editPath ~= overlapAlignment.editPath;
+
+            aSeqPos = overlap.end.contigA;
+            bSeqPos = overlap.end.contigB;
+        }
+
+        auto getNonOverlappingCoordinates(
+            in AlignmentChain.LocalAlignment lhs,
+            in AlignmentChain.LocalAlignment rhs,
+        )
+        {
+            alias TranslatedTracePoint = AlignmentChain.TranslatedTracePoint;
+            alias ResolvedCoords = Tuple!(
+                TranslatedTracePoint, "begin",
+                TranslatedTracePoint, "end",
+            );
+
+            alias resolveOn(string contig) = () => ResolvedCoords(
+                lhs.translateTracePoint!contig(
+                    mixin(`rhs.` ~ contig ~ `.begin`),
+                    ac.tracePointDistance,
+                    RoundingMode.floor,
+                ),
+                rhs.translateTracePoint!contig(
+                    mixin(`lhs.` ~ contig ~ `.end`),
+                    ac.tracePointDistance,
+                    RoundingMode.ceil,
+                ),
+            );
+
+            if (
+                lhs.contigA.end >= rhs.contigA.begin &&
+                lhs.contigB.end >= rhs.contigB.begin
+            )
+            {
+                auto resolvedOnContigA = resolveOn!"contigA"();
+                auto resolvedOnContigB = resolveOn!"contigB"();
+                auto allResolvedCoords = only(
+                    resolvedOnContigA.begin,
+                    resolvedOnContigA.end,
+                    resolvedOnContigB.begin,
+                    resolvedOnContigB.end,
+                );
+
+                return ResolvedCoords(
+                    minElement!"a.contigA"(allResolvedCoords),
+                    maxElement!"a.contigA"(allResolvedCoords),
+                );
+            }
+            else if (lhs.contigA.end >= rhs.contigA.begin)
+                return resolveOn!"contigA"();
+            else if (lhs.contigB.end >= rhs.contigB.begin)
+                return resolveOn!"contigB"();
+            else
+                assert(0, "unreachable");
         }
 
         coord_t nextTracePoint(
@@ -1543,36 +1660,46 @@ auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in
 {
     // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
     // requirements of this function
-    static id_t _firstRecord;
-    static string _dbFile;
-    static id_t _numRecords;
-    static string[] _cache;
+    static uint _dbIdx;
+    static id_t[2] _firstRecord;
+    static string[2] _dbFile;
+    static id_t[2] _numRecords;
+    static string[][2] _cache;
 
-    if (dbFile != _dbFile)
+    if (!dbFile.among(_dbFile[0], _dbFile[1]))
     {
-        _dbFile = dbFile;
-        _numRecords = cast(id_t) getNumContigs(dbFile, workdir);
-        _cache.length = 0;
+        // Select least recently used DB cache
+        _dbIdx = 1 - _dbIdx;
+        _firstRecord[_dbIdx] = 0;
+        _dbFile[_dbIdx] = dbFile;
+        _numRecords[_dbIdx] = cast(id_t) getNumContigs(dbFile, workdir);
+        _cache[_dbIdx].length = 0;
     }
 
-    if (recordNumber >= _firstRecord + _cache.length || recordNumber < _firstRecord)
+    _dbIdx = _dbFile[0] == dbFile ? 0 : 1;
+    assert(_dbFile[_dbIdx] == dbFile);
+
+    if (
+        recordNumber >= _firstRecord[_dbIdx] + _cache[_dbIdx].length ||
+        recordNumber < _firstRecord[_dbIdx]
+    )
     {
         enum string[] dbdumpOptions = [DBdumpOptions.sequenceString];
-        _cache.length = cacheSize;
+        _cache[_dbIdx].length = cacheSize;
         auto bufferRest = readSequences(dbdump(
             dbFile,
             recordNumber,
-            min(recordNumber + cacheSize - 1, _numRecords),
+            min(recordNumber + cacheSize - 1, _numRecords[_dbIdx]),
             dbdumpOptions,
             workdir,
-        )).copy(_cache);
-        _cache = _cache[0 .. $ - bufferRest.length];
-        _firstRecord = recordNumber;
-        enforce!DazzlerCommandException(_cache.length > 0, "cannot read sequence: empty dump");
+        )).copy(_cache[_dbIdx]);
+        _cache[_dbIdx] = _cache[_dbIdx][0 .. $ - bufferRest.length];
+        _firstRecord[_dbIdx] = recordNumber;
+        enforce!DazzlerCommandException(_cache[_dbIdx].length > 0, "cannot read sequence: empty dump");
     }
 
 
-    return _cache[recordNumber - _firstRecord];
+    return _cache[_dbIdx][recordNumber - _firstRecord[_dbIdx]];
 }
 
 private auto readSequences(R)(R dbdump)
