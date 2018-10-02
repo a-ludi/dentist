@@ -291,7 +291,7 @@ class PileUpProcessor
             compressedSequence,
             0,
             zip(referencePositions, referenceRead[].map!"a.seed", referenceRead[].map!"a.flags")
-                .map!(spliceSite => cast(SpliceSite) spliceSite)
+                .map!(spliceSite => SpliceSite(spliceSite.expand))
                 .array,
         );
 
