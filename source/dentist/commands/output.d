@@ -610,7 +610,15 @@ auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
             auto incidentInsertion = incidentEdgesCache[contigNode]
                 .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
                 .front;
-            incidentInsertion.payload.sequence = seed == AlignmentLocationSeed.front
+            auto insertionSpliceSite = incidentInsertion
+                .payload
+                .spliceSites
+                .find!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId)
+                .front;
+            auto shouldCropBack = (seed == AlignmentLocationSeed.front) ^
+                                  (insertionSpliceSite.flags.complement);
+
+            incidentInsertion.payload.sequence = shouldCropBack
                 ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
                 : incidentInsertion.payload.sequence[croppingDiff .. $];
 
@@ -666,7 +674,15 @@ void resolveOverlappingCropping(Result)(
             auto incidentInsertion = incidentEdgesCache[contigNode]
                 .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
                 .front;
-            incidentInsertion.payload.sequence = alignmentSeed == AlignmentLocationSeed.front
+            auto insertionSpliceSite = incidentInsertion
+                .payload
+                .spliceSites
+                .find!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId)
+                .front;
+            auto shouldCropBack = (alignmentSeed == AlignmentLocationSeed.front) ^
+                                  (insertionSpliceSite.flags.complement);
+
+            incidentInsertion.payload.sequence = shouldCropBack
                 ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
                 : incidentInsertion.payload.sequence[croppingDiff .. $];
 
