@@ -1259,7 +1259,11 @@ auto getExactAlignment(
 )
 {
     assert(ac.tracePointDistance > 0, "trace points required for getExactAlignment");
-    assert(beginA < endA);
+    assert(
+        ac.first.contigA.begin <= beginA &&
+        beginA < endA &&
+        endA <= ac.last.contigA.end
+    );
 
     // Translate input coords to tracepoints to get exact alignments
     auto begin = ac.translateTracePoint(beginA, RoundingMode.floor);
@@ -1317,7 +1321,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             in TranslatedTracePoint end,
             S aSequence,
             S bSequence,
-           in size_t memoryLimit = 2^^20,
+            in size_t memoryLimit = 2^^20,
         )
         {
             this.ac = ac;
@@ -1437,6 +1441,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             );
             _paddedAlignment.score += gapAlignment.score;
             _paddedAlignment.editPath ~= gapAlignment.editPath;
+            _paddedAlignment.reference = aSequence[0 .. aSeqEnd];
+            _paddedAlignment.query = bSequence[0 .. bSeqEnd];
 
             aSeqPos = afterGap.contigA.begin;
             bSeqPos = afterGap.contigB.begin;
@@ -1467,6 +1473,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             );
             _paddedAlignment.score += overlapAlignment.score;
             _paddedAlignment.editPath ~= overlapAlignment.editPath;
+            _paddedAlignment.reference = aSequence[0 .. aSeqEnd];
+            _paddedAlignment.query = bSequence[0 .. bSeqEnd];
 
             aSeqPos = overlap.end.contigA;
             bSeqPos = overlap.end.contigB;
