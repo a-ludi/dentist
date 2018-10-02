@@ -24,6 +24,7 @@ import dentist.common.alignments :
     id_t;
 import dentist.dazzler :
     ContigSegment,
+    fingerprint,
     GapSegment,
     getAlignments,
     getExactAlignment,
@@ -333,7 +334,6 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
         auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
 
         shared size_t numCorrectContigs;
@@ -346,22 +346,11 @@ private struct ResultAnalyzer
                 .fold!"a | b"(ReferenceRegion());
             size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
 
-            AlignmentChain lastAC;
-            ExactAlignment exactAlignment;
             foreach (overlappingAlignment; overlappingAlignments)
             {
                 auto alignmentBegin = overlappingAlignment.first.contigA.begin;
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
-
-                if (lastAC != overlappingAlignment)
-                    exactAlignment = getExactAlignment(
-                        options.trueAssemblyDb,
-                        options.resultDb,
-                        overlappingAlignment,
-                        options.workdir,
-                        2^^30,
-                    );
-
+                auto exactAlignment = getOverlapAlignment(overlappingAlignment);
                 auto overlappingExactAlignment = exactAlignment.partial(
                     mappedInterval.begin > alignmentBegin
                         ? mappedInterval.begin - alignmentBegin
@@ -371,7 +360,7 @@ private struct ResultAnalyzer
                         : alignmentEnd - alignmentBegin,
                 );
 
-                if (shouldLog(LogLevel.debug_) && exactAlignment.score > 10)
+                if (shouldLog(LogLevel.debug_) && overlappingExactAlignment.score > 10)
                     logJsonDebug(
                         "alignmentChain", overlappingAlignment.toJson,
                         "alignmentBegin", mappedInterval.begin > alignmentBegin
@@ -398,7 +387,6 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
         auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
 
         shared size_t numCorrectGaps;
@@ -411,22 +399,11 @@ private struct ResultAnalyzer
                 .fold!"a | b"(ReferenceRegion());
             size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
 
-            AlignmentChain lastAC;
-            ExactAlignment exactAlignment;
             foreach (overlappingAlignment; overlappingAlignments)
             {
                 auto alignmentBegin = overlappingAlignment.first.contigA.begin;
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
-
-                if (lastAC != overlappingAlignment)
-                    exactAlignment = getExactAlignment(
-                        options.trueAssemblyDb,
-                        options.resultDb,
-                        overlappingAlignment,
-                        options.workdir,
-                        2^^30,
-                    );
-
+                auto exactAlignment = getOverlapAlignment(overlappingAlignment);
                 auto overlappingExactAlignment = exactAlignment.partial(
                     mappedInterval.begin > alignmentBegin
                         ? mappedInterval.begin - alignmentBegin
@@ -436,7 +413,7 @@ private struct ResultAnalyzer
                         : alignmentEnd - alignmentBegin,
                 );
 
-                if (shouldLog(LogLevel.debug_) && exactAlignment.score > 10)
+                if (shouldLog(LogLevel.debug_) && overlappingExactAlignment.score > 10)
                     logJsonDebug(
                         "alignmentChain", overlappingAlignment.toJson,
                         "alignmentBegin", mappedInterval.begin > alignmentBegin
@@ -457,6 +434,28 @@ private struct ResultAnalyzer
         }
 
         return numCorrectGaps;
+    }
+
+    auto getOverlapAlignment(in AlignmentChain alignmentChain)
+    {
+        alias ExactAlignment = typeof(getExactAlignment("", "", alignmentChain, ""));
+        alias Fingerprint = typeof(fingerprint(&alignmentChain));
+
+        static ExactAlignment[Fingerprint] _cache;
+
+        auto acFingerprint = fingerprint(&alignmentChain);
+        if (acFingerprint !in _cache)
+        {
+            _cache[acFingerprint] = getExactAlignment(
+                options.trueAssemblyDb,
+                options.resultDb,
+                alignmentChain,
+                options.workdir,
+                9*2^^30,
+            );
+        }
+
+        return _cache[acFingerprint];
     }
 
     static AlignmentChain getDummyAC(in ReferenceInterval refInterval)
