@@ -350,6 +350,8 @@ private struct ResultAnalyzer
             {
                 auto alignmentBegin = overlappingAlignment.first.contigA.begin;
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
+                if (mappedInterval.end <= alignmentBegin)
+                    continue;
                 auto exactAlignment = getOverlapAlignment(overlappingAlignment);
                 auto overlappingExactAlignment = exactAlignment.partial(
                     mappedInterval.begin > alignmentBegin
@@ -403,6 +405,8 @@ private struct ResultAnalyzer
             {
                 auto alignmentBegin = overlappingAlignment.first.contigA.begin;
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
+                if (mappedInterval.end <= alignmentBegin)
+                    continue;
                 auto exactAlignment = getOverlapAlignment(overlappingAlignment);
                 auto overlappingExactAlignment = exactAlignment.partial(
                     mappedInterval.begin > alignmentBegin
