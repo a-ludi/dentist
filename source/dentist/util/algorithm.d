@@ -10,6 +10,7 @@ module dentist.util.algorithm;
 
 import std.algorithm :
     copy,
+    countUntil,
     min,
     OpenRight,
     uniq;
@@ -244,6 +245,36 @@ unittest
 
     // Can be called with non-lvalues
     assert(uniqInPlace([1, 2, 2, 2, 3, 3, 4]) == [1, 2, 3, 4]);
+}
+
+/// Replaces the first occurrence of `needle` by `replacement` in `array` if
+/// present. Modifies array.
+Array replaceInPlace(alias pred = "a == b", Array, E)(auto ref Array array, E needle, E replacement)
+        if (isDynamicArray!Array)
+{
+    auto i = array.countUntil!pred(needle);
+
+    if (i < 0)
+        return array;
+
+    array[i] = replacement;
+
+    return array;
+}
+
+///
+unittest
+{
+    auto arr = [1, 2, 3, 4, 2, 3];
+
+    assert(arr.replaceInPlace(2, 7) == [1, 7, 3, 4, 2, 3]);
+    // The input array gets modified.
+    assert(arr == [1, 7, 3, 4, 2, 3]);
+    // Replaces only the first occurrence
+    assert(arr.replaceInPlace(2, 7) == [1, 7, 3, 4, 7, 3]);
+
+    // Can be called with non-lvalues
+    assert([1, 2, 3].replaceInPlace(2, 7) == [1, 7, 3]);
 }
 
 /// Get the first element in range assuming it to be non-empty.
