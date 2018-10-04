@@ -50,6 +50,7 @@ import dentist.dazzler :
     getFastaSequence,
     getScaffoldStructure,
     ScaffoldSegment;
+import dentist.util.algorithm : replaceInPlace;
 import dentist.util.fasta : complement, reverseComplementer;
 import dentist.util.log;
 import dentist.util.math :
@@ -65,6 +66,7 @@ import std.algorithm :
     canFind,
     copy,
     count,
+    countUntil,
     filter,
     find,
     fold,
@@ -654,10 +656,8 @@ void resolveOverlappingCropping(Result)(
     assert(backCroppingPos < frontCroppingPos);
     auto newCroppingPos = floor((frontCroppingPos + backCroppingPos) / 2, tracePointDistance);
 
-    import std.meta : AliasSeq;
-
-    static foreach (alias result; AliasSeq!(frontResult, backResult))
-    {{
+    void resolveOverlappingCroppingFor(ref Result result)
+    {
         auto alignmentSeed = result.spliceSite.alignmentSeed;
         auto croppingDiff = absdiff(
             newCroppingPos,
@@ -674,21 +674,36 @@ void resolveOverlappingCropping(Result)(
             auto incidentInsertion = incidentEdgesCache[contigNode]
                 .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
                 .front;
-            auto insertionSpliceSite = incidentInsertion
+            auto insertionSpliceSiteIdx = incidentInsertion
                 .payload
                 .spliceSites
-                .find!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId)
-                .front;
+                .countUntil!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId);
+            auto insertionSpliceSite = incidentInsertion
+                .payload
+                .spliceSites[insertionSpliceSiteIdx];
             auto shouldCropBack = (alignmentSeed == AlignmentLocationSeed.front) ^
                                   (insertionSpliceSite.flags.complement);
 
             incidentInsertion.payload.sequence = shouldCropBack
                 ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
                 : incidentInsertion.payload.sequence[croppingDiff .. $];
+            incidentInsertion
+                .payload
+                .spliceSites[insertionSpliceSiteIdx]
+                .croppingRefPosition
+                .value = newCroppingPos;
 
             scaffold.add!replace(incidentInsertion);
+            incidentEdgesCache[incidentInsertion.start]
+                .replaceInPlace(incidentInsertion, incidentInsertion);
+            incidentEdgesCache[incidentInsertion.end]
+                .replaceInPlace(incidentInsertion, incidentInsertion);
+
             result.spliceSite.croppingRefPosition.value = newCroppingPos;
             result.insertionUpdated |= Yes.insertionUpdated;
         }
-    }}
+    }
+
+    resolveOverlappingCroppingFor(frontResult);
+    resolveOverlappingCroppingFor(backResult);
 }
