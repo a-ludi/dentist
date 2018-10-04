@@ -956,12 +956,12 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 }
             }
 
-            Edge[] opIndex(in Node node)
+            ref inout(Edge[]) opIndex(in Node node) inout
             {
                 return incidentEdges[graph.indexOf(node)];
             }
 
-            Edge[] opIndex(in size_t nodeIdx)
+            ref inout(Edge[]) opIndex(in size_t nodeIdx) inout
             {
                 return incidentEdges[nodeIdx];
             }
