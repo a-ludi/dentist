@@ -455,7 +455,7 @@ private struct ResultAnalyzer
                 options.resultDb,
                 alignmentChain,
                 options.workdir,
-                9*2^^30,
+                10*2^^30,
             );
         }
 
