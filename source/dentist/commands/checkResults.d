@@ -58,7 +58,6 @@ import std.algorithm :
     max,
     maxElement,
     min,
-    sort,
     sum;
 import std.array : array;
 import std.format : format;
@@ -95,15 +94,22 @@ void execute(in Options options)
 
 private struct ResultAnalyzer
 {
+    alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
+    alias Fingerprint = typeof(fingerprint(&resultAlignment[0]));
+    static enum identityLevels = Stats.identityLevels;
+
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
     protected coord_t referenceOffset;
     protected AlignmentChain[] resultAlignment;
+    protected ExactAlignment[Fingerprint] exactResultAlignments;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
     protected ReferenceRegion reconstructedRegions;
     protected ReferenceRegion[] reconstructedGaps;
+    protected size_t[][identityLevels.length] correctContigsPerIdentityLevel;
+    protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
 
     Stats collect()
     {
@@ -139,6 +145,7 @@ private struct ResultAnalyzer
         stats.maxClosedGap = getMaxClosedGap();
         if (options.bucketSize > 0)
         {
+            stats.correctGapLengthHistograms = getCorrectGapLengthHistograms();
             stats.closedGapLengthHistogram = getClosedGapLengthHistogram();
             stats.gapLengthHistogram = getGapLengthHistogram();
         }
@@ -156,7 +163,8 @@ private struct ResultAnalyzer
             options.resultsAlignmentFile,
             options.workdir,
             options.tracePointDistance,
-        ).sort!isStrictlyBefore.release;
+        );
+        calculateExactResultAlignments();
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -167,6 +175,31 @@ private struct ResultAnalyzer
         referenceGaps = getReferenceGaps();
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
+        correctContigsPerIdentityLevel = getCorrectRegions(reconstructedRegions.intervals);
+        correctGapsPerIdentityLevel = getCorrectRegions(referenceGaps
+                .intervals
+                .filter!(gap => isInnerGap(gap))
+                .array);
+    }
+
+    void calculateExactResultAlignments()
+    {
+        mixin(traceExecution);
+
+        foreach (alignmentChain; parallel(resultAlignment))
+        {
+            auto acFingerprint = fingerprint(&alignmentChain);
+            auto exactAlignment = getExactAlignment(
+                options.trueAssemblyDb,
+                options.resultDb,
+                alignmentChain,
+                options.workdir,
+                10*2^^30,
+            );
+
+            synchronized
+                exactResultAlignments[acFingerprint] = exactAlignment;
+        }
     }
 
     ReferenceRegion getReferenceGaps()
@@ -330,134 +363,63 @@ private struct ResultAnalyzer
 
     size_t getNumCorrectContigs()
     {
-        mixin(traceExecution);
-
-        auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
-
-        shared size_t numCorrectContigs;
-        foreach (mappedInterval; parallel(mappedRegionsMask.intervals))
-        {
-            auto overlappingAlignments = sortedResultAlignment
-                .equalRange(getDummyAC(mappedInterval));
-            auto overlappedRegion = overlappingAlignments
-                .map!(to!(ReferenceRegion, "contigA"))
-                .fold!"a | b"(ReferenceRegion());
-            size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
-
-            foreach (overlappingAlignment; overlappingAlignments)
-            {
-                auto alignmentBegin = overlappingAlignment.first.contigA.begin;
-                auto alignmentEnd = overlappingAlignment.last.contigA.end;
-                if (mappedInterval.end <= alignmentBegin || alignmentEnd <= mappedInterval.begin)
-                    continue;
-                auto exactAlignment = getOverlapAlignment(overlappingAlignment);
-                auto overlappingExactAlignment = exactAlignment.partial(
-                    mappedInterval.begin > alignmentBegin
-                        ? mappedInterval.begin - alignmentBegin
-                        : 0,
-                    mappedInterval.end < alignmentEnd
-                        ? mappedInterval.end - alignmentBegin
-                        : alignmentEnd - alignmentBegin,
-                );
-
-                if (shouldLog(LogLevel.debug_) && overlappingExactAlignment.score > 10)
-                    logJsonDebug(
-                        "alignmentChain", overlappingAlignment.toJson,
-                        "alignmentBegin", mappedInterval.begin > alignmentBegin
-                            ? mappedInterval.begin
-                            : alignmentBegin,
-                        "alignmentEnd", mappedInterval.end < alignmentEnd
-                            ? mappedInterval.end
-                            : alignmentEnd,
-                        "mappedInterval", mappedInterval.toJson,
-                        "alignment", overlappingExactAlignment.toString!('|', '*', '·', '-')(50),
-                    );
-
-                numDiffs += overlappingExactAlignment.score;
-            }
-
-            if (100 * numDiffs <= 1 * mappedInterval.size)
-                numCorrectContigs.atomicOp!"+="(1);
-        }
-
-        return numCorrectContigs;
+        return correctContigsPerIdentityLevel[0].length;
     }
 
     size_t getNumCorrectGaps()
     {
-        mixin(traceExecution);
+        return correctGapsPerIdentityLevel[0].length;
+    }
 
-        auto sortedResultAlignment = resultAlignment.assumeSorted!isStrictlyBefore;
+    size_t[][identityLevels.length] getCorrectRegions(in ReferenceInterval[] intervals)
+    {
+        auto sortedResultAlignment = resultAlignment.assumeSorted!"a.contigA.id < b.contigA.id";
 
-        shared size_t numCorrectGaps;
-        foreach (mappedInterval; parallel(referenceGaps.intervals))
+        size_t[][identityLevels.length] identicalLengthsPerLevel;
+        foreach (identicalLengths; identicalLengthsPerLevel)
+            identicalLengths.reserve(intervals.length);
+
+        foreach (interval; parallel(intervals))
         {
             auto overlappingAlignments = sortedResultAlignment
-                .equalRange(getDummyAC(mappedInterval));
+                .equalRange(getDummyAC(interval));
             auto overlappedRegion = overlappingAlignments
                 .map!(to!(ReferenceRegion, "contigA"))
                 .fold!"a | b"(ReferenceRegion());
-            size_t numDiffs = (ReferenceRegion(mappedInterval) - overlappedRegion).size;
+            size_t numDiffs = (ReferenceRegion(interval) - overlappedRegion).size;
 
             foreach (overlappingAlignment; overlappingAlignments)
             {
                 auto alignmentBegin = overlappingAlignment.first.contigA.begin;
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
-                if (mappedInterval.end <= alignmentBegin || alignmentEnd <= mappedInterval.begin)
-                    continue;
+                if (interval.end <= alignmentBegin || alignmentEnd <= interval.begin)
+                    continue; // Ignore non-overlaps
                 auto exactAlignment = getOverlapAlignment(overlappingAlignment);
                 auto overlappingExactAlignment = exactAlignment.partial(
-                    mappedInterval.begin > alignmentBegin
-                        ? mappedInterval.begin - alignmentBegin
+                    interval.begin > alignmentBegin
+                        ? interval.begin - alignmentBegin
                         : 0,
-                    mappedInterval.end < alignmentEnd
-                        ? mappedInterval.end - alignmentBegin
+                    interval.end < alignmentEnd
+                        ? interval.end - alignmentBegin
                         : alignmentEnd - alignmentBegin,
                 );
-
-                if (shouldLog(LogLevel.debug_) && overlappingExactAlignment.score > 10)
-                    logJsonDebug(
-                        "alignmentChain", overlappingAlignment.toJson,
-                        "alignmentBegin", mappedInterval.begin > alignmentBegin
-                            ? mappedInterval.begin
-                            : alignmentBegin,
-                        "alignmentEnd", mappedInterval.end < alignmentEnd
-                            ? mappedInterval.end
-                            : alignmentEnd,
-                        "gapInterval", mappedInterval.toJson,
-                        "alignment", overlappingExactAlignment.toString!('|', '*', '·', '-')(50),
-                    );
 
                 numDiffs += overlappingExactAlignment.score;
             }
 
-            if (100 * numDiffs <= 1 * mappedInterval.size)
-                numCorrectGaps.atomicOp!"+="(1);
+            foreach (i, identityLevel; identityLevels)
+                if (numDiffs <= (1.0 - identityLevel) * interval.size)
+                    synchronized identicalLengthsPerLevel[i] ~= interval.size;
         }
 
-        return numCorrectGaps;
+        return identicalLengthsPerLevel;
     }
 
     auto getOverlapAlignment(in AlignmentChain alignmentChain)
     {
-        alias ExactAlignment = typeof(getExactAlignment("", "", alignmentChain, ""));
-        alias Fingerprint = typeof(fingerprint(&alignmentChain));
-
-        static ExactAlignment[Fingerprint] _cache;
-
         auto acFingerprint = fingerprint(&alignmentChain);
-        if (acFingerprint !in _cache)
-        {
-            _cache[acFingerprint] = getExactAlignment(
-                options.trueAssemblyDb,
-                options.resultDb,
-                alignmentChain,
-                options.workdir,
-                10*2^^30,
-            );
-        }
 
-        return _cache[acFingerprint];
+        return exactResultAlignments[acFingerprint];
     }
 
     static AlignmentChain getDummyAC(in ReferenceInterval refInterval)
@@ -481,6 +443,21 @@ private struct ResultAnalyzer
                 ),
             )],
         );
+    }
+
+    bool isInnerGap(in ReferenceInterval gap)
+    {
+        return 0 < gap.begin && gap.end < trueScaffoldLength(cast(id_t) gap.contigId);
+    }
+
+    coord_t trueScaffoldLength(in id_t contigId)
+    {
+        return cast(coord_t) trueAssemblyScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => contigPart.get!ContigSegment)
+            .find!(contigPart => contigPart.globalContigId == contigId)
+            .first
+            .length;
     }
 
     size_t getNumClosedGaps()
@@ -563,17 +540,9 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        alias scaffoldLength = (contigId) => trueAssemblyScaffoldStructure
-            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
-            .map!(contigPart => contigPart.get!ContigSegment)
-            .find!(contigPart => contigPart.globalContigId == contigId)
-            .first
-            .length;
-
         return referenceGaps
             .intervals
-            // Do not count gaps at the very beginning or end of an "true scaffold"
-            .filter!(gap => 0 < gap.begin && gap.end < scaffoldLength(gap.contigId))
+            .filter!(gap => isInnerGap(gap))
             .map!(gap => gap.size)
             .sum;
     }
@@ -640,6 +609,26 @@ private struct ResultAnalyzer
             .maxElement!"a.size";
     }
 
+    Histogram!coord_t[identityLevels.length] getCorrectGapLengthHistograms()
+    {
+        mixin(traceExecution);
+
+        typeof(return) correctGapLengthHistograms;
+
+        foreach (i; 0 .. identityLevels.length)
+        {
+            correctGapLengthHistograms[i] = histogram(
+                options.bucketSize,
+                correctGapsPerIdentityLevel[i],
+            );
+            // NOTE: for some reason bucketSize is not correctly set; force it
+            correctGapLengthHistograms[i].bucketSize = options.bucketSize;
+            writeln(correctGapLengthHistograms[i].bucketSize);
+        }
+
+        return correctGapLengthHistograms;
+    }
+
     Histogram!coord_t getClosedGapLengthHistogram()
     {
         mixin(traceExecution);
@@ -665,24 +654,6 @@ private struct ResultAnalyzer
                 .array,
         );
     }
-}
-
-bool isStrictlyBefore(string contig = "contigA")(
-    in AlignmentChain lhs,
-    in AlignmentChain rhs,
-) pure nothrow if (contig.among("contigA", "contigB"))
-{
-    alias lhsContigId = () => mixin("lhs." ~ contig ~ ".id");
-    alias rhsContigId = () => mixin("rhs." ~ contig ~ ".id");
-    alias lhsEnd = () => mixin("lhs.first." ~ contig ~ ".end");
-    alias rhsBegin = () => mixin("rhs.first." ~ contig ~ ".begin");
-
-    if (lhsContigId() < rhsContigId())
-        return true;
-    else if (lhsContigId() > rhsContigId())
-        return false;
-    else
-        return lhsEnd() < rhsBegin();
 }
 
 private struct Histogram(value_t)
@@ -726,6 +697,8 @@ auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
 
 private struct Stats
 {
+    static enum identityLevels = [.99, .95, .90];
+
     size_t numBpsExpected;
     size_t numBpsKnown;
     size_t numBpsResult;
@@ -744,6 +717,7 @@ private struct Stats
     size_t gapMedian;
     size_t closedGapMedian;
     ReferenceInterval maxClosedGap;
+    Histogram!coord_t[identityLevels.length] correctGapLengthHistograms;
     Histogram!coord_t closedGapLengthHistogram;
     Histogram!coord_t gapLengthHistogram;
 
@@ -768,7 +742,13 @@ private struct Stats
             "gapMedian": gapMedian.toJson,
             "closedGapMedian": closedGapMedian.toJson,
             "maxClosedGap": maxClosedGap.toJson,
-            "gapLengthHistogram": histsToJson(closedGapLengthHistogram, gapLengthHistogram),
+            "gapLengthHistogram": histsToJson(
+                correctGapLengthHistograms[0],
+                correctGapLengthHistograms[1],
+                correctGapLengthHistograms[2],
+                closedGapLengthHistogram,
+                gapLengthHistogram,
+            ),
         ].toJsonString;
     }
 
@@ -799,7 +779,13 @@ private struct Stats
             format!"closedGapMedian:       %*d"(columnWidth, closedGapMedian),
             format!"maxClosedGap:          %*s"(columnWidth, toString(maxClosedGap)),
             gapLengthHistogram.length > 0
-                ? format!"gapLengthHistogram:\n    \n%s"(histsToString(closedGapLengthHistogram, gapLengthHistogram))
+                ? format!"gapLengthHistogram:\n    \n%s"(histsToString(
+                    correctGapLengthHistograms[0],
+                    correctGapLengthHistograms[1],
+                    correctGapLengthHistograms[2],
+                    closedGapLengthHistogram,
+                    gapLengthHistogram,
+                ))
                 : null,
         ];
 
