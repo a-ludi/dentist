@@ -149,11 +149,40 @@ struct AlignmentChain
             case RoundingMode.ceil:
                 if (firstTracePointRefPos == contigAPos)
                     return 0;
+                if (contigAPos <= secondTracePointRefPos)
+                    return 1;
                 else if (contigAPos <= secondFromLastTracePointRefPos)
                     return 1 + ceildiv(contigAPos - secondTracePointRefPos, tracePointDistance);
                 else
                     return tracePoints.length;
             }
+        }
+
+        unittest
+        {
+            auto localAlignment = LocalAlignment(
+                Locus(50, 2897),
+                Locus(50, 2905),
+                8,
+                [TracePoint(1, 50), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+                 TracePoint(7, 105)],
+            );
+            coord_t contigPos = 79;
+            trace_point_t tracePointDistance = 100;
+            auto roundingMode = RoundingMode.ceil;
+            auto tpsUpTo = localAlignment.tracePointsUpTo!"contigA"(
+                contigPos,
+                tracePointDistance,
+                roundingMode,
+            );
+
+            assert(0 <= tpsUpTo && tpsUpTo <= localAlignment.tracePoints.length);
         }
 
         auto tracePointsUpTo(string contig)(
