@@ -335,7 +335,6 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
-        TestingCommand.checkResults,
     ))
     {
         @Argument("<in:reference>")

@@ -31,7 +31,10 @@ import dentist.dazzler :
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
-import dentist.util.algorithm : first, last;
+import dentist.util.algorithm :
+    first,
+    last,
+    sliceBy;
 import dentist.util.log;
 import dentist.util.math :
     absdiff,
@@ -94,7 +97,6 @@ private struct ResultAnalyzer
 {
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
-    protected const(ScaffoldSegment)[] refScaffoldStructure;
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
     protected coord_t referenceOffset;
     protected AlignmentChain[] resultAlignment;
@@ -147,7 +149,6 @@ private struct ResultAnalyzer
     void init()
     {
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
-        refScaffoldStructure = getScaffoldStructure(options.refDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
         resultAlignment = getAlignments(
             options.trueAssemblyDb,
@@ -264,10 +265,10 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return refScaffoldStructure
-            .map!(contigPart => contigPart.peek!ContigSegment !is null
-                ? contigPart.peek!ContigSegment.length
-                : contigPart.peek!GapSegment.length)
+        return mappedRegionsMask
+            .intervals
+            .sliceBy!"a.contigId == b.contigId"
+            .map!(trueScaffoldSlice => trueScaffoldSlice[$ - 1].end - trueScaffoldSlice[0].begin)
             .sum;
     }
 
@@ -275,10 +276,7 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return refScaffoldStructure
-            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
-            .map!(contigPart => contigPart.peek!ContigSegment.length)
-            .sum;
+        return mappedRegionsMask.size;
     }
 
     size_t getNumBpsResult()
@@ -327,7 +325,7 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return refScaffoldStructure.count!(contigPart => contigPart.peek!ContigSegment !is null);
+        return mappedRegionsMask.intervals.length;
     }
 
     size_t getNumCorrectContigs()
@@ -565,9 +563,18 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return refScaffoldStructure
-            .filter!(contigPart => contigPart.peek!GapSegment !is null)
-            .map!(contigPart => contigPart.peek!GapSegment.length)
+        alias scaffoldLength = (contigId) => trueAssemblyScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => contigPart.get!ContigSegment)
+            .find!(contigPart => contigPart.globalContigId == contigId)
+            .first
+            .length;
+
+        return referenceGaps
+            .intervals
+            // Do not count gaps at the very beginning or end of an "true scaffold"
+            .filter!(gap => 0 < gap.begin && gap.end < scaffoldLength(gap.contigId))
+            .map!(gap => gap.size)
             .sum;
     }
 
@@ -575,9 +582,9 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return refScaffoldStructure
-            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
-            .map!(contigPart => contigPart.peek!ContigSegment.length)
+        return mappedRegionsMask
+            .intervals
+            .map!(mappedInterval => mappedInterval.size)
             .array
             .N!50(getNumBpsExpected);
     }
