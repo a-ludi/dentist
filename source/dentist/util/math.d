@@ -209,9 +209,11 @@ unittest
 /// Returns the result of `ceil(a / b)` but uses integer arithmetic only.
 Integer ceildiv(Integer)(in Integer a, in Integer b) pure nothrow if (isIntegral!Integer)
 {
-    return a % b == 0
+    Integer resultSign = (a < 0) ^ (b < 0) ? -1 : 1;
+
+    return resultSign < 0 || a % b == 0
         ? a / b
-        : a / b + 1;
+        : a / b + resultSign;
 }
 
 ///
@@ -222,6 +224,8 @@ unittest
     assert(ceildiv(2L, 3L) == 1L);
     assert(ceildiv(3U, 3U) == 1U);
     assert(ceildiv(4, 3) == 2);
+    assert(ceildiv(-4, 4) == -1);
+    assert(ceildiv(-4, 3) == -1);
 }
 
 class EdgeExistsException : Exception
