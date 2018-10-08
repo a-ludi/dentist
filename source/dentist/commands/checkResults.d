@@ -623,7 +623,6 @@ private struct ResultAnalyzer
             );
             // NOTE: for some reason bucketSize is not correctly set; force it
             correctGapLengthHistograms[i].bucketSize = options.bucketSize;
-            writeln(correctGapLengthHistograms[i].bucketSize);
         }
 
         return correctGapLengthHistograms;
