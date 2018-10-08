@@ -9,6 +9,7 @@
 module dentist.util.string;
 
 import std.algorithm :
+    countUntil,
     joiner,
     min,
     map;
@@ -91,6 +92,47 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
     score_t indelPenalty;
     Flag!"freeShift" freeShift;
 
+    bool isValid() const pure nothrow
+    {
+        score_t computedScore;
+        size_t i, j;
+        foreach (k, editOp; editPath)
+        {
+            if (i > reference.length || j > query.length)
+                return false;
+
+            final switch (editOp)
+            {
+            case EditOp.substitution:
+                if (i == reference.length || j == query.length)
+                    return false;
+                computedScore += getScore(reference[i], query[j]);
+                ++i;
+                ++j;
+                break;
+            case EditOp.deletetion:
+                if (i == reference.length)
+                    return false;
+                computedScore += indelPenalty;
+                ++i;
+                break;
+            case EditOp.insertion:
+                if (j == query.length)
+                    return false;
+                computedScore += indelPenalty;
+                ++j;
+                break;
+            }
+        }
+        if (freeShift)
+            computedScore -= editPath.countUntil(EditOp.substitution);
+
+        return
+            i == reference.length &&
+            j == query.length &&
+            computedScore == score;
+    }
+
     /**
         Get a partial alignment with respect to `reference`.
     */
@@ -141,7 +183,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             }
         }
 
-        return typeof(this)(
+        auto partialAlignment = typeof(this)(
             newScore,
             editPath[editBegin .. editEnd],
             reference[begin .. end],
@@ -149,6 +191,9 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             indelPenalty,
             freeShift,
         );
+        assert(partialAlignment.isValid());
+
+        return partialAlignment;
     }
 
     auto opDollar() const pure nothrow
