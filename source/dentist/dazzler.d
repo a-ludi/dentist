@@ -1370,8 +1370,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 if (i > 0)
                 {
                     if (
-                        aSeqPos < localAlignment.contigA.begin &&
-                        bSeqPos < localAlignment.contigB.begin
+                        aSeqPos <= localAlignment.contigA.begin &&
+                        bSeqPos <= localAlignment.contigB.begin
                     )
                         addGapAlignment(localAlignment);
                     else
@@ -1500,8 +1500,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             );
 
             if (
-                lhs.contigA.end >= rhs.contigA.begin &&
-                lhs.contigB.end >= rhs.contigB.begin
+                lhs.contigA.end > rhs.contigA.begin &&
+                lhs.contigB.end > rhs.contigB.begin
             )
             {
                 auto resolvedOnContigA = resolveOn!"contigA"();
@@ -1518,9 +1518,9 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                     )),
                 );
             }
-            else if (lhs.contigA.end >= rhs.contigA.begin)
+            else if (lhs.contigA.end > rhs.contigA.begin)
                 return resolveOn!"contigA"();
-            else if (lhs.contigB.end >= rhs.contigB.begin)
+            else if (lhs.contigB.end > rhs.contigB.begin)
                 return resolveOn!"contigB"();
             else
                 assert(0, "unreachable");
@@ -1534,7 +1534,13 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
         )
         {
             if (freeShift)
-                _paddedAlignment.score += partialAlignment.editPath.countUntil(EditOp.substitution);
+            {
+                auto firstSubstitution = partialAlignment.editPath.countUntil(EditOp.substitution);
+
+                _paddedAlignment.score += indelPenalty * (firstSubstitution < 0
+                    ? partialAlignment.editPath.length
+                    : firstSubstitution);
+            }
 
             _paddedAlignment.score += partialAlignment.score;
             _paddedAlignment.editPath ~= partialAlignment.editPath;
