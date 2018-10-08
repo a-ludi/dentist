@@ -175,7 +175,7 @@ private struct ResultAnalyzer
         referenceGaps = getReferenceGaps();
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
-        correctContigsPerIdentityLevel = getCorrectRegions(reconstructedRegions.intervals);
+        correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
         correctGapsPerIdentityLevel = getCorrectRegions(referenceGaps
                 .intervals
                 .filter!(gap => isInnerGap(gap))
