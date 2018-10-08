@@ -89,6 +89,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
     S reference;
     S query;
     score_t indelPenalty;
+    Flag!"freeShift" freeShift;
 
     /**
         Get a partial alignment with respect to `reference`.
@@ -146,6 +147,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             reference[begin .. end],
             query[queryBegin .. queryEnd],
             indelPenalty,
+            freeShift,
         );
     }
 
@@ -343,6 +345,7 @@ SequenceAlignment!(const(S), scoreFun) findAlignment(
         reference,
         query,
         indelPenalty,
+        freeShift,
     );
 }
 
