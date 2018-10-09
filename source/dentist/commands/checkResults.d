@@ -670,6 +670,10 @@ private struct Histogram(value_t)
     this(in value_t bucketSize, in value_t[] values)
     {
         this.bucketSize = bucketSize + 0;
+
+        if (values.length == 0)
+            return; // empty histogram
+
         auto largestValue = maxElement(values);
         this.length = largestValue / bucketSize + 1;
 
@@ -802,7 +806,7 @@ private struct Stats
         assert([hists].all!(h => h.bucketSize == hists[0].bucketSize));
         auto limitsWidth = numWidth(hists[0].bucketSize * [hists].map!"a.length".maxElement);
         auto countWidths = [hists]
-            .map!(h => numWidth(max(1, maxElement(h.histogram))))
+            .map!(h => numWidth(max(1, h.histogram.length == 0 ? 1 : maxElement(h.histogram))))
             .array;
 
         auto bucketsList = tupleMap!(h => h.buckets.array)(hists);
