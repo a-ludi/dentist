@@ -8,8 +8,11 @@
 */
 module dentist.common.alignments;
 
-import dentist.common.scaffold : buildScaffold, concatenatePayloads, ContigNode,
-    ContigPart, discardAmbiguousJoins, Join, mergeExtensionsWithGaps;
+import dentist.common.scaffold :
+    concatenatePayloads,
+    ContigNode,
+    ContigPart,
+    Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
 import dentist.util.log;
 import dentist.util.math : ceildiv, floor, RoundingMode;
