@@ -337,6 +337,19 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
 /// This removes ambiguous gap insertions.
 Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMargin)
 {
+    alias joinToJson = (join) => shouldLog(LogLevel.debug_)
+        ? join.toJson
+        : [
+            "start": join.start,
+            "end": join.end,
+            "payload": [
+                "type": pileUp.getType.to!string.toJson,
+                "readAlignments": shouldLog(LogLevel.debug_)
+                    ? pileUp.map!"a[]".array.toJson
+                    : toJson(null),
+            ].toJson,
+        ].toJson;
+
     auto incidentEdgesCache = scaffold.allIncidentEdges();
 
     foreach (contigNode; scaffold.nodes)
@@ -361,8 +374,8 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
                 logJsonDiagnostic(
                     "info", "removing bad gap pile ups",
                     "sourceContigNode", contigNode.toJson,
-                    "correctGapJoin", correctGapJoin.toJson,
-                    "removedGapJoins", incidentGapJoins.toJson,
+                    "correctGapJoin", joinToJson(correctGapJoin),
+                    "removedGapJoins", joinToJson(incidentGapJoins),
                 );
             }
             else
@@ -370,7 +383,7 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
                 logJsonDiagnostic(
                     "info", "skipping ambiguous gap pile ups",
                     "sourceContigNode", contigNode.toJson,
-                    "removedGapJoins", incidentGapJoins.toJson,
+                    "removedGapJoins", joinToJson(incidentGapJoins),
                 );
             }
 
