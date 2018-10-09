@@ -307,7 +307,7 @@ class PileUpProcessor
             .map!(args => {
                 auto contigEdge = getDefaultJoin!InsertionInfo(args[0].contigId);
                 contigEdge.payload.spliceSites = [
-                    SpliceSite(args[0], args[1].seed, AlignmentChain.emptyFlags),
+                    SpliceSite(args[0], args[1].seed, args[1].flags),
                 ];
 
                 return contigEdge;

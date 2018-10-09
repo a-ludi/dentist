@@ -73,7 +73,8 @@ import std.algorithm :
     joiner,
     map,
     maxElement,
-    swap;
+    swap,
+    swapAt;
 import std.array : array;
 import std.conv : to;
 import std.format : format;
@@ -449,7 +450,7 @@ OutputScaffold fixCropping(
 
     foreach (contigJoin; contigJoins)
     {
-        auto insertionUpdated1 = removeDegradingCropping(contigJoin, incidentEdgesCache);
+        auto insertionUpdated1 = transferCroppingFromIncidentJoins(contigJoin, incidentEdgesCache);
         auto insertionUpdated2 = resolveCroppingConflicts(scaffold, contigJoin, incidentEdgesCache,
                                                          tracePointDistance);
 
@@ -475,37 +476,40 @@ OutputScaffold fixCropping(
     return scaffold;
 }
 
-Flag!"insertionUpdated" removeDegradingCropping(
+Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
     ref Insertion contigJoin,
     OutputScaffold.IncidentEdgesCache incidentEdgesCache,
 )
 {
-    typeof(return) insertionUpdated;
-
-    foreach (contigNode; [contigJoin.start, contigJoin.end])
+    SpliceSite spliceSiteFromIncidentJoins(ContigNode contigNode)
     {
-        auto shouldInsertNewSequence = incidentEdgesCache[contigNode]
-            .canFind!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension));
+        alias isSomeInsertion = insertion =>
+            !insertion.isOutputGap && (insertion.isGap || insertion.isExtension);
 
-        if (!shouldInsertNewSequence)
-        {
-            auto contigLength = contigJoin.payload.contigLength;
-            auto newSpliceSites = contigJoin
-                .payload
-                .spliceSites
-                .filter!(spliceSite =>
-                    (contigNode.contigPart == ContigPart.begin) ^
-                    (spliceSite.alignmentSeed == AlignmentLocationSeed.front))
-                .array;
-            if (newSpliceSites.length < contigJoin.payload.spliceSites.length)
-            {
-                contigJoin.payload.spliceSites = newSpliceSites;
-                insertionUpdated = Yes.insertionUpdated;
-            }
-        }
+        auto incidentJoins = incidentEdgesCache[contigNode].filter!isSomeInsertion;
+
+        if (incidentJoins.empty)
+            return SpliceSite();
+
+        assert(incidentJoins.walkLength(2) == 1, "non-linearized scaffold");
+        auto spliceSitesForContigNode = incidentJoins
+            .front
+            .payload
+            .spliceSites
+            .filter!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId);
+        assert(!spliceSitesForContigNode.empty, "missing splice site");
+        assert(spliceSitesForContigNode.walkLength(2) <= 1, "too many splice sites");
+
+        return spliceSitesForContigNode.front;
     }
 
-    return insertionUpdated;
+    auto bufferRest = only(contigJoin.start, contigJoin.end)
+        .map!spliceSiteFromIncidentJoins
+        .filter!(spliceSite => spliceSite != SpliceSite.init)
+        .copy(contigJoin.payload.spliceSites);
+    contigJoin.payload.spliceSites.length -= bufferRest.length;
+
+    return cast(typeof(return)) (bufferRest.length > 0);
 }
 
 Flag!"insertionUpdated" resolveCroppingConflicts(
@@ -520,148 +524,35 @@ Flag!"insertionUpdated" resolveCroppingConflicts(
     if (spliceSites.length <= 1)
         return No.insertionUpdated;
 
-    auto frontResult = resolveCroppingConflictsAt!(AlignmentLocationSeed.front)(
-        scaffold,
-        contigJoin,
-        incidentEdgesCache,
-        tracePointDistance,
-    );
-    auto backResult = resolveCroppingConflictsAt!(AlignmentLocationSeed.back)(
-        scaffold,
-        contigJoin,
-        incidentEdgesCache,
-        tracePointDistance,
-    );
+    alias croppingRefPos = (spliceSite) => spliceSite.croppingRefPosition.value;
+    if (croppingRefPos(spliceSites[0]) <= croppingRefPos(spliceSites[1]))
+        return No.insertionUpdated;
 
-    if (
-        backResult.spliceSite.croppingRefPosition.value
-        <
-        frontResult.spliceSite.croppingRefPosition.value
-    )
-        resolveOverlappingCropping(
-            scaffold,
-            contigJoin,
-            frontResult,
-            backResult,
-            incidentEdgesCache,
-            tracePointDistance,
-        );
+    resolveOverlappingCropping(scaffold, contigJoin, incidentEdgesCache, tracePointDistance);
 
-    auto newSpliceSites = only(frontResult, backResult)
-        .map!"a.spliceSite"
-        .filter!"a.croppingRefPosition.contigId > 0"
-        .array;
-    auto insertionUpdated = only(frontResult, backResult)
-        .map!"a.insertionUpdated"
-        .fold!"a | b";
-
-    if (insertionUpdated)
-        contigJoin.payload.spliceSites = newSpliceSites;
-
-    return insertionUpdated;
+    return Yes.insertionUpdated;
 }
 
-auto resolveCroppingConflictsAt(AlignmentLocationSeed seed)(
+private void resolveOverlappingCropping(
     ref OutputScaffold scaffold,
     ref Insertion contigJoin,
     OutputScaffold.IncidentEdgesCache incidentEdgesCache,
     trace_point_t tracePointDistance,
 )
 {
-    alias Result = Tuple!(
-        Flag!"insertionUpdated", "insertionUpdated",
-        SpliceSite, "spliceSite",
-    );
+    assert(contigJoin.payload.spliceSites.length == 2);
 
-    auto seedSpliceSites = contigJoin
-        .payload
-        .spliceSites
-        .filter!(spliceSite => spliceSite.alignmentSeed == seed);
-    auto numSeedSpliceSites = seedSpliceSites.walkLength(2);
+    auto spliceSites = contigJoin.payload.spliceSites;
+    // Crop overlapping insertions to the center of the overlap
+    alias croppingRefPos = (spliceSite) => spliceSite.croppingRefPosition.value;
+    auto newCroppingPos = floor(mean(spliceSites.map!croppingRefPos), tracePointDistance);
 
-    if (numSeedSpliceSites == 0)
-        return Result(No.insertionUpdated, SpliceSite());
-    else if (numSeedSpliceSites == 1)
-        return Result(No.insertionUpdated, seedSpliceSites.front);
-
-    auto commonCroppingPostition = seedSpliceSites
-        .map!"a.croppingRefPosition.value"
-        .mean;
-
-    static if (seed == AlignmentLocationSeed.front)
-        commonCroppingPostition = floor(commonCroppingPostition, tracePointDistance);
-    else
-        commonCroppingPostition = ceil(commonCroppingPostition, tracePointDistance);
-
-    Flag!"insertionUpdated" insertionUpdated;
-
-    foreach (ref spliceSite; seedSpliceSites)
+    void resolveOverlappingCroppingFor(ref SpliceSite spliceSite)
     {
-        auto croppingDiff = absdiff(
-            commonCroppingPostition,
-            spliceSite.croppingRefPosition.value,
-        );
-
-        if (croppingDiff > 0)
-        {
-            alias replace = OutputScaffold.ConflictStrategy.replace;
-
-            auto contigNode = seed == AlignmentLocationSeed.front
-                ? contigJoin.start
-                : contigJoin.end;
-            auto incidentInsertion = incidentEdgesCache[contigNode]
-                .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
-                .front;
-            auto insertionSpliceSite = incidentInsertion
-                .payload
-                .spliceSites
-                .find!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId)
-                .front;
-            auto shouldCropBack = (seed == AlignmentLocationSeed.front) ^
-                                  (insertionSpliceSite.flags.complement);
-
-            incidentInsertion.payload.sequence = shouldCropBack
-                ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
-                : incidentInsertion.payload.sequence[croppingDiff .. $];
-
-            scaffold.add!replace(incidentInsertion);
-            insertionUpdated |= Yes.insertionUpdated;
-        }
-    }
-
-    return Result(
-        insertionUpdated,
-        SpliceSite(
-            ReferencePoint(
-                seedSpliceSites.front.croppingRefPosition.contigId,
-                commonCroppingPostition,
-            ),
-            seed,
-            seedSpliceSites.front.flags,
-        ),
-    );
-}
-
-void resolveOverlappingCropping(Result)(
-    ref OutputScaffold scaffold,
-    ref Insertion contigJoin,
-    ref Result frontResult,
-    ref Result backResult,
-    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
-    trace_point_t tracePointDistance,
-)
-{
-    auto frontCroppingPos = frontResult.spliceSite.croppingRefPosition.value;
-    auto backCroppingPos = backResult.spliceSite.croppingRefPosition.value;
-    assert(backCroppingPos < frontCroppingPos);
-    auto newCroppingPos = floor((frontCroppingPos + backCroppingPos) / 2, tracePointDistance);
-
-    void resolveOverlappingCroppingFor(ref Result result)
-    {
-        auto alignmentSeed = result.spliceSite.alignmentSeed;
+        auto alignmentSeed = spliceSite.alignmentSeed;
         auto croppingDiff = absdiff(
             newCroppingPos,
-            result.spliceSite.croppingRefPosition.value,
+            spliceSite.croppingRefPosition.value,
         );
 
         if (croppingDiff > 0)
@@ -678,32 +569,30 @@ void resolveOverlappingCropping(Result)(
                 .payload
                 .spliceSites
                 .countUntil!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId);
-            auto insertionSpliceSite = incidentInsertion
+            auto insertionSpliceSite = &incidentInsertion
                 .payload
                 .spliceSites[insertionSpliceSiteIdx];
             auto shouldCropBack = (alignmentSeed == AlignmentLocationSeed.front) ^
                                   (insertionSpliceSite.flags.complement);
 
+            // Crop insertion to new cropping position
             incidentInsertion.payload.sequence = shouldCropBack
                 ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
                 : incidentInsertion.payload.sequence[croppingDiff .. $];
-            incidentInsertion
-                .payload
-                .spliceSites[insertionSpliceSiteIdx]
-                .croppingRefPosition
-                .value = newCroppingPos;
+            insertionSpliceSite.croppingRefPosition.value = newCroppingPos;
 
+            // Store updated insertion in scaffold and update the cache
             scaffold.add!replace(incidentInsertion);
             incidentEdgesCache[incidentInsertion.start]
                 .replaceInPlace(incidentInsertion, incidentInsertion);
             incidentEdgesCache[incidentInsertion.end]
                 .replaceInPlace(incidentInsertion, incidentInsertion);
 
-            result.spliceSite.croppingRefPosition.value = newCroppingPos;
-            result.insertionUpdated |= Yes.insertionUpdated;
+            // Update splice site of contigJoin
+            spliceSite.croppingRefPosition.value = newCroppingPos;
         }
     }
 
-    resolveOverlappingCroppingFor(frontResult);
-    resolveOverlappingCroppingFor(backResult);
+    foreach (ref spliceSite; spliceSites)
+        resolveOverlappingCroppingFor(spliceSite);
 }
