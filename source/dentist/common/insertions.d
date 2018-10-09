@@ -30,18 +30,20 @@ import std.array : array;
 import std.typecons : Flag, tuple, Tuple;
 
 /// Information about the point where the two sequences should be spliced.
-alias SpliceSite = Tuple!(
-    ReferencePoint, "croppingRefPosition",
-    AlignmentLocationSeed, "alignmentSeed",
-    AlignmentChain.Flags, "flags",
-);
+struct SpliceSite
+{
+    ReferencePoint croppingRefPosition;
+    AlignmentLocationSeed alignmentSeed;
+    AlignmentChain.Flags flags;
+}
 
 /// This characterizes an insertion.
-alias InsertionInfo = Tuple!(
-    CompressedSequence, "sequence",
-    size_t, "contigLength",
-    SpliceSite[], "spliceSites",
-);
+struct InsertionInfo
+{
+    CompressedSequence sequence;
+    size_t contigLength;
+    SpliceSite[] spliceSites;
+}
 
 /// This is used to collect all sub-sequences of the output.
 alias OutputScaffold = Scaffold!InsertionInfo;
