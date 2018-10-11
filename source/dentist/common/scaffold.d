@@ -8,6 +8,7 @@
 */
 module dentist.common.scaffold;
 
+import dentist.common.alignments : getType;
 import dentist.util.log;
 import dentist.util.math :
     add,
@@ -340,12 +341,12 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
     alias joinToJson = (join) => shouldLog(LogLevel.debug_)
         ? join.toJson
         : [
-            "start": join.start,
-            "end": join.end,
+            "start": join.start.toJson,
+            "end": join.end.toJson,
             "payload": [
-                "type": pileUp.getType.to!string.toJson,
+                "type": join.payload.getType.to!string.toJson,
                 "readAlignments": shouldLog(LogLevel.debug_)
-                    ? pileUp.map!"a[]".array.toJson
+                    ? join.payload.map!"a[]".array.toJson
                     : toJson(null),
             ].toJson,
         ].toJson;
@@ -375,7 +376,7 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
                     "info", "removing bad gap pile ups",
                     "sourceContigNode", contigNode.toJson,
                     "correctGapJoin", joinToJson(correctGapJoin),
-                    "removedGapJoins", joinToJson(incidentGapJoins),
+                    "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
                 );
             }
             else
@@ -383,7 +384,7 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
                 logJsonDiagnostic(
                     "info", "skipping ambiguous gap pile ups",
                     "sourceContigNode", contigNode.toJson,
-                    "removedGapJoins", joinToJson(incidentGapJoins),
+                    "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
                 );
             }
 
