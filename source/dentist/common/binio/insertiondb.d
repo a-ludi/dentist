@@ -165,6 +165,9 @@ struct InsertionDb
     {
         assert(from <= to && to <= length);
 
+        if (from == to)
+            return [];
+
         // Step 1: determine memory requirements and DB slices
         slices = getSlices(from, to);
 

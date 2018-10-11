@@ -117,14 +117,14 @@ T readRecords(T)(File dbFile, T records) if (isArray!T)
 
         enforce!BinaryIOException(
             records.length == expectedLength,
-            format!"malformed pile up DB `%s`: premature end of file"(
+            format!"malformed DB `%s`: premature end of file"(
                     dbFile.name)
         );
     }
     catch (ErrnoException e)
     {
         throw new BinaryIOException(
-            format!"malformed pile up DB `%s`: cannot read record of type %s: %s"(
+            format!"malformed DB `%s`: cannot read record of type %s: %s"(
                     dbFile.name, T.stringof, e.msg),
         );
     }
