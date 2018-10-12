@@ -129,7 +129,7 @@ struct PileUpDb
         auto to = slice[1];
         ensureDbIndex();
         enforce!PileUpDbException(
-            to <= length,
+            from <= to && to <= length,
             format!"cannot read blocks %d-%d in `%s`: out of bounds [0, %d]"(
                     from, to, pileUpDb.name, length)
         );
@@ -140,7 +140,7 @@ struct PileUpDb
     size_t[2] opSlice(size_t dim)(size_t from, size_t to)
             if (dim == 0)
     {
-        assert(from < to, "invalid slice");
+        assert(from <= to, "invalid slice");
 
         return [from, to];
     }
@@ -165,6 +165,9 @@ struct PileUpDb
     private PileUp[] readSlice(size_t from, size_t to)
     {
         assert(from <= to && to <= length);
+
+        if (from == to)
+            return [];
 
         // Step 1: determine memory requirements and DB slices
         dbSlices = getDbSlices(from, to);
