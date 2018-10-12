@@ -8,10 +8,11 @@
 */
 module dentist.commands.collectPileUps.filter;
 
-import dentist.common : ReferenceRegion, to;
+import dentist.common : isTesting, ReferenceRegion, to;
 import dentist.common.alignments :
     AlignmentChain,
     haveEqualIds;
+import dentist.util.log;
 import dentist.util.math : NaturalNumberSet;
 import std.algorithm :
     all,
@@ -22,10 +23,15 @@ import std.algorithm :
     sort,
     uniq;
 import std.array : array;
+import std.math : round;
+import std.random : randomSample;
 import std.range :
     InputRange,
     inputRangeObject,
+    iota,
+    retro,
     walkLength;
+import vibe.data.json : Json, toJson = serializeToJson;
 
 interface AlignmentChainFilter
 {
@@ -43,16 +49,7 @@ abstract class ReadFilter : AlignmentChainFilter
 
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
-        NaturalNumberSet discardedReadIds;
-        discardedReadIds.reserveFor(unusedReads.capacity);
-
-        foreach (discardedAlignment; getDiscardedReadIds(alignmentChains))
-        {
-            auto discardedReadId = discardedAlignment.contigB.id;
-
-            discardedReadIds.add(discardedReadId);
-            unusedReads.remove(discardedReadId);
-        }
+        auto discardedReadIds = getDiscardedReadIds(alignmentChains);
 
         foreach (ref alignmentChain; alignmentChains)
         {
@@ -63,7 +60,70 @@ abstract class ReadFilter : AlignmentChainFilter
         return alignmentChains;
     }
 
-    InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains);
+    abstract InputRange!(AlignmentChain) getAlignmentsOfDiscardedReads(AlignmentChain[] alignmentChains);
+
+    NaturalNumberSet getDiscardedReadIds(AlignmentChain[] alignmentChains)
+    {
+        NaturalNumberSet discardedReadIds;
+        discardedReadIds.reserveFor(unusedReads.capacity);
+
+        foreach (discardedAlignment; getAlignmentsOfDiscardedReads(alignmentChains))
+        {
+            auto discardedReadId = discardedAlignment.contigB.id;
+
+            discardedReadIds.add(discardedReadId);
+            unusedReads.remove(discardedReadId);
+        }
+
+        return discardedReadIds;
+    }
+}
+
+static if (isTesting)
+{
+    /// Sub-sample reads by pseudo-randomly discarding reads.
+    class SubSampleFilter : ReadFilter
+    {
+        double subSampleRate;
+        size_t numReads;
+
+        this(NaturalNumberSet* unusedReads, double subSampleRate, size_t numReads)
+        {
+            super(unusedReads);
+
+            this.subSampleRate = subSampleRate;
+            this.numReads = numReads;
+        }
+
+        override InputRange!(AlignmentChain) getAlignmentsOfDiscardedReads(AlignmentChain[] alignmentChains)
+        {
+            assert(0, "do not use");
+        }
+
+        override NaturalNumberSet getDiscardedReadIds(AlignmentChain[] alignmentChains)
+        {
+            auto numDiscardReads = numReads - round(subSampleRate * numReads).to!size_t;
+            auto discardedReadIds = NaturalNumberSet();
+
+            if (subSampleRate >= 1.0)
+                return discardedReadIds;
+
+            // NOTE: we use `retro` to start with the largest element thus
+            //       resizing the size of the number set only once.
+            foreach (discardedReadId; iota(numReads).retro.randomSample(numDiscardReads))
+                discardedReadIds.add(discardedReadId);
+
+            logJsonDiagnostic(
+                "info", "sub-sampling reads",
+                "numDiscardReads", numDiscardReads,
+                "discardedReadIds", shouldLog(LogLevel.debug_)
+                    ? discardedReadIds.elements.array.toJson
+                    : Json(null),
+            );
+
+            return discardedReadIds;
+        }
+    }
 }
 
 /// Discard improper alignments.
@@ -90,7 +150,7 @@ class RedundantAlignmentChainsFilter : ReadFilter
         super(unusedReads);
     }
 
-    override InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains)
+    override InputRange!(AlignmentChain) getAlignmentsOfDiscardedReads(AlignmentChain[] alignmentChains)
     {
         assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
 
@@ -134,7 +194,7 @@ class AmbiguousAlignmentChainsFilter : ReadFilter
         super(unusedReads);
     }
 
-    override InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains)
+    override InputRange!(AlignmentChain) getAlignmentsOfDiscardedReads(AlignmentChain[] alignmentChains)
     {
         assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
 

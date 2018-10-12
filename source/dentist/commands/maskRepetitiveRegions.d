@@ -10,6 +10,7 @@ module dentist.commands.maskRepetitiveRegions;
 
 import dentist.commandline : DentistCommand, OptionsFor;
 import dentist.common :
+    isTesting,
     ReferenceInterval,
     ReferenceRegion;
 import dentist.common.alignments :
@@ -18,9 +19,12 @@ import dentist.common.alignments :
     id_t;
 import dentist.dazzler :
     getAlignments,
+    getNumContigs,
     writeMask;
 import dentist.util.log;
+import dentist.util.math : NaturalNumberSet;
 import std.algorithm :
+    isSorted,
     joiner,
     map,
     sort,
@@ -65,6 +69,8 @@ class RepeatMaskAssessor
         mixin(traceExecution);
 
         readInputs();
+        static if (isTesting)
+            subSampleReads();
         assessRepeatStructure();
         writeRepeatMask();
     }
@@ -89,6 +95,20 @@ class RepeatMaskAssessor
             logJsonWarn("info", "empty self-alignment");
         if (readsAlignment.length == 0)
             logJsonWarn("info", "empty ref vs. reads alignment");
+    }
+
+    static if (isTesting)
+    {
+        void subSampleReads()
+        {
+            import dentist.commands.collectPileUps.filter : SubSampleFilter;
+
+            auto numReads = getNumContigs(options.readsDb, options.workdir);
+            auto dummy = NaturalNumberSet(numReads);
+            auto subSample = new SubSampleFilter(&dummy, options.subSampleRate, numReads);
+            readsAlignment = subSample(readsAlignment);
+            assert(isSorted(readsAlignment));
+        }
     }
 
     void assessRepeatStructure()

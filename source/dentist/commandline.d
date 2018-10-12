@@ -82,6 +82,9 @@ import std.typecons : BitFlags;
 import transforms : camelCase, snakeCaseCT;
 import vibe.data.json : serializeToJsonString;
 
+static if (isTesting)
+    import std.random : rndGen, unpredictableSeed;
+
 
 /// Possible returns codes of the command line execution.
 enum ReturnCode
@@ -1038,6 +1041,38 @@ struct OptionsFor(DentistCommand command)
             "reference error rate must be in (0, 1)"
         ))
         double referenceErrorRate = .01;
+    }
+
+    static if (isTesting && command.among(
+        DentistCommand.maskRepetitiveRegions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("seed", "r")
+        @Help("use <uint> as a seed for randomized behaviour")
+        uint seed;
+
+        @PostValidate(Priority.medium)
+        void hookSeedRndGen()
+        {
+            if (seed == 0)
+                seed = unpredictableSeed;
+            rndGen.seed(seed);
+        }
+    }
+
+    static if (isTesting && command.among(
+        DentistCommand.maskRepetitiveRegions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("sub-sample", "S")
+        @Help("randomly sub-sample the set of reads used to build pile ups (see also --seed)")
+        @Validate!(value => enforce!CLIException(
+            0.0 < value && value <= 1.0,
+            "sub-sample rate must be in (0, 1)"
+        ))
+        double subSampleRate = 1.0;
     }
 
     static if (command.among(
