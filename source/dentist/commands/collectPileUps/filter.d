@@ -31,6 +31,7 @@ import std.range :
     iota,
     retro,
     walkLength;
+import std.typecons : Yes;
 import vibe.data.json : Json, toJson = serializeToJson;
 
 interface AlignmentChainFilter
@@ -103,23 +104,33 @@ static if (isTesting)
         override NaturalNumberSet getDiscardedReadIds(AlignmentChain[] alignmentChains)
         {
             auto numDiscardReads = numReads - round(subSampleRate * numReads).to!size_t;
-            auto discardedReadIds = NaturalNumberSet();
+            auto discardedReadIds = NaturalNumberSet(numReads);
 
             if (subSampleRate >= 1.0)
                 return discardedReadIds;
 
-            // NOTE: we use `retro` to start with the largest element thus
-            //       resizing the size of the number set only once.
-            foreach (discardedReadId; iota(numReads).retro.randomSample(numDiscardReads))
+            foreach (discardedReadId; iota(numReads).randomSample(numDiscardReads))
                 discardedReadIds.add(discardedReadId);
 
-            logJsonDiagnostic(
-                "info", "sub-sampling reads",
-                "numDiscardReads", numDiscardReads,
-                "discardedReadIds", shouldLog(LogLevel.debug_)
-                    ? discardedReadIds.elements.array.toJson
-                    : Json(null),
-            );
+            if (shouldLog(LogLevel.diagnostic))
+            {
+                NaturalNumberSet keptReadIds;
+                if (shouldLog(LogLevel.debug_))
+                {
+                    keptReadIds = NaturalNumberSet(numReads, Yes.addAll);
+
+                    foreach (discardedReadId; discardedReadIds.elements)
+                        keptReadIds.remove(discardedReadId);
+                }
+
+                logJsonDiagnostic(
+                    "info", "sub-sampling reads",
+                    "numKeptReads", numReads - numDiscardReads,
+                    "keptReadIds", shouldLog(LogLevel.debug_)
+                        ? keptReadIds.elements.array.toJson
+                        : Json(null),
+                );
+            }
 
             return discardedReadIds;
         }
