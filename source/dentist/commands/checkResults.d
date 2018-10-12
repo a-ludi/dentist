@@ -603,6 +603,9 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
+        if (reconstructedGaps.length == 0)
+            return ReferenceInterval(0, 0, 0);
+
         return zip(referenceGaps.intervals, reconstructedGaps)
             .filter!(pair => isGapClosed(pair))
             .map!"a[0]"
