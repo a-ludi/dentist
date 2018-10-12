@@ -16,7 +16,6 @@ import dentist.commands.collectPileUps.filter :
     WeaklyAnchoredAlignmentChainsFilter;
 import dentist.common :
     DentistException,
-    isTesting,
     ReferenceInterval,
     ReferenceRegion;
 import dentist.common.alignments :
@@ -120,15 +119,6 @@ class PileUpCollector
     protected void filterAlignments()
     {
         mixin(traceExecution);
-
-        static if (isTesting)
-        {
-            import dentist.commands.collectPileUps.filter : SubSampleFilter;
-
-            auto subSample = new SubSampleFilter(&unusedReads, options.subSampleRate, numReads);
-            readsAlignment = subSample(readsAlignment);
-            assert(isSorted(readsAlignment));
-        }
 
         auto filters = tuple(
             new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
