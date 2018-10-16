@@ -2585,7 +2585,7 @@ void writeMask(Region)(
     maskRegions.sort();
 
     auto numReads = getNumContigs(dbFile, workdir).to!MaskHeaderEntry;
-    MaskHeaderEntry size = 0; // this seems to be zero always (see DAMASKER/TANmask.c:422)
+    MaskHeaderEntry size = 0; // Mark the DAZZ_TRACK as a mask (see DAZZ_DB/DB.c:1183)
     MaskHeaderEntry currentContig = 1;
     MaskDataPointer dataPointer = 0;
 
