@@ -394,17 +394,25 @@ private struct ResultAnalyzer
                 auto alignmentEnd = overlappingAlignment.last.contigA.end;
                 if (interval.end <= alignmentBegin || alignmentEnd <= interval.begin)
                     continue; // Ignore non-overlaps
-                auto exactAlignment = getOverlapAlignment(overlappingAlignment);
-                auto overlappingExactAlignment = exactAlignment.partial(
-                    interval.begin > alignmentBegin
-                        ? interval.begin - alignmentBegin
-                        : 0,
-                    interval.end < alignmentEnd
-                        ? interval.end - alignmentBegin
-                        : alignmentEnd - alignmentBegin,
-                );
+                auto overlapBegin = interval.begin > alignmentBegin
+                    ? interval.begin - alignmentBegin
+                    : 0;
+                auto overlapEnd = interval.end < alignmentEnd
+                    ? interval.end - alignmentBegin
+                    : alignmentEnd - alignmentBegin;
 
-                numDiffs += overlappingExactAlignment.score;
+                if (overlappingAlignment.flags.complement)
+                {
+                    // Inversions are not allowed
+                    numDiffs += overlapEnd - overlapBegin;
+                }
+                else
+                {
+                    auto exactAlignment = getOverlapAlignment(overlappingAlignment);
+                    auto overlappingExactAlignment = exactAlignment.partial(overlapBegin, overlapEnd);
+
+                    numDiffs += overlappingExactAlignment.score;
+                }
             }
 
             foreach (i, identityLevel; identityLevels)
