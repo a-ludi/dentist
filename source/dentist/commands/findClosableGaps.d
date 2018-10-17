@@ -103,7 +103,7 @@ struct ClosableGapsFinder
                 contigPart.length,
             ));
             auto scaffoldGaps = scaffoldRegion - mappedRegionsMask;
-            auto firstContigId = this.closableGaps.length;
+            auto firstContigId = this.closableGaps.length + 1;
             this.closableGaps.length += scaffoldGaps.intervals.length;
             auto closableGaps = this.closableGaps[$ - scaffoldGaps.intervals.length .. $];
 
