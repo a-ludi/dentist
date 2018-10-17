@@ -323,6 +323,7 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
         auto changeEvents = coverageChanges(alignments);
         auto lastEvent = changeEvents.front;
 
+        debug logJsonDebug("changeEvents", changeEvents.array.toJson);
         foreach (event; changeEvents)
         {
             auto currentZone = coverageZone(event.currentCoverage);
