@@ -92,6 +92,11 @@ struct AlignmentChain
         {
             coord_t begin;
             coord_t end;
+
+            @property coord_t length() const pure nothrow
+            {
+                return end - begin;
+            }
         }
 
         static struct TracePoint

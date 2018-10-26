@@ -1367,6 +1367,28 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
 
             foreach (i, localAlignment; coveringLocalAlignments.enumerate)
             {
+                // NOTE: damapper may produce false/bad chains that include a
+                //       complete stack of local alignments that have nearly
+                //       100% overlap. In most cases they decrease performance
+                //       drastically and in some cases they can even cause
+                //       errors in this procedure. So let's ignore them at
+                //       this point.
+                if (
+                    // LA is completely contained in previous alignments
+                    localAlignment.contigA.end < aSeqPos ||
+                    (
+                        // LA is not the last one; we need that to get the
+                        // furthest alignment possible
+                        i < coveringLocalAlignments.length - 1 &&
+                        // < 50% of the LA add to the padded alignment
+                        (localAlignment.contigA.end - aSeqPos) /
+                        localAlignment.contigA.length < 0.5 &&
+                        // < 100 bps of the LA add to the padded alignment
+                        localAlignment.contigA.end - aSeqPos < 100
+                    )
+                )
+                    continue; // ignore this localAlignment
+
                 if (i > 0)
                 {
                     if (
