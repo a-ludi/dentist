@@ -49,6 +49,7 @@ import dentist.swinfo :
     version_;
 import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
+import dentist.util.math : ceildiv;
 import dentist.util.tempfile : mkdtemp;
 import std.algorithm :
     among,
@@ -674,6 +675,47 @@ struct OptionsFor(DentistCommand command)
     mixin HelpOption;
 
     static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("acceptable-coverage-reads")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            this is used to derive a repeat mask from the ref vs. reads alignment;
+            if the alignment coverage is out of the interval [<from>, <to>]
+            it will be considered repetitive (default: floor(0.1*C)..ceil(1.9*C), see --read-coverage)
+        }")
+        @Validate!(validateCoverageBounds!(typeof(coverageBoundsReads), "acceptable-coverage-reads"))
+        string acceptableCoverageReadsString;
+
+        @Option()
+        id_t[2] coverageBoundsReads;
+
+        @PostValidate(Priority.medium)
+        void setCoverageBoundsReads()
+        {
+            enforce!CLIException(
+                acceptableCoverageReadsString != acceptableCoverageReadsString.init ||
+                readCoverage != readCoverage.init,
+                "must provide either --read-coverage or --acceptable-coverage-reads",
+            );
+            enforce!CLIException(
+                (acceptableCoverageReadsString != acceptableCoverageReadsString.init) ^
+                (readCoverage != readCoverage.init),
+                "must not provide both --read-coverage and --acceptable-coverage-reads",
+            );
+
+            if (acceptableCoverageReadsString != acceptableCoverageReadsString.init)
+                parseRange!coverageBoundsReads(acceptableCoverageReadsString);
+            if (readCoverage != readCoverage.init)
+                coverageBoundsReads = [
+                    readCoverage / 10,
+                    ceildiv(19 * readCoverage, 10),
+                ];
+        }
+    }
+
+    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -752,48 +794,6 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("coverage-reads", "C")
-        @MetaVar("<from>..<to>")
-        @Help(q"{
-            this is used to derive a repeat mask from the ref vs. reads alignment;
-            if the alignment coverage is out of the interval [<from>, <to>]
-            it will be considered repetitive
-        }")
-        void parseCoverageBoundsReads(string rangeString) pure
-        {
-            parseRange!coverageBoundsReads(rangeString);
-        }
-
-        @Option()
-        @Validate!(validateCoverageBounds!"reads")
-        id_t[2] coverageBoundsReads;
-    }
-
-    static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("coverage-self", "c")
-        @MetaVar("<from>..<to>")
-        @Help(q"{
-            this is used to derive a repeat mask from the self alignment;
-            if the alignment coverage is out of the interval [<from>, <to>]
-            it will be considered repetitive
-        }")
-        void parseCoverageBoundsSelf(string rangeString) pure
-        {
-            parseRange!coverageBoundsSelf(rangeString);
-        }
-
-        @Option()
-        @Validate!(validateCoverageBounds!"self")
-        id_t[2] coverageBoundsSelf;
-    }
-
-    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -815,9 +815,9 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.output,
     ))
     {
-        @Option("debug-graph")
+        @Option("debug-scaffold")
         @MetaVar("<file>")
-        @Help("write the assembly graph to <file>; use `show-insertions` to inspect the result")
+        @Help("write the assembly scaffold to <file>; use `show-insertions` to inspect the result")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string assemblyGraphFile;
     }
@@ -948,6 +948,30 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("max-coverage-self")
+        @MetaVar("<uint>")
+        @Help(format!q"{
+            this is used to derive a repeat mask from the self alignment;
+            if the alignment coverage larger than <uint> it will be
+            considered repetitive (default: %d)
+        }"(defaultValue!maxCoverageSelf))
+        @Validate!(validatePositive!("max-coverage-self", id_t))
+        id_t maxCoverageSelf = 4;
+
+        @Option()
+        id_t[2] coverageBoundsSelf;
+
+        @PostValidate(Priority.medium)
+        void setCoverageBoundsSelf()
+        {
+            coverageBoundsSelf = [0, maxCoverageSelf];
+        }
+    }
+
+    static if (command.among(
         TestingCommand.findClosableGaps,
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
@@ -1009,6 +1033,17 @@ struct OptionsFor(DentistCommand command)
             require at least <uint> spanning reads to close a gap (default: %d)
         }")
         size_t minSpanningReads = 3;
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("read-coverage", "C")
+        @Help(q"{
+            this is used to provide good default values for --acceptable-coverage-reads
+        }")
+        id_t readCoverage;
     }
 
     static if (command.among(
@@ -1182,6 +1217,7 @@ struct OptionsFor(DentistCommand command)
         {
             return [
                 DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
                 DamapperOptions.bestMatches ~ ".7",
                 format!(DamapperOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate) * (1 - readsErrorRate)),
             ];
@@ -1621,16 +1657,40 @@ private
         }
     }
 
-    void validateCoverageBounds(string what)(id_t[2] coverageBounds)
+    DestType parseRange(DestType, string msg = "ill-formatted range")(in string rangeString) pure
+            if (isStaticArray!DestType && DestType.init.length == 2)
     {
+        try
+        {
+            DestType dest;
+
+            rangeString[].formattedRead!"%d..%d"(dest[0], dest[1]);
+
+            return dest;
+        }
+        catch (Exception e)
+        {
+            throw new CLIException(msg);
+        }
+    }
+
+    void validatePositive(string option, V)(V value)
+    {
+        enforce!CLIException(
+            0 < value,
+            option ~ " must be greater than zero",
+        );
+    }
+
+    void validateCoverageBounds(DestType, string option)(in string coverageBoundsString)
+    {
+        auto coverageBounds = parseRange!DestType(coverageBoundsString);
         auto from = coverageBounds[0];
         auto to = coverageBounds[1];
 
         enforce!CLIException(
-            0 <= from && from < to,
-            coverageBounds == coverageBounds.init
-                ? "missing --coverage-" ~ what
-                : "invalid coverage bounds (" ~ what ~ "); check that 0 <= <from> < <to>"
+            coverageBounds == coverageBounds.init || 0 <= from && from < to,
+            "invalid coverage bounds (--" ~ option ~ "); check that 0 <= <from> < <to>"
         );
     }
 
