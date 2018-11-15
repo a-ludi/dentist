@@ -503,13 +503,12 @@ Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
         return spliceSitesForContigNode.front;
     }
 
-    auto bufferRest = only(contigJoin.start, contigJoin.end)
+    contigJoin.payload.spliceSites = only(contigJoin.start, contigJoin.end)
         .map!spliceSiteFromIncidentJoins
         .filter!(spliceSite => spliceSite != SpliceSite.init)
-        .copy(contigJoin.payload.spliceSites);
-    contigJoin.payload.spliceSites.length -= bufferRest.length;
+        .array;
 
-    return cast(typeof(return)) (bufferRest.length > 0);
+    return cast(typeof(return)) (contigJoin.payload.spliceSites.length > 0);
 }
 
 Flag!"insertionUpdated" resolveCroppingConflicts(

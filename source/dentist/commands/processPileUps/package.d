@@ -70,8 +70,6 @@ void execute(Options)(in Options options)
 /// This class comprises the `processPileUps` step of the `dentist` algorithm
 class PileUpProcessor
 {
-    static enum maxInsertionsPerPileup = 3;
-
     protected const Options options;
     protected PileUp[] pileUps;
     ReferenceRegion repeatMask;
@@ -80,7 +78,7 @@ class PileUpProcessor
     this(in ref Options options)
     {
         this.options = options;
-        this.insertions.length = maxInsertionsPerPileup * options.pileUpBatchSize;
+        this.insertions.length = options.pileUpBatchSize;
     }
 
     void run()
@@ -94,11 +92,8 @@ class PileUpProcessor
         {
             fetchTracePoints(pileUp);
 
-            auto baseIdx = maxInsertionsPerPileup * i;
-            processPileUp(pileUp, insertions[baseIdx .. baseIdx + maxInsertionsPerPileup]);
+            processPileUp(pileUp, &insertions[i]);
         }
-
-        import std.datetime.stopwatch;
 
         insertions.sort();
         dropEmptyInsertions();
@@ -167,7 +162,7 @@ class PileUpProcessor
         return pileUp;
     }
 
-    protected void processPileUp(PileUp pileUp, Insertion[] insertionsBuffer) const
+    protected void processPileUp(PileUp pileUp, Insertion* resultInsertion) const
     {
         mixin(traceExecution);
 
@@ -205,13 +200,11 @@ class PileUpProcessor
             }
 
             auto compressedSequence = CompressedSequence.from(insertSequence);
-            insertionsBuffer[0] = makeInsertions(
+            *resultInsertion = makeInsertions(
                 referenceRead,
                 compressedSequence,
                 croppingResult.referencePositions,
             );
-            insertionsBuffer[1 .. 1 + croppingResult.referencePositions.length] =
-                makeFlankingContigSlices(referenceRead, croppingResult.referencePositions)[];
         }
         catch(Exception e)
         {
@@ -293,23 +286,5 @@ class PileUpProcessor
         );
 
         return insertion;
-    }
-
-    protected static Insertion[] makeFlankingContigSlices(
-        ReadAlignment referenceRead,
-        ReferencePoint[] referencePositions,
-    )
-    {
-        return zip(referencePositions, referenceRead[])
-            .map!(args => {
-                auto contigEdge = getDefaultJoin!InsertionInfo(args[0].contigId);
-                contigEdge.payload.spliceSites = [
-                    SpliceSite(args[0], args[1].seed, args[1].flags),
-                ];
-
-                return contigEdge;
-            })
-            .map!"a()"
-            .array;
     }
 }
