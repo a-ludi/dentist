@@ -368,9 +368,8 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
                 auto correctGapJoin = incidentGapJoins[correctGapJoinIdx];
 
                 // Remove correct gap join from the list
-                incidentGapJoins[correctGapJoinIdx .. $ - 1] =
-                        incidentGapJoins[correctGapJoinIdx + 1 .. $];
-                --incidentGapJoins.length;
+                incidentGapJoins = incidentGapJoins[0 .. correctGapJoinIdx] ~
+                                   incidentGapJoins[correctGapJoinIdx + 1 .. $];
 
                 logJsonDiagnostic(
                     "info", "removing bad gap pile ups",
