@@ -11,7 +11,6 @@ module dentist.commands.processPileUps;
 import dentist.commandline : DentistCommand, OptionsFor;
 import dentist.commands.processPileUps.cropper : CropOptions, cropPileUp;
 import dentist.common :
-    insertionScore,
     ReferenceInterval,
     ReferencePoint,
     ReferenceRegion;
@@ -44,7 +43,7 @@ import std.algorithm :
     find,
     joiner,
     map,
-    maxIndex,
+    maxElement,
     merge,
     sort,
     uniq;
@@ -52,7 +51,7 @@ import std.array : array;
 import std.conv : to;
 import std.exception : enforce;
 import std.parallelism : parallel, taskPool;
-import std.range : evenChunks, only, zip;
+import std.range : enumerate, evenChunks, only, zip;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -251,16 +250,14 @@ class PileUpProcessor
         in ReferencePoint[] referencePositions,
     ) const pure
     {
-        return pileUp
-            .filter!(readAlignment =>
-                readAlignment.length == referencePositions.length &&
-                readAlignment[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
-            .map!(readAlignment => insertionScore(
-                readAlignment,
-                repeatMask,
-                options,
-            ))
-            .maxIndex;
+        // NOTE pileUp is not modified but the read alignments need to be assignable.
+        return (cast(PileUp) pileUp)
+            .enumerate
+            .filter!(enumReadAlignment =>
+                enumReadAlignment.value.length == referencePositions.length &&
+                enumReadAlignment.value[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
+            .maxElement!(enumReadAlignment => enumReadAlignment.value.meanScore)
+            .index;
     }
 
     protected bool shouldSkipShortExtension(T)(

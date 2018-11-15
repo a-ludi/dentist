@@ -15,7 +15,7 @@ import dentist.common.scaffold :
     Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
 import dentist.util.log;
-import dentist.util.math : ceildiv, floor, RoundingMode;
+import dentist.util.math : absdiff, ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
 import std.algorithm :
     all,
@@ -506,7 +506,7 @@ struct AlignmentChain
     {
         return localAlignments
             .chunks(2)
-            .map!(las => las.length < 2 ? 0 : las[1].contigA.begin - las[0].contigA.end)
+            .map!(las => las.length < 2 ? 0 : absdiff(las[1].contigA.begin, las[0].contigA.end))
             .sum;
     }
 
