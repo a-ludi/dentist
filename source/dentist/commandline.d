@@ -868,18 +868,6 @@ struct OptionsFor(DentistCommand command)
         size_t fastaLineWidth = 50;
     }
 
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("good-anchor-length")
-        @Help(format!q"{
-            alignment anchors with at least this length will get no penalty (default: %d)
-        }"(defaultValue!goodAnchorLength))
-        @Validate!(value => enforce!CLIException(value > 0, "good anchor length must be greater than zero"))
-        size_t goodAnchorLength = 1000;
-    }
-
     static if (needWorkdir)
     {
         @Option("input-provide-method", "p")
