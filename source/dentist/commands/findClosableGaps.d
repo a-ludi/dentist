@@ -113,8 +113,13 @@ struct ClosableGapsFinder
                 closableGaps[i].toContig = cast(id_t) (firstContigId + i + 1);
                 closableGaps[i].gapSize = cast(coord_t) gap.size;
 
+                // Skip gaps at the beginning or end of a true scaffold
                 if (gap.begin == 0 || gap.end == contigPart.length)
-                    continue; // Skip gaps at the beginning or end of a true scaffold
+                {
+                    --firstContigId;
+
+                    continue;
+                }
 
                 foreach (read; trueAlignments)
                     if (
