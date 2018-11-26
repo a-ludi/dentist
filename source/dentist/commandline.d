@@ -49,7 +49,6 @@ import dentist.swinfo :
     version_;
 import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
-import dentist.util.math : ceildiv;
 import dentist.util.tempfile : mkdtemp;
 import std.algorithm :
     among,
@@ -63,6 +62,7 @@ import std.conv;
 import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
 import std.format : format, formattedRead;
+import std.math : ceil, floor, log_e = log;
 import std.meta : AliasSeq, staticMap, staticSort;
 import std.parallelism : defaultPoolThreads, totalCPUs;
 import std.path : absolutePath, buildPath;
@@ -675,47 +675,6 @@ struct OptionsFor(DentistCommand command)
     mixin HelpOption;
 
     static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("acceptable-coverage-reads")
-        @MetaVar("<from>..<to>")
-        @Help(q"{
-            this is used to derive a repeat mask from the ref vs. reads alignment;
-            if the alignment coverage is out of the interval [<from>, <to>]
-            it will be considered repetitive (default: floor(0.1*C)..ceil(1.9*C), see --read-coverage)
-        }")
-        @Validate!(validateCoverageBounds!(typeof(coverageBoundsReads), "acceptable-coverage-reads"))
-        string acceptableCoverageReadsString;
-
-        @Option()
-        id_t[2] coverageBoundsReads;
-
-        @PostValidate(Priority.medium)
-        void setCoverageBoundsReads()
-        {
-            enforce!CLIException(
-                acceptableCoverageReadsString != acceptableCoverageReadsString.init ||
-                readCoverage != readCoverage.init,
-                "must provide either --read-coverage or --acceptable-coverage-reads",
-            );
-            enforce!CLIException(
-                (acceptableCoverageReadsString != acceptableCoverageReadsString.init) ^
-                (readCoverage != readCoverage.init),
-                "must not provide both --read-coverage and --acceptable-coverage-reads",
-            );
-
-            if (acceptableCoverageReadsString != acceptableCoverageReadsString.init)
-                parseRange!coverageBoundsReads(acceptableCoverageReadsString);
-            if (readCoverage != readCoverage.init)
-                coverageBoundsReads = [
-                    readCoverage / 10,
-                    ceildiv(19 * readCoverage, 10),
-                ];
-        }
-    }
-
-    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -939,6 +898,53 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.maskRepetitiveRegions,
     ))
     {
+        @Option("max-coverage-reads")
+        @MetaVar("<uint>")
+        @Help(q"{
+            this is used to derive a repeat mask from the ref vs. reads alignment;
+            if the alignment coverage is larger than <uint> it will be
+            considered repetitive; a default value is derived from --read-coverage;
+            both options are mutually exclusive
+        }")
+        id_t maxCoverageReads;
+
+        @Option()
+        id_t[2] coverageBoundsReads;
+
+        @PostValidate(Priority.medium)
+        void setCoverageBoundsReads()
+        {
+            enforce!CLIException(
+                maxCoverageReads != maxCoverageReads.init ||
+                readCoverage != readCoverage.init,
+                "must provide either --read-coverage or --acceptable-coverage-reads",
+            );
+            enforce!CLIException(
+                (maxCoverageReads != maxCoverageReads.init) ^
+                (readCoverage != readCoverage.init),
+                "must not provide both --read-coverage and --acceptable-coverage-reads",
+            );
+
+            id_t upperBound(double x)
+            {
+                enum aReads = 1.65;
+                enum bReads = 0.1650612;
+                enum cReads = 5.9354533;
+
+                return to!id_t(x / log_e(log_e(log_e(bReads * x + cReads)/log_e(aReads))));
+            }
+
+            if (readCoverage != readCoverage.init)
+                maxCoverageReads = upperBound(readCoverage);
+
+            coverageBoundsReads = [0, maxCoverageReads];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
         @Option("max-coverage-self")
         @MetaVar("<uint>")
         @Help(format!q"{
@@ -971,7 +977,14 @@ struct OptionsFor(DentistCommand command)
             alignment need to have at least this length of unique anchoring sequence (default: %d)
         }"(defaultValue!minAnchorLength))
         @Validate!(value => enforce!CLIException(value > 0, "minimum anchor length must be greater than zero"))
-        size_t minAnchorLength = 1000;
+        @Validate!(
+            (value, options) => enforce!CLIException(
+                value > options.tracePointDistance,
+                "minimum anchor length should be greater than --trace-point-spacing"
+            ),
+            is(typeof(OptionsFor!command().tracePointDistance)),
+        )
+        size_t minAnchorLength = 500;
     }
 
     static if (command.among(
@@ -1029,7 +1042,8 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("read-coverage", "C")
         @Help(q"{
-            this is used to provide good default values for --acceptable-coverage-reads
+            this is used to provide good default values for --acceptable-coverage-reads;
+            both options are mutually exclusive
         }")
         id_t readCoverage;
     }
