@@ -2312,7 +2312,10 @@ private struct ScaffoldStructureReader
             return;
         }
 
-        auto nextContigPart = ContigSegment(lastContigPart.globalContigId + 1);
+        auto nextContigPart = ContigSegment(
+            lastContigPart.globalContigId + 1,
+            lastContigPart.scaffoldId,
+        );
 
         rawScaffoldInfo.front.formattedRead!scaffoldInfoLineFormat(
             nextContigPart.header,
@@ -2320,10 +2323,10 @@ private struct ScaffoldStructureReader
             nextContigPart.begin,
             nextContigPart.end,
         );
-        if (lastContigPart.header != nextContigPart.header[0 .. $ - 1])
-        {
-            nextContigPart.scaffoldId = lastContigPart.scaffoldId + 1;
-        }
+        auto hasHeaderChanged = lastContigPart.header != nextContigPart.header[0 .. $ - 1];
+
+        if (hasHeaderChanged)
+            ++nextContigPart.scaffoldId;
 
         if (currentPart.peek!GapSegment !is null
                 || lastContigPart.scaffoldId != nextContigPart.scaffoldId)

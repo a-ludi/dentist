@@ -95,35 +95,44 @@ struct ClosableGapsFinder
         alias isContigPart = contigPart => contigPart.peek!ContigSegment !is null;
         alias mkContigPart = contigPart => contigPart.get!ContigSegment;
 
+        id_t currentContigId;
         foreach (contigPart; trueAssemblyScaffoldStructure.filter!isContigPart.map!mkContigPart)
         {
-            auto scaffoldRegion = ReferenceRegion(ReferenceInterval(
+            // `contigId` is 1-based
+            ++currentContigId;
+            auto trueContigRegion = ReferenceRegion(ReferenceInterval(
                 contigPart.globalContigId,
                 0,
                 contigPart.length,
             ));
-            auto scaffoldGaps = scaffoldRegion - mappedRegionsMask;
-            auto firstContigId = this.closableGaps.length + 1;
+            auto scaffoldGaps = trueContigRegion - mappedRegionsMask;
             this.closableGaps.length += scaffoldGaps.intervals.length;
             auto closableGaps = this.closableGaps[$ - scaffoldGaps.intervals.length .. $];
 
+            auto trueAlignments = this.trueAlignments
+                .assumeSorted!"a.scaffoldId < b.scaffoldId"
+                .equalRange(TrueAlignment(cast(id_t) contigPart.scaffoldId))
+                .map!(read => TrueAlignment(
+                    read.scaffoldId,
+                    cast(coord_t) (read.begin - contigPart.begin),
+                    cast(coord_t) (read.end - contigPart.begin),
+                    read.flags,
+                    read.readId,
+                ))
+                .array;
+
             foreach (i, gap; scaffoldGaps.intervals)
             {
-                closableGaps[i].fromContig = cast(id_t) (firstContigId + i);
-                closableGaps[i].toContig = cast(id_t) (firstContigId + i + 1);
+                closableGaps[i].fromContig = cast(id_t) (currentContigId);
+                closableGaps[i].toContig = cast(id_t) (currentContigId + 1);
                 closableGaps[i].gapSize = cast(coord_t) gap.size;
 
-                // Skip gaps at the beginning or end of a true scaffold
                 if (gap.begin == 0 || gap.end == contigPart.length)
-                {
-                    --firstContigId;
-
+                    // Skip gaps at the beginning or end of a true scaffold
                     continue;
-                }
 
                 foreach (read; trueAlignments)
                     if (
-                        read.scaffoldId + 1 == gap.contigId &&
                         read.begin < gap.begin &&
                         (gap.begin - read.begin) >= options.minAnchorLength &&
                         gap.end < read.end &&
@@ -131,6 +140,7 @@ struct ClosableGapsFinder
                     )
                         closableGaps[i].spanningReads ~= read.readId;
                 closableGaps[i].spanningReads.sort;
+                ++currentContigId;
             }
         }
 
