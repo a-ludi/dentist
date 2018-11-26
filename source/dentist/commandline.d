@@ -1448,8 +1448,13 @@ private
 
     enum getUDA(alias symbol, T) = getUDAs!(symbol, T)[0];
 
-    struct Validate(alias _validate) {
-        alias validate = _validate;
+    struct Validate(alias _validate, bool isEnabled = true) {
+        static if (isEnabled)
+            alias validate = _validate;
+        else
+            alias validate = __truth;
+
+        static bool __truth(T)(T) { return true; }
     }
 
     enum Priority
