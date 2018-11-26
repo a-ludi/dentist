@@ -732,6 +732,8 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
     auto gapJoins = scaffold.edges.filter!isGap;
     auto forbiddenJoins = setDifference!orderByNodes(gapJoins, allowedJoins).array;
 
+    // NOTE: joins between scaffolds will be re-included into the graph later
+    //       if joinPolicy == scaffolds.
     foreach (forbiddenJoin; forbiddenJoins)
     {
         forbiddenJoin.payload = T.init;

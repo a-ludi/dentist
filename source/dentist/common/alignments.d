@@ -1288,50 +1288,34 @@ struct ReadAlignment
     }
 
     /**
-        Returns true iff the read alignment spans a gap, ie. two alignments on
-        different reference contigs with different individual extension type are
-        involved.
-
-        ---
-        Case 1 (complement alignment):
-
-                  0             ry lr   0             ry lr
-            ref   |--<--<--<-+-<-+--|   |--+-<-+-<-+-<-+--|
-                             | | |         | | |
-            read          |--+->-+->-->-->-+->-+--|
-                          0     ay         la
-
-        Case 1 (complement alignment):
-
-                  0             ry lr1  0 rx             lr2
-            ref   |-->-->-->-+->-+--|   |--+->-+->-+->-+--|
-                             | | |         | | |
-            read          |--+->-+->-->-->-+->-+--|
-                          0     ay         bx     la
-        ---
+        Returns true iff the read alignment spans a gap, ie. two alignments of
+        the same read on different reference contigs are involved.
     */
     @property bool isGap() const pure nothrow
-    {
-        return isParallel ^ isAntiParallel;
-    }
-
-    private @property bool joinsTwoContigs() const pure nothrow
     {
         return _length == 2 &&
             _alignments[0].contigA.id != _alignments[1].contigA.id &&
             _alignments[0].contigB.id == _alignments[1].contigB.id;
     }
 
+    /**
+        Returns true iff the read alignment spans a gap and the flanking
+        contigs have in the same orientation (according to this alignment).
+    */
     @property bool isParallel() const pure nothrow
     {
-        return joinsTwoContigs &&
+        return isGap &&
             _alignments[0].seed != _alignments[1].seed &&
             _alignments[0].complement == _alignments[1].complement;
     }
 
+    /**
+        Returns true iff the read alignment spans a gap and the flanking
+        contigs have in different orientation (according to this alignment).
+    */
     @property bool isAntiParallel() const pure nothrow
     {
-        return joinsTwoContigs &&
+        return isGap &&
             _alignments[0].seed == _alignments[1].seed &&
             _alignments[0].complement != _alignments[1].complement;
     }
