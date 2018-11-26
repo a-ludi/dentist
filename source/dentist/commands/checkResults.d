@@ -711,7 +711,7 @@ auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
 
 private struct Stats
 {
-    static enum identityLevels = [.99, .95, .90];
+    static enum identityLevels = [.999, .99, .95, .90];
 
     size_t numBpsExpected;
     size_t numBpsKnown;
@@ -760,6 +760,7 @@ private struct Stats
                 correctGapLengthHistograms[0],
                 correctGapLengthHistograms[1],
                 correctGapLengthHistograms[2],
+                correctGapLengthHistograms[3],
                 closedGapLengthHistogram,
                 gapLengthHistogram,
             ),
@@ -797,6 +798,7 @@ private struct Stats
                     correctGapLengthHistograms[0],
                     correctGapLengthHistograms[1],
                     correctGapLengthHistograms[2],
+                    correctGapLengthHistograms[3],
                     closedGapLengthHistogram,
                     gapLengthHistogram,
                 ))
