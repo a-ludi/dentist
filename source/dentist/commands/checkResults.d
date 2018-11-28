@@ -177,10 +177,12 @@ private struct ResultAnalyzer
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
         correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
-        correctGapsPerIdentityLevel = getCorrectRegions(referenceGaps
+        correctGapsPerIdentityLevel = getCorrectRegions(
+            referenceGaps
                 .intervals
-                .filter!(gap => isInnerGap(gap))
-                .array);
+                .array,
+            File(options.gapDetailsTabular, "w"),
+        );
     }
 
     void calculateExactResultAlignments()
@@ -217,6 +219,7 @@ private struct ResultAnalyzer
             .map!(contigPart => contigPart.get!ContigSegment)
             .map!(contigPart => cast(ReferenceInterval[]) mappedGapsMask(contigPart).intervals)
             .joiner
+            .filter!(gap => isInnerGap(gap))
             .array
         );
     }
@@ -580,7 +583,6 @@ private struct ResultAnalyzer
 
         return referenceGaps
             .intervals
-            .filter!(gap => isInnerGap(gap))
             .map!(gap => gap.size)
             .sum;
     }
