@@ -233,8 +233,8 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return [begin, end];
     }
 
-    /// Get a string representation of this alignment. Visually breaks unless
-    /// elements of the sequences convert to single chars via `to!string`.
+    /// Get a string representation of this alignment. Visual alignment breaks
+    /// unless elements of the sequences convert to single chars via `to!string`.
     string toString(
         alias matchSymbol = '|',
         alias substitutionSymbol = '*',
