@@ -339,6 +339,13 @@ ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
         if (shareReadSequence(saPair[0], saPair[1])
                 && !seededPartsOfOneAlignment(saPair[0], saPair[1]))
         {
+            // NOTE this discards reads supporting ambiguous joins:
+            //
+            //      ```
+            //          contig A1: |---------|
+            //               read:        |---------|
+            //      contig A2 & C: |---------|   |---------|
+            //      ```
             return emptyRange();
         }
     }
