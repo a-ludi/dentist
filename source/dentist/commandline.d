@@ -794,6 +794,17 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("debug-gap-details")
+        @MetaVar("<file>")
+        @Help("write the statistics for every single gap to a tabular file <file>")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string gapDetailsTabular;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {

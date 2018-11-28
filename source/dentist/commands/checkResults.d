@@ -59,7 +59,7 @@ import std.algorithm :
     maxElement,
     min,
     sum;
-import std.array : array;
+import std.array : appender, array;
 import std.format : format;
 import std.math :
     ceil,
@@ -71,6 +71,7 @@ import std.range :
     StoppingPolicy,
     zip;
 import std.range.primitives;
+import std.regex : ctRegex, replaceAll;
 import std.stdio : File, writeln;
 import std.string : join;
 import std.typecons : Tuple;
@@ -371,8 +372,18 @@ private struct ResultAnalyzer
         return correctGapsPerIdentityLevel[0].length;
     }
 
-    size_t[][identityLevels.length] getCorrectRegions(in ReferenceInterval[] intervals)
+    size_t[][identityLevels.length] getCorrectRegions(in ReferenceInterval[] intervals, File detailsTabular = File())
     {
+        if (detailsTabular.isOpen)
+            detailsTabular.writefln!"%10s %10s %10s %10s %10s %s"(
+                "contigId",
+                "begin",
+                "end",
+                "numDiffs",
+                "percentIdentity",
+                "sequenceAlignment",
+            );
+
         auto sortedResultAlignment = resultAlignment.assumeSorted!"a.contigA.id < b.contigA.id";
 
         size_t[][identityLevels.length] identicalLengthsPerLevel;
@@ -383,10 +394,12 @@ private struct ResultAnalyzer
         {
             auto overlappingAlignments = sortedResultAlignment
                 .equalRange(getDummyAC(interval));
+
             auto overlappedRegion = overlappingAlignments
                 .map!(to!(ReferenceRegion, "contigA"))
                 .fold!"a | b"(ReferenceRegion());
             size_t numDiffs = (ReferenceRegion(interval) - overlappedRegion).size;
+            auto alignmentString = appender!string;
 
             foreach (overlappingAlignment; overlappingAlignments)
             {
@@ -412,8 +425,25 @@ private struct ResultAnalyzer
                     auto overlappingExactAlignment = exactAlignment.partial(overlapBegin, overlapEnd);
 
                     numDiffs += overlappingExactAlignment.score;
+
+                    if (detailsTabular.isOpen)
+                        alignmentString ~= overlappingExactAlignment
+                            .toString()
+                            .replaceAll(ctRegex!(r"\n", "g"), "\\n");
                 }
+                if (detailsTabular.isOpen)
+                    alignmentString ~= "\\n\\n";
             }
+
+            if (detailsTabular.isOpen)
+                synchronized detailsTabular.writefln!"%10d %10d %10d %10d %.8f %s"(
+                    interval.contigId,
+                    interval.begin,
+                    interval.end,
+                    numDiffs,
+                    1.0 - (numDiffs.to!double / interval.size.to!double),
+                    alignmentString.data,
+                );
 
             foreach (i, identityLevel; identityLevels)
                 if (numDiffs <= (1.0 - identityLevel) * interval.size)
