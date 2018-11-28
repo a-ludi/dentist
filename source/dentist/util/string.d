@@ -28,7 +28,7 @@ import std.range :
     take,
     zip;
 import std.range.primitives : hasSlicing;
-import std.string : join, lineSplitter;
+import std.string : lineSplitter;
 import std.traits : isSomeString;
 import std.typecons :
     Flag,
@@ -283,7 +283,9 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
                 referenceLine.data.to!string,
                 compareLine.data.to!string,
                 queryLine.data.to!string,
-            ).join('\n');
+            )
+                .joiner("\n")
+                .to!string;
         else
             return zip(
                 referenceLine.data.to!string.chunks(width),
