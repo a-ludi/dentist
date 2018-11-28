@@ -788,7 +788,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("debug-alignment")
         @MetaVar("<file>")
-        @Help("write the result alignment to a tabular file <file>; use `show-insertions` to inspect the result")
+        @Help("write the result alignment to a tabular file <file>")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string alignmentTabular;
     }
