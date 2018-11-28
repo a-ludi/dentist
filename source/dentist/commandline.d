@@ -1017,9 +1017,9 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("min-extension-length")
         @Help(format!q"{
-            extensions must have at least <ulong> bps of processPileUps to be inserted (default: %d)
+            extensions must have at least <ulong> bps of consensus to be inserted (default: %d)
         }"(defaultValue!minExtensionLength))
-        @Validate!(value => enforce!CLIException(value > 0, "good extension length must be greater than zero"))
+        @Validate!(value => enforce!CLIException(value > 0, "minimum extension length must be greater than zero"))
         size_t minExtensionLength = 100;
     }
 
