@@ -338,18 +338,21 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
 /// This removes ambiguous gap insertions.
 Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMargin)
 {
-    alias joinToJson = (join) => shouldLog(LogLevel.debug_)
-        ? join.toJson
-        : [
-            "start": join.start.toJson,
-            "end": join.end.toJson,
-            "payload": [
-                "type": join.payload.getType.to!string.toJson,
-                "readAlignments": shouldLog(LogLevel.debug_)
-                    ? join.payload.map!"a[]".array.toJson
-                    : toJson(null),
-            ].toJson,
-        ].toJson;
+    static if (__traits(compiles, getType(join.payload)))
+        alias joinToJson = (join) => shouldLog(LogLevel.debug_)
+            ? join.toJson
+            : [
+                "start": join.start.toJson,
+                "end": join.end.toJson,
+                "payload": [
+                    "type": join.payload.getType.to!string.toJson,
+                    "readAlignments": shouldLog(LogLevel.debug_)
+                        ? join.payload.map!"a[]".array.toJson
+                        : toJson(null),
+                ].toJson,
+            ].toJson;
+    else
+        alias joinToJson = (join) => join.toJson;
 
     auto incidentEdgesCache = scaffold.allIncidentEdges();
 
