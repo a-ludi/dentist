@@ -126,6 +126,7 @@ struct ClosableGapsFinder
                 closableGaps[i].fromContig = cast(id_t) (currentContigId);
                 closableGaps[i].toContig = cast(id_t) (currentContigId + 1);
                 closableGaps[i].gapSize = cast(coord_t) gap.size;
+                closableGaps[i].mappedInterval = gap;
 
                 if (gap.begin == 0 || gap.end == contigPart.length)
                     // Skip gaps at the beginning or end of a true scaffold
@@ -156,6 +157,7 @@ struct ClosableGap
     id_t fromContig;
     id_t toContig;
     coord_t gapSize;
+    ReferenceInterval mappedInterval;
     id_t[] spanningReads;
 }
 
