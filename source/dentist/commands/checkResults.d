@@ -177,12 +177,19 @@ private struct ResultAnalyzer
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
         correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
-        correctGapsPerIdentityLevel = getCorrectRegions(
-            referenceGaps
-                .intervals
-                .array,
-            File(options.gapDetailsTabular, "w"),
-        );
+        if (options.gapDetailsTabular !is null)
+            correctGapsPerIdentityLevel = getCorrectRegions(
+                referenceGaps
+                    .intervals
+                    .array,
+                File(options.gapDetailsTabular, "w"),
+            );
+        else
+            correctGapsPerIdentityLevel = getCorrectRegions(
+                referenceGaps
+                    .intervals
+                    .array,
+            );
     }
 
     void calculateExactResultAlignments()
