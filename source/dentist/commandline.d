@@ -37,6 +37,7 @@ import dentist.dazzler :
     getMaskFiles,
     getTracePointDistance,
     lasEmpty,
+    LasFilterAlignmentsOptions,
     provideDamFileInWorkdir,
     provideLasFileInWorkdir,
     ProvideMethod,
@@ -1272,18 +1273,27 @@ struct OptionsFor(DentistCommand command)
             string[] daccordOptions;
             string[] dalignerOptions;
             string[] dbsplitOptions;
+            string[] lasFilterAlignmentsOptions;
             string workdir;
         }
 
         @property auto consensusOptions() const
         {
             return const(ConsensusOptions)(
+                // daccordOptions
                 [
                     DaccordOptions.produceFullSequences,
                     DaccordOptions.numberOfThreads ~ numDaccordThreads.to!string,
                 ],
+                // dalignerOptions
                 pileUpAlignmentOptions,
+                // dbsplitOptions
                 [],
+                // lasFilterAlignmentsOptions
+                [
+                    LasFilterAlignmentsOptions.errorThresold ~ (2.0 * readsErrorRate).to!string,
+                ],
+                // workdir
                 workdir,
             );
         }

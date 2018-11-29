@@ -50,8 +50,14 @@ import std.exception : enforce;
 import std.file : exists, remove;
 import std.format : format, formattedRead;
 import std.meta : AliasSeq;
-import std.path : absolutePath, baseName, buildPath, dirName, relativePath,
-    stripExtension, withExtension;
+import std.path :
+    absolutePath,
+    baseName,
+    buildPath,
+    dirName,
+    relativePath,
+    stripExtension,
+    withExtension;
 import std.process : Config, escapeShellCommand, kill, pipeProcess,
     ProcessPipes, Redirect, wait;
 import std.range :
@@ -2034,6 +2040,7 @@ unittest
 */
 string getConsensus(Options)(in string dbFile, in size_t readId, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
+            isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             isSomeString!(typeof(options.workdir)))
@@ -2043,6 +2050,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         string[] daccordOptions;
         string[] dalignerOptions;
         string[] dbsplitOptions;
+        string[] lasFilterAlignmentsOptions;
         string workdir;
     }
 
@@ -2051,6 +2059,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         options.daccordOptions ~ format!"%s%d,%d"(cast(string) DaccordOptions.readInterval, readIdx, readIdx),
         options.dalignerOptions,
         options.dbsplitOptions,
+        options.lasFilterAlignmentsOptions,
         options.workdir,
     ));
 
@@ -2065,27 +2074,63 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
 /// ditto
 string getConsensus(Options)(in string dbFile, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
+            isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             isSomeString!(typeof(options.workdir)))
 {
     dalign(dbFile, options.dalignerOptions, options.workdir);
-    computeErrorProfile(dbFile, options);
-
     auto lasFile = getLasFile(dbFile, options.workdir);
+    enforce!DazzlerCommandException(
+        !lasEmpty(
+            lasFile,
+            dbFile,
+            null,
+            options.workdir,
+        ),
+        "empty pre-consensus alignment",
+    );
 
-    if (lasEmpty(lasFile, dbFile, null, options.workdir))
-    {
-        return null;
-    }
+    computeIntrinsticQualityValuesForConsensus(dbFile, options);
+    auto filteredLasFile = filterAlignmentsForConsensus(dbFile, options);
+    enforce!DazzlerCommandException(
+        !lasEmpty(
+            filteredLasFile,
+            dbFile,
+            null,
+            options.workdir,
+        ),
+        "empty pre-consensus alignment",
+    );
 
-    auto consensusDb = daccord(dbFile, lasFile, options.daccordOptions, options.workdir);
+    computeErrorProfile(dbFile, filteredLasFile, options);
+
+    auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.workdir);
     dbsplit(consensusDb, options.dbsplitOptions, options.workdir);
 
     return consensusDb;
 }
 
-private void computeErrorProfile(Options)(in string dbFile, in Options options)
+private void computeIntrinsticQualityValuesForConsensus(Options)(in string dbFile, in Options options)
+        if (isSomeString!(typeof(options.workdir)))
+{
+    auto readDepth = getNumContigs(dbFile, options.workdir);
+    auto lasFile = getLasFile(dbFile, options.workdir);
+
+    computeIntrinsicQV(dbFile, lasFile, readDepth, options.workdir);
+}
+
+private string filterAlignmentsForConsensus(Options)(in string dbFile, in Options options)
+        if (isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
+            isSomeString!(typeof(options.workdir)))
+{
+    auto lasFile = getLasFile(dbFile, options.workdir);
+    auto filteredLasFile = lasFilterAlignments(dbFile, lasFile, options.lasFilterAlignmentsOptions, options.workdir);
+
+    return filteredLasFile;
+}
+
+private void computeErrorProfile(Options)(in string dbFile, in string lasFile, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
             isSomeString!(typeof(options.workdir)))
 {
@@ -2093,19 +2138,16 @@ private void computeErrorProfile(Options)(in string dbFile, in Options options)
         .daccordOptions
         .filter!(option => !option.startsWith(
             cast(string) DaccordOptions.produceFullSequences,
-            //cast(string) DaccordOptions.readInterval,
             cast(string) DaccordOptions.readsPart,
             cast(string) DaccordOptions.errorProfileFileName,
         ))
         .chain(only(DaccordOptions.computeErrorProfileOnly))
         .array;
-    auto lasFile = getLasFile(dbFile, options.workdir);
-    enforce!DazzlerCommandException(!lasEmpty(lasFile, dbFile, null,
-            options.workdir), "empty pre-consensus alignment");
 
     // Produce error profile
     silentDaccord(dbFile, lasFile, eProfOptions, options.workdir);
 }
+
 
 unittest
 {
@@ -2845,6 +2887,20 @@ enum LAdumpOptions
     properOverlapsOnly = "-o",
 }
 
+/// Options for `computeintrinsicqv`.
+enum ComputeIntrinsicQVOptions
+{
+    /// Read depth aka. read coverage. (mandatory)
+    readDepth = "-d",
+}
+
+/// Options for `lasfilteralignments`.
+enum LasFilterAlignmentsOptions
+{
+    /// Error threshold for proper alignment termination (default: 0.35)
+    errorThresold = "-e",
+}
+
 private
 {
 
@@ -2883,6 +2939,37 @@ private
 
         executeCommand(chain(only("damapper", DamapperOptions.symmetric),
                 damapperOpts, dbListRelativeToWorkDir), workdir);
+    }
+
+    void computeIntrinsicQV(in string dbFile, in string lasFile, in size_t readDepth,
+                             in string workdir)
+    {
+        executeCommand(chain(
+            only("computeintrinsicqv"),
+            only(
+                ComputeIntrinsicQVOptions.readDepth ~ readDepth.to!string,
+                dbFile.stripBlock.relativeToWorkdir(workdir),
+                lasFile.relativeToWorkdir(workdir),
+            ),
+        ), workdir);
+    }
+
+    string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options,
+                             in string workdir)
+    {
+        string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
+
+        executeCommand(chain(
+            only("lasfilteralignments"),
+            options,
+            only(
+                filteredLasFile.relativeToWorkdir(workdir),
+                dbFile.stripBlock.relativeToWorkdir(workdir),
+                lasFile.relativeToWorkdir(workdir),
+            ),
+        ), workdir);
+
+        return filteredLasFile;
     }
 
     string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
