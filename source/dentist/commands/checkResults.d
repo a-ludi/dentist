@@ -165,7 +165,6 @@ private struct ResultAnalyzer
             options.workdir,
             options.tracePointDistance,
         );
-        calculateExactResultAlignments();
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -176,6 +175,7 @@ private struct ResultAnalyzer
         referenceGaps = getReferenceGaps();
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
+        calculateExactResultAlignments();
         correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
         if (options.gapDetailsTabular !is null)
             correctGapsPerIdentityLevel = getCorrectRegions(
