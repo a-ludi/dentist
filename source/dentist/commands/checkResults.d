@@ -175,6 +175,11 @@ private struct ResultAnalyzer
         referenceGaps = getReferenceGaps();
         reconstructedRegions = getReconstructedRegions();
         reconstructedGaps = getReconstructedGaps();
+        debug logJsonDebug(
+            "referenceGaps", referenceGaps.toJson,
+            "reconstructedRegions", reconstructedRegions.toJson,
+            "reconstructedGaps", reconstructedGaps.toJson,
+        );
         calculateExactResultAlignments();
         correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
         if (options.gapDetailsTabular !is null)
@@ -650,13 +655,10 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        if (reconstructedGaps.length == 0)
-            return ReferenceInterval(0, 0, 0);
-
         return zip(referenceGaps.intervals, reconstructedGaps)
             .filter!(pair => isGapClosed(pair))
             .map!"a[0]"
-            .maxElement!"a.size";
+            .maxElement!"a.size"(ReferenceInterval(0, 0, 0));
     }
 
     Histogram!coord_t[identityLevels.length] getCorrectGapLengthHistograms()
