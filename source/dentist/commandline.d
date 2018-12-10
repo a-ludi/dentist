@@ -1024,6 +1024,8 @@ struct OptionsFor(DentistCommand command)
         size_t minExtensionLength = 100;
     }
 
+    static enum defaultMinSpanningReads = 3;
+
     static if (command.among(
         DentistCommand.processPileUps,
     ))
@@ -1033,7 +1035,7 @@ struct OptionsFor(DentistCommand command)
             pile ups must have at least <ulong> reads to be processed (default: %d)
         }"(defaultValue!minReadsPerPileUp))
         @Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero"))
-        size_t minReadsPerPileUp = 5;
+        size_t minReadsPerPileUp = defaultMinSpanningReads;
     }
 
     static if (command.among(
@@ -1045,7 +1047,7 @@ struct OptionsFor(DentistCommand command)
         @Help(format!q"{
             require at least <uint> spanning reads to close a gap (default: %d)
         }"(defaultValue!minSpanningReads))
-        size_t minSpanningReads = 3;
+        size_t minSpanningReads = defaultMinSpanningReads;
     }
 
     static if (command.among(

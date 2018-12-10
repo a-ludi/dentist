@@ -170,6 +170,23 @@ class PileUpProcessor
         {
             if (pileUp.length < options.minReadsPerPileUp)
             {
+                logJsonInfo(
+                    "info", "skipping pile up due to `minReadsPerPileUp`",
+                    "reason", "minReadsPerPileUp",
+                    "pileUp", [
+                        "type": pileUp.getType.to!string.toJson,
+                        "length": pileUp.length.toJson,
+                        "contigIds": pileUp
+                            .map!(ra => ra[].map!"a.contigA.id".array)
+                            .joiner
+                            .array
+                            .sort
+                            .uniq
+                            .array
+                            .toJson,
+                    ],
+                );
+
                 return;
             }
 
@@ -196,6 +213,23 @@ class PileUpProcessor
                 shouldSkipShortExtension(croppingResult, insertSequence, referenceRead)
             )
             {
+                logJsonInfo(
+                    "info", "skipping pile up due to `minExtensionLength`",
+                    "reason", "minExtensionLength",
+                    "pileUp", [
+                        "type": pileUp.getType.to!string.toJson,
+                        "length": pileUp.length.toJson,
+                        "contigIds": pileUp
+                            .map!(ra => ra[].map!"a.contigA.id".array)
+                            .joiner
+                            .array
+                            .sort
+                            .uniq
+                            .array
+                            .toJson,
+                    ],
+                );
+
                 return;
             }
 
@@ -210,9 +244,11 @@ class PileUpProcessor
         {
             logJsonWarn(
                 "info", "skipping pile up due to errors",
+                "reason", "error",
                 "error", e.message().to!string,
                 "pileUp", [
                     "type": pileUp.getType.to!string.toJson,
+                    "length": pileUp.length.toJson,
                     "contigIds": pileUp
                         .map!(ra => ra[].map!"a.contigA.id".array)
                         .joiner
