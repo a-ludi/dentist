@@ -1042,9 +1042,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("min-spanning-reads", "s")
-        @Help(q"{
+        @Help(format!q"{
             require at least <uint> spanning reads to close a gap (default: %d)
-        }")
+        }"(defaultValue!minSpanningReads))
         size_t minSpanningReads = 3;
     }
 
