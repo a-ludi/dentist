@@ -8,6 +8,7 @@
 */
 module dentist.dazzler;
 
+import core.memory : GC;
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.common.binio : CompressedSequence;
 import dentist.util.algorithm : sliceUntil;
@@ -1459,6 +1460,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             auto bSeqBegin = bSeqPos - begin.contigB;
             auto bSeqEnd = afterGap.contigB.begin - begin.contigB;
 
+            GC.collect();
             auto gapAlignment = findAlignment(
                 aSequence[aSeqBegin .. aSeqEnd],
                 bSequence[bSeqBegin .. bSeqEnd],
@@ -1490,6 +1492,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             // trace points due to previous overlap resolution
             auto bSeqBegin = _paddedAlignment.query.length;
             auto bSeqEnd = overlap.end.contigB - begin.contigB;
+
+            GC.collect();
             auto overlapAlignment = findAlignment(
                 aSequence[aSeqBegin .. aSeqEnd],
                 bSequence[bSeqBegin .. bSeqEnd],
