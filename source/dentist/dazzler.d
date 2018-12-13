@@ -1586,10 +1586,14 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             coord_t contigAPos,
         )
         {
-            if (contigAPos % ac.tracePointDistance == 0)
-                return min(la.contigA.end, contigAPos + ac.tracePointDistance);
-            else
-                return ceil(contigAPos, ac.tracePointDistance);
+            alias isAlignedTracePoint = (pos) => pos % ac.tracePointDistance == 0;
+
+            return min(
+                la.contigA.end,
+                isAlignedTracePoint(contigAPos)
+                    ? contigAPos + ac.tracePointDistance
+                    : ceil(contigAPos, ac.tracePointDistance),
+            );
         }
     }
 
