@@ -1372,6 +1372,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 .sliceUntil!(la => end.contigA < la.contigA.begin);
             assert(!coveringLocalAlignments.empty);
 
+            size_t lastUsedIndex;
             foreach (i, localAlignment; coveringLocalAlignments.enumerate)
             {
                 // NOTE: damapper may produce false/bad chains that include a
@@ -1405,11 +1406,12 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                         addGapAlignment(localAlignment);
                     else
                         resolveOverlappingAlignments(
-                            coveringLocalAlignments[i - 1],
+                            coveringLocalAlignments[lastUsedIndex],
                             localAlignment,
                         );
                 }
 
+                lastUsedIndex = i;
                 auto skip = skipTracePointsToASeqPos(localAlignment);
                 foreach (tracePoint; localAlignment.tracePoints[skip .. $])
                 {

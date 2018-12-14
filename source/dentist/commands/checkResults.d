@@ -32,6 +32,7 @@ import dentist.dazzler :
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm :
+    cmpLexicographically,
     first,
     last,
     sliceBy;
@@ -42,7 +43,8 @@ import dentist.util.math :
     longestIncreasingSubsequence,
     mean,
     median,
-    N;
+    N,
+    NaturalNumberSet;
 import dentist.util.range : tupleMap;
 import std.algorithm :
     all,
@@ -58,7 +60,10 @@ import std.algorithm :
     max,
     maxElement,
     min,
-    sum;
+    remove,
+    sort,
+    sum,
+    uniq;
 import std.array : appender, array;
 import std.format : format;
 import std.math :
@@ -67,7 +72,9 @@ import std.math :
 import std.parallelism : parallel;
 import std.range :
     assumeSorted,
+    chain,
     enumerate,
+    only,
     StoppingPolicy,
     zip;
 import std.range.primitives;
@@ -158,13 +165,13 @@ private struct ResultAnalyzer
     {
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        resultAlignment = getAlignments(
+        resultAlignment = cleanUpAlignments(getAlignments(
             options.trueAssemblyDb,
             options.resultDb,
             options.resultsAlignmentFile,
             options.workdir,
             options.tracePointDistance,
-        );
+        ));
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -195,6 +202,162 @@ private struct ResultAnalyzer
                     .intervals
                     .array,
             );
+    }
+
+    AlignmentChain[] cleanUpAlignments(AlignmentChain[] localAlignments)
+    {
+        mixin(traceExecution);
+
+        static struct AlignmentEvent
+        {
+            size_t contigId;
+            size_t position;
+            int diff;
+            AlignmentChain* alignmentChain;
+
+            int opCmp(in AlignmentEvent other) const pure nothrow
+            {
+                return cmpLexicographically!(
+                    const(AlignmentEvent),
+                    e => e.contigId,
+                    e => e.position,
+                    e => -e.diff,
+                )(this, other);
+            }
+        }
+
+        // 1. Prepare alignmentEvents
+        auto alignmentEvents = localAlignments
+            .map!((ref alignment) => only(
+                AlignmentEvent(alignment.contigA.id, alignment.first.contigA.begin, 1, &alignment),
+                AlignmentEvent(alignment.contigA.id, alignment.last.contigA.end, -1, &alignment),
+            ))
+            .joiner;
+        auto contigBoundaryEvents = localAlignments
+            .map!"a.contigA"
+            .uniq
+            .map!(contig => only(
+                AlignmentEvent(contig.id, 0, 0, null),
+                AlignmentEvent(contig.id, contig.length, 0, null),
+            ))
+            .joiner;
+        auto changeEvents = chain(alignmentEvents, contigBoundaryEvents).array;
+        changeEvents.sort();
+
+        if (changeEvents.length == 0)
+            return localAlignments;
+
+        // 2. Find overlapping alignments
+        int currentCoverage;
+        auto overlappingAlignments = appender!(AlignmentChain*[]);
+        auto goodAlignments = appender!(AlignmentChain*[]);
+        foreach (changeEvent; changeEvents)
+        {
+            currentCoverage += changeEvent.diff;
+
+            if (currentCoverage == 0 && overlappingAlignments.data.length > 0)
+            {
+                // Collected local group of overlapping alignments
+
+                auto locallyCleanedUpAlignments = overlappingAlignments.data.length == 1
+                    ? overlappingAlignments.data
+                    : locallyCleanUpAlignments(overlappingAlignments.data);
+                logJsonDebug(
+                    "overlappingAlignments", overlappingAlignments.data.map!"*a".array.toJson,
+                    "locallyCleanedUpAlignments", locallyCleanedUpAlignments.map!"*a".array.toJson,
+                );
+                goodAlignments ~= locallyCleanedUpAlignments;
+
+                overlappingAlignments.clear();
+            }
+            else if (currentCoverage >= 1 && changeEvent.diff > 0)
+            {
+                // Found overlapping alignments
+                assert(changeEvent.alignmentChain !is null);
+                overlappingAlignments ~= changeEvent.alignmentChain;
+            }
+        }
+
+        logJsonDiagnostic(
+            "numRawLocalAlignments", localAlignments.length,
+            "numCleanedLocalAlignments", goodAlignments.data.length,
+        );
+
+        return goodAlignments.data.map!"*a".array;
+    }
+
+    AlignmentChain*[] locallyCleanUpAlignments(AlignmentChain*[] overlappingAlignments)
+    {
+        ReferenceInterval interval(in AlignmentChain* ac) pure
+        {
+            return ReferenceInterval(
+                ac.contigA.id,
+                ac.first.contigA.begin,
+                ac.last.contigA.end,
+            );
+        }
+
+        alias containedWithin = (lhs, rhs) => interval(lhs) in interval(rhs);
+        alias overlapEachOther = (lhs, rhs) =>
+                interval(lhs).intersects(interval(rhs));
+
+        // 1. Remove LAs completely included in others
+        foreach (ac; overlappingAlignments)
+            foreach (other; overlappingAlignments)
+                ac.disableIf(!other.flags.disabled && containedWithin(ac, other));
+
+        // 2. Find combination of alignments, s.t.
+        //     - they are not disabled
+        //     - they do not overlap
+        //     - if more than one: cover maximum possible area
+        //     - if more than one: have best quality
+
+        static struct ViableCombination
+        {
+            ReferenceRegion region;
+            AlignmentChain*[] acs;
+        }
+
+        auto viableCombinationsAcc = appender!(ViableCombination[]);
+
+        void findNonOverlappingCombinations(AlignmentChain*[] candidates, ReferenceRegion region, AlignmentChain*[] included)
+        {
+            size_t numExpansions;
+            foreach (i, candidate; candidates)
+            {
+                auto candidateInterval = interval(candidate);
+                auto newRegion = region | candidateInterval;
+
+                if (newRegion.size == region.size + candidateInterval.size)
+                {
+                    findNonOverlappingCombinations(
+                        candidates.remove(i),
+                        newRegion,
+                        included ~ [candidate],
+                    );
+                    ++numExpansions;
+                }
+            }
+
+            if (numExpansions == 0)
+                viableCombinationsAcc ~= ViableCombination(
+                    region,
+                    included,
+                );
+        }
+
+        findNonOverlappingCombinations(
+            overlappingAlignments.filter!"!a.flags.disabled".array,
+            ReferenceRegion(),
+            [],
+        );
+
+        assert(viableCombinationsAcc.data.length > 0);
+
+        return viableCombinationsAcc
+            .data
+            .maxElement!(vc => vc.region.size - vc.acs.map!"a.totalDiffs".sum.to!double)
+            .acs;
     }
 
     void calculateExactResultAlignments()
