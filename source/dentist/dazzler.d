@@ -1383,7 +1383,7 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 //       this point.
                 if (
                     // LA is completely contained in previous alignments
-                    localAlignment.contigA.end < aSeqPos ||
+                    localAlignment.contigA.end <= aSeqPos ||
                     (
                         // LA is neither first...
                         0 < i && i < coveringLocalAlignments.length - 1 &&
