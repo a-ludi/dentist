@@ -16,9 +16,12 @@ import std.array : array;
 import std.conv : to;
 import std.file : getSize;
 import std.math : log10, lrint, FloatingPointControl;
-import std.stdio : writefln, writeln;
+import std.stdio : stderr, writefln, writeln;
 import std.typecons : tuple;
-import vibe.data.json : toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import vibe.data.json :
+    toJson = serializeToJson,
+    toJsonString = serializeToPrettyJson,
+    serializeToJsonString;
 
 /// Execute the `showPileUps` command with `options`.
 void execute(Options)(in Options options)
@@ -42,13 +45,16 @@ void execute(Options)(in Options options)
     else
         writeTabular(stats);
 
-    logJsonDebug("pileUps", pileUpDb[]
-        .map!(pileUp => [
-            "type": pileUp.getType.to!string.toJson,
-            "readAlignments": pileUp.map!"a[]".array.toJson,
-        ].toJson)
-        .array
-        .toJson);
+    if (shouldLog(LogLevel.debug_))
+    {
+        foreach (pileUp; pileUpDb[])
+        {
+            stderr.writeln(serializeToJsonString([
+                "type": pileUp.getType.to!string.toJson,
+                "readAlignments": pileUp.map!"a[]".array.toJson,
+            ]));
+        }
+    }
 }
 
 struct Stats
