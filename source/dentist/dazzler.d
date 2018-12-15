@@ -1657,8 +1657,8 @@ unittest
     auto exactAlignment = getPaddedAlignment(ac, begin, end, aSequence, bSequence);
 
     assert(exactAlignment.toString(50) ==
-        "ag-tgctggccccagt-caagggcatgtacctgg-gttgcag-g-ttcc-\n" ~
-        "|| ||*|||||||||| ||||||||||||||||| ||||||| | |||| \n" ~
+        "ag-tgctggccccagt-caagggcatgtacctgg-gttgcag--gttcc-\n" ~
+        "|| ||*|||||||||| ||||||||||||||||| |||||||  ||||| \n" ~
         "agatgatggccccagtgcaagggcatgtacctggtgttgcagcggttcca\n" ~
         "\n" ~
         "-ccagcccccgta-ggggtgtgtgtgtggaa-gg-caaccaatt-gatgt\n" ~
