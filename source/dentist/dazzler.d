@@ -1630,6 +1630,14 @@ unittest
                 ],
             ),
             LocalAlignment(
+                Locus(400, 439),
+                Locus(7034, 7076),
+                4,
+                [
+                    TracePoint( 4,  42),
+                ],
+            ),
+            LocalAlignment(
                 Locus(590, 798),
                 Locus(7263, 7475),
                 41,
