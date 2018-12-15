@@ -1385,9 +1385,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                     // LA is completely contained in previous alignments
                     localAlignment.contigA.end < aSeqPos ||
                     (
-                        // LA is not the last one; we need that to get the
-                        // furthest alignment possible
-                        i < coveringLocalAlignments.length - 1 &&
+                        // LA is neither first...
+                        0 < i && i < coveringLocalAlignments.length - 1 &&
                         // < 50% of the LA add to the padded alignment
                         (localAlignment.contigA.end - aSeqPos) /
                         localAlignment.contigA.length < 0.5 &&
