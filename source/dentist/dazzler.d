@@ -9,16 +9,21 @@
 module dentist.dazzler;
 
 import core.memory : GC;
+import dentist.common : ReferenceInterval, ReferenceRegion;
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.common.binio : CompressedSequence;
 import dentist.util.algorithm : sliceUntil;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
-import dentist.util.math : floor, ceil, RoundingMode;
+import dentist.util.math : absdiff, floor, ceil, RoundingMode;
 import dentist.util.range : arrayChunks, takeExactly;
+import dentist.util.region : findTilings, min, sup;
 import dentist.util.string :
     EditOp,
     findAlignment,
+    longestInputsLength,
+    memoryRequired,
+    score_t,
     SequenceAlignment;
 import dentist.util.tempfile : mkstemp;
 import std.algorithm :
@@ -39,9 +44,11 @@ import std.algorithm :
     maxElement,
     min,
     minElement,
+    remove,
     sort,
     splitter,
     startsWith,
+    sum,
     SwapStrategy,
     uniq,
     until;
@@ -68,6 +75,7 @@ import std.range :
     enumerate,
     generate,
     only,
+    repeat,
     slide,
     takeExactly,
     zip;
@@ -1299,10 +1307,10 @@ auto getExactAlignment(
 
     assert(begin.contigA <= beginA);
 
-    return paddedAlignment[(beginA - begin.contigA) .. (endA - begin.contigA)];
+    return paddedAlignment[(beginA - begin.contigA) .. min(endA - begin.contigA, $)];
 }
 
-private auto getPaddedAlignment(S, TranslatedTracePoint)(
+auto getPaddedAlignment(S, TranslatedTracePoint)(
     in AlignmentChain ac,
     in TranslatedTracePoint begin,
     in TranslatedTracePoint end,
@@ -1314,6 +1322,8 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
     static struct AlignmentPadder
     {
         static enum indelPenalty = 1;
+
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
 
         private const AlignmentChain ac;
         private const TranslatedTracePoint begin;
@@ -1366,36 +1376,14 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
         {
             aSeqPos = begin.contigA + 0;
             bSeqPos = begin.contigB + 0;
-            auto coveringLocalAlignments = ac
-                .localAlignments
+            auto cleanedLocalAlignments = cleanUpLocalAlignments(ac.localAlignments);
+            auto coveringLocalAlignments = cleanedLocalAlignments
                 .find!(la => la.contigA.begin <= begin.contigA)
                 .sliceUntil!(la => end.contigA < la.contigA.begin);
             assert(!coveringLocalAlignments.empty);
 
-            size_t lastUsedIndex;
             foreach (i, localAlignment; coveringLocalAlignments.enumerate)
             {
-                // NOTE: damapper may produce false/bad chains that include a
-                //       complete stack of local alignments that have nearly
-                //       100% overlap. In most cases they decrease performance
-                //       drastically and in some cases they can even cause
-                //       errors in this procedure. So let's ignore them at
-                //       this point.
-                if (
-                    // LA is completely contained in previous alignments
-                    localAlignment.contigA.end <= aSeqPos ||
-                    (
-                        // LA is neither first...
-                        0 < i && i < coveringLocalAlignments.length - 1 &&
-                        // < 50% of the LA add to the padded alignment
-                        (localAlignment.contigA.end - aSeqPos) /
-                        localAlignment.contigA.length < 0.5 &&
-                        // < 100 bps of the LA add to the padded alignment
-                        localAlignment.contigA.end - aSeqPos < 100
-                    )
-                )
-                    continue; // ignore this localAlignment
-
                 if (i > 0)
                 {
                     if (
@@ -1405,12 +1393,11 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                         addGapAlignment(localAlignment);
                     else
                         resolveOverlappingAlignments(
-                            coveringLocalAlignments[lastUsedIndex],
+                            coveringLocalAlignments[i - 1],
                             localAlignment,
                         );
                 }
 
-                lastUsedIndex = i;
                 auto skip = skipTracePointsToASeqPos(localAlignment);
                 foreach (tracePoint; localAlignment.tracePoints[skip .. $])
                 {
@@ -1422,7 +1409,43 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             }
         }
 
-        size_t skipTracePointsToASeqPos(in AlignmentChain.LocalAlignment localAlignment)
+        // NOTE: damapper may produce false/bad chains that include a
+        //       complete stack of local alignments that have nearly
+        //       100% overlap. In most cases they decrease performance
+        //       drastically and in some cases they can even cause
+        //       errors in this procedure. So let's ignore them at
+        //       this point.
+        const(LocalAlignment[]) cleanUpLocalAlignments(in LocalAlignment[] localAlignments)
+        {
+            ReferenceInterval toInterval(in LocalAlignment* la) pure
+            {
+                return ReferenceInterval(
+                    0,
+                    la.contigA.begin,
+                    la.contigA.end,
+                );
+            }
+
+            auto combinations = findTilings!toInterval(
+                localAlignments.map!((ref la) => &la).array,
+                longestInputsLength(memoryLimit),
+            );
+
+            alias Combination = typeof(combinations[0]);
+            auto combinationScore(in Combination combination)
+            {
+                long coveredBasePairs = combination.region.size;
+                long score = combination.region.size
+                     - combination.totalOverlap
+                     - combination.elements.map!"a.numDiffs".sum;
+
+                return score;
+            }
+
+            return combinations.maxElement!combinationScore.elements.map!"*a".array;
+        }
+
+        size_t skipTracePointsToASeqPos(in LocalAlignment localAlignment)
         {
             return localAlignment.tracePointsUpTo!"contigA"(
                 aSeqPos,
@@ -1460,17 +1483,48 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             auto aSeqEnd = afterGap.contigA.begin - begin.contigA;
             auto bSeqBegin = bSeqPos - begin.contigB;
             auto bSeqEnd = afterGap.contigB.begin - begin.contigB;
+            auto aSubsequence = aSequence[aSeqBegin .. aSeqEnd];
+            auto bSubsequence = bSequence[bSeqBegin .. bSeqEnd];
 
-            GC.collect();
-            auto gapAlignment = findAlignment(
-                aSequence[aSeqBegin .. aSeqEnd],
-                bSequence[bSeqBegin .. bSeqEnd],
-                indelPenalty,
-                Yes.freeShift,
-                memoryLimit,
-            );
+            if (memoryRequired(aSubsequence, bSubsequence) <= memoryLimit)
+            {
+                GC.collect();
+                auto gapAlignment = findAlignment(
+                    aSubsequence,
+                    bSubsequence,
+                    indelPenalty,
+                    Yes.freeShift,
+                    memoryLimit,
+                );
 
-            appendPartialAlignment(gapAlignment, aSeqEnd, bSeqEnd, Yes.freeShift);
+                appendPartialAlignment(gapAlignment, aSeqEnd, bSeqEnd, Yes.freeShift);
+            }
+            else
+            {
+                auto numIndels = cast(score_t) absdiff(aSubsequence.length, bSubsequence.length);
+                auto numSubst = cast(score_t) min(aSubsequence.length, bSubsequence.length);
+                auto indelOp = aSubsequence.length < bSubsequence.length
+                    ? EditOp.insertion
+                    : EditOp.deletetion;
+
+                logJsonWarn(
+                    "info", "faking too long alignment gap",
+                    "gapSize", aSubsequence.length,
+                    "acFingerprint", [fingerprint(&ac).expand].toJson,
+                );
+                auto fakeAlignment = typeof(_paddedAlignment)(
+                    0,
+                    chain(indelOp.repeat(numIndels), EditOp.substitution.repeat(numSubst)).array,
+                    aSubsequence,
+                    bSubsequence,
+                    indelPenalty,
+                    Yes.freeShift,
+                );
+                fakeAlignment.score = fakeAlignment.computeScore();
+                assert(fakeAlignment.isValid());
+                appendPartialAlignment(fakeAlignment, aSeqEnd, bSeqEnd, Yes.freeShift);
+            }
+
             aSeqPos = afterGap.contigA.begin;
             bSeqPos = afterGap.contigB.begin;
         }
@@ -1502,7 +1556,6 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
                 Yes.freeShift,
                 memoryLimit,
             );
-            _paddedAlignment = _paddedAlignment[0 .. aSeqBegin];
             appendPartialAlignment(overlapAlignment, aSeqEnd, bSeqEnd, Yes.freeShift);
             aSeqPos = overlap.end.contigA;
             bSeqPos = overlap.end.contigB;
@@ -1579,7 +1632,12 @@ private auto getPaddedAlignment(S, TranslatedTracePoint)(
             _paddedAlignment.editPath ~= partialAlignment.editPath;
             _paddedAlignment.reference = aSequence[0 .. aSeqEnd];
             _paddedAlignment.query = bSequence[0 .. bSeqEnd];
-            assert(_paddedAlignment.isValid(), "exact alignment invalid after stitching");
+            assert(
+                _paddedAlignment.isValid(),
+                format
+                    !"exact alignment invalid after stitching: %1$d %2$d [%3$d, %5$d) [%4$d, %6$d)"
+                    (fingerprint(&ac).expand),
+            );
         }
 
         coord_t nextTracePoint(

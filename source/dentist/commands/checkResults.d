@@ -165,13 +165,22 @@ private struct ResultAnalyzer
     {
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        resultAlignment = cleanUpAlignments(getAlignments(
-            options.trueAssemblyDb,
-            options.resultDb,
-            options.resultsAlignmentFile,
-            options.workdir,
-            options.tracePointDistance,
-        ));
+        if (options.onlyContigId == 0)
+            resultAlignment = cleanUpAlignments(getAlignments(
+                options.trueAssemblyDb,
+                options.resultDb,
+                options.resultsAlignmentFile,
+                options.workdir,
+                options.tracePointDistance,
+            ));
+        else
+            resultAlignment = cleanUpAlignments(getAlignments(
+                options.trueAssemblyDb,
+                options.resultDb,
+                options.resultsAlignmentFile,
+                options.workdir,
+                options.tracePointDistance,
+            ).filter!(ac => ac.contigA.id == options.onlyContigId).array);
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -600,7 +609,7 @@ private struct ResultAnalyzer
                 else
                 {
                     auto exactAlignment = getOverlapAlignment(overlappingAlignment);
-                    auto overlappingExactAlignment = exactAlignment.partial(overlapBegin, overlapEnd);
+                    auto overlappingExactAlignment = exactAlignment[overlapBegin..min(overlapEnd, $)];
 
                     numDiffs += overlappingExactAlignment.score;
 

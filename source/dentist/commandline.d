@@ -787,6 +787,15 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.checkResults,
     ))
     {
+        @Option("only-contig")
+        @Help("restrict analysis to contig <uint> (experimental)")
+        id_t onlyContigId;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
         @Option("debug-alignment")
         @MetaVar("<file>")
         @Help("write the result alignment to a tabular file <file>")

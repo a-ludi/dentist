@@ -13,7 +13,8 @@ import std.algorithm : all, cmp, filter, map, max, min, sort, sum;
 import std.array : appender, array, join;
 import std.exception : assertThrown;
 import std.format : format;
-import std.range : assumeSorted, ElementType, isInputRange, only, retro;
+import std.functional : unaryFun;
+import std.range : assumeSorted, dropExactly, ElementType, isInputRange, only, retro;
 import std.traits : isNumeric, Unqual;
 
 /// Returns the type of the property `tag` of `T`.
@@ -1125,4 +1126,132 @@ unittest
     assertThrown!EmptyRegionException(sup(emptyRegion));
     assertThrown!(MismatchingTagsException!int)(min(region2));
     assertThrown!(MismatchingTagsException!int)(sup(region2));
+}
+
+struct Tiling(R, N, T)
+{
+    R region;
+    N totalOverlap;
+    T[] elements;
+}
+
+auto findTilings(alias toInterval, T, N)(T[] elements, in N maxLocalOverlap, in N maxGlobalOverlap = N.max)
+{
+    alias interval = unaryFun!toInterval;
+    alias Region = typeof(interval(elements[0]) - interval(elements[0]));
+    alias Num = typeof(interval(elements[0]).size);
+    alias overlapEachOther = (lhs, rhs) => interval(lhs).intersects(interval(rhs));
+
+    auto tilingsAcc = appender!(Tiling!(Region, Num, T)[]);
+
+    void findAllowedTilings(T[] candidates, Region region, T[] included, in Num globalOverlap)
+    {
+        if (globalOverlap > maxGlobalOverlap)
+            return;
+
+        tilingsAcc ~= Tiling!(Region, Num, T)(
+            region,
+            globalOverlap,
+            included,
+        );
+
+        size_t numExpansions;
+        foreach (i, candidate; candidates)
+        {
+            auto candidateInterval = interval(candidate);
+            auto newRegion = region | candidateInterval;
+            auto localOverlap = region.size + candidateInterval.size - newRegion.size;
+
+            if (localOverlap <= maxLocalOverlap)
+            {
+                findAllowedTilings(
+                    candidates.dropExactly(i + 1),
+                    newRegion,
+                    included ~ [candidate],
+                    globalOverlap + localOverlap,
+                );
+                ++numExpansions;
+            }
+        }
+    }
+
+    findAllowedTilings(
+        elements,
+        Region(),
+        [],
+        Num.init,
+    );
+
+    assert(tilingsAcc.data.length > 0);
+
+    return tilingsAcc.data;
+}
+
+unittest
+{
+    alias R = Region!(int, int);
+    alias TI = R.TaggedInterval;
+    auto elements = [
+        [1, 5],
+        [3, 9],
+        [7, 10],
+        [1, 10],
+    ];
+    auto tilings = findTilings!(
+        interval => TI(0, interval[0], interval[1])
+    )(
+        elements,
+        2,
+        4,
+    );
+
+    import std.stdio;
+
+    assert(tilings == [
+        Tiling!(R, int, int[])(
+            R([]),
+            0,
+            [],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 1, 5)]),
+            0,
+            [[1, 5]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 1, 9)]),
+            2,
+            [[1, 5], [3, 9]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 1, 10)]),
+            4,
+            [[1, 5], [3, 9], [7, 10]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 1, 5), TI(0, 7, 10)]),
+            0,
+            [[1, 5], [7, 10]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 3, 9)]),
+            0,
+            [[3, 9]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 3, 10)]),
+            2,
+            [[3, 9], [7, 10]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 7, 10)]),
+            0,
+            [[7, 10]],
+        ),
+        Tiling!(R, int, int[])(
+            R([TI(0, 1, 10)]),
+            0,
+            [[1, 10]],
+        ),
+]);
 }

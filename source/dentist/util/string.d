@@ -20,6 +20,7 @@ import std.array :
 import std.conv : to;
 import std.exception : basicExceptionCtors, enforce;
 import std.functional : binaryFun;
+import std.math : round, sqrt;
 import std.range :
     chain,
     chunks,
@@ -92,56 +93,98 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
     score_t indelPenalty;
     Flag!"freeShift" freeShift;
 
+    /// Compute alignment score.
+    score_t computeScore() const pure
+    {
+        auto walkResult = walkEditOps();
+        enforce!AlignmentException(
+            walkResult.i == reference.length && walkResult.j == query.length,
+            "invalid alignment",
+        );
+
+        return walkResult.computedScore;
+    }
+
     bool isValid() const pure nothrow
+    {
+        auto walkResult = walkEditOps();
+
+        return isValid(walkResult);
+    }
+
+    private bool isValid(in WalkResult walkResult) const pure nothrow
+    {
+        return walkResult.i == reference.length &&
+               walkResult.j == query.length &&
+               walkResult.computedScore == score;
+    }
+
+    private static struct WalkResult
     {
         score_t computedScore;
         size_t i, j;
+    }
+
+    private auto walkEditOps() const pure nothrow
+    {
+        WalkResult result;
         foreach (k, editOp; editPath)
         {
-            if (i > reference.length || j > query.length)
-                return false;
+            if (result.i > reference.length || result.j > query.length)
+                return result;
 
             final switch (editOp)
             {
             case EditOp.substitution:
-                if (i == reference.length || j == query.length)
-                    return false;
-                computedScore += getScore(reference[i], query[j]);
-                ++i;
-                ++j;
+                if (result.i == reference.length || result.j == query.length)
+                    return result;
+                result.computedScore += getScore(reference[result.i], query[result.j]);
+                ++result.i;
+                ++result.j;
                 break;
             case EditOp.deletetion:
-                if (i == reference.length)
-                    return false;
-                computedScore += indelPenalty;
-                ++i;
+                if (result.i == reference.length)
+                    return result;
+                result.computedScore += indelPenalty;
+                ++result.i;
                 break;
             case EditOp.insertion:
-                if (j == query.length)
-                    return false;
-                computedScore += indelPenalty;
-                ++j;
+                if (result.j == query.length)
+                    return result;
+                result.computedScore += indelPenalty;
+                ++result.j;
                 break;
             }
         }
         if (freeShift)
-            computedScore -= editPath.countUntil(EditOp.substitution);
+        {
+            auto firstSubstitution = editPath.countUntil(EditOp.substitution);
+            result.computedScore -= firstSubstitution > 0
+                ? firstSubstitution
+                : editPath.length;
+        }
 
-        return
-            i == reference.length &&
-            j == query.length &&
-            computedScore == score;
+        return result;
     }
 
     /**
         Get a partial alignment with respect to `reference`.
     */
     auto partial(in size_t begin, in size_t end) inout pure nothrow
+    in
+    {
+        assert(this.isValid());
+    }
+    out (partialAlignment)
+    {
+        assert(partialAlignment.isValid());
+    }
+    do
     {
         assert(0 <= begin && begin <= end && end <= reference.length, "index out of bounds");
 
         if (end == begin)
-            return typeof(this)(0, [], reference, query, indelPenalty);
+            return typeof(this)(0, [], reference[0 .. 0], query[0 .. 0], indelPenalty);
         else if (0 == begin && end == reference.length)
             return this;
 
@@ -191,7 +234,6 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             indelPenalty,
             freeShift,
         );
-        assert(partialAlignment.isValid());
 
         return partialAlignment;
     }
@@ -359,13 +401,8 @@ SequenceAlignment!(const(S), scoreFun) findAlignment(
 )
 {
     alias score = binaryFun!scoreFun;
-    auto memoryRequired = score_t.sizeof * (
-        // Space for the scoring matrix F
-        ((reference.length + 1) * (query.length + 1)) +
-        // Space for the edit path
-        (reference.length + query.length));
     enforce!AlignmentException(
-        memoryRequired <= memoryLimit,
+        memoryRequired(reference, query) <= memoryLimit,
         "memory limit exceeded; use short reference and/or query",
     );
 
@@ -562,6 +599,23 @@ unittest
         "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat\n" ~
         "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
         "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------");
+}
+
+// Returns the amount of memory required to compute an alignment between reference and query.
+size_t memoryRequired(S)(in S reference, in S query)
+{
+    return score_t.sizeof * (
+        // Space for the scoring matrix F
+        ((reference.length + 1) * (query.length + 1)) +
+        // Space for the edit path
+        (reference.length + query.length)
+    );
+}
+
+/// Returns longest query and refernce length possible with memoryLimit.
+size_t longestInputsLength(size_t memoryLimit) pure
+{
+    return round(sqrt((memoryLimit / score_t.sizeof + 3).to!double) - 2).to!size_t;
 }
 
 // Find edit path of the best alignment
