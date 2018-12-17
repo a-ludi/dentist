@@ -391,6 +391,8 @@ private struct ResultAnalyzer
 
     ReferenceRegion getReferenceGaps()
     {
+        mixin(traceExecution);
+
         alias scaffoldRegion = (contigPart) => ReferenceRegion(ReferenceInterval(
             contigPart.globalContigId,
             0,
@@ -410,6 +412,8 @@ private struct ResultAnalyzer
 
     ReferenceRegion getReconstructedRegions()
     {
+        mixin(traceExecution);
+
         return ReferenceRegion(resultAlignment
             .map!(ac => ac
                 .localAlignments
@@ -424,6 +428,8 @@ private struct ResultAnalyzer
 
     ReferenceRegion[] getReconstructedGaps()
     {
+        mixin(traceExecution);
+
         return referenceGaps
             .intervals
             .map!(gap => reconstructedRegions & gap)
