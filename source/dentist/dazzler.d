@@ -3232,7 +3232,7 @@ private
     auto executePipe(Range)(Range command, in string workdir = null)
             if (isInputRange!Range && isSomeString!(ElementType!Range))
     {
-        static struct LinesPipe
+        static final class LinesPipe
         {
             static enum lineTerminator = "\n";
 
@@ -3240,6 +3240,12 @@ private
             private const string workdir;
             private ProcessPipes process;
             private string currentLine;
+
+            this(in string[] command, in string workdir)
+            {
+                this.command = command;
+                this.workdir = workdir;
+            }
 
             ~this()
             {
