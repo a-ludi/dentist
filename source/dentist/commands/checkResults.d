@@ -146,6 +146,7 @@ private struct ResultAnalyzer
         stats.numUnaddressedGaps = getNumUnaddressedGaps();
         stats.numBpsInClosedGaps = getNumBpsInClosedGaps();
         stats.numBpsInGaps = getNumBpsInGaps();
+        stats.maximumN50 = getMaximumN50();
         stats.inputN50 = getInputN50();
         stats.resultN50 = getResultN50();
         stats.gapMedian = getGapMedian();
@@ -777,6 +778,17 @@ private struct ResultAnalyzer
             .sum;
     }
 
+    size_t getMaximumN50()
+    {
+        mixin(traceExecution);
+
+        return trueAssemblyScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => contigPart.peek!ContigSegment.length)
+            .array
+            .N!50(getNumBpsExpected);
+    }
+
     size_t getInputN50()
     {
         mixin(traceExecution);
@@ -945,6 +957,7 @@ private struct Stats
     size_t numUnaddressedGaps;
     size_t numBpsInClosedGaps;
     size_t numBpsInGaps;
+    size_t maximumN50;
     size_t inputN50;
     size_t resultN50;
     size_t gapMedian;
@@ -970,6 +983,7 @@ private struct Stats
             "numUnaddressedGaps": numUnaddressedGaps.toJson,
             "numBpsInClosedGaps": numBpsInClosedGaps.toJson,
             "numBpsInGaps": numBpsInGaps.toJson,
+            "maximumN50": maximumN50.toJson,
             "inputN50": inputN50.toJson,
             "resultN50": resultN50.toJson,
             "gapMedian": gapMedian.toJson,
@@ -1007,6 +1021,7 @@ private struct Stats
             format!"numBpsInClosedGaps:    %*d"(columnWidth, numBpsInClosedGaps),
             format!"numBpsInNonClosedGaps: %*d"(columnWidth, numBpsInGaps - numBpsInClosedGaps),
 
+            format!"maximumN50:            %*d"(columnWidth, maximumN50),
             format!"inputN50:              %*d"(columnWidth, inputN50),
             format!"resultN50:             %*d"(columnWidth, resultN50),
             format!"gapMedian:             %*d"(columnWidth, gapMedian),
@@ -1090,6 +1105,7 @@ private struct Stats
             numUnaddressedGaps,
             numBpsInClosedGaps,
             numBpsInGaps,
+            maximumN50,
             inputN50,
             resultN50,
             gapMedian,
