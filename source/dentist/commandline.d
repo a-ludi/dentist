@@ -318,7 +318,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<in:short-read-assembly>")
-        @Help("short read assembly in .dam format")
+        @Help("short-read assembly in .dam format")
         @Validate!(validateDB!".dam")
         string shortReadAssemblyFile;
         @Option()
@@ -397,7 +397,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Argument("<in:short-vs-true-read-alignment>")
         @Help(q"{
-            locals alignments of the short read assembly against the 'true'
+            locals alignments of the short-read assembly against the 'true'
             assembly in form of a .las file as produced by `daligner`
         }")
         @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.shortReadAssemblyFile))
