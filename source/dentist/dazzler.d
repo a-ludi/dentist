@@ -889,6 +889,9 @@ private:
     {
         finishCurrentLAs();
         currentAC.id = currentACID++;
+
+        // ensure alignment chain is valid by triggering invariant of AlignmentChain
+        cast(void) currentAC.first;
     }
 
     void readLengths()
