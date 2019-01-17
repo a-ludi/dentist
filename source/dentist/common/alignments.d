@@ -556,6 +556,23 @@ struct AlignmentChain
             }
     }
 
+    @property double averageErrorRate() const pure
+    {
+        return totalDiffs.to!double / coveredBases!"contigA".to!double;
+    }
+
+    unittest
+    {
+        with (Complement) with (LocalAlignment)
+            {
+                auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
+                auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+
+                assert(ac.averageErrorRate == 4.0 / 9.0);
+            }
+    }
+
     int compareIds(ref const AlignmentChain other) const pure nothrow
     {
         return cmpLexicographically!(
