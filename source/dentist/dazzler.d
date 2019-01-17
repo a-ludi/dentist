@@ -1855,7 +1855,7 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string w
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in id_t cacheSize = 1024)
+string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in id_t cacheSize = 1024)
 {
     // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
     // requirements of this function
@@ -2109,6 +2109,21 @@ unittest
     {
         assert(hiddenDbFile.isFile);
     }
+}
+
+/**
+    Self-dalign dbFile.
+
+    Returns: path to las-file.
+*/
+string getDalignment(Options)(in string dbFile, in Options options)
+        if (isOptionsList!(typeof(options.dalignerOptions)) &&
+            isSomeString!(typeof(options.workdir)))
+{
+    dalign(dbFile, options.dalignerOptions, options.workdir);
+    auto lasFile = getLasFile(dbFile, options.workdir);
+
+    return lasFile;
 }
 
 /**
