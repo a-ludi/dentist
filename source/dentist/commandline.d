@@ -1068,7 +1068,7 @@ struct OptionsFor(DentistCommand command)
             this is used to provide good default values for --acceptable-coverage-reads;
             both options are mutually exclusive
         }")
-        id_t readCoverage;
+        double readCoverage;
     }
 
     static if (command.among(
