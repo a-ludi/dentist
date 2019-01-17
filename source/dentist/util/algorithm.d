@@ -24,7 +24,7 @@ import std.range.primitives;
     Order `a` and `b` lexicographically by applying each `fun` to them. For
     unary functions compares `fun(a) < fun(b)`.
 */
-bool orderLexicographically(T, fun...)(T a, T b) pure nothrow
+bool orderLexicographically(T, fun...)(T a, T b)
 {
     static foreach (i, getFieldValue; fun)
     {
@@ -46,7 +46,7 @@ bool orderLexicographically(T, fun...)(T a, T b) pure nothrow
     Compare `a` and `b` lexicographically by applying each `fun` to them. For
     unary functions compares `fun(a) < fun(b)`.
 */
-int cmpLexicographically(T, fun...)(T a, T b) pure nothrow
+int cmpLexicographically(T, fun...)(T a, T b)
 {
     static foreach (i, getFieldValue; fun)
     {
