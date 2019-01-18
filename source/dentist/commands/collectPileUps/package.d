@@ -121,10 +121,10 @@ class PileUpCollector
         mixin(traceExecution);
 
         auto filters = tuple(
-            new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
             new ImproperAlignmentChainsFilter(),
             new AmbiguousAlignmentChainsFilter(&unusedReads),
             new RedundantAlignmentChainsFilter(&unusedReads),
+            new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
         );
         logJsonDiagnostic(
             "filterStage", "Input",

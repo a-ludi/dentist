@@ -8,24 +8,40 @@
 */
 module dentist.commands.collectPileUps.filter;
 
-import dentist.common : ReferenceRegion, to;
+import dentist.common :
+    ReadInterval,
+    ReadRegion,
+    ReferenceInterval,
+    ReferenceRegion,
+    to,
+    toInterval;
 import dentist.common.alignments :
     AlignmentChain,
     haveEqualIds;
+import dentist.util.log;
+import dentist.util.algorithm :
+    cmpLexicographically,
+    orderLexicographically;
 import dentist.util.math : NaturalNumberSet;
 import std.algorithm :
     all,
     chunkBy,
+    copy,
     filter,
+    isSorted,
     joiner,
     map,
     sort,
     uniq;
-import std.array : array;
+import std.array :
+    appender,
+    array;
 import std.range :
     InputRange,
     inputRangeObject,
     walkLength;
+import std.typecons : Flag, Yes;
+import vibe.data.json : toJson = serializeToJson;
 
 interface AlignmentChainFilter
 {
@@ -98,97 +114,105 @@ class RedundantAlignmentChainsFilter : ReadFilter
     }
 }
 
-/// Discard read if it has an alignment that aligns in multiple
-/// locations of one contig with approximately equal quality.
-class AmbiguousAlignmentChainsFilter : ReadFilter
+alias orderByReadAndErrorRate = orderLexicographically!(
+    AlignmentChain,
+    ac => ac.contigB.id,
+    ac => ac.averageErrorRate,
+);
+
+alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
+
+/// Discard read if part of it aligns to multiple loci in the reference.
+class AmbiguousAlignmentChainsFilter : AlignmentChainFilter
 {
-    /**
-        Two scores are considered similar if the relative "error" of them is
-        smaller than defaulMaxRelativeDiff.
-
-        The relative error is defined as:
-
-            relError(a, b) = abs(a - b)/max(a - b)
-
-        **Implementation note:** all computations are done in integer
-        arithmetic hence AlignmentChain.maxScore corresponds to 1 in the above
-        equation.
-    */
-    static enum maxRelativeDiff = AlignmentChain.maxScore / 20; // 5% of larger value
-    /**
-        Two scores are considered similar if the absolute "error" of them is
-        smaller than defaulMaxAbsoluteDiff.
-
-        The relative error is defined as:
-
-            absError(a, b) = abs(a - b)
-
-        **Implementation note:** all computations are done in integer
-        arithmetic hence all scores are lower than or equal to
-        AlignmentChain.maxScore .
-    */
-    static enum maxAbsoluteDiff = AlignmentChain.maxScore / 100; // 1% wrt. score
+    NaturalNumberSet* unusedReads;
 
     this(NaturalNumberSet* unusedReads)
     {
-        super(unusedReads);
+        this.unusedReads = unusedReads;
     }
 
-    override InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains)
+    override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
         assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
 
-        return alignmentChains
+        auto bufferRest = alignmentChains
+            .sort!orderByReadAndErrorRate
             .filter!"!a.flags.disabled"
-            .chunkBy!haveEqualIds
-            .filter!isAmgiguouslyAlignedRead
+            .chunkBy!groupByRead
+            .map!array
+            .map!groupByReadLocus
+            .map!(groupedByReadLocus => getUniquelyAlignedRead(groupedByReadLocus))
             .joiner
-            .inputRangeObject;
+            .copy(alignmentChains);
+        alignmentChains.length -= bufferRest.length;
+
+        return alignmentChains.sort.release;
     }
 
-    static bool isAmgiguouslyAlignedRead(Chunk)(Chunk readAlignments)
+    /// Groups local alignments of one read into groups of overlapping alignments.
+    static protected AlignmentChain[][] groupByReadLocus(AlignmentChain[] readAlignments)
     {
-        return readAlignments.save.walkLength(2) > 1 && haveSimilarScore(readAlignments);
+        // TODO find better algorithm that can solve situations like this:
+        //     Read:    |------------------|
+        //
+        //     AC1   ...------|
+        //     AC2                |------...
+        //     AC3   ...--------------------...
+        assert(readAlignments.length > 0, "readAlignments chunk must not be empty");
+        enum expectedMaximumGroups = 10;
+        alias toReadInterval = toInterval!(ReadInterval, "contigB");
+
+        auto unusedAlignments = NaturalNumberSet(readAlignments.length, Yes.addAll);
+        AlignmentChain[] groupedAlignmentsBuffer;
+        groupedAlignmentsBuffer.reserve(readAlignments.length);
+        auto groupedAlignmentsAcc = appender!(AlignmentChain[][]);
+        groupedAlignmentsAcc.reserve(expectedMaximumGroups);
+
+        while (!unusedAlignments.empty)
+        {
+            auto currentIndex = unusedAlignments.minElement;
+            auto currentReadAlignment = readAlignments[currentIndex];
+            auto currentReadInterval = toReadInterval(currentReadAlignment);
+            unusedAlignments.remove(currentIndex);
+            auto sliceBegin = groupedAlignmentsBuffer.length;
+            groupedAlignmentsBuffer ~= currentReadAlignment;
+
+            foreach (unusedIndex; unusedAlignments.elements)
+            {
+                auto unusedReadAlignment = readAlignments[unusedIndex];
+                auto unusedAlignmentInterval = toReadInterval(unusedReadAlignment);
+
+                if (currentReadInterval.intersects(unusedAlignmentInterval))
+                {
+                    groupedAlignmentsBuffer ~= unusedReadAlignment;
+                    unusedAlignments.remove(unusedIndex);
+                }
+            }
+
+            groupedAlignmentsAcc ~= groupedAlignmentsBuffer[sliceBegin .. $];
+        }
+
+        return groupedAlignmentsAcc.data;
     }
 
-    static bool haveSimilarScore(Chunk)(Chunk readAlignments)
+    protected auto getUniquelyAlignedRead(AlignmentChain[][] groupedByReadLocus)
     {
-        auto scores = readAlignments.map!"a.score".array.sort.release;
+        enum emptyRange = groupedByReadLocus.init.joiner;
 
-        return similarScore(scores[0], scores[1]);
+        foreach (readLocusAlignments; groupedByReadLocus)
+        {
+            if (readLocusAlignments.length > 1)
+            {
+                this.unusedReads.remove(groupedByReadLocus[0][0].contigB.id);
+
+                return emptyRange;
+            }
+        }
+
+        return groupedByReadLocus.joiner;
     }
 
-    protected static bool similarScore(size_t a, size_t b) pure
-    {
-        auto diff = a > b ? a - b : b - a;
-        auto magnitude = a > b ? a : b;
-
-        return diff < maxAbsoluteDiff || (diff * AlignmentChain.maxScore / magnitude) < maxRelativeDiff;
-    }
-
-    unittest
-    {
-        enum eps = 1;
-        enum refValueSmall = 2 * maxAbsoluteDiff;
-        enum refValueLarge = AlignmentChain.maxScore / 2;
-
-        // test absolute part
-        assert(similarScore(refValueSmall, refValueSmall));
-        assert(similarScore(refValueSmall, refValueSmall + (maxAbsoluteDiff - 1)));
-        assert(similarScore(refValueSmall, refValueSmall - (maxAbsoluteDiff - 1)));
-        assert(!similarScore(refValueSmall, refValueSmall + (maxAbsoluteDiff + 1)));
-        assert(!similarScore(refValueSmall, refValueSmall - (maxAbsoluteDiff + 1)));
-        // test relative part
-        assert(similarScore(refValueLarge, refValueLarge));
-        assert(similarScore(refValueLarge,
-                refValueLarge + refValueLarge * maxRelativeDiff / AlignmentChain.maxScore));
-        assert(similarScore(refValueLarge,
-                refValueLarge - refValueLarge * maxRelativeDiff / AlignmentChain.maxScore) + eps);
-        assert(!similarScore(refValueLarge,
-                refValueLarge + refValueLarge * 2 * maxRelativeDiff / AlignmentChain.maxScore));
-        assert(!similarScore(refValueLarge,
-                refValueLarge - refValueLarge * 2 * maxRelativeDiff / AlignmentChain.maxScore));
-    }
 }
 
 class WeaklyAnchoredAlignmentChainsFilter : AlignmentChainFilter

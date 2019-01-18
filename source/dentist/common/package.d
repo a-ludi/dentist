@@ -126,3 +126,12 @@ R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
         .array
     );
 }
+
+Interval toInterval(Interval, string contig)(in AlignmentChain alignment)
+{
+    return Interval(
+        mixin("alignment." ~ contig ~ ".id") + 0,
+        mixin("alignment.first." ~ contig ~ ".begin") + 0,
+        mixin("alignment.last." ~ contig ~ ".end") + 0,
+    );
+}
