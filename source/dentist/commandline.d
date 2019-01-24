@@ -1755,12 +1755,12 @@ private
     alias typeOf(alias T) = typeof(T);
 
     void validateFileExtension(
-        string msg = "expected %-(%s, %) but got %s",
+        string msg = "expected %-(%s or %) but got %s",
         extensions...
     )(in string file)
             if (allSatisfy!(isSomeString, staticMap!(typeOf, extensions)))
     {
-        enum defaultMsg = "expected %-(%s, %) but got %s";
+        enum defaultMsg = "expected %-(%s or %) but got %s";
 
         enforce!CLIException(
             file.endsWith(extensions),
