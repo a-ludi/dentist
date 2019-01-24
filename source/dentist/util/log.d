@@ -110,8 +110,8 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
 ///
 unittest
 {
-    import std.regex : ctRegex, matchFirst;
     import std.stdio : File, stderr;
+    import vibe.data.json : Json, parseJsonString;
 
     auto origStderr = stderr;
     stderr = File.tmpfile();
@@ -124,11 +124,12 @@ unittest
     logJsonError("error", "mysterious observation", "secret", 42);
 
     stderr.rewind();
-    auto expected = ctRegex!(
-            `\{"secret":42,"error":"mysterious observation","thread":[0-9]+,"timestamp":[0-9]+\}` ~ '\n');
-    auto observed = stderr.readln;
+    auto observed = parseJsonString(stderr.readln);
 
-    assert(matchFirst(observed, expected), "got unexpected output `" ~ observed ~ "`");
+    assert(observed["thread"].type == Json.Type.int_);
+    assert(observed["timestamp"].type == Json.Type.int_);
+    assert(observed["error"] == "mysterious observation");
+    assert(observed["secret"] == 42);
 }
 
 /**
@@ -288,6 +289,7 @@ unittest
 {
     import std.regex : ctRegex, matchFirst;
     import std.stdio : File, stderr;
+    import vibe.data.json : Json, parseJsonString;
 
     auto origStderr = stderr;
     stderr = File.tmpfile();
@@ -310,13 +312,17 @@ unittest
     doSomething();
     stderr.rewind();
 
-    auto expected1 = ctRegex!
-            `\{"state":"enter","function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
-    auto expected2 = ctRegex!
-            `\{"state":"exit","timeElapsed":[0-9]{2,},"function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
-    auto observed1 = stderr.readln;
-    auto observed2 = stderr.readln;
+    enum functionFQN = ctRegex!`dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething`;
+    auto observed1 = parseJsonString(stderr.readln);
+    auto observed2 = parseJsonString(stderr.readln);
 
-    assert(matchFirst(observed1, expected1), "got unexpected output `" ~ observed1 ~ "`");
-    assert(matchFirst(observed2, expected2), "got unexpected output `" ~ observed2 ~ "`");
+    assert(observed1["thread"].type == Json.Type.int_);
+    assert(observed1["timestamp"].type == Json.Type.int_);
+    assert(observed1["state"] == "enter");
+    assert(matchFirst(observed1["function"].to!string, functionFQN));
+
+    assert(observed2["thread"].type == Json.Type.int_);
+    assert(observed2["timestamp"].type == Json.Type.int_);
+    assert(observed2["state"] == "exit");
+    assert(matchFirst(observed2["function"].to!string, functionFQN));
 }

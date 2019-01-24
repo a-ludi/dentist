@@ -984,29 +984,29 @@ unittest
         "% T 12",
         "@ T 4",
         "P 1 2 n >",
-        "L 8 9",
+        "L 13 15",
         "C 3 4 5 6",
         "D 7",
         "P 1 2 n -",
-        "L 8 9",
+        "L 13 15",
         "C 12 13 14 15",
         "D 16",
         "P 19 20 c +",
-        "L 26 27",
+        "L 31 33",
         "C 21 22 23 24",
         "D 25",
         "P 19 20 c -",
-        "L 26 27",
+        "L 31 33",
         "C 30 31 32 33",
         "D 34",
         "T 1",
         "   0 1",
         "P 37 38 n .",
-        "L 35 36",
+        "L 40 42",
         "C 39 40 41 42",
         "D 43",
         "P 46 47 c .",
-        "L 53 54",
+        "L 58 60",
         "C 48 49 50 51",
         "D 52",
         "T 3",
@@ -1014,7 +1014,7 @@ unittest
         "   3 101",
         "   4 104",
         "P 46 47 n .",
-        "L 53 54",
+        "L 58 60",
         "C 57 58 59 60",
         "D 61",
         "T 3",
@@ -1055,8 +1055,8 @@ unittest
         auto expectedResult = [
             AlignmentChain(
                 0,
-                Contig(1, 8),
-                Contig(2, 9),
+                Contig(1, 13),
+                Contig(2, 15),
                 emptyFlags,
                 [
                     LocalAlignment(
@@ -1073,8 +1073,8 @@ unittest
             ),
             AlignmentChain(
                 1,
-                Contig(19, 26),
-                Contig(20, 27),
+                Contig(19, 31),
+                Contig(20, 33),
                 Flags(complement),
                 [
                     LocalAlignment(
@@ -1094,8 +1094,8 @@ unittest
             ),
             AlignmentChain(
                 2,
-                Contig(37, 35),
-                Contig(38, 36),
+                Contig(37, 40),
+                Contig(38, 42),
                 emptyFlags,
                 [
                     LocalAlignment(
@@ -1107,8 +1107,8 @@ unittest
             ),
             AlignmentChain(
                 3,
-                Contig(46, 53),
-                Contig(47, 54),
+                Contig(46, 58),
+                Contig(47, 60),
                 Flags(complement),
                 [
                     LocalAlignment(
@@ -1125,8 +1125,8 @@ unittest
             ),
             AlignmentChain(
                 4,
-                Contig(46, 53),
-                Contig(47, 54),
+                Contig(46, 58),
+                Contig(47, 60),
                 emptyFlags,
                 [
                     LocalAlignment(
