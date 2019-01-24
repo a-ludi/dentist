@@ -9,8 +9,11 @@
 module dentist.commandline;
 
 import darg :
+    ArgParseError,
     ArgParseHelp,
     Argument,
+    ArgumentsParser,
+    handleArg,
     Help,
     helpString,
     MetaVar,
@@ -80,7 +83,7 @@ import std.traits :
     isStaticArray,
     Parameters,
     ReturnType;
-import std.typecons : BitFlags;
+import std.typecons : BitFlags, tuple;
 import transforms : camelCase, snakeCaseCT;
 import vibe.data.json : serializeToJsonString;
 
@@ -292,6 +295,48 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.checkResults,
     );
 
+    static if (command == DentistCommand.maskRepetitiveRegions)
+    {
+        @ArgumentsParser
+        auto parseArguments(const(string)[] leftOver)
+        {
+            alias referenceSymbol = __traits(getMember, this, "refFile");
+            enum referenceUDA = getUDAs!(referenceSymbol, Argument)[0];
+
+            enforce!ArgParseError(leftOver.length >= numArguments.lowerBound, referenceUDA.multiplicityError(0));
+            enforce!ArgParseError(leftOver.length <= numArguments.upperBound, "Missing positional arguments.");
+
+            auto hasReadsFile = (leftOver.length == numArguments.upperBound);
+            handleArg!"refFile"(this, leftOver[0]);
+            leftOver = leftOver[1 .. $];
+
+            if (hasReadsFile)
+            {
+                handleArg!"readsFile"(this, leftOver[0]);
+                leftOver = leftOver[1 .. $];
+            }
+
+            handleArg!"dbAlignmentInputFile"(this, leftOver[0]);
+            leftOver = leftOver[1 .. $];
+
+            foreach (member; __traits(allMembers, typeof(this)))
+            {
+                alias symbol = __traits(getMember, this, member);
+                alias argUDAs = getUDAs!(symbol, Argument);
+
+                static if (
+                    argUDAs.length > 0 &&
+                    !member.among("refFile", "readsFile", "dbAlignmentInputFile")
+                )
+                {
+                    handleArg!member(this, leftOver[0]);
+                    leftOver = leftOver[1 .. $];
+                }
+            }
+
+            return this;
+        }
+    }
 
     static if (command.among(
         TestingCommand.translocateGaps,
@@ -359,17 +404,29 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.processPileUps,
     ))
     {
-        @Argument("<in:reads>")
-        @Help("set of PacBio reads in .dam format")
-        @Validate!validateDB
+        static if (command == DentistCommand.maskRepetitiveRegions)
+            enum argReadsMultiplicity = Multiplicity.optional;
+        else
+            enum argReadsMultiplicity = 1;
+
+        @Argument("<in:reads>", argReadsMultiplicity)
+        @Help("set of PacBio reads in .db/.dam format")
+        @Validate!(validateReadsDb)
         string readsFile;
         @Option()
         string readsDb;
 
+        static void validateReadsDb(string readsFile)
+        {
+            if (argReadsMultiplicity == 1 || readsFile !is null)
+                validateDB(readsFile);
+        }
+
         @PostValidate()
         void hookProvideReadsFileInWorkDir()
         {
-            readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
+            if (readsFile !is null)
+                readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
         }
     }
 
@@ -420,21 +477,20 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.maskRepetitiveRegions,
     ))
     {
-        @Argument("<in:self-alignment>")
-        @Help(q"{
-            local alignments of the reference against itself in form of a .las
-            file as produced by `daligner`
-        }")
-        @Validate!((value, options) => validateLasFile(value, options.refFile))
-        string selfAlignmentInputFile;
+        @Argument("<in:alignment>")
+        @Help("self-alignment of the reference assembly or reads vs. reference alignment")
+        @Validate!((value, options) => options.readsFile is null
+            ? validateLasFile(value, options.refFile)
+            : validateLasFile(value, options.refFile, options.readsFile))
+        string dbAlignmentInputFile;
         @Option()
-        string selfAlignmentFile;
+        string dbAlignmentFile;
 
         @PostValidate()
-        void hookProvideSelfAlignmentInWorkDir()
+        void hookProvideShortReadAssemblyAlignmentInWorkDir()
         {
-            selfAlignmentFile = provideLasFileInWorkdir(
-                selfAlignmentInputFile,
+            dbAlignmentFile = provideLasFileInWorkdir(
+                dbAlignmentInputFile,
                 provideMethod,
                 workdir,
             );
@@ -442,7 +498,6 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -511,7 +566,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<in:repeat-mask>")
-        @Help("read <repeat-mask> generated by the `maskRepetitiveRegions` command")
+        @Help("read <repeat-mask> generated by the `mask-repetitive-regions` command")
         @Validate!((value, options) => validateInputMask(options.refFile, value))
         string repeatMask;
     }
@@ -935,6 +990,9 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsReads()
         {
+            if (readsDb is null)
+                return;
+
             enforce!CLIException(
                 maxCoverageReads != maxCoverageReads.init ||
                 readCoverage != readCoverage.init,
@@ -982,6 +1040,9 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsSelf()
         {
+            if (readsDb is null)
+                return;
+
             coverageBoundsSelf = [0, maxCoverageSelf];
         }
     }
@@ -1315,6 +1376,28 @@ struct OptionsFor(DentistCommand command)
         OptionsFor!command defaultOptions;
 
         return __traits(getMember, defaultOptions, property.stringof);
+    }
+
+
+    static auto numArguments() pure nothrow
+    {
+        alias ThisOptions = OptionsFor!command;
+        size_t lowerBound;
+        size_t upperBound;
+
+        foreach (member; __traits(allMembers, ThisOptions))
+        {
+            alias symbol = __traits(getMember, ThisOptions.init, member);
+            alias argUDAs = getUDAs!(symbol, Argument);
+
+            static if (argUDAs.length > 0)
+            {
+                lowerBound += argUDAs[0].lowerBound;
+                upperBound += argUDAs[0].upperBound;
+            }
+        }
+
+        return tuple!("lowerBound", "upperBound")(lowerBound, upperBound);
     }
 }
 

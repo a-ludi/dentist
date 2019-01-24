@@ -23,9 +23,11 @@ import dentist.util.log;
 import std.algorithm :
     joiner,
     map,
+    predSwitch,
     sort,
     uniq;
 import std.array : appender, array;
+import std.conv : to;
 import std.format : format;
 import std.range :
     chain,
@@ -47,12 +49,18 @@ void execute(in Options options)
     assessor.run();
 }
 
+enum AlignmentType : ubyte
+{
+    self,
+    reads,
+}
+
 /// This class comprises the `collectPileUps` step of the `dentist` algorithm
 class RepeatMaskAssessor
 {
     protected const Options options;
-    protected AlignmentChain[] selfAlignment;
-    protected AlignmentChain[] readsAlignment;
+    protected AlignmentType alignmentType;
+    protected AlignmentChain[] alignment;
     protected ReferenceRegion repetitiveRegions;
 
     this(in ref Options options)
@@ -73,80 +81,54 @@ class RepeatMaskAssessor
     {
         mixin(traceExecution);
 
-        selfAlignment = getAlignments(
-            options.refDb,
-            options.selfAlignmentFile,
-            options.workdir,
-        );
-        readsAlignment = getAlignments(
-            options.refDb,
-            options.readsDb,
-            options.readsAlignmentFile,
-            options.workdir,
-        );
+        alignmentType = options.readsDb is null
+            ? AlignmentType.self
+            : AlignmentType.reads;
 
-        if (selfAlignment.length == 0)
-            logJsonWarn("info", "empty self alignment");
-        if (readsAlignment.length == 0)
-            logJsonWarn("info", "empty ref vs. reads alignment");
+        final switch (alignmentType)
+        {
+            case AlignmentType.self:
+                alignment = getAlignments(
+                    options.refDb,
+                    options.dbAlignmentFile,
+                    options.workdir,
+                );
+                break;
+            case AlignmentType.reads:
+                alignment = getAlignments(
+                    options.refDb,
+                    options.readsDb,
+                    options.dbAlignmentFile,
+                    options.workdir,
+                );
+                break;
+        }
+
+        if (alignment.length == 0)
+            logJsonWarn("info", "empty " ~ alignmentType.to!string ~ "-alignment");
     }
 
     void assessRepeatStructure()
     {
         mixin(traceExecution);
 
-        auto assessmentStages = [
-            assessmentStage(
-                "self-alignment",
-                new BadAlignmentCoverageAssessor(
-                    options.coverageBoundsSelf[0],
-                    options.coverageBoundsSelf[1]
-                ),
-                selfAlignment,
-            ),
-            assessmentStage(
-                "reads-alignment",
-                new BadAlignmentCoverageAssessor(
-                    options.coverageBoundsReads[0],
-                    options.coverageBoundsReads[1]
-                ),
-                readsAlignment,
-            ),
-        ];
+        id_t[2] coverageBounds = predSwitch(alignmentType,
+            AlignmentType.self, options.coverageBoundsSelf,
+            AlignmentType.reads, options.coverageBoundsReads,
+        );
+        auto repeatAssessor = new BadAlignmentCoverageAssessor(
+            coverageBounds[0],
+            coverageBounds[1]
+        );
 
-        foreach (stage; assessmentStages)
-        {
-            auto repetitiveRegions = stage.assessor(stage.input);
-
-            logJsonDiagnostic(
-                "assessor", stage.name,
-                "repetitiveRegions", shouldLog(LogLevel.debug_)
-                    ? repetitiveRegions.intervals.toJson
-                    : toJson(null),
-                "numRepetitiveRegions", repetitiveRegions.intervals.length,
-            );
-
-            if (shouldLog(LogLevel.debug_))
-            {
-                auto maskName = format!"%s-%s"(options.repeatMask, stage.name);
-
-                writeMask(
-                    options.refDb,
-                    maskName,
-                    repetitiveRegions.intervals,
-                    options.workdir,
-                );
-            }
-
-            this.repetitiveRegions |= repetitiveRegions;
-        }
+        repetitiveRegions = repeatAssessor(alignment);
 
         logJsonDiagnostic(
-            "assessor", "finalResult",
+            "alignmentType", alignmentType.to!string,
             "repetitiveRegions", shouldLog(LogLevel.debug_)
-                ? this.repetitiveRegions.intervals.toJson
+                ? repetitiveRegions.intervals.toJson
                 : toJson(null),
-            "numRepetitiveRegions", this.repetitiveRegions.intervals.length,
+            "numRepetitiveRegions", repetitiveRegions.intervals.length,
         );
     }
 
@@ -161,23 +143,6 @@ class RepeatMaskAssessor
             options.workdir,
         );
     }
-}
-
-// see `assessmentStage` below.
-alias MaskAssessmentStage(Assessor : RepeatAssessor) = Tuple!(
-    string, "name",
-    Assessor, "assessor",
-    const(AlignmentChain[]), "input",
-);
-
-/// Construct a stage of the repeat mask assessment pipeline.
-MaskAssessmentStage!Assessor assessmentStage(Assessor : RepeatAssessor)(
-    string name,
-    Assessor assessor,
-    const(AlignmentChain[]) input,
-)
-{
-    return typeof(return)(name, assessor, input);
 }
 
 /**
