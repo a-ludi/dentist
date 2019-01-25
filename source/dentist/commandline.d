@@ -422,10 +422,15 @@ struct OptionsFor(DentistCommand command)
                 validateDB(readsFile);
         }
 
+        @property bool hasReadsDb() const pure nothrow
+        {
+            return readsFile !is null;
+        }
+
         @PostValidate()
         void hookProvideReadsFileInWorkDir()
         {
-            if (readsFile !is null)
+            if (hasReadsDb)
                 readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
         }
     }
@@ -990,7 +995,7 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsReads()
         {
-            if (readsDb is null)
+            if (!hasReadsDb)
                 return;
 
             enforce!CLIException(
@@ -1040,7 +1045,7 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsSelf()
         {
-            if (readsDb is null)
+            if (hasReadsDb)
                 return;
 
             coverageBoundsSelf = [0, maxCoverageSelf];
