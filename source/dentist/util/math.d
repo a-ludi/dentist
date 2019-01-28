@@ -1767,6 +1767,138 @@ unittest
 }
 
 /**
+    Find all maximal connected components of a graph-like structure. The
+    predicate `isConnected` will be evaluated `O(n^^2)` times in the
+    worst-case and `Ω(n)` in the best case. In expectation it will be
+    evaluated `θ(n*log(n))`.
+
+    Params:
+        isConnected =   binary predicate that evaluates to true iff two nodes,
+                        represented as indices, are connected
+        numNodes    =   total number of nodes in the graph
+
+    Returns:    range of maxmimally connected components represented as
+                `NaturalNumberSet`s
+*/
+auto findMaximallyConnectedComponents(alias isConnected)(in size_t numNodes)
+{
+    return MaximalConnectedComponents!(binaryFun!isConnected)(numNodes);
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : only;
+
+    alias modEqv(size_t m) = (a, b) => (a % m) == (b % m);
+    alias clusterByThreshold(size_t t) = (a, b) => (a < t) == (b < t);
+
+    assert(equal(
+        findMaximallyConnectedComponents!(modEqv!5)(15),
+        only(
+            NaturalNumberSet.create(0, 5, 10),
+            NaturalNumberSet.create(1, 6, 11),
+            NaturalNumberSet.create(2, 7, 12),
+            NaturalNumberSet.create(3, 8, 13),
+            NaturalNumberSet.create(4, 9, 14),
+        ),
+    ));
+    assert(equal(
+        findMaximallyConnectedComponents!(modEqv!3)(15),
+        only(
+            NaturalNumberSet.create(0, 3, 6, 9, 12),
+            NaturalNumberSet.create(1, 4, 7, 10, 13),
+            NaturalNumberSet.create(2, 5, 8, 11, 14),
+        ),
+    ));
+    assert(equal(
+        findMaximallyConnectedComponents!(clusterByThreshold!10)(15),
+        only(
+            NaturalNumberSet.create(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+            NaturalNumberSet.create(10, 11, 12, 13, 14),
+        ),
+    ));
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : only;
+
+    auto connectivity = [
+        [false, false, false, true ],
+        [false, false, true , false],
+        [false, true , false, false],
+        [true , false, false, false],
+    ];
+    alias isConnected = (i, j) => connectivity[i][j];
+
+    assert(equal(
+        findMaximallyConnectedComponents!isConnected(4),
+        only(
+            NaturalNumberSet.create(0, 3),
+            NaturalNumberSet.create(1, 2),
+        ),
+    ));
+}
+
+private struct MaximalConnectedComponents(alias isConnected)
+{
+
+    const(size_t) numNodes;
+    NaturalNumberSet unvisited;
+    NaturalNumberSet currentComponent;
+
+    this(in size_t numNodes)
+    {
+        this.numNodes = numNodes;
+        this.unvisited = NaturalNumberSet(numNodes, Yes.addAll);
+        this.currentComponent = NaturalNumberSet(numNodes);
+
+        if (!empty)
+            popFront();
+    }
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty " ~ typeof(this).stringof);
+
+        currentComponent.clear();
+
+        if (unvisited.empty)
+            return;
+
+        auto seedNode = unvisited.minElement;
+
+        maximizeConnectedComponent(seedNode);
+    }
+
+    private void maximizeConnectedComponent(size_t node)
+    {
+        currentComponent.add(node);
+        unvisited.remove(node);
+
+        foreach (nextNode; unvisited.elements)
+            if (isConnected(node, nextNode))
+                maximizeConnectedComponent(nextNode);
+    }
+
+    @property NaturalNumberSet front()
+    {
+        assert(!empty, "Attempting to fetch the front an empty " ~ typeof(this).stringof);
+
+        return currentComponent;
+    }
+
+    @property bool empty() const pure nothrow
+    {
+        return unvisited.empty && currentComponent.empty;
+    }
+}
+
+/**
     Find all maximal cliques in a graph represented by `adjacencyList`.
     The implementation is based on version 1 of the Bron-Kerbosch algorithm [1].
 
