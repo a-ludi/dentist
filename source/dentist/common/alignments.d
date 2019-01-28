@@ -51,6 +51,8 @@ import std.range :
     iota,
     only,
     radial,
+    repeat,
+    retro,
     slide,
     takeNone,
     zip;
@@ -788,6 +790,123 @@ struct AlignmentChain
         assert(ac.translateTracePoint(2584, RoundingMode.floor) == tuple(2584, 2158));
         assertThrown!Exception(ac.translateTracePoint(578, RoundingMode.floor));
         assertThrown!Exception(ac.translateTracePoint(2585, RoundingMode.floor));
+    }
+
+    /**
+        Generate a cartoon of this alignment relative to `contig`.
+
+        Params:
+            bpsPerChar =    Number of base pairs that one char represents.
+
+        Returns: a cartoon of this alignment
+    */
+    static string cartoon(string contig)(in coord_t bpsPerChar, in AlignmentChain[] alignmentChains...)
+    {
+        if (alignmentChains.length == 0)
+            return "";
+
+        alias getContig = ac => mixin("ac." ~ contig);
+        alias getCoords = la => mixin("la." ~ contig);
+        alias getComplementedCoords = la => LocalAlignment.Locus(
+
+        );
+
+        auto referenceContig = getContig(alignmentChains[0]);
+
+        enforce!Exception(
+            alignmentChains.all!(ac => getContig(ac) == referenceContig),
+            "all alignment chains must share the same reference contig",
+        );
+
+        InputRange!char cartoonLine(in AlignmentChain ac)
+        {
+            if (contig == "contigA" || !ac.flags.complement)
+                return inputRangeObject(chain(
+                    ' '.repeat(getCoords(ac.first).begin / bpsPerChar),
+                    ac
+                        .localAlignments
+                        .slide!(No.withPartial)(2)
+                        .map!(laPair => getCoords(laPair[1]).begin > getCoords(laPair[0]).end
+                            ? chain(
+                                '-'.repeat(ceildiv(getCoords(laPair[0]).length, bpsPerChar)),
+                                '='.repeat((getCoords(laPair[1]).begin - getCoords(laPair[0]).end) / bpsPerChar),
+                            )
+                            : chain(
+                                '-'.repeat(ceildiv(
+                                    getCoords(laPair[0]).length - (getCoords(laPair[0]).end - getCoords(laPair[1]).begin),
+                                    bpsPerChar,
+                                )),
+                                '='.repeat(0),
+                            ),
+                        )
+                        .joiner,
+                    '-'.repeat(ceildiv(getCoords(ac.last).length, bpsPerChar)),
+                ));
+            else
+                return inputRangeObject(chain(
+                    ' '.repeat((referenceContig.length - getCoords(ac.last).end) / bpsPerChar),
+                    ac
+                        .localAlignments
+                        .retro
+                        .slide!(No.withPartial)(2)
+                        .map!(laPair => getCoords(laPair[0]).begin > getCoords(laPair[1]).end
+                            ? chain(
+                                '-'.repeat(ceildiv(getCoords(laPair[0]).length, bpsPerChar)),
+                                '='.repeat((getCoords(laPair[0]).begin - getCoords(laPair[1]).end) / bpsPerChar),
+                            )
+                            : chain(
+                                '-'.repeat(ceildiv(
+                                    getCoords(laPair[0]).length - (getCoords(laPair[1]).end - getCoords(laPair[0]).begin),
+                                    bpsPerChar,
+                                )),
+                                '='.repeat(0),
+                            )
+                        )
+                        .joiner,
+                    '-'.repeat(ceildiv(getCoords(ac.first).length, bpsPerChar)),
+                ));
+        }
+
+        return chain(
+            '-'.repeat(ceildiv(referenceContig.length, bpsPerChar)),
+            only('\n'),
+            alignmentChains.map!cartoonLine.joiner(only('\n')),
+        ).to!string;
+    }
+
+    ///
+    unittest
+    {
+        with (AlignmentChain) with (LocalAlignment) with (Complement)
+        {
+            auto acs = [
+                AlignmentChain(
+                    0,
+                    Contig(1, 10),
+                    Contig(1, 10),
+                    emptyFlags,
+                    [
+                        LocalAlignment(Locus(0, 3), Locus(0, 3)),
+                        LocalAlignment(Locus(4, 5), Locus(4, 5)),
+                    ]),
+                AlignmentChain(
+                    1,
+                    Contig(1, 10),
+                    Contig(1, 10),
+                    Flags(Flag.complement),
+                    [
+                        LocalAlignment(Locus(5, 8), Locus(0, 3)),
+                        LocalAlignment(Locus(9, 10), Locus(4, 5)),
+                    ]),
+            ];
+
+            assert(cartoon!"contigA"(1, acs) == "----------\n" ~
+                                                "---=-\n" ~
+                                                "     ---=-");
+            assert(cartoon!"contigB"(1, acs) == "----------\n" ~
+                                                "---=-\n" ~
+                                                "     -=---");
+        }
     }
 }
 
