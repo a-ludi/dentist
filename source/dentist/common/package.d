@@ -10,7 +10,13 @@ module dentist.common;
 
 import dentist.util.log;
 import dentist.util.region : Region;
-import std.algorithm : count, fold, map, max, sum;
+import std.algorithm :
+    among,
+    count,
+    fold,
+    map,
+    max,
+    sum;
 import std.array : array;
 import std.conv : to;
 import std.format : format;
@@ -127,11 +133,47 @@ R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
     );
 }
 
+/**
+    Get the interval that the alignment covers. This method does returns a
+    single interval from the first to the last matching base pair. It takes
+    complementary alignments into account when an interval on `contigB` is
+    requested
+
+    Params:
+        Interval  = interval type with (at least) three fields `contigId`,
+                   `begin` and `end`
+        contig    = either `"contigA"` or `"contigB"`
+        alignment = alignment chain
+
+    Returns: interval from the first to the last matching base pair.
+*/
 Interval toInterval(Interval, string contig)(in AlignmentChain alignment)
 {
-    return Interval(
-        mixin("alignment." ~ contig ~ ".id") + 0,
-        mixin("alignment.first." ~ contig ~ ".begin") + 0,
-        mixin("alignment.last." ~ contig ~ ".end") + 0,
-    );
+    static assert(contig.among("contigA", "contigB"), "invalid contig name");
+
+    static if (contig == "contigA")
+    {
+        return Interval(
+            alignment.contigA.id + 0,
+            alignment.first.contigA.begin + 0,
+            alignment.last.contigA.end + 0,
+        );
+    }
+    else
+    {
+        static assert(contig == "contigB");
+
+        if (alignment.flags.complement)
+            return Interval(
+                alignment.contigB.id + 0,
+                alignment.contigB.length - alignment.last.contigB.end,
+                alignment.contigB.length - alignment.first.contigB.begin,
+            );
+        else
+            return Interval(
+                alignment.contigB.id + 0,
+                alignment.first.contigB.begin,
+                alignment.last.contigB.end,
+            );
+    }
 }
