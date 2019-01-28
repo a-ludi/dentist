@@ -333,22 +333,16 @@ ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
         return emptyRange();
     }
 
-    // Validate seeded alignments and discard accordingly.
-    foreach (saPair; seededAlignments.slide!(No.withPartial)(2))
-    {
-        if (shareReadSequence(saPair[0], saPair[1])
-                && !seededPartsOfOneAlignment(saPair[0], saPair[1]))
-        {
-            // NOTE this discards reads supporting ambiguous joins:
-            //
-            //      ```
-            //          contig A1: |---------|
-            //               read:        |---------|
-            //      contig A2 & C: |---------|   |---------|
-            //      ```
-            return emptyRange();
-        }
-    }
+    // Validate seeded alignments
+    version (assert)
+        foreach (saPair; seededAlignments.slide!(No.withPartial)(2))
+            assert(
+                (
+                    !shareReadSequence(saPair[0], saPair[1]) ||
+                    seededPartsOfOneAlignment(saPair[0], saPair[1])
+                ),
+                "illegal overlap between seeded alignments",
+            );
 
     // Collect read alignments
     bool startWithExtension = beginRelToContigB(seededAlignments[0]) > 0;
@@ -582,158 +576,5 @@ unittest
                 SeededAlignment(alignmentChains[0], Seed.front),
             ]),
         ]));
-    }
-    {
-        // Case 6:
-        //
-        // |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).length == 0);
-    }
-    {
-        // Case 7:
-        //
-        //                |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).length == 0);
-    }
-    {
-        // Case 8:
-        //
-        //                        |-->-->-->--|
-        // |-->-->-->--|  |--<--<--<--| |-->-->-->--|
-        //
-        //       |----->  <-----------> <-----|
-        auto alignmentChains = [
-            AlignmentChain(
-                0,
-                Contig(1, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(10, 20),
-                    Locus(0, 10),
-                )]
-            ),
-            AlignmentChain(
-                1,
-                Contig(2, 20),
-                Contig(1, 60),
-                Flags(complement),
-                [LocalAlignment(
-                    Locus(0, 20),
-                    Locus(20, 40),
-                )]
-            ),
-            AlignmentChain(
-                2,
-                Contig(3, 20),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 10),
-                    Locus(50, 60),
-                )]
-            ),
-            AlignmentChain(
-                3,
-                Contig(4, 30),
-                Contig(1, 60),
-                emptyFlags,
-                [LocalAlignment(
-                    Locus(0, 30),
-                    Locus(30, 60),
-                )]
-            ),
-        ];
-        assert(collectReadAlignments(alignmentChains).length == 0);
     }
 }
