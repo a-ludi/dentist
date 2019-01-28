@@ -184,6 +184,16 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TaggedInterval(3, 60, 60).empty);
         }
 
+        bool opBinary(string op)(auto ref const TaggedInterval other) const pure nothrow
+                if (op == "==")
+        {
+            return (this.empty && other.empty) || (
+                this.tag == other.tag &&
+                this.begin == other.begin &&
+                this.end == other.end
+            );
+        }
+
         /**
             Returns the convex hull of the intervals.
 
@@ -1083,8 +1093,9 @@ unittest
 }
 
 /**
-    Returns the minimum/supremum point of the intervals. Both values are
-    undefined for empty regions.
+    Returns the minimum/supremum point or convex hull of the intervals. Both
+    minimum and supremum are undefined for empty regions but the convex hull
+    is not.
 
     Throws: MismatchingTagsException if `tag`s differ.
     Throws: EmptyRegionException if region is empty.
@@ -1108,6 +1119,19 @@ auto sup(R)(R region) if (is(R : Region!Args, Args...))
     auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
 
     return convexHull.end;
+}
+
+/// ditto
+auto convexHull(R)(R region) if (is(R : Region!Args, Args...))
+{
+    alias TI = R.TaggedInterval;
+
+    if (region.empty)
+        return TI();
+
+    auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
+
+    return convexHull;
 }
 
 ///
