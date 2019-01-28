@@ -3,7 +3,6 @@
 	"versions": {
 		"botan": "1.12.10",
 		"botan-math": "1.0.3",
-		"darg": "0.1.0",
 		"diet-ng": "1.5.0",
 		"dstats": "1.0.5",
 		"dub": "1.11.0-alpha.1",
