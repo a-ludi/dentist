@@ -17,7 +17,7 @@ import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
 import dentist.util.math : absdiff, floor, ceil, RoundingMode;
 import dentist.util.range : arrayChunks, takeExactly;
-import dentist.util.region : findTilings, min, sup;
+import dentist.util.region : convexHull, findTilings, min, sup;
 import dentist.util.string :
     EditOp,
     findAlignment,
@@ -1429,23 +1429,35 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
                 );
             }
 
+            assert(localAlignments.length > 0, "localAlignments must not be empty");
+            auto coveredInterval = ReferenceInterval(
+                0,
+                localAlignments[0].contigA.begin,
+                localAlignments[$ - 1].contigA.end,
+            );
             auto combinations = findTilings!toInterval(
                 localAlignments.map!((ref la) => &la).array,
                 longestInputsLength(memoryLimit),
             );
+            assert(combinations.length > 0, "no viable tilings found");
 
             alias Combination = typeof(combinations[0]);
             auto combinationScore(in Combination combination)
             {
                 long coveredBasePairs = combination.region.size;
-                long score = combination.region.size
+                long score =
+                     + combination.region.size
                      - combination.totalOverlap
                      - combination.elements.map!"a.numDiffs".sum;
 
                 return score;
             }
 
-            return combinations.maxElement!combinationScore.elements.map!"*a".array;
+            return combinations
+                .filter!(combination => convexHull(combination.region) == coveredInterval)
+                .maxElement!combinationScore
+                .elements
+                .map!"*a".array;
         }
 
         size_t skipTracePointsToASeqPos(in LocalAlignment localAlignment)
