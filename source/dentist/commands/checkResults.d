@@ -17,7 +17,8 @@ import dentist.commandline : TestingCommand, OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion,
-    to;
+    to,
+    toInterval;
 import dentist.common.alignments :
     AlignmentChain,
     coord_t,
@@ -276,6 +277,7 @@ private struct ResultAnalyzer
                     "overlappingAlignments", overlappingAlignments.data.map!"*a".array.toJson,
                     "locallyCleanedUpAlignments", locallyCleanedUpAlignments.map!"*a".array.toJson,
                 );
+                assert(locallyCleanedUpAlignments.length > 0, "aligments empty after clean up");
                 goodAlignments ~= locallyCleanedUpAlignments;
 
                 overlappingAlignments.clear();
@@ -291,6 +293,15 @@ private struct ResultAnalyzer
         logJsonDiagnostic(
             "numRawLocalAlignments", localAlignments.length,
             "numCleanedLocalAlignments", goodAlignments.data.length,
+            "rawLocalAlignmentsCoveredBasePairs", ReferenceRegion(localAlignments
+                .map!(ac => ac.toInterval!(ReferenceInterval, "contigA"))
+                .array
+            ).size,
+            "cleanedLocalAlignmentsCoveredBasePairs", ReferenceRegion(goodAlignments
+                .data
+                .map!(ac => (*ac).toInterval!(ReferenceInterval, "contigA"))
+                .array
+            ).size,
         );
 
         return goodAlignments.data.map!"*a".array;
@@ -298,29 +309,27 @@ private struct ResultAnalyzer
 
     AlignmentChain*[] locallyCleanUpAlignments(AlignmentChain*[] overlappingAlignments)
     {
-        ReferenceInterval interval(in AlignmentChain* ac) pure
-        {
-            return ReferenceInterval(
-                ac.contigA.id,
-                ac.first.contigA.begin,
-                ac.last.contigA.end,
-            );
-        }
-
-        alias containedWithin = (lhs, rhs) => interval(lhs) in interval(rhs);
+        alias interval = ac => (*ac).toInterval!(ReferenceInterval, "contigA");
+        alias containedWithin = (lhs, rhs) => interval(lhs) in interval(rhs) &&
+                                              3*interval(lhs).size < 2*interval(rhs).size;
         alias overlapEachOther = (lhs, rhs) =>
                 interval(lhs).intersects(interval(rhs));
 
-        // 1. Remove LAs completely included in others
+        // 1. Remove LAs completely included in others and much smaller (2/3)
         foreach (ac; overlappingAlignments)
             foreach (other; overlappingAlignments)
-                ac.disableIf(!other.flags.disabled && containedWithin(ac, other));
+                ac.disableIf(
+                    !ac.flags.disabled &&
+                    !other.flags.disabled &&
+                    containedWithin(ac, other)
+                );
 
         // 2. Find combination of alignments, s.t.
         //     - they are not disabled
         //     - they do not overlap
         //     - if more than one: cover maximum possible area
         //     - if more than one: have best quality
+        //     - if more than one: have non-complementary alignment
 
         static struct ViableCombination
         {
@@ -366,7 +375,14 @@ private struct ResultAnalyzer
 
         return viableCombinationsAcc
             .data
-            .maxElement!(vc => vc.region.size - vc.acs.map!"a.totalDiffs".sum.to!double)
+            .maxElement!(vc =>
+                // prefer large regions
+                +  1 * vc.region.size
+                // penalize bad alignment quality
+                -  1 * vc.acs.map!"a.totalDiffs".sum
+                // penalize complementary alignments
+                - 10 * vc.acs.map!"a.flags.complement ? 1 : 0".sum
+            )
             .acs;
     }
 
