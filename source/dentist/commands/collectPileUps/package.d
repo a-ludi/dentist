@@ -29,7 +29,11 @@ import dentist.dazzler :
     readMask;
 import dentist.util.log;
 import dentist.util.math : NaturalNumberSet;
-import std.algorithm : count, isSorted, map, sum;
+import std.algorithm :
+    canFind,
+    count,
+    map,
+    sum;
 import std.array : array;
 import std.conv : to;
 import std.exception : enforce;
@@ -122,9 +126,9 @@ class PileUpCollector
 
         auto filters = tuple(
             new ImproperAlignmentChainsFilter(),
+            new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
             new AmbiguousAlignmentChainsFilter(&unusedReads),
             new RedundantAlignmentChainsFilter(&unusedReads),
-            new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
         );
         logJsonDiagnostic(
             "filterStage", "Input",
@@ -137,7 +141,6 @@ class PileUpCollector
         foreach (i, filter; filters)
         {
             readsAlignment = filter(readsAlignment);
-            assert(isSorted(readsAlignment));
 
             logJsonDiagnostic(
                 "filterStage", typeof(filter).stringof,
@@ -147,6 +150,11 @@ class PileUpCollector
                 "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
             );
         }
+
+        enforce!DentistException(
+            readsAlignment.canFind!"!a.flags.disabled",
+            "no alignment chains left after filtering",
+        );
     }
 
     protected PileUp[] buildPileUps()

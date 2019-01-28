@@ -22,7 +22,9 @@ import dentist.util.log;
 import dentist.util.algorithm :
     cmpLexicographically,
     orderLexicographically;
-import dentist.util.math : NaturalNumberSet;
+import dentist.util.math :
+    findMaximallyConnectedComponents,
+    NaturalNumberSet;
 import std.algorithm :
     all,
     chunkBy,
@@ -36,6 +38,7 @@ import std.algorithm :
 import std.array :
     appender,
     array;
+import std.parallelism : taskPool;
 import std.range :
     InputRange,
     inputRangeObject,
@@ -136,74 +139,71 @@ class AmbiguousAlignmentChainsFilter : AlignmentChainFilter
     {
         assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
 
-        auto bufferRest = alignmentChains
+        auto alignmentsGroupedByRead = alignmentChains
             .sort!orderByReadAndErrorRate
             .filter!"!a.flags.disabled"
             .chunkBy!groupByRead
-            .map!array
-            .map!groupByReadLocus
+            .map!array;
+        auto bufferRest = taskPool
+            .map!groupByReadLocus(alignmentsGroupedByRead)
             .map!(groupedByReadLocus => getUniquelyAlignedRead(groupedByReadLocus))
             .joiner
             .copy(alignmentChains);
         alignmentChains.length -= bufferRest.length;
 
-        return alignmentChains.sort.release;
+        return alignmentChains;
     }
 
     /// Groups local alignments of one read into groups of overlapping alignments.
     static protected AlignmentChain[][] groupByReadLocus(AlignmentChain[] readAlignments)
     {
-        // TODO find better algorithm that can solve situations like this:
-        //     Read:    |------------------|
-        //
-        //     AC1   ...------|
-        //     AC2                |------...
-        //     AC3   ...--------------------...
         assert(readAlignments.length > 0, "readAlignments chunk must not be empty");
-        enum expectedMaximumGroups = 10;
+
+        enum maximumExpectedGroups = 10;
         alias toReadInterval = toInterval!(ReadInterval, "contigB");
+        alias getAlignmentIntervalAt = i => toReadInterval(readAlignments[i]);
+        alias shareOverlap = (lhs, rhs) =>
+            getAlignmentIntervalAt(lhs).intersects(getAlignmentIntervalAt(rhs));
+        alias toGroup = (component) => component
+            .elements
+            .map!(i => readAlignments[i])
+            .array;
 
-        auto unusedAlignments = NaturalNumberSet(readAlignments.length, Yes.addAll);
-        AlignmentChain[] groupedAlignmentsBuffer;
-        groupedAlignmentsBuffer.reserve(readAlignments.length);
-        auto groupedAlignmentsAcc = appender!(AlignmentChain[][]);
-        groupedAlignmentsAcc.reserve(expectedMaximumGroups);
+        auto components = findMaximallyConnectedComponents!shareOverlap(readAlignments.length);
+        auto groups = appender!(AlignmentChain[][]);
 
-        while (!unusedAlignments.empty)
-        {
-            auto currentIndex = unusedAlignments.minElement;
-            auto currentReadAlignment = readAlignments[currentIndex];
-            auto currentReadInterval = toReadInterval(currentReadAlignment);
-            unusedAlignments.remove(currentIndex);
-            auto sliceBegin = groupedAlignmentsBuffer.length;
-            groupedAlignmentsBuffer ~= currentReadAlignment;
+        groups.reserve(maximumExpectedGroups);
+        groups.put(components.map!toGroup);
 
-            foreach (unusedIndex; unusedAlignments.elements)
-            {
-                auto unusedReadAlignment = readAlignments[unusedIndex];
-                auto unusedAlignmentInterval = toReadInterval(unusedReadAlignment);
-
-                if (currentReadInterval.intersects(unusedAlignmentInterval))
-                {
-                    groupedAlignmentsBuffer ~= unusedReadAlignment;
-                    unusedAlignments.remove(unusedIndex);
-                }
-            }
-
-            groupedAlignmentsAcc ~= groupedAlignmentsBuffer[sliceBegin .. $];
-        }
-
-        return groupedAlignmentsAcc.data;
+        return groups.data;
     }
 
     protected auto getUniquelyAlignedRead(AlignmentChain[][] groupedByReadLocus)
     {
         enum emptyRange = groupedByReadLocus.init.joiner;
+        // bp/char in debug output
+        enum blockSize = 250;
 
-        foreach (readLocusAlignments; groupedByReadLocus)
+        foreach (ref readLocusAlignments; groupedByReadLocus)
         {
             if (readLocusAlignments.length > 1)
             {
+                logJsonDiagnostic(
+                    "info", "unable to resolve ambiguous read alignment",
+                    "readId", readLocusAlignments[0].contigB.id,
+                    "readLocusAlignments", shouldLog(LogLevel.debug_)
+                        ? readLocusAlignments.toJson
+                        : toJson(null),
+                    "readLocusAlignmentIntervals", readLocusAlignments
+                        .map!(toInterval!(ReadInterval, "contigB"))
+                        .array
+                        .toJson,
+                    "alignmentCartoon", AlignmentChain.cartoon!"contigB"(
+                        blockSize,
+                        readLocusAlignments,
+                    ),
+                );
+
                 this.unusedReads.remove(groupedByReadLocus[0][0].contigB.id);
 
                 return emptyRange;
