@@ -1,0 +1,12 @@
+language: d
+d:
+    - dmd
+    - gdc
+    - ldc
+
+branches:
+    only:
+        - master
+        - develop
+        - travis-ci
+        - /^v\d+\.\d+\.\d+(-\S+)?$/
