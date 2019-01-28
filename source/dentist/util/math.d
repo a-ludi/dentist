@@ -17,6 +17,7 @@ import std.algorithm :
     filter,
     map,
     max,
+    maxElement,
     sort,
     sum,
     swap,
@@ -1415,6 +1416,16 @@ struct NaturalNumberSet
         }
     }
 
+    static NaturalNumberSet create(size_t[] initialElements...)
+    {
+        auto set = NaturalNumberSet(initialElements.maxElement);
+
+        foreach (i; initialElements)
+            set.add(i);
+
+        return set;
+    }
+
     this(this)
     {
         parts = parts.dup;
@@ -1434,7 +1445,8 @@ struct NaturalNumberSet
     {
         if (parts.length == 0)
         {
-            parts.length = max(1, ceil(n, partSize) / partSize);
+            parts.length = max(1, ceildiv(n, partSize));
+            nMax = parts.length * partSize;
         }
 
         while (!inBounds(n))
@@ -1499,6 +1511,39 @@ struct NaturalNumberSet
     bool empty() const pure nothrow
     {
         return parts.all!(part => part == emptyPart);
+    }
+
+    void clear() pure nothrow
+    {
+        foreach (ref part; parts)
+            part = emptyPart;
+    }
+
+    bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "==")
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+        {
+            if (this.parts[i] != other.parts[i])
+                return false;
+        }
+
+        static bool hasEmptyTail(ref in NaturalNumberSet set, in size_t tailStart)
+        {
+            foreach (i; tailStart .. set.parts.length)
+                if (set.parts[i] != emptyPart)
+                    return false;
+
+            return true;
+        }
+
+        if (this.parts.length > numCommonParts)
+            return hasEmptyTail(this, numCommonParts);
+        if (other.parts.length > numCommonParts)
+            return hasEmptyTail(other, numCommonParts);
+
+        return true;
     }
 
     size_t minElement() const
@@ -1659,6 +1704,25 @@ struct NaturalNumberSet
         }
 
         assert(equal(someNumbers, set.elements));
+    }
+
+    /// The set may be modified while iterating:
+    unittest
+    {
+        import std.algorithm : equal;
+        import std.range : iota;
+
+        enum numElements = 64;
+        auto set = NaturalNumberSet(numElements, Yes.addAll);
+
+        foreach (i; set.elements)
+        {
+            if (i % 10 == 0)
+                set.remove(i + 1);
+        }
+
+        auto expectedNumbers = iota(numElements).filter!"a == 0 || !((a - 1) % 10 == 0)";
+        assert(equal(expectedNumbers, set.elements));
     }
 }
 
