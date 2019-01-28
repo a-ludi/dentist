@@ -67,7 +67,7 @@ import std.exception : enforce, ErrnoException;
 import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
 import std.format : format, formattedRead;
 import std.math : ceil, floor, log_e = log;
-import std.meta : AliasSeq, staticMap, staticSort;
+import std.meta : Alias, AliasSeq, staticMap, staticSort;
 import std.parallelism : defaultPoolThreads, totalCPUs;
 import std.path : absolutePath, buildPath;
 import std.range : only, takeOne;
@@ -300,7 +300,7 @@ struct OptionsFor(DentistCommand command)
         @ArgumentsParser
         auto parseArguments(const(string)[] leftOver)
         {
-            alias referenceSymbol = __traits(getMember, this, "refFile");
+            alias referenceSymbol = Alias!(__traits(getMember, this, "refFile"));
             enum referenceUDA = getUDAs!(referenceSymbol, Argument)[0];
 
             enforce!ArgParseError(leftOver.length >= numArguments.lowerBound, referenceUDA.multiplicityError(0));
@@ -321,7 +321,7 @@ struct OptionsFor(DentistCommand command)
 
             foreach (member; __traits(allMembers, typeof(this)))
             {
-                alias symbol = __traits(getMember, this, member);
+                alias symbol = Alias!(__traits(getMember, this, member));
                 alias argUDAs = getUDAs!(symbol, Argument);
 
                 static if (
@@ -1392,7 +1392,7 @@ struct OptionsFor(DentistCommand command)
 
         foreach (member; __traits(allMembers, ThisOptions))
         {
-            alias symbol = __traits(getMember, ThisOptions.init, member);
+            alias symbol = Alias!(__traits(getMember, ThisOptions, member));
             alias argUDAs = getUDAs!(symbol, Argument);
 
             static if (argUDAs.length > 0)
