@@ -742,14 +742,23 @@ struct OptionsFor(DentistCommand command)
         @Option("batch", "b")
         @MetaVar("<from>..<to>")
         @Help(q"{
-            process only a subset of the pile ups in the given range (excluding <to>);
-            <from> and <to> are zero-based indices into the pile up DB
+            process only a subset of the pile ups in the given range (excluding <to>).
+            <from> and <to> are zero-based indices into the pile up DB or <to>
+            may be `$` to indicate the end of the pile up DB.
         }")
         void parsePileUpBatch(string batchString) pure
         {
             try
             {
-                batchString.formattedRead!"%d..%d"(pileUpBatch[0], pileUpBatch[1]);
+                if (batchString.endsWith("$"))
+                {
+                    batchString.formattedRead!"%d..$"(pileUpBatch[0]);
+                    pileUpBatch[1] = id_t.max;
+                }
+                else
+                {
+                    batchString.formattedRead!"%d..%d"(pileUpBatch[0], pileUpBatch[1]);
+                }
             }
             catch (Exception e)
             {
@@ -781,7 +790,7 @@ struct OptionsFor(DentistCommand command)
 
             enforce!CLIException(
                 pileUpBatch == pileUpBatch.init ||
-                (0 <= from && from < to && to <= options.pileUpLength),
+                (0 <= from && from < to && (to == id_t.max || to <= options.pileUpLength)),
                 format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
                         options.pileUpLength)
             );
@@ -790,7 +799,7 @@ struct OptionsFor(DentistCommand command)
         @PostValidate()
         void hookEnsurePresenceOfBatchRange()
         {
-            if (pileUpBatch == pileUpBatch.init)
+            if (pileUpBatch == pileUpBatch.init || pileUpBatch[1] == id_t.max)
             {
                 pileUpBatch[1] = pileUpLength;
             }
