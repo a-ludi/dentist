@@ -35,7 +35,8 @@ import std.algorithm :
     sort,
     sum,
     swap,
-    SwapStrategy;
+    SwapStrategy,
+    uniq;
 import std.array : appender, array, minimallyInitializedArray;
 import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
@@ -60,7 +61,7 @@ import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
 import std.traits : isArray, TemplateArgsOf, TemplateOf;
-import vibe.data.json : toJson = serializeToJson;
+import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writefln, writeln;
 
@@ -2079,4 +2080,21 @@ unittest
     assert(pileUp[0][0].id == 1);
     assert(pileUp[0][1].id == 2);
     assert(pileUp[1][0].id == 3);
+}
+
+/// Converts the pileup into a simple JSON object for diagnostic purposes.
+Json pileUpToSimpleJson(in PileUp pileUp)
+{
+    return [
+        "type": pileUp.getType.to!string.toJson,
+        "length": pileUp.length.toJson,
+        "contigIds": pileUp
+            .map!(ra => ra[].map!"0 + a.contigA.id".array)
+            .joiner
+            .array
+            .sort
+            .uniq
+            .array
+            .toJson,
+    ].toJson;
 }
