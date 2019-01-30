@@ -63,6 +63,7 @@ import std.path :
     baseName,
     buildPath,
     dirName,
+    extension,
     relativePath,
     stripExtension,
     withExtension;
@@ -92,6 +93,7 @@ import std.stdio : File;
 import std.string : lineSplitter, outdent;
 import std.traits : isArray, isIntegral, isSomeString, ReturnType, Unqual;
 import std.typecons : Flag, No, tuple, Tuple, Yes;
+import std.uni : toUpper;
 import std.variant : Algebraic;
 import vibe.data.json : Json, toJson = serializeToJson;
 
@@ -218,7 +220,24 @@ bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir
     return numParts == 0;
 }
 
-/// Build a new .dam file by using the given subset of reads in inDbFile.
+/// Returns the number of records in dbFile.
+id_t numDbRecords(in string dbFile, in string workdir)
+{
+    auto recordNumberLine = dbdump(dbFile, [], workdir).find!(l => l.startsWith("+ R")).front;
+    id_t numRecords;
+
+    recordNumberLine.formattedRead!"+ R %d"(numRecords);
+
+    return numRecords;
+}
+
+/// Returns true iff dbFile is empty.
+bool dbEmpty(in string dbFile, in string workdir)
+{
+    return numDbRecords(dbFile, workdir) == 0;
+}
+
+/// Build a new .db/.dam file by using the given subset of reads in inDbFile.
 string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
@@ -226,7 +245,7 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
     enum outDbNameTemplate = "subset-XXXXXX";
 
     auto outDbTemplate = buildPath(options.workdir, outDbNameTemplate);
-    auto outDb = mkstemp(outDbTemplate, damFileExtension);
+    auto outDb = mkstemp(outDbTemplate, inDbFile.extension);
 
     outDb.file.close();
     remove(outDb.name);
@@ -710,8 +729,24 @@ private:
             {
                 switch (currentLineType)
                 {
-                case totalChainPartsCount.indicator: goto case;
+                case totalChainPartsCount.indicator:
+                    static assert(totalTracePointsCount.indicator == totalChainPartsCount.indicator);
+
+                    switch (currentLineSubType)
+                    {
+                    case totalChainPartsCount.subIndicator:
+                        if (readTotalChainPartsCount() == 0)
+                            // do not try to read empty dump
+                            return setEmpty();
+                        break;
+                    case totalTracePointsCount.subIndicator:
+                        break; // ignore
+                    default:
+                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
+                    }
+                    break;
                 case maxChainPartsCountPerPile.indicator:
+                    static assert(maxTracePointsCountPerPile.indicator == maxChainPartsCountPerPile.indicator);
                     break; // ignore
                 case maxTracePointCount.indicator:
                     _enforce(currentLineSubType == maxTracePointCount.subIndicator, "expected `@ T` line");
@@ -805,6 +840,16 @@ private:
 
             return No.empty;
         }
+    }
+
+    id_t readTotalChainPartsCount()
+    {
+        enum totalChainPartsCountFormat = LasDumpLineFormat.totalChainPartsCount.format;
+
+        id_t totalChainPartsCount;
+        currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
+
+        return totalChainPartsCount;
     }
 
     void readMaxTracePointCount()
@@ -2128,12 +2173,28 @@ unittest
 
     Returns: path to las-file.
 */
-string getDalignment(Options)(in string dbFile, in Options options)
-        if (isOptionsList!(typeof(options.dalignerOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+string getDalignment(in string dbFile, in string[] dalignerOptions, in string workdir)
 {
-    dalign(dbFile, options.dalignerOptions, options.workdir);
-    auto lasFile = getLasFile(dbFile, options.workdir);
+    dalign(dbFile, dalignerOptions, workdir);
+    auto lasFile = getLasFile(dbFile, workdir);
+
+    return lasFile;
+}
+
+/**
+    Map dbFile.
+
+    Returns: path to las-file.
+*/
+string getDamapping(
+    in string refDb,
+    in string queryDb,
+    in string[] damapperOptions,
+    in string workdir,
+)
+{
+    damapper(refDb, queryDb, damapperOptions, workdir);
+    auto lasFile = getLasFile(refDb, queryDb, workdir);
 
     return lasFile;
 }
@@ -3121,13 +3182,14 @@ private
             .map!(to!size_t)
             .map!(to!string)
             .map!esc;
+        auto fastaToDbCommand = "fasta2" ~ inDbFile.extension[1 .. $].toUpper;
 
         executeShell(chain(
             only("DBshow"),
             only(esc(inDbFile.relativeToWorkdir(workdir))),
             escapedReadIds,
             only("|"),
-            only("fasta2DAM", Fasta2DazzlerOptions.fromStdin),
+            only(fastaToDbCommand, Fasta2DazzlerOptions.fromStdin),
             only(esc(outDbFile.relativeToWorkdir(workdir))),
         ), workdir);
     }
@@ -3219,9 +3281,24 @@ private
         ), workdir);
     }
 
+    auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir)
+    {
+        return executePipe(chain(
+            only("DBdump"),
+            dbdumpOptions,
+            only(dbFile.relativeToWorkdir(workdir)),
+        ), workdir);
+    }
+
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
             in string[] dbdumpOptions, in string workdir)
-            if (isForwardRange!Range && is(ElementType!Range : size_t))
+        if (
+            isForwardRange!Range &&
+            (
+                (is(Range.length) && Range.length == 0) ||
+                is(ElementType!Range : size_t)
+            )
+        )
     {
         return executePipe(chain(
             only("DBdump"),
@@ -3384,7 +3461,7 @@ private
         assert(helloWorld.equal(["Hello World!"]));
     }
 
-    string executeCommand(Range)(in Range command, in string workdir = null)
+    string executeCommand(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.process : Config, execute;
@@ -3395,7 +3472,7 @@ private
         return output;
     }
 
-    void executeShell(Range)(in Range command, in string workdir = null)
+    void executeShell(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : joiner;
@@ -3406,7 +3483,7 @@ private
                     Config.none, size_t.max, workdir));
     }
 
-    void executeScript(Range)(in Range command, in string workdir = null)
+    void executeScript(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.process : Config, executeShell;
@@ -3416,7 +3493,7 @@ private
                     Config.none, size_t.max, workdir));
     }
 
-    string executeWrapper(string type, alias execCall, Range)(in Range command)
+    string executeWrapper(string type, alias execCall, Range)(Range command)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.array : array;
