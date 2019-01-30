@@ -2169,7 +2169,7 @@ unittest
 }
 
 /**
-    Self-dalign dbFile.
+    Align DB(s) to each other using `daligner`.
 
     Returns: path to las-file.
 */
@@ -2177,6 +2177,15 @@ string getDalignment(in string dbFile, in string[] dalignerOptions, in string wo
 {
     dalign(dbFile, dalignerOptions, workdir);
     auto lasFile = getLasFile(dbFile, workdir);
+
+    return lasFile;
+}
+
+/// ditto
+string getDalignment(in string referenceDb, in string queryDb, in string[] dalignerOptions, in string workdir)
+{
+    dalign(referenceDb, queryDb, dalignerOptions, workdir);
+    auto lasFile = getLasFile(referenceDb, queryDb, workdir);
 
     return lasFile;
 }
