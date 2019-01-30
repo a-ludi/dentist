@@ -13,18 +13,21 @@ import dentist.commands.processPileUps.cropper : CropOptions, cropPileUp;
 import dentist.common :
     dentistEnforce,
     DentistException,
+    id_t,
     ReferenceInterval,
     ReferencePoint,
     ReferenceRegion;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentLocationSeed,
     getAlignmentRefs,
     getType,
     isExtension,
     makeJoin,
     PileUp,
     pileUpToSimpleJson,
-    ReadAlignment;
+    ReadAlignment,
+    SeededAlignment;
 import dentist.common.binio :
     CompressedSequence,
     InsertionDb,
@@ -38,10 +41,15 @@ import dentist.util.log;
 import dentist.dazzler :
     attachTracePoints,
     dbEmpty,
+    dbSubset,
+    getAlignments,
+    getDalignment,
     getConsensus,
     getFastaSequence,
     readMask;
 import std.algorithm :
+    canFind,
+    countUntil,
     equal,
     filter,
     find,
@@ -53,8 +61,10 @@ import std.algorithm :
     uniq;
 import std.array : array;
 import std.conv : to;
+import std.format : format;
 import std.parallelism : parallel, taskPool;
 import std.range : enumerate, evenChunks, only, zip;
+import std.range.primitives : empty, front, popFront;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -158,6 +168,8 @@ protected class PileUpProcessor
     protected ReferencePoint[] croppingPositions;
     protected size_t referenceReadIdx;
     protected string consensusDb;
+    protected AlignmentChain[] postConsensusAlignment;
+    protected ReadAlignment insertionAlignment;
     protected CompressedSequence insertionSequence;
     protected Insertion insertion;
 
@@ -208,6 +220,8 @@ protected class PileUpProcessor
             crop();
             selectReferenceRead();
             computeConsensus();
+            alignConsensusToFlankingContigs();
+            getInsertionAlignment();
             getInsertionSequence();
 
             if (pileUp.isExtension && shouldSkipShortExtension())
@@ -309,6 +323,106 @@ protected class PileUpProcessor
                 "consensusDb": consensusDb.toJson,
                 "referenceRead": (referenceReadIdx + 1).toJson,
             ].toJson,
+        );
+    }
+
+    protected void alignConsensusToFlankingContigs()
+    {
+        // FIXME crop flanks to expected matching region + a small margin
+        auto flankingContigsDb = dbSubset(
+            options.refDb,
+            croppingPositions.map!"a.contigId",
+            options.consensusOptions,
+        );
+        postConsensusAlignment = getAlignments(
+            flankingContigsDb,
+            consensusDb,
+            getDalignment(
+                flankingContigsDb,
+                consensusDb,
+                options.postConsensusAlignmentOptions,
+                options.workdir,
+            ),
+            options.workdir,
+            options.tracePointDistance,
+        );
+
+        foreach (ref ac; postConsensusAlignment)
+        {
+            // Insert correct `contigId`s
+            ac.contigA.id = croppingPositions[ac.contigA.id - 1]
+                .contigId
+                .to!id_t;
+            ac.disableIf(!ac.isProper);
+        }
+
+        dentistEnforce(
+            postConsensusAlignment.canFind!"!a.flags.disabled",
+            "consensus does not align to flanking contig(s)",
+            ["consensusDb": consensusDb].toJson,
+        );
+    }
+
+    protected void getInsertionAlignment()
+    {
+        SeededAlignment[2] insertionAlignmentBuffer;
+
+        foreach (ref croppingPos; croppingPositions)
+        {
+            alias contigsMatch = ac => ac.contigA.id == croppingPos.contigId;
+
+            auto refReadFlankAlignmentIdx = referenceRead[].countUntil!contigsMatch;
+            assert(refReadFlankAlignmentIdx >= 0);
+            auto alignmentSeed = referenceRead[refReadFlankAlignmentIdx].seed;
+
+            alias isProperInsertionOverlap = ac =>
+                alignmentSeed == AlignmentLocationSeed.front
+                    ? ac.first.contigA.begin == 0 && ac.last.contigB.end == ac.contigB.length
+                    : ac.last.contigA.end == ac.contigA.length && ac.first.contigB.begin == 0;
+
+            auto flankAlignments = postConsensusAlignment
+                .filter!(ac => !ac.flags.disabled)
+                .filter!contigsMatch
+                .filter!isProperInsertionOverlap;
+
+            dentistEnforce(
+                !flankAlignments.empty,
+                format!"consensus does not align to flanking contig %d"(croppingPos.contigId),
+                ["consensusDb": consensusDb].toJson,
+            );
+
+            auto flankAlignment = SeededAlignment(flankAlignments.front, alignmentSeed);
+            insertionAlignmentBuffer[refReadFlankAlignmentIdx] = flankAlignment;
+
+            flankAlignments.popFront();
+            dentistEnforce(
+                flankAlignments.empty,
+                format!"consensus ambiguously aligns to flanking contig %d"(croppingPos.contigId),
+                ["consensusDb": consensusDb].toJson,
+            );
+        }
+
+        insertionAlignment = ReadAlignment(insertionAlignmentBuffer[0 .. referenceRead.length]);
+
+        dentistEnforce(
+            insertionAlignment.isValid,
+            "consensus alignment is invalid",
+            ["consensusDb": consensusDb].toJson,
+        );
+        dentistEnforce(
+            (
+                insertionAlignment.type == referenceRead.type &&
+                insertionAlignment.isParallel == referenceRead.isParallel
+            ),
+            format!"consensus alignment has an unexpected type: %s%s"(
+                insertionAlignment.type,
+                insertionAlignment.isGap
+                    ? insertionAlignment.isParallel
+                        ? " (parallel)"
+                        : " (anti-parallel)"
+                    : "",
+            ),
+            ["consensusDb": consensusDb].toJson,
         );
     }
 

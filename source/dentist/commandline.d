@@ -1164,6 +1164,7 @@ struct OptionsFor(DentistCommand command)
     static if (command.among(
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("reference-error")
@@ -1327,14 +1328,33 @@ struct OptionsFor(DentistCommand command)
 
     static if (
         is(typeof(OptionsFor!command().minAnchorLength)) &&
-        is(typeof(OptionsFor!command().readsErrorRate))
+        is(typeof(OptionsFor!command().readsErrorRate)) &&
+        is(typeof(OptionsFor!command().numDaccordThreads))
     ) {
         @property string[] pileUpAlignmentOptions() const
         {
             return [
                 DalignerOptions.identity,
+                DalignerOptions.numThreads ~ numDaccordThreads.to!string,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - readsErrorRate)^^2),
+            ];
+        }
+    }
+
+    static if (
+        is(typeof(OptionsFor!command().minAnchorLength)) &&
+        is(typeof(OptionsFor!command().readsErrorRate)) &&
+        is(typeof(OptionsFor!command().referenceErrorRate)) &&
+        is(typeof(OptionsFor!command().numDaccordThreads))
+    ) {
+        @property string[] postConsensusAlignmentOptions() const
+        {
+            return [
+                DalignerOptions.asymmetric,
+                DalignerOptions.numThreads ~ numDaccordThreads.to!string,
+                format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate^^minReadsPerPileUp) * (1 - readsErrorRate)),
             ];
         }
     }
