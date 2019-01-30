@@ -11,6 +11,8 @@ module dentist.commands.processPileUps;
 import dentist.commandline : DentistCommand, OptionsFor;
 import dentist.commands.processPileUps.cropper : CropOptions, cropPileUp;
 import dentist.common :
+    dentistEnforce,
+    DentistException,
     ReferenceInterval,
     ReferencePoint,
     ReferenceRegion;
@@ -21,6 +23,7 @@ import dentist.common.alignments :
     isExtension,
     makeJoin,
     PileUp,
+    pileUpToSimpleJson,
     ReadAlignment;
 import dentist.common.binio :
     CompressedSequence,
@@ -34,8 +37,9 @@ import dentist.common.scaffold : ContigNode, getDefaultJoin;
 import dentist.util.log;
 import dentist.dazzler :
     attachTracePoints,
+    dbEmpty,
     getConsensus,
-    getFastaSequences,
+    getFastaSequence,
     readMask;
 import std.algorithm :
     equal,
@@ -49,7 +53,6 @@ import std.algorithm :
     uniq;
 import std.array : array;
 import std.conv : to;
-import std.exception : enforce;
 import std.parallelism : parallel, taskPool;
 import std.range : enumerate, evenChunks, only, zip;
 import std.typecons : Yes;
@@ -62,13 +65,13 @@ alias Options = OptionsFor!(DentistCommand.processPileUps);
 /// Execute the `processPileUps` command with `options`.
 void execute(Options)(in Options options)
 {
-    auto processor = new PileUpProcessor(options);
+    auto processor = new PileUpsProcessor(options);
 
     processor.run();
 }
 
 /// This class comprises the `processPileUps` step of the `dentist` algorithm
-class PileUpProcessor
+class PileUpsProcessor
 {
     protected const Options options;
     protected PileUp[] pileUps;
@@ -89,34 +92,18 @@ class PileUpProcessor
         readRepeatMask();
 
         foreach (i, pileUp; parallel(pileUps))
-        {
-            fetchTracePoints(pileUp);
-
-            processPileUp(pileUp, &insertions[i]);
-        }
+            processPileUp(i, pileUp);
 
         insertions.sort();
         dropEmptyInsertions();
-        debug logJsonDebug("insertions", insertions
-            .map!(ins => [
-                "start": [
-                    "contigId": ins.start.contigId.toJson,
-                    "contigPart": ins.start.contigPart.to!string.toJson,
-                ],
-                "end": [
-                    "contigId": ins.end.contigId.toJson,
-                    "contigPart": ins.end.contigPart.to!string.toJson,
-                ],
-                "payload": [
-                    "sequence": ins.payload.sequence.to!string.toJson,
-                    "contigLength": ins.payload.contigLength.toJson,
-                    "spliceSites": ins.payload.spliceSites.toJson,
-                ],
-            ])
-            .array
-            .toJson);
-
         writeInsertions();
+    }
+
+    protected void processPileUp(size_t i, PileUp pileUp)
+    {
+        auto processor = new PileUpProcessor(options, repeatMask);
+
+        processor.run(i, pileUp, &insertions[i]);
     }
 
     protected void readPileUps()
@@ -145,6 +132,53 @@ class PileUpProcessor
             ));
     }
 
+    protected void dropEmptyInsertions()
+    {
+        insertions = insertions.find!(ins => ins.start.contigId != 0);
+    }
+
+    protected void writeInsertions()
+    {
+        mixin(traceExecution);
+
+        InsertionDb.write(options.insertionsFile, insertions);
+    }
+}
+
+/// This class processes a single pileup.
+protected class PileUpProcessor
+{
+    const(Options) options;
+    const(ReferenceRegion) repeatMask;
+
+    protected size_t pileUpId;
+    protected PileUp pileUp;
+    protected Insertion* resultInsertion;
+    protected string croppedDb;
+    protected ReferencePoint[] croppingPositions;
+    protected size_t referenceReadIdx;
+    protected string consensusDb;
+    protected CompressedSequence insertionSequence;
+    protected Insertion insertion;
+
+    this(in Options options, in ReferenceRegion repeatMask)
+    {
+        this.options = options;
+        this.repeatMask = repeatMask;
+        this.pileUpId = 0 + pileUpId;
+        this.pileUp = pileUp;
+        this.resultInsertion = resultInsertion;
+    }
+
+    void run(size_t pileUpId, PileUp pileUp, Insertion* resultInsertion)
+    {
+        this.pileUpId = 0 + pileUpId;
+        this.pileUp = fetchTracePoints(pileUp);
+        this.resultInsertion = resultInsertion;
+
+        processPileUp();
+    }
+
     protected ref PileUp fetchTracePoints(ref PileUp pileUp)
     {
         mixin(traceExecution);
@@ -162,82 +196,34 @@ class PileUpProcessor
         return pileUp;
     }
 
-    protected void processPileUp(PileUp pileUp, Insertion* resultInsertion) const
+    protected void processPileUp()
     {
         mixin(traceExecution);
 
         try
         {
-            if (pileUp.length < options.minReadsPerPileUp)
-            {
-                logJsonInfo(
-                    "info", "skipping pile up due to `minReadsPerPileUp`",
-                    "reason", "minReadsPerPileUp",
-                    "pileUp", [
-                        "type": pileUp.getType.to!string.toJson,
-                        "length": pileUp.length.toJson,
-                        "contigIds": pileUp
-                            .map!(ra => ra[].map!"a.contigA.id".array)
-                            .joiner
-                            .array
-                            .sort
-                            .uniq
-                            .array
-                            .toJson,
-                    ],
-                );
-
+            if (shouldSkipSmallPileUp())
                 return;
-            }
 
-            auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
-                options.readsDb,
-                options.tracePointDistance,
-                options.workdir,
-            ));
-            auto referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingResult.referencePositions);
-            auto referenceRead = pileUp[referenceReadIdx];
-            assert(referenceRead.length == croppingResult.referencePositions.length);
+            crop();
+            selectReferenceRead();
+            computeConsensus();
+            getInsertionSequence();
 
-            auto consensusDb = getConsensus(
-                croppingResult.db,
-                referenceReadIdx + 1,
-                options.consensusOptions
-            );
-            auto insertSequences = getFastaSequences(consensusDb, only(1), options.workdir);
-            enforce!Exception(!insertSequences.empty, "consensus could not be computed");
-            auto insertSequence = insertSequences.front;
-
-            if (
-                pileUp.isExtension &&
-                shouldSkipShortExtension(croppingResult, insertSequence, referenceRead)
-            )
-            {
-                logJsonInfo(
-                    "info", "skipping pile up due to `minExtensionLength`",
-                    "reason", "minExtensionLength",
-                    "pileUp", [
-                        "type": pileUp.getType.to!string.toJson,
-                        "length": pileUp.length.toJson,
-                        "contigIds": pileUp
-                            .map!(ra => ra[].map!"a.contigA.id".array)
-                            .joiner
-                            .array
-                            .sort
-                            .uniq
-                            .array
-                            .toJson,
-                    ],
-                );
-
+            if (pileUp.isExtension && shouldSkipShortExtension())
                 return;
-            }
 
-            auto compressedSequence = CompressedSequence.from(insertSequence);
-            *resultInsertion = makeInsertions(
-                referenceRead,
-                compressedSequence,
-                croppingResult.referencePositions,
+            *resultInsertion = makeInsertion();
+        }
+        catch(DentistException e)
+        {
+            logJsonWarn(
+                "info", "skipping pile up due to errors",
+                "reason", "error",
+                "error", e.message.to!string,
+                "errorPayload", e.payload,
+                "pileUpId", pileUpId,
+                "pileUp", pileUp.pileUpToSimpleJson,
             );
         }
         catch(Exception e)
@@ -245,33 +231,52 @@ class PileUpProcessor
             logJsonWarn(
                 "info", "skipping pile up due to errors",
                 "reason", "error",
-                "error", e.message().to!string,
-                "pileUp", [
-                    "type": pileUp.getType.to!string.toJson,
-                    "length": pileUp.length.toJson,
-                    "contigIds": pileUp
-                        .map!(ra => ra[].map!"a.contigA.id".array)
-                        .joiner
-                        .array
-                        .sort
-                        .uniq
-                        .array
-                        .toJson,
-                ],
+                "error", e.message.to!string,
+                "pileUpId", pileUpId,
+                "pileUp", pileUp.pileUpToSimpleJson,
             );
         }
     }
 
-    protected void dropEmptyInsertions()
+    protected bool shouldSkipSmallPileUp() const nothrow
     {
-        insertions = insertions.find!(ins => ins.start.contigId != 0);
+        if (pileUp.length < options.minReadsPerPileUp)
+        {
+            logJsonInfo(
+                "info", "skipping pile up due to `minReadsPerPileUp`",
+                "reason", "minReadsPerPileUp",
+                "pileUpId", pileUpId,
+                "pileUp", pileUp.pileUpToSimpleJson,
+            );
+
+            return true;
+        }
+
+        return false;
     }
 
-    protected void writeInsertions()
+    protected void crop()
     {
-        mixin(traceExecution);
+        auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
+            options.readsDb,
+            options.tracePointDistance,
+            options.workdir,
+        ));
 
-        InsertionDb.write(options.insertionsFile, insertions);
+        croppedDb = croppingResult.db;
+        croppingPositions = croppingResult.referencePositions;
+    }
+
+    protected void selectReferenceRead()
+    {
+        referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingPositions);
+
+        assert(referenceRead.length == croppingPositions.length);
+    }
+
+    protected @property inout(ReadAlignment) referenceRead() inout
+    {
+        return pileUp[referenceReadIdx];
     }
 
     protected size_t bestReadAlignmentIndex(
@@ -289,34 +294,63 @@ class PileUpProcessor
             .index;
     }
 
-    protected bool shouldSkipShortExtension(T)(
-        T croppingResult,
-        in string insertSequence,
-        in ReadAlignment referenceRead,
-    ) const
+    protected void computeConsensus()
     {
-        assert(croppingResult.referencePositions.length == 1);
+        consensusDb = getConsensus(
+            croppedDb,
+            referenceReadIdx + 1,
+            options.consensusOptions,
+        );
 
-        auto refPos = croppingResult.referencePositions[0].value;
-        auto refLength = referenceRead[0].contigA.length;
-        ulong extensionLength = referenceRead.isFrontExtension
-            ? insertSequence.length.to!ulong - refPos.to!ulong
-            : insertSequence.length.to!ulong - (refLength - refPos).to!ulong;
-
-        return extensionLength < options.minExtensionLength;
+        dentistEnforce(
+            !dbEmpty(consensusDb, options.workdir),
+            "consensus could not be computed",
+            [
+                "consensusDb": consensusDb.toJson,
+                "referenceRead": (referenceReadIdx + 1).toJson,
+            ].toJson,
+        );
     }
 
-    protected static Insertion makeInsertions(
-        ReadAlignment referenceRead,
-        CompressedSequence compressedSequence,
-        ReferencePoint[] referencePositions,
-    )
+    protected void getInsertionSequence()
+    {
+        auto fastaSequence = getFastaSequence(consensusDb, 1, options.workdir);
+        insertionSequence = CompressedSequence.from(fastaSequence);
+    }
+
+    protected bool shouldSkipShortExtension() const
+    {
+        assert(croppingPositions.length == 1);
+
+        auto refPos = croppingPositions[0].value;
+        auto refLength = referenceRead[0].contigA.length;
+        ulong extensionLength = referenceRead.isFrontExtension
+            ? insertionSequence.length.to!ulong - refPos.to!ulong
+            : insertionSequence.length.to!ulong - (refLength - refPos).to!ulong;
+
+        if (extensionLength < options.minExtensionLength)
+        {
+            logJsonInfo(
+                "info", "skipping pile up due to `minExtensionLength`",
+                "reason", "minExtensionLength",
+                "pileUpId", pileUpId,
+                "pileUp", pileUp.pileUpToSimpleJson,
+            );
+
+            return true;
+        }
+
+        return false;
+    }
+
+    protected Insertion makeInsertion()
     {
         auto insertion = makeJoin!Insertion(referenceRead);
+        // FIXME reduce payload to `insertionSequence`
         insertion.payload = InsertionInfo(
-            compressedSequence,
+            insertionSequence,
             0,
-            zip(referencePositions, referenceRead[].map!"a.seed", referenceRead[].map!"a.flags")
+            zip(croppingPositions, referenceRead[].map!"a.seed", referenceRead[].map!"a.flags")
                 .map!(spliceSite => SpliceSite(spliceSite.expand))
                 .array,
         );
