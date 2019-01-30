@@ -231,8 +231,7 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
     return array(alignmentsByContig);
 }
 
-/// Returns a common trace points wrt. contigA that is not in mask and is on
-/// the relevant half of the contig.
+/// Returns a common trace points wrt. contigA that is not in mask.
 private long getCommonTracePoint(
     in SeededAlignment[] alignments,
     in ReferenceRegion mask,
