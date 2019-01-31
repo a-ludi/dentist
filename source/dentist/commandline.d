@@ -1155,8 +1155,8 @@ struct OptionsFor(DentistCommand command)
         @Option("reads-error")
         @Help("estimated error rate in reads")
         @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reads error rate must be in (0, 1)"
+            0.0 < value && value <= 0.3,
+            "reads error rate must be in (0, 0.3]"
         ))
         double readsErrorRate = .15;
     }
@@ -1170,8 +1170,8 @@ struct OptionsFor(DentistCommand command)
         @Option("reference-error")
         @Help("estimated error rate in reference")
         @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reference error rate must be in (0, 1)"
+            0.0 < value && value <= 0.3,
+            "reference error rate must be in (0, 0.3]"
         ))
         double referenceErrorRate = .01;
     }
@@ -1301,12 +1301,20 @@ struct OptionsFor(DentistCommand command)
         is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().referenceErrorRate))
     ) {
+        @Validate!validateAverageCorrelationRate
+        @property auto selfAlignmentOptionsAverageCorrelationRate() const
+        {
+            return (1 - referenceErrorRate)^^2;
+        }
+
         @property string[] selfAlignmentOptions() const
         {
             return [
                 DalignerOptions.identity,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate)^^2),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
@@ -1315,13 +1323,21 @@ struct OptionsFor(DentistCommand command)
         is(typeof(OptionsFor!command().referenceErrorRate)) &&
         is(typeof(OptionsFor!command().readsErrorRate))
     ) {
+        @Validate!validateAverageCorrelationRate
+        @property auto refVsReadsAlignmentOptionsAverageCorrelationRate() const
+        {
+            return (1 - referenceErrorRate) * (1 - readsErrorRate);
+        }
+
         @property string[] refVsReadsAlignmentOptions() const
         {
             return [
                 DamapperOptions.symmetric,
                 DamapperOptions.oneDirection,
                 DamapperOptions.bestMatches ~ ".7",
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate) * (1 - readsErrorRate)),
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    refVsReadsAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
@@ -1331,13 +1347,21 @@ struct OptionsFor(DentistCommand command)
         is(typeof(OptionsFor!command().readsErrorRate)) &&
         is(typeof(OptionsFor!command().numDaccordThreads))
     ) {
+        @Validate!validateAverageCorrelationRate
+        @property auto pileUpAlignmentOptionsAverageCorrelationRate() const
+        {
+            return (1 - readsErrorRate)^^2;
+        }
+
         @property string[] pileUpAlignmentOptions() const
         {
             return [
                 DalignerOptions.identity,
                 DalignerOptions.numThreads ~ numDaccordThreads.to!string,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - readsErrorRate)^^2),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    pileUpAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
@@ -1676,7 +1700,7 @@ private
         static foreach (alias symbol; getSymbolsByUDA!(Options, Validate))
         {{
             alias validate = getUDAs!(symbol, Validate)[0].validate;
-            auto value = __traits(getMember, options, symbol.stringof);
+            auto value = __traits(getMember, options, __traits(identifier, symbol));
             alias Value = typeof(value);
             alias Validator = typeof(validate);
 
@@ -1836,6 +1860,14 @@ private
         enforce!CLIException(
             0 < value,
             option ~ " must be greater than zero",
+        );
+    }
+
+    void validateAverageCorrelationRate(V)(V value)
+    {
+        enforce!CLIException(
+            0.7 <= value && value < 1.0,
+            "-e option of daligner/damapper must be in [0.7, 1) - some error rate(s) are too high",
         );
     }
 
