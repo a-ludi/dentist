@@ -1062,6 +1062,19 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("max-insertions-error")
+        @Help("insertion and existing contigs must match with less than <double> errors")
+        @Validate!(value => enforce!CLIException(
+            0.0 < value && value <= 0.3,
+            "maximum insertions error rate must be in (0, 0.3]"
+        ))
+        double maxInsertionsError = 1e-1;
+    }
+
+    static if (command.among(
         TestingCommand.findClosableGaps,
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
@@ -1367,18 +1380,36 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (
-        is(typeof(OptionsFor!command().minAnchorLength)) &&
-        is(typeof(OptionsFor!command().readsErrorRate)) &&
-        is(typeof(OptionsFor!command().referenceErrorRate)) &&
-        is(typeof(OptionsFor!command().numDaccordThreads))
+        is(typeof(OptionsFor!command().maxInsertionsError)) &&
+        is(typeof(OptionsFor!command().numDaccordThreads)) &&
+        is(typeof(OptionsFor!command().tracePointDistance)) &&
+        is(typeof(OptionsFor!command().workdir))
     ) {
+        enum flankingContigsRepeatMaskName = "rep";
+
+        @property string flankingContigsRepeatMaskPath() const
+        {
+            enum maskName = "rep";
+
+            return buildPath(workdir, maskName);
+        }
+
+        @Validate!validateAverageCorrelationRate
+        @property auto postConsensusAlignmentOptionsAverageCorrelationRate() const
+        {
+            return 1 - maxInsertionsError;
+        }
+
         @property string[] postConsensusAlignmentOptions() const
         {
             return [
                 DalignerOptions.asymmetric,
                 DalignerOptions.numThreads ~ numDaccordThreads.to!string,
+                DalignerOptions.masks ~ flankingContigsRepeatMaskName,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate^^minReadsPerPileUp) * (1 - readsErrorRate)),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    postConsensusAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }

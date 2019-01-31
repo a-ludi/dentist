@@ -46,7 +46,8 @@ import dentist.dazzler :
     getDalignment,
     getConsensus,
     getFastaSequence,
-    readMask;
+    readMask,
+    writeMask;
 import std.algorithm :
     canFind,
     countUntil,
@@ -177,14 +178,11 @@ protected class PileUpProcessor
     {
         this.options = options;
         this.repeatMask = repeatMask;
-        this.pileUpId = 0 + pileUpId;
-        this.pileUp = pileUp;
-        this.resultInsertion = resultInsertion;
     }
 
     void run(size_t pileUpId, PileUp pileUp, Insertion* resultInsertion)
     {
-        this.pileUpId = 0 + pileUpId;
+        this.pileUpId = options.pileUpBatch[0] + pileUpId;
         this.pileUp = fetchTracePoints(pileUp);
         this.resultInsertion = resultInsertion;
 
@@ -329,10 +327,26 @@ protected class PileUpProcessor
     protected void alignConsensusToFlankingContigs()
     {
         // FIXME crop flanks to expected matching region + a small margin
+        auto flankingContigIds = croppingPositions.map!"a.contigId".array;
         auto flankingContigsDb = dbSubset(
             options.refDb,
-            croppingPositions.map!"a.contigId",
+            flankingContigIds,
             options.consensusOptions,
+        );
+        auto flankingContigsRepeatMask = repeatMask
+            .intervals
+            .filter!(interval => flankingContigIds.canFind(interval.contigId))
+            .map!(interval => ReferenceInterval(
+                1 + flankingContigIds.countUntil(interval.contigId),
+                interval.begin,
+                interval.end,
+            ))
+            .array;
+        writeMask(
+            flankingContigsDb,
+            options.flankingContigsRepeatMaskPath,
+            flankingContigsRepeatMask,
+            options.workdir,
         );
         postConsensusAlignment = getAlignments(
             flankingContigsDb,
@@ -353,7 +367,7 @@ protected class PileUpProcessor
             ac.contigA.id = croppingPositions[ac.contigA.id - 1]
                 .contigId
                 .to!id_t;
-            ac.disableIf(!ac.isProper);
+            ac.disableIf(!ac.isProper || ac.averageErrorRate >= options.maxInsertionsError);
         }
 
         dentistEnforce(
