@@ -1148,6 +1148,18 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("no-highlight-insertions", "H")
+        @Help("
+            turn off highlighting (upper case) of inserted sequences in the
+            FASTA output
+        ")
+        OptionFlag noHighlightInsertions;
+    }
+
+    static if (command.among(
         DentistCommand.maskRepetitiveRegions,
     ))
     {

@@ -34,9 +34,11 @@ import dentist.common.binio :
     PileUpDb;
 import dentist.common.insertions :
     Insertion,
-    InsertionInfo,
-    SpliceSite;
-import dentist.common.scaffold : ContigNode, getDefaultJoin;
+    InsertionInfo;
+import dentist.common.scaffold :
+    ContigNode,
+    getDefaultJoin,
+    isParallel;
 import dentist.util.log;
 import dentist.dazzler :
     attachTracePoints,
@@ -152,6 +154,10 @@ class PileUpsProcessor
     {
         mixin(traceExecution);
 
+        // Use this output to quickly generate test data
+        debug if (shouldLog(LogLevel.debug_))
+            printInsertions(insertions);
+
         InsertionDb.write(options.insertionsFile, insertions);
     }
 }
@@ -182,6 +188,8 @@ protected class PileUpProcessor
 
     void run(size_t pileUpId, PileUp pileUp, Insertion* resultInsertion)
     {
+        mixin(traceExecution);
+
         this.pileUpId = options.pileUpBatch[0] + pileUpId;
         this.pileUp = fetchTracePoints(pileUp);
         this.resultInsertion = resultInsertion;
@@ -308,6 +316,8 @@ protected class PileUpProcessor
 
     protected void computeConsensus()
     {
+        mixin(traceExecution);
+
         consensusDb = getConsensus(
             croppedDb,
             referenceReadIdx + 1,
@@ -326,7 +336,8 @@ protected class PileUpProcessor
 
     protected void alignConsensusToFlankingContigs()
     {
-        // FIXME crop flanks to expected matching region + a small margin
+        mixin(traceExecution);
+
         auto flankingContigIds = croppingPositions.map!"a.contigId".array;
         auto flankingContigsDb = dbSubset(
             options.refDb,
@@ -474,15 +485,70 @@ protected class PileUpProcessor
     protected Insertion makeInsertion()
     {
         auto insertion = makeJoin!Insertion(referenceRead);
-        // FIXME reduce payload to `insertionSequence`
         insertion.payload = InsertionInfo(
             insertionSequence,
             0,
-            zip(croppingPositions, referenceRead[].map!"a.seed", referenceRead[].map!"a.flags")
-                .map!(spliceSite => SpliceSite(spliceSite.expand))
-                .array,
+            insertionAlignment[],
         );
 
+        assert(insertion.isParallel == insertionAlignment.isParallel);
+
         return insertion;
+    }
+}
+
+debug private void printInsertions(in Insertion[] insertions)
+{
+    import std.stdio : writefln;
+
+    foreach (insertion; insertions)
+    {
+        writefln!"Insertion(";
+        writefln!"    ContigNode(%d, %s),"(insertion.start.contigId, insertion.start.contigPart.to!string);
+        writefln!"    ContigNode(%d, %s),"(insertion.end.contigId, insertion.end.contigPart.to!string);
+        writefln!"    InsertionInfo(";
+        writefln!`        CompressedSequence.from("%s"),`(insertion.payload.sequence.to!string);
+        writefln!"        %d,"(insertion.payload.contigLength);
+        writefln!"        [";
+
+        foreach (overlap; insertion.payload.overlaps)
+        {
+
+        writefln!"            SeededAlignment(";
+        writefln!"                AlignmentChain(";
+        writefln!"                    %d,"(overlap.id);
+        writefln!"                    Contig(%d, %d),"(overlap.contigA.id, overlap.contigA.length);
+        writefln!"                    Contig(%d, %d),"(overlap.contigB.id, overlap.contigB.length);
+        writefln!"                    %s,"(overlap.flags.complement ? "Flags(complement)" : "emptyFlags");
+        writefln!"                    [";
+
+        foreach (localAlignment; overlap.localAlignments)
+        {
+        writefln!"                        LocalAlignment(";
+        writefln!"                            Locus(%d, %d),"(localAlignment.contigA.begin, localAlignment.contigA.end);
+        writefln!"                            Locus(%d, %d),"(localAlignment.contigB.begin, localAlignment.contigB.end);
+        writefln!"                            %d,"(localAlignment.numDiffs);
+        writefln!"                            [";
+
+        foreach (tracePoint; localAlignment.tracePoints)
+        {
+        writefln!"                                TracePoint(%d, %d),"(tracePoint.numDiffs, tracePoint.numBasePairs);
+        }
+
+        writefln!"                            ],";
+        writefln!"                        ),";
+        }
+
+        writefln!"                    ],";
+        writefln!"                    %d,"(overlap.tracePointDistance);
+        writefln!"                ),";
+        writefln!"                AlignmentLocationSeed.%s,"(overlap.seed.to!string);
+        writefln!"            ),";
+
+        }
+
+        writefln!"        ],";
+        writefln!"    ),";
+        writefln!"),";
     }
 }

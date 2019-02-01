@@ -23,6 +23,7 @@ import std.algorithm :
     any,
     canFind,
     chunkBy,
+    countUntil,
     cumulativeFold,
     equal,
     filter,
@@ -84,10 +85,12 @@ struct AlignmentChain
     }
 
     static alias Flags = BitFlags!Flag;
-    static alias TranslatedTracePoint = Tuple!(
-        coord_t, "contigA",
-        coord_t, "contigB",
-    );
+
+    static struct TranslatedTracePoint
+    {
+        coord_t contigA;
+        coord_t contigB;
+    }
 
     static struct LocalAlignment
     {
@@ -115,7 +118,7 @@ struct AlignmentChain
 
         TranslatedTracePoint translateTracePoint(string contig = "contigA")(
             in coord_t contigPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure if (contig.among("contigA", "contigB"))
         {
@@ -134,9 +137,41 @@ struct AlignmentChain
             return TranslatedTracePoint(contigAPos, contigBPos);
         }
 
+        /// Crops this local alignment from startingSeed to contigPos.
+        void cropToTracePoint(string contig = "contigA")(
+            in AlignmentLocationSeed startingSeed,
+            in coord_t contigPos,
+            in trace_point_t tracePointDistance,
+            in RoundingMode roundingMode,
+        ) pure if (contig.among("contigA", "contigB"))
+        {
+            auto index = tracePointsUpTo!contig(contigPos, tracePointDistance, roundingMode);
+            auto newLocusBoundary = translateTracePoint!contig(
+                contigPos,
+                tracePointDistance,
+                roundingMode,
+            );
+
+            final switch (startingSeed)
+            {
+            case AlignmentLocationSeed.front:
+                contigA.end = newLocusBoundary.contigA;
+                contigB.end = newLocusBoundary.contigB;
+                tracePoints = tracePoints[0 .. index];
+                break;
+            case AlignmentLocationSeed.back:
+                contigA.begin = newLocusBoundary.contigA;
+                contigB.begin = newLocusBoundary.contigB;
+                tracePoints = tracePoints[index .. $];
+                break;
+            }
+
+            numDiffs = tracePoints.map!(tp => tp.numDiffs.to!diff_t).sum;
+        }
+
         auto tracePointsUpTo(string contig)(
             in coord_t contigAPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure nothrow if (contig == "contigA")
         {
@@ -198,7 +233,7 @@ struct AlignmentChain
 
         auto tracePointsUpTo(string contig)(
             in coord_t contigBPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure nothrow if (contig == "contigB")
         {
@@ -247,6 +282,15 @@ struct AlignmentChain
     LocalAlignment[] localAlignments;
     trace_point_t tracePointDistance;
 
+    static @property AlignmentChain disabledInstance()
+    {
+        AlignmentChain ac;
+
+        ac.flags |= Flag.disabled;
+
+        return ac;
+    }
+
     static foreach(flagName; __traits(allMembers, Flag))
     {
         mixin(format!(q"<
@@ -266,6 +310,9 @@ struct AlignmentChain
 
     invariant
     {
+        if (flags.disabled)
+            return;
+
         assert(localAlignments.length >= 1, "empty chain is forbidden");
         foreach (la; localAlignments)
         {
@@ -712,19 +759,8 @@ struct AlignmentChain
         RoundingMode roundingMode,
     ) const pure if (contig.among("contigA", "contigB"))
     {
-        bool coversContigPos(in AlignmentChain.LocalAlignment localAlignment)
-        {
-            return mixin(`localAlignment.` ~ contig ~ `.begin <= contigPos
-                && contigPos <= localAlignment.` ~ contig ~ `.end`);
-        }
-
-        enum otherContig = contig == "contigA" ? "contigB" : "contigA";
-        auto coveringLocalAlignments = localAlignments.find!coversContigPos;
-        enforce!Exception(
-            coveringLocalAlignments.length > 0,
-            "cannot translate coordinate due to lack of alignment coverage",
-        );
-        auto coveringLocalAlignment = coveringLocalAlignments[0];
+        auto index = coveringLocalAlignmentIndex!contig(contigPos, roundingMode);
+        auto coveringLocalAlignment = localAlignments[index];
 
         return coveringLocalAlignment.translateTracePoint!contig(
             contigPos,
@@ -774,23 +810,222 @@ struct AlignmentChain
             tracePointDistance,
         );
 
-        assert(ac.translateTracePoint(579, RoundingMode.floor) == tuple(579, 0));
-        assert(ac.translateTracePoint(599, RoundingMode.floor) == tuple(579, 0));
-        assert(ac.translateTracePoint(600, RoundingMode.floor) == tuple(600, 23));
-        assert(ac.translateTracePoint(699, RoundingMode.floor) == tuple(600, 23));
+        assert(ac.translateTracePoint(579, RoundingMode.floor) == TranslatedTracePoint(579, 0));
+        assert(ac.translateTracePoint(599, RoundingMode.floor) == TranslatedTracePoint(579, 0));
+        assert(ac.translateTracePoint(600, RoundingMode.floor) == TranslatedTracePoint(600, 23));
+        assert(ac.translateTracePoint(699, RoundingMode.floor) == TranslatedTracePoint(600, 23));
+        assert(
+            ac.translateTracePoint(700, RoundingMode.ceil)
+            ==
+            ac.translateTracePoint(700, RoundingMode.floor)
+        );
         assert(
             ac.translateTracePoint(699, RoundingMode.ceil)
             ==
             ac.translateTracePoint(701, RoundingMode.floor)
         );
-        assert(ac.translateTracePoint(700, RoundingMode.floor) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(799, RoundingMode.floor) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(800, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(899, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(2583, RoundingMode.floor) == tuple(2500, 2070));
-        assert(ac.translateTracePoint(2584, RoundingMode.floor) == tuple(2584, 2158));
+        assert(ac.translateTracePoint(700, RoundingMode.floor) == TranslatedTracePoint(700, 23 + 109));
+        assert(ac.translateTracePoint(799, RoundingMode.floor) == TranslatedTracePoint(700, 23 + 109));
+        assert(ac.translateTracePoint(800, RoundingMode.floor) == TranslatedTracePoint(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(899, RoundingMode.floor) == TranslatedTracePoint(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(2583, RoundingMode.floor) == TranslatedTracePoint(2500, 2070));
+        assert(ac.translateTracePoint(2584, RoundingMode.floor) == TranslatedTracePoint(2584, 2158));
         assertThrown!Exception(ac.translateTracePoint(578, RoundingMode.floor));
         assertThrown!Exception(ac.translateTracePoint(2585, RoundingMode.floor));
+    }
+
+    /// Crops this alignment chain from startingSeed to contigPos.
+    void cropToTracePoint(string contig = "contigA")(
+        in AlignmentLocationSeed startingSeed,
+        in coord_t contigPos,
+        in RoundingMode roundingMode,
+    ) pure if (contig.among("contigA", "contigB"))
+    {
+        auto index = coveringLocalAlignmentIndex!contig(contigPos, roundingMode);
+
+        localAlignments[index].cropToTracePoint!contig(
+            startingSeed,
+            contigPos,
+            tracePointDistance,
+            roundingMode,
+        );
+        auto isEmptyCroppedLA = localAlignments[index].contigA.length == 0 ||
+                                localAlignments[index].contigB.length == 0;
+
+        final switch (startingSeed)
+        {
+        case AlignmentLocationSeed.front:
+            if (isEmptyCroppedLA)
+                --index;
+            localAlignments = localAlignments[0 .. index + 1];
+            break;
+        case AlignmentLocationSeed.back:
+            if (isEmptyCroppedLA)
+                ++index;
+            localAlignments = localAlignments[index .. $];
+            break;
+        }
+
+        if (localAlignments.length == 0)
+            flags.disabled = true;
+    }
+
+    unittest
+    {
+        enum front = AlignmentLocationSeed.front;
+        enum back = AlignmentLocationSeed.back;
+        alias Locus = LocalAlignment.Locus;
+        alias TracePoint = LocalAlignment.TracePoint;
+        enum tracePointDistance = 100;
+        alias getAC = () => AlignmentChain(
+            0,
+            Contig(1, 2584),
+            Contig(58024, 10570),
+            Flags(Flag.complement),
+            [LocalAlignment(
+                Locus(579, 2584),
+                Locus(0, 2158),
+                292,
+                [
+                    TracePoint( 2,  23),
+                    TracePoint(11, 109),
+                    TracePoint(13, 109),
+                    TracePoint(15, 107),
+                    TracePoint(18, 107),
+                    TracePoint(14, 103),
+                    TracePoint(16, 106),
+                    TracePoint(17, 106),
+                    TracePoint( 9, 106),
+                    TracePoint(14, 112),
+                    TracePoint(16, 105),
+                    TracePoint(16, 114),
+                    TracePoint(10, 103),
+                    TracePoint(14, 110),
+                    TracePoint(15, 110),
+                    TracePoint(15, 101),
+                    TracePoint(17, 108),
+                    TracePoint(17, 109),
+                    TracePoint(15, 111),
+                    TracePoint(17, 111),
+                    TracePoint(11,  88),
+                ],
+            )],
+            tracePointDistance,
+        );
+        enum originalAC = getAC();
+
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 579, RoundingMode.floor);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 599, RoundingMode.floor);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 600, RoundingMode.floor);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.first.contigA.begin == originalAC.first.contigA.begin);
+            assert(ac.first.contigA.end == 600);
+            assert(ac.first.contigB.begin == originalAC.first.contigB.begin);
+            assert(ac.first.contigB.end == 23);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 699, RoundingMode.floor);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.first.contigA.begin == originalAC.first.contigA.begin);
+            assert(ac.first.contigA.end == 600);
+            assert(ac.first.contigB.begin == originalAC.first.contigB.begin);
+            assert(ac.first.contigB.end == 23);
+        }
+        {
+            auto ac1 = getAC();
+            ac1.cropToTracePoint(front, 699, RoundingMode.ceil);
+            auto ac2 = getAC();
+            ac2.cropToTracePoint(front, 701, RoundingMode.floor);
+
+            assert(ac1 == ac2);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2584, RoundingMode.ceil);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2501, RoundingMode.ceil);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2500, RoundingMode.ceil);
+            import std.stdio;
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.last.contigA.end == originalAC.last.contigA.end);
+            assert(ac.last.contigA.begin == 2500);
+            assert(ac.last.contigB.end == originalAC.last.contigB.end);
+            assert(ac.last.contigB.begin == 2070);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2401, RoundingMode.ceil);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.last.contigA.end == originalAC.last.contigA.end);
+            assert(ac.last.contigA.begin == 2500);
+            assert(ac.last.contigB.end == originalAC.last.contigB.end);
+            assert(ac.last.contigB.begin == 2070);
+        }
+        {
+            auto ac1 = getAC();
+            ac1.cropToTracePoint(back, 2401, RoundingMode.ceil);
+            auto ac2 = getAC();
+            ac2.cropToTracePoint(back, 2500, RoundingMode.floor);
+
+            assert(ac1 == ac2);
+        }
+
+        assertThrown!Exception(getAC().cropToTracePoint(front, 578, RoundingMode.floor));
+        assertThrown!Exception(getAC().cropToTracePoint(front, 2585, RoundingMode.floor));
+    }
+
+    protected size_t coveringLocalAlignmentIndex(string contig = "contigA")(
+        in coord_t contigPos,
+        in RoundingMode roundingMode,
+    ) const pure if (contig.among("contigA", "contigB"))
+    {
+        bool coversContigPos(in AlignmentChain.LocalAlignment localAlignment)
+        {
+            return mixin(`localAlignment.` ~ contig ~ `.begin <= contigPos
+                && contigPos <= localAlignment.` ~ contig ~ `.end`);
+        }
+
+        auto index = localAlignments.countUntil!coversContigPos;
+        enforce!Exception(
+            index >= 0,
+            "cannot translate coordinate due to lack of alignment coverage",
+        );
+
+        return index;
     }
 
     /**

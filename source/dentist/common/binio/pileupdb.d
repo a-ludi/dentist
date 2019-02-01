@@ -34,7 +34,7 @@ import std.format : format;
 import std.typecons : tuple, Tuple;
 import std.stdio : File;
 
-version (unittest) import dentist.common.binio._testdata :
+version (unittest) import dentist.common.binio._testdata.pileupdb :
     getPileUpsTestData,
     numLocalAlignments,
     numPileUps,
