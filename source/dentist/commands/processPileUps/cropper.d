@@ -18,6 +18,7 @@ import dentist.common.alignments :
     AlignmentLocationSeed,
     coord_t,
     getType,
+    isExtension,
     PileUp,
     ReadAlignment,
     SeededAlignment,
@@ -35,12 +36,14 @@ import std.algorithm :
     filter,
     fold,
     map,
+    predSwitch,
     sort,
     sum,
     swap;
 import std.array : array, minimallyInitializedArray;
 import std.conv : to;
 import std.format : format;
+import std.path : buildPath;
 import std.range :
     chain,
     chunks,
@@ -81,9 +84,26 @@ private struct PileUpCropper
 
     void buildDb()
     {
+        enum extensionDbName = "pileup-%d.dam";
+        enum gapDbName = "pileup-%d-%d.dam";
+
         fetchCroppingRefPositions();
         auto croppedSequences = pileUpWithSequence().map!(t => getCroppedSequence(t.expand));
-        croppedDb = buildDamFile(croppedSequences, options.workdir);
+
+        if (croppingRefPositions.length == 1)
+            croppedDb = format!extensionDbName(croppingRefPositions[0].contigId);
+        else
+            croppedDb = format!gapDbName(
+                croppingRefPositions[0].contigId,
+                croppingRefPositions[1].contigId,
+            );
+        croppedDb = buildPath(options.workdir, croppedDb);
+
+        buildDamFile(
+            croppedDb,
+            croppedSequences,
+            options.workdir,
+        );
     }
 
     private void fetchCroppingRefPositions()

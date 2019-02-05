@@ -2128,7 +2128,12 @@ EOF".outdent;
     }
 }
 
-/// Build a .dam file with the given set of FASTA records.
+/**
+    Build `outputDb` with the given set of FASTA records. If no `outputDb`
+    is given a temporary `.dam` file will be created.
+
+    Returns: DB file name
+*/
 string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
@@ -2139,10 +2144,19 @@ string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] db
 
     tempDb.file.close();
     remove(tempDb.name);
-    fasta2dam(tempDb.name, fastaRecords, workdir);
-    dbsplit(tempDb.name, dbsplitOptions, workdir);
 
-    return tempDb.name;
+    return buildDamFile(tempDb.name, fastaRecords, workdir, dbsplitOptions);
+}
+
+/// ditto
+string buildDamFile(Range)(string outputDb, Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
+        if (isInputRange!Range && isSomeString!(ElementType!Range))
+{
+    assert(outputDb.endsWith(damFileExtension), "outputDb must end with " ~ damFileExtension);
+    fasta2dam(outputDb, fastaRecords, workdir);
+    dbsplit(outputDb, dbsplitOptions, workdir);
+
+    return outputDb;
 }
 
 unittest
@@ -2159,12 +2173,21 @@ unittest
     scope (exit)
         rmdirRecurse(tmpDir);
 
-    string dbName = buildDamFile(fastaRecords[], tmpDir);
-
-    assert(dbName.isFile);
-    foreach (hiddenDbFile; getHiddenDbFiles(dbName))
     {
-        assert(hiddenDbFile.isFile);
+        string dbName = buildDamFile(fastaRecords[], tmpDir);
+
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
+    }
+    {
+        string wantedDbName = buildPath(tmpDir, "unit-test.dam");
+        string dbName = buildDamFile(wantedDbName, fastaRecords[], tmpDir);
+
+        assert(dbName == wantedDbName);
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
     }
 }
 
@@ -2211,7 +2234,7 @@ string getDamapping(
 /**
     Self-dalign dbFile and build consensus using daccord.
 
-    Returns: list of consensus DBs.
+    Returns: filename of consensus DB.
 */
 string getConsensus(Options)(in string dbFile, in size_t readId, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
