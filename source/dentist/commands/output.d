@@ -379,9 +379,8 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForExistingContig(begin, insertion, globalComplement);
-
         auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
-        contigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
+        auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
 
         logJsonDebug(
             "info", "writing contig insertion",
@@ -395,9 +394,9 @@ class AssemblyWriter
         );
 
         if (insertionInfo.complement)
-            contigSequence.reverseComplementer.copy(writer);
+            croppedContigSequence.reverseComplementer.copy(writer);
         else
-            contigSequence.copy(writer);
+            croppedContigSequence.copy(writer);
     }
 
     protected void writeGap(
@@ -431,6 +430,8 @@ class AssemblyWriter
         logJsonDebug(
             "info", "writing new sequence insertion",
             "type", insertion.isGap ? "gap" : "extension",
+            "spliceStart", insertionInfo.cropping.begin,
+            "spliceEnd", insertionInfo.cropping.end,
             "insertionLength", insertionInfo.length,
             "isAntiParallel", insertion.isAntiParallel,
             "localComplement", insertionInfo.complement,
@@ -477,26 +478,26 @@ OutputScaffold fixCropping(
 
     foreach (contigJoin; contigJoins)
     {
-        auto insertionUpdated1 = transferCroppingFromIncidentJoins(contigJoin, incidentEdgesCache);
-        auto insertionUpdated2 = resolveCroppingConflicts(scaffold, contigJoin, incidentEdgesCache,
-                                                         tracePointDistance);
+        auto insertionUpdated = transferCroppingFromIncidentJoins(contigJoin, incidentEdgesCache);
 
         version (assert)
         {
             auto overlaps = contigJoin.payload.overlaps;
 
-            alias cropPos = getCroppingPosition!"contigA";
             assert(overlaps.length <= 2);
             if (overlaps.length == 2)
+            {
+                auto cropPos0 = getCroppingPosition!"contigA"(overlaps[0]);
+                auto cropPos1 = getCroppingPosition!"contigA"(overlaps[1]);
+
                 assert(
-                    cropPos(overlaps[0]) == cropPos(overlaps[1]) ||
-                    (cropPos(overlaps[0]) < cropPos(overlaps[1]))
-                    ==
-                    (overlaps[0].seed < overlaps[1].seed)
+                    cropPos0 == cropPos1 ||
+                    (cropPos0 < cropPos1) == (overlaps[0].seed < overlaps[1].seed)
                 );
+            }
         }
 
-        if (insertionUpdated1 || insertionUpdated2)
+        if (insertionUpdated)
             scaffold.add!replace(contigJoin);
     }
 
@@ -537,92 +538,4 @@ Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
         .array;
 
     return cast(typeof(return)) (contigJoin.payload.overlaps.length > 0);
-}
-
-Flag!"insertionUpdated" resolveCroppingConflicts(
-    ref OutputScaffold scaffold,
-    ref Insertion contigJoin,
-    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
-    trace_point_t tracePointDistance,
-)
-{
-    auto overlaps = contigJoin.payload.overlaps;
-
-    if (overlaps.length <= 1)
-        return No.insertionUpdated;
-
-    if (getCroppingPosition!"contigA"(overlaps[0]) <= getCroppingPosition!"contigA"(overlaps[1]))
-        return No.insertionUpdated;
-
-    resolveOverlappingCropping(scaffold, contigJoin, incidentEdgesCache, tracePointDistance);
-
-    return Yes.insertionUpdated;
-}
-
-private void resolveOverlappingCropping(
-    ref OutputScaffold scaffold,
-    ref Insertion contigJoin,
-    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
-    trace_point_t tracePointDistance,
-)
-{
-    assert(contigJoin.payload.overlaps.length == 2);
-
-    auto overlaps = contigJoin.payload.overlaps;
-    // Crop overlapping insertions to the center of the overlap
-    auto newCroppingPos = floor(mean(overlaps.map!(getCroppingPosition!"contigA")), tracePointDistance);
-
-    void resolveOverlappingCroppingFor(ref SeededAlignment overlap)
-    {
-        auto alignmentSeed = overlap.seed;
-        auto croppingDiff = absdiff(newCroppingPos, getCroppingPosition!"contigA"(overlap));
-
-        if (croppingDiff > 0)
-        {
-            alias replace = OutputScaffold.ConflictStrategy.replace;
-
-            auto contigNode = alignmentSeed.predSwitch(
-                AlignmentLocationSeed.front, contigJoin.start,
-                AlignmentLocationSeed.back, contigJoin.end,
-            );
-            auto incidentInsertion = incidentEdgesCache[contigNode]
-                .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
-                .front;
-            auto insertionOverlapIdx = incidentInsertion
-                .payload
-                .overlaps
-                .countUntil!(overlap => overlap.contigA.id == contigNode.contigId);
-            auto insertionOverlap = &incidentInsertion
-                .payload
-                .overlaps[insertionOverlapIdx];
-
-            // Translated newCroppingPos to the next trace point to get an
-            // exact alignment after cropping
-            auto newCroppingPosOnOverlap = alignmentSeed.predSwitch(
-                AlignmentLocationSeed.front, min(newCroppingPos, insertionOverlap.last.contigA.end),
-                AlignmentLocationSeed.back, max(newCroppingPos, insertionOverlap.first.contigA.begin),
-            );
-            insertionOverlap.alignment.cropToTracePoint(
-                alignmentSeed,
-                newCroppingPosOnOverlap,
-                alignmentSeed.predSwitch(
-                    AlignmentLocationSeed.front, RoundingMode.floor,
-                    AlignmentLocationSeed.back, RoundingMode.ceil,
-                ),
-            );
-
-            // Store updated insertion in scaffold and update the cache
-            scaffold.add!replace(incidentInsertion);
-            incidentEdgesCache[incidentInsertion.start]
-                .replaceInPlace(incidentInsertion, incidentInsertion);
-            incidentEdgesCache[incidentInsertion.end]
-                .replaceInPlace(incidentInsertion, incidentInsertion);
-
-            // Update splice site of contigJoin
-            overlap = *insertionOverlap;
-        }
-    }
-
-    foreach (ref overlap; overlaps)
-        resolveOverlappingCroppingFor(overlap);
 }

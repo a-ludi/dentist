@@ -25,6 +25,7 @@ import dentist.common.scaffold :
     isExtension,
     isGap,
     Scaffold;
+import dentist.util.log;
 import dentist.util.math : add;
 import std.algorithm :
     among,
@@ -32,6 +33,7 @@ import std.algorithm :
     filter;
 import std.array : array;
 import std.typecons : tuple;
+import vibe.data.json : toJson = serializeToJson;
 
 
 /// This characterizes an insertion.
@@ -74,9 +76,9 @@ coord_t getCroppingPosition(string contig)(in SeededAlignment overlap)
     final switch (overlap.seed)
     {
         case AlignmentLocationSeed.front:
-            return mixin("overlap.last." ~ contig ~ ".end");
-        case AlignmentLocationSeed.back:
             return mixin("overlap.first." ~ contig ~ ".begin");
+        case AlignmentLocationSeed.back:
+            return mixin("overlap.last." ~ contig ~ ".end");
     }
 }
 
@@ -182,15 +184,27 @@ auto getInfoForNewSequenceInsertion(
         }
         break;
     case 2:
-        if (overlaps[1].seed > overlaps[0].seed)
+        if (overlaps[0].seed > overlaps[1].seed)
+        {
+            slice.begin = getCroppingPosition!"contigB"(overlaps[0]);
+            slice.end = getCroppingPosition!"contigB"(overlaps[1]);
+        }
+        else
         {
             slice.begin = getCroppingPosition!"contigB"(overlaps[1]);
             slice.end = getCroppingPosition!"contigB"(overlaps[0]);
         }
-        else
+        if (slice.end < slice.begin)
         {
-            slice.begin = getCroppingPosition!"contigB"(overlaps[0]);
-            slice.end = getCroppingPosition!"contigB"(overlaps[1]);
+            logJsonWarn(
+                "info", "adjusting invalid interval",
+                "cropping", [
+                    "begin": slice.begin,
+                    "end": slice.end,
+                ].toJson,
+                "sequence", insertion.payload.sequence.to!string,
+            );
+            slice.end = slice.begin;
         }
         break;
     default:
