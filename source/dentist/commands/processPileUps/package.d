@@ -191,27 +191,16 @@ protected class PileUpProcessor
         mixin(traceExecution);
 
         this.pileUpId = options.pileUpBatch[0] + pileUpId;
-        this.pileUp = fetchTracePoints(pileUp);
+        this.pileUp = pileUp;
         this.resultInsertion = resultInsertion;
 
-        processPileUp();
-    }
-
-    protected ref PileUp fetchTracePoints(ref PileUp pileUp)
-    {
-        mixin(traceExecution);
-
-        auto allAlignmentChains = pileUp.getAlignmentRefs();
-        allAlignmentChains.sort!"*a < *b";
-        allAlignmentChains.attachTracePoints(
-            options.refDb,
-            options.readsDb,
-            options.readsAlignmentFile,
-            options.tracePointDistance,
-            options.workdir
+        logJsonDiagnostic(
+            "info", "processing pile up",
+            "pileUpId", this.pileUpId,
+            "pileUp", pileUp.pileUpToSimpleJson(),
         );
 
-        return pileUp;
+        processPileUp();
     }
 
     protected void processPileUp()
@@ -223,6 +212,7 @@ protected class PileUpProcessor
             if (shouldSkipSmallPileUp())
                 return;
 
+            fetchTracePoints();
             crop();
             selectReferenceRead();
             computeConsensus();
@@ -275,6 +265,21 @@ protected class PileUpProcessor
         return false;
     }
 
+    protected void fetchTracePoints()
+    {
+        mixin(traceExecution);
+
+        auto allAlignmentChains = pileUp.getAlignmentRefs();
+        allAlignmentChains.sort!"*a < *b";
+        allAlignmentChains.attachTracePoints(
+            options.refDb,
+            options.readsDb,
+            options.readsAlignmentFile,
+            options.tracePointDistance,
+            options.workdir
+        );
+    }
+
     protected void crop()
     {
         auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
@@ -291,6 +296,7 @@ protected class PileUpProcessor
     {
         referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingPositions);
 
+        logJsonDiagnostic("referenceReadIdx", referenceReadIdx);
         assert(referenceRead.length == croppingPositions.length);
     }
 
@@ -390,6 +396,8 @@ protected class PileUpProcessor
 
     protected void getInsertionAlignment()
     {
+        mixin(traceExecution);
+
         SeededAlignment[2] insertionAlignmentBuffer;
 
         foreach (ref croppingPos; croppingPositions)
