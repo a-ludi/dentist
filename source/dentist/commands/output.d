@@ -47,7 +47,8 @@ import dentist.common.scaffold :
     isGap,
     linearWalk,
     normalizeUnkownJoins,
-    removeExtensions;
+    removeExtensions,
+    removeSpanning;
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
@@ -178,9 +179,14 @@ class AssemblyWriter
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
-        if (!options.shouldExtendContigs)
+        if (!options.onlyFlags.extending)
         {
             assemblyGraph = assemblyGraph.removeExtensions!InsertionInfo();
+        }
+
+        if (!options.onlyFlags.spanning)
+        {
+            assemblyGraph = assemblyGraph.removeSpanning!InsertionInfo();
         }
 
         assemblyGraph = assemblyGraph

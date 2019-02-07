@@ -83,7 +83,10 @@ import std.traits :
     isStaticArray,
     Parameters,
     ReturnType;
-import std.typecons : BitFlags, tuple;
+import std.typecons :
+    BitFlags,
+    tuple,
+    Yes;
 import transforms : camelCase, snakeCaseCT;
 import vibe.data.json : serializeToJsonString;
 
@@ -898,15 +901,6 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.output,
-    ))
-    {
-        @Option("extend-contigs")
-        @Help("if given extend contigs even if no spanning reads can be found")
-        OptionFlag shouldExtendContigs;
-    }
-
-    static if (command.among(
         TestingCommand.translocateGaps,
         DentistCommand.output,
     ))
@@ -1157,6 +1151,37 @@ struct OptionsFor(DentistCommand command)
             FASTA output
         ")
         OptionFlag noHighlightInsertions;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+        DentistCommand.output,
+    ))
+    {
+        @Option("only")
+        @Help(format!"
+            only process/output insertions of the given type. Note, extending
+            insertions are experimental and may produce invalid results.
+            (default: spanning)
+        ")
+        OnlyFlag onlyFlag;
+
+        enum OnlyFlag
+        {
+            spanning = 1 << 0,
+            extending = 1 << 1,
+            both = spanning | extending,
+        }
+
+        alias OnlyFlags = BitFlags!(OnlyFlag, Yes.unsafe);
+
+        OnlyFlags onlyFlags;
+
+        @PostValidate()
+        void initOnlyFlags() pure nothrow
+        {
+            onlyFlags = OnlyFlags(onlyFlag);
+        }
     }
 
     static if (command.among(

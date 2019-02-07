@@ -23,6 +23,7 @@ import dentist.common.alignments :
     getAlignmentRefs,
     getType,
     isExtension,
+    isGap,
     makeJoin,
     PileUp,
     pileUpToSimpleJson,
@@ -193,6 +194,20 @@ protected class PileUpProcessor
         this.pileUpId = options.pileUpBatch[0] + pileUpId;
         this.pileUp = pileUp;
         this.resultInsertion = resultInsertion;
+
+        if (
+            (!options.onlyFlags.extending && pileUp.isExtension) ||
+            (!options.onlyFlags.spanning && pileUp.isGap)
+        )
+        {
+            logJsonInfo(
+                "info", "skipping pile up due to --only",
+                "pileUpId", this.pileUpId,
+                "pileUp", pileUp.pileUpToSimpleJson(),
+            );
+
+            return;
+        }
 
         logJsonDiagnostic(
             "info", "processing pile up",
