@@ -24,14 +24,17 @@ import dentist.common.alignments :
     PileUp;
 import dentist.common.binio : writePileUpsDb;
 import dentist.dazzler :
+    GapSegment,
     getAlignments,
     getNumContigs,
+    getScaffoldStructure,
     readMask;
 import dentist.util.log;
 import dentist.util.math : NaturalNumberSet;
 import std.algorithm :
     canFind,
     count,
+    filter,
     map,
     sum;
 import std.array : array;
@@ -59,6 +62,7 @@ class PileUpCollector
     protected size_t numReads;
     protected AlignmentChain[] readsAlignment;
     protected ReferenceRegion repetitiveRegions;
+    protected GapSegment[] inputGaps;
     protected NaturalNumberSet unusedReads;
 
     this(in ref Options options)
@@ -83,6 +87,11 @@ class PileUpCollector
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
         numReads = getNumContigs(options.readsDb, options.workdir);
         unusedReads = NaturalNumberSet(numReads, Yes.addAll);
+        inputGaps = getScaffoldStructure(options.refDb)
+            .filter!(part => part.peek!GapSegment !is null)
+            .map!(gapPart => gapPart.get!GapSegment)
+            .array;
+
         logJsonInfo(
             "numReferenceContigs", numReferenceContigs,
             "numReads", numReads,
@@ -154,6 +163,7 @@ class PileUpCollector
         auto pileUps = build(
             numReferenceContigs,
             readsAlignment,
+            inputGaps,
             options,
         );
 

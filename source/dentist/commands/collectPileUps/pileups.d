@@ -16,21 +16,25 @@ import dentist.common.alignments :
     coord_t,
     getType,
     isValid,
+    makeJoin,
     PileUp,
     ReadAlignment,
-    SeededAlignment,
-    to;
+    SeededAlignment;
 import dentist.common.binio : ArrayStorage;
 import dentist.common.scaffold :
     buildScaffold,
-    concatenatePayloads,
+    ContigNode,
+    ContigPart,
     discardAmbiguousJoins,
+    getUnkownJoin,
     isGap,
     Join,
     mergeExtensionsWithGaps,
+    removeNoneJoins,
     Scaffold;
+import dentist.dazzler : GapSegment;
 import dentist.util.algorithm : orderLexicographically;
-import dentist.util.math : filterEdges;
+import dentist.util.math : filterEdges, mapEdges;
 import dentist.util.log;
 import std.algorithm :
     any,
@@ -38,6 +42,7 @@ import std.algorithm :
     chunkBy,
     equal,
     filter,
+    fold,
     joiner,
     map,
     min,
@@ -47,23 +52,42 @@ import std.algorithm : equal;
 import std.array : array;
 import std.conv : to;
 import std.range : chain, iota, only, slide, walkLength, zip;
-import std.typecons : No;
+import std.range.primitives;
+import std.traits : EnumMembers;
+import std.typecons :
+    BitFlags,
+    No;
 import vibe.data.json : toJson = serializeToJson;
 
 
-private auto collectPileUps(Scaffold!(ReadAlignment[]) scaffold)
+private auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
 {
     return scaffold
         .edges
-        .filter!"a.payload.length > 0"
         .map!"a.payload"
+        .filter!(payload => payload.types.pileUp)
+        .map!(payload => payload.readAlignments)
+        .filter!(pileUp => pileUp.length > 0)
         .filter!(pileUp => pileUp.isValid);
 }
 
-private void debugLogPileUps(string state, Scaffold!(ReadAlignment[]) scaffold)
+private void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold)
 {
     logJsonDebug(
         "state", state,
+        "joins", scaffold
+            .edges
+            .map!(join => [
+                "start": join.start.toJson,
+                "end": join.end.toJson,
+                "payloadTypes": only(EnumMembers!(ScaffoldPayload.Type))
+                    .filter!(type => join.payload.types & type)
+                    .map!"a.to!string"
+                    .array
+                    .toJson,
+            ])
+            .array
+            .toJson,
         "pileUps", collectPileUps(scaffold)
             .map!(pileUp => [
                 "type": pileUp.getType.to!string.toJson,
@@ -74,15 +98,86 @@ private void debugLogPileUps(string state, Scaffold!(ReadAlignment[]) scaffold)
     );
 }
 
+struct ScaffoldPayload
+{
+    static enum Type : ubyte
+    {
+        pileUp = 1 << 0,
+        inputGap = 1 << 1,
+    }
+
+    BitFlags!Type types;
+    ReadAlignment[] readAlignments;
+
+    private this(Type type, ReadAlignment[] readAlignments = []) pure nothrow
+    {
+        this.types |= type;
+        if (types.pileUp)
+            this.readAlignments = readAlignments;
+    }
+
+    private this(BitFlags!Type types, ReadAlignment[] readAlignments) pure nothrow
+    {
+        this.types = types;
+        this.readAlignments = readAlignments;
+    }
+
+    static ScaffoldPayload pileUp(ReadAlignment[] readAlignments) pure nothrow
+    {
+        return ScaffoldPayload(Type.pileUp, readAlignments);
+    }
+
+    void remove(Type type)() pure nothrow if (type == Type.pileUp)
+    {
+        types.pileUp = false;
+        readAlignments = [];
+    }
+
+    static ScaffoldPayload inputGap() pure nothrow
+    {
+        return ScaffoldPayload(Type.inputGap);
+    }
+
+    void remove(Type type)() pure nothrow if (type == Type.inputGap)
+    {
+        types.inputGap = false;
+    }
+
+    static ScaffoldPayload merge(R)(R payloads)
+        if (isInputRange!R && is(ElementType!R == ScaffoldPayload))
+    {
+        return ScaffoldPayload(
+            payloads.save.map!"a.types".fold!"a | b",
+            payloads.map!"a.readAlignments".joiner.array,
+        );
+    }
+
+    static ScaffoldPayload merge(ScaffoldPayload[] payloads...)
+    {
+        return merge!(ScaffoldPayload[])(payloads);
+    }
+}
+
+Join!ScaffoldPayload mergeJoins(Join!ScaffoldPayload[] joins...)
+{
+    assert(joins.length > 0);
+
+    auto mergedJoin = joins[0];
+
+    mergedJoin.payload = ScaffoldPayload.merge(joins.map!"a.payload");
+
+    return mergedJoin;
+}
+
 PileUp[] build(Options)(
     in size_t numReferenceContigs,
     AlignmentChain[] candidates,
+    GapSegment[] inputGaps,
     in Options options,
 )
 {
     alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
-    alias Payload = ReadAlignment[];
-    alias ReadAlignmentJoin = Join!Payload;
+    alias ReadAlignmentJoin = Join!ScaffoldPayload;
 
     candidates.sort!("a.contigB.id < b.contigB.id", SwapStrategy.stable);
 
@@ -93,14 +188,22 @@ PileUp[] build(Options)(
         .joiner
         .filter!"a.isValid"
         .map!"a.getInOrder()"
-        .map!(to!ReadAlignmentJoin);
-    auto alignmentsScaffold = buildScaffold!(concatenatePayloads!Payload, Payload)(numReferenceContigs + 0, readAlignmentJoins);
+        .map!makeScaffoldJoin;
+    auto inputGapJoins = inputGaps
+        .map!makeScaffoldJoin;
+
+    auto alignmentsScaffold = buildScaffold!(mergeJoins, ScaffoldPayload)(
+        numReferenceContigs + 0,
+        chain(readAlignmentJoins, inputGapJoins),
+    );
     debugLogPileUps("raw", alignmentsScaffold);
-    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!Payload(options.bestPileUpMargin);
+    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!ScaffoldPayload(options.bestPileUpMargin);
     debugLogPileUps("unambiguous", alignmentsScaffold);
-    alignmentsScaffold.filterEdges!(e => !e.isGap || e.payload.length >= options.minSpanningReads);
+    alignmentsScaffold = alignmentsScaffold.enforceMinSpanningReads(options.minSpanningReads);
     debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
-    alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!("a ~ b", Payload);
+    alignmentsScaffold = alignmentsScaffold.removeInputGaps();
+    debugLogPileUps("inputGapsRemoved", alignmentsScaffold);
+    alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!(ScaffoldPayload.merge, ScaffoldPayload);
     debugLogPileUps("extensionsMerged", alignmentsScaffold);
     auto pileUps = collectPileUps(alignmentsScaffold).array;
 
@@ -301,7 +404,132 @@ unittest
         }
 }
 
+/// Generate join from read alignment.
+Join!ScaffoldPayload makeScaffoldJoin(ReadAlignment readAlignment)
+{
+    auto join = makeJoin!(typeof(return))(readAlignment);
+    join.payload = ScaffoldPayload.pileUp([readAlignment]);
 
+    return join;
+}
+
+///
+unittest
+{
+    with (AlignmentChain) with (LocalAlignment) with (Flag)
+            {
+                auto frontExtension = ReadAlignment(
+                    SeededAlignment.from(AlignmentChain(
+                        3,
+                        Contig(1, 100),
+                        Contig(1, 10),
+                        emptyFlags,
+                        [
+                            LocalAlignment(
+                                Locus(2, 3),
+                                Locus(5, 6),
+                                0,
+                            ),
+                            LocalAlignment(
+                                Locus(5, 6),
+                                Locus(9, 10),
+                                0,
+                            ),
+                        ],
+                    )).front,
+                );
+                auto backExtension = ReadAlignment(
+                    SeededAlignment.from(AlignmentChain(
+                        5,
+                        Contig(1, 100),
+                        Contig(1, 10),
+                        emptyFlags,
+                        [
+                            LocalAlignment(
+                                Locus(94, 95),
+                                Locus(0, 1),
+                                0,
+                            ),
+                            LocalAlignment(
+                                Locus(97, 98),
+                                Locus(4, 5),
+                                0,
+                            ),
+                        ],
+                    )).front,
+                );
+                auto gap = ReadAlignment(
+                    SeededAlignment.from(AlignmentChain(
+                        11,
+                        Contig(1, 100),
+                        Contig(1, 10),
+                        Flags(complement),
+                        [
+                            LocalAlignment(
+                                Locus(94, 95),
+                                Locus(0, 1),
+                                0,
+                            ),
+                            LocalAlignment(
+                                Locus(97, 98),
+                                Locus(4, 5),
+                                0,
+                            ),
+                        ],
+                    )).front,
+                    SeededAlignment.from(AlignmentChain(
+                        12,
+                        Contig(2, 100),
+                        Contig(1, 10),
+                        emptyFlags,
+                        [
+                            LocalAlignment(
+                                Locus(94, 95),
+                                Locus(0, 1),
+                                0,
+                            ),
+                            LocalAlignment(
+                                Locus(97, 98),
+                                Locus(4, 5),
+                                0,
+                            ),
+                        ],
+                    )).front,
+                );
+
+                auto join1 = frontExtension.to!(Join!ScaffoldPayload);
+                auto join2 = backExtension.to!(Join!ScaffoldPayload);
+                auto join3 = gap.to!(Join!ScaffoldPayload);
+
+                assert(join1.start == ContigNode(1, ContigPart.pre));
+                assert(join1.end == ContigNode(1, ContigPart.begin));
+                assert(join1.payload == [frontExtension]);
+
+                assert(join2.start == ContigNode(1, ContigPart.end));
+                assert(join2.end == ContigNode(1, ContigPart.post));
+                assert(join2.payload == [backExtension]);
+
+                assert(join3.start == ContigNode(1, ContigPart.end));
+                assert(join3.end == ContigNode(2, ContigPart.end));
+                assert(join3.payload == [gap]);
+            }
+}
+
+/// Generate join from inputGap.
+Join!ScaffoldPayload makeScaffoldJoin(GapSegment inputGap)
+{
+    return typeof(return)(
+        ContigNode(
+            inputGap.beginGlobalContigId,
+            ContigPart.end,
+        ),
+        ContigNode(
+            inputGap.endGlobalContigId,
+            ContigPart.begin,
+        ),
+        ScaffoldPayload.inputGap,
+    );
+}
 
 // Not meant for public usage.
 ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
@@ -577,4 +805,37 @@ unittest
             ]),
         ]));
     }
+}
+
+Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffold, size_t minSpanningReads)
+{
+    auto enforceMinSpanningReadsOnJoin(ref Join!ScaffoldPayload join)
+    {
+        if (
+            join.payload.types.pileUp &&
+            join.isGap &&
+            join.payload.readAlignments.length < minSpanningReads
+        )
+            join.payload.remove!(ScaffoldPayload.Type.pileUp)();
+
+        return join;
+    }
+
+    scaffold.mapEdges!enforceMinSpanningReadsOnJoin;
+
+    return removeNoneJoins!ScaffoldPayload(scaffold);
+}
+
+Scaffold!ScaffoldPayload removeInputGaps(Scaffold!ScaffoldPayload scaffold)
+{
+    auto removeInputGapsOnJoin(ref Join!ScaffoldPayload join)
+    {
+        join.payload.remove!(ScaffoldPayload.Type.inputGap)();
+
+        return join;
+    }
+
+    scaffold.mapEdges!removeInputGapsOnJoin;
+
+    return removeNoneJoins!ScaffoldPayload(scaffold);
 }

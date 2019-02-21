@@ -335,25 +335,28 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
     return scaffold;
 }
 
-/// This removes ambiguous gap insertions.
-Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMargin)
+auto joinToJson(T)(T join)
 {
-    static if (__traits(compiles, getType(join.payload)))
-        alias joinToJson = (join) => shouldLog(LogLevel.debug_)
+    static if (__traits(compiles, getType(join.payload.readAlignments)))
+        return shouldLog(LogLevel.debug_)
             ? join.toJson
             : [
                 "start": join.start.toJson,
                 "end": join.end.toJson,
                 "payload": [
-                    "type": join.payload.getType.to!string.toJson,
+                    "type": join.payload.readAlignments.getType.to!string.toJson,
                     "readAlignments": shouldLog(LogLevel.debug_)
-                        ? join.payload.map!"a[]".array.toJson
+                        ? join.payload.readAlignments.map!"a[]".array.toJson
                         : toJson(null),
                 ].toJson,
             ].toJson;
     else
-        alias joinToJson = (join) => join.toJson;
+        return join.toJson;
+}
 
+/// This removes ambiguous gap insertions.
+Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMargin)
+{
     auto incidentEdgesCache = scaffold.allIncidentEdges();
 
     foreach (contigNode; scaffold.nodes)
@@ -362,39 +365,47 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
 
         if (contigNode.contigPart.isReal && incidentEdgesCache[contigNode].length > 2)
         {
-            auto incidentGapJoins = incidentEdgesCache[contigNode].filter!isGap.array;
-            auto correctGapJoinIdx = incidentGapJoins.findCorrectGapJoin!T(bestPileUpMargin);
+            auto incidentGapJoins = incidentEdgesCache[contigNode]
+                .filter!isGap
+                .filter!"a.payload.types.pileUp"
+                .array;
 
-            if (correctGapJoinIdx < incidentGapJoins.length)
+            if (incidentGapJoins.length > 1)
             {
-                // Keep correct gap join for diagnostic output
-                auto correctGapJoin = incidentGapJoins[correctGapJoinIdx];
+                auto correctGapJoinIdx = incidentGapJoins.findCorrectGapJoin!T(bestPileUpMargin);
 
-                // Remove correct gap join from the list
-                incidentGapJoins = incidentGapJoins[0 .. correctGapJoinIdx] ~
-                                   incidentGapJoins[correctGapJoinIdx + 1 .. $];
+                if (correctGapJoinIdx < incidentGapJoins.length)
+                {
+                    // Keep correct gap join for diagnostic output
+                    auto correctGapJoin = incidentGapJoins[correctGapJoinIdx];
 
-                logJsonDiagnostic(
-                    "info", "removing bad gap pile ups",
-                    "sourceContigNode", contigNode.toJson,
-                    "correctGapJoin", joinToJson(correctGapJoin),
-                    "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
-                );
-            }
-            else
-            {
-                logJsonDiagnostic(
-                    "info", "skipping ambiguous gap pile ups",
-                    "sourceContigNode", contigNode.toJson,
-                    "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
-                );
-            }
+                    // Remove correct gap join from the list
+                    incidentGapJoins = incidentGapJoins[0 .. correctGapJoinIdx] ~
+                                       incidentGapJoins[correctGapJoinIdx + 1 .. $];
 
-            // Mark bad/ambiguous pile ups for removal
-            foreach (gapJoin; incidentGapJoins)
-            {
-                gapJoin.payload = T.init;
-                scaffold.add!(scaffold.ConflictStrategy.replace)(gapJoin);
+                    logJsonDiagnostic(
+                        "info", "removing bad gap pile ups",
+                        "sourceContigNode", contigNode.toJson,
+                        "correctGapJoin", joinToJson(correctGapJoin),
+                        "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
+                    );
+                }
+                else
+                {
+                    logJsonDiagnostic(
+                        "info", "skipping ambiguous gap pile ups",
+                        "sourceContigNode", contigNode.toJson,
+                        "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
+                    );
+                }
+
+                // Mark bad/ambiguous pile ups for removal
+                foreach (gapJoin; incidentGapJoins.filter!"a.payload.types.pileUp")
+                {
+                    gapJoin.payload.remove!(T.Type.pileUp)();
+
+                    scaffold.add!(scaffold.ConflictStrategy.replace)(gapJoin);
+                }
             }
         }
     }
@@ -404,12 +415,8 @@ Scaffold!T discardAmbiguousJoins(T)(Scaffold!T scaffold, in double bestPileUpMar
 
 size_t findCorrectGapJoin(T)(Join!T[] incidentGapJoins, in double bestPileUpMargin)
 {
-    if (incidentGapJoins.length < 2)
-        // There is no ambiguity in the first place.
-        return 0;
-
     auto pileUpsLengths = incidentGapJoins
-        .map!"a.payload.length"
+        .map!"a.payload.readAlignments.length"
         .map!(to!double)
         .enumerate
         .array;
@@ -823,7 +830,8 @@ Scaffold!T mergeExtensionsWithGaps(alias mergePayloads, T)(Scaffold!T scaffold)
     foreach (contigNode; scaffold.nodes)
     {
         assert(!contigNode.contigPart.isTranscendent || scaffold.degree(contigNode) <= 1);
-        assert(scaffold.degree(contigNode) <= 3);
+        debug auto incidentEdges = scaffold.incidentEdges(contigNode).array;
+        assert(scaffold.degree(contigNode) <= 3, "node degree must be <= 3");
 
         if (contigNode.contigPart.isReal && scaffold.degree(contigNode) == 3)
         {
