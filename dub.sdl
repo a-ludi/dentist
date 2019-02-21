@@ -1,22 +1,24 @@
-name             "dentist"
-description      "Close assembly gaps using long-reads with focus on correctness."
-authors          "Arne Ludwig <arne.ludwig@posteo.de>"
-copyright        "Copyright © 2018, Arne Ludwig <arne.ludwig@posteo.de>"
-license          "MIT"
+name              "dentist"
+description       "Close assembly gaps using long-reads with focus on correctness."
+authors           "Arne Ludwig <arne.ludwig@posteo.de>"
+copyright         "Copyright © 2018, Arne Ludwig <arne.ludwig@posteo.de>"
+license           "MIT"
 
-dependency       "darg"               path="./darg"
-dependency       "string-transform-d" version="~>1.0.0"
-dependency       "vibe-d:data"        version="~>0.8.4-alpha.1"
+dependency        "darg"               path="./darg"
+dependency        "string-transform-d" version="~>1.0.0"
+dependency        "vibe-d:data"        version="~>0.8.4-alpha.1"
 
-targetType       "executable"
-mainSourceFile   "source/app.d"
+targetType        "executable"
+mainSourceFile    "source/app.d"
+
+buildRequirements "allowWarnings"
 // NOTE: fixes deprecation warning in `std.typecons.BitFlags`
-dflags           "-transition=intpromote"
+dflags            "-transition=intpromote"
 
-preBuildCommands "./update-swinfo.sh"
+preBuildCommands  "./update-swinfo.sh"
 
 configuration "default"
 
 configuration "testing" {
-    versions     "DentistTesting"
+    versions      "DentistTesting"
 }
