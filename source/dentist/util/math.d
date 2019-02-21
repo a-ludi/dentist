@@ -1384,6 +1384,14 @@ void filterEdges(alias pred, G)(ref G graph) if (is(G : Graph!Params, Params...)
     graph._edges.shrinkTo(graph._edges.data.length - bufferRest.length);
 }
 
+void mapEdges(alias fun, G)(ref G graph) if (is(G : Graph!Params, Params...))
+{
+    foreach (ref edge; graph._edges.data)
+        edge = unaryFun!fun(edge);
+
+    graph._edges.data.sort();
+}
+
 class EmptySetException : Exception
 {
     this(string msg)
