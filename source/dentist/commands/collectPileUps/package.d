@@ -37,7 +37,7 @@ import std.algorithm :
 import std.array : array;
 import std.conv : to;
 import std.exception : enforce;
-import std.typecons : tuple;
+import std.typecons : tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 /// Options for the `collectPileUps` command.
@@ -71,7 +71,6 @@ class PileUpCollector
         mixin(traceExecution);
 
         readInputs();
-        initUnusedReads();
         filterAlignments();
         auto pileUps = buildPileUps();
         writePileUps(pileUps);
@@ -83,6 +82,7 @@ class PileUpCollector
 
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
         numReads = getNumContigs(options.readsDb, options.workdir);
+        unusedReads = NaturalNumberSet(numReads, Yes.addAll);
         logJsonInfo(
             "numReferenceContigs", numReferenceContigs,
             "numReads", numReads,
@@ -107,17 +107,6 @@ class PileUpCollector
             ));
 
         enforce!DentistException(readsAlignment.length > 0, "empty ref vs. reads alignment");
-    }
-
-    protected void initUnusedReads()
-    {
-        mixin(traceExecution);
-
-        unusedReads.reserveFor(numReads);
-        foreach (readId; 1 .. numReads + 1)
-        {
-            unusedReads.add(readId);
-        }
     }
 
     protected void filterAlignments()
