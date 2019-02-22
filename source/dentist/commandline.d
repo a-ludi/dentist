@@ -817,6 +817,22 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("best-pile-up-margin")
+        @Help(format!q"{
+            given a set of of conflicting gap closing candidates, if the
+            largest has <double> times more reads than the second largest it
+            is considered unique. If a candidates would close gap in the
+            reference assembly marked by `n`s the number reads is multipled by
+            --existing-gap-bonus. (default: %s)
+        }"(defaultValue!bestPileUpMargin))
+        @Validate!(value => enforce!CLIException(value > 1.0, "--best-pile-up-margin must be greater than 1.0"))
+        double bestPileUpMargin = 3.0;
+    }
+
+    static if (command.among(
         TestingCommand.checkResults,
     ))
     {
@@ -886,20 +902,6 @@ struct OptionsFor(DentistCommand command)
         @Help("write the statistics for every single gap to a tabular file <file>")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string gapDetailsTabular;
-    }
-
-    static if (command.among(
-        DentistCommand.collectPileUps,
-    ))
-    {
-        @Option("best-pile-up-margin")
-        @Help(q"{
-            given a set of possibly of conflicting pile ups, if the largest
-            has <double> times more reads than the second largest it is
-            considered unique
-        }")
-        @Validate!(value => enforce!CLIException(value > 1.0, "--best-pile-up-margin must be greater than 1.0"))
-        double bestPileUpMargin = 3.0;
     }
 
     static if (command.among(
@@ -1232,6 +1234,20 @@ struct OptionsFor(DentistCommand command)
             "reference error rate must be in (0, 0.3]"
         ))
         double referenceErrorRate = .01;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("existing-gap-bonus")
+        @Help(format!q"{
+            if a candidate would close an existing gap its size is multipled
+            by <double> before conflict resolution
+            (see --best-pile-up-margin). (default: %s)
+        }"(defaultValue!existingGapBonus))
+        @Validate!(value => enforce!CLIException(1.0 <= value, "--existing-gap-bonus must be at least 1.0"))
+        double existingGapBonus = 6.0;
     }
 
     static if (command.among(

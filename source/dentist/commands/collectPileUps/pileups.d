@@ -25,16 +25,21 @@ import dentist.common.scaffold :
     buildScaffold,
     ContigNode,
     ContigPart,
-    discardAmbiguousJoins,
     getUnkownJoin,
     isGap,
+    isTranscendent,
+    isReal,
     Join,
     mergeExtensionsWithGaps,
     removeNoneJoins,
     Scaffold;
 import dentist.dazzler : GapSegment;
 import dentist.util.algorithm : orderLexicographically;
-import dentist.util.math : filterEdges, mapEdges;
+import dentist.util.math :
+    add,
+    bulkAdd,
+    filterEdges,
+    mapEdges;
 import dentist.util.log;
 import std.algorithm :
     any,
@@ -46,18 +51,29 @@ import std.algorithm :
     joiner,
     map,
     min,
+    minElement,
     sort,
     SwapStrategy;
 import std.algorithm : equal;
-import std.array : array;
+import std.array : appender, array;
+import std.bitmanip : bitsSet;
 import std.conv : to;
-import std.range : chain, iota, only, slide, walkLength, zip;
+import std.range :
+    chain,
+    enumerate,
+    iota,
+    only,
+    slide,
+    walkLength,
+    zip;
 import std.range.primitives;
 import std.traits : EnumMembers;
 import std.typecons :
     BitFlags,
-    No;
-import vibe.data.json : toJson = serializeToJson;
+    Flag,
+    No,
+    Yes;
+import vibe.data.json : Json, toJson = serializeToJson;
 
 
 private auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
@@ -77,15 +93,7 @@ private void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold)
         "state", state,
         "joins", scaffold
             .edges
-            .map!(join => [
-                "start": join.start.toJson,
-                "end": join.end.toJson,
-                "payloadTypes": only(EnumMembers!(ScaffoldPayload.Type))
-                    .filter!(type => join.payload.types & type)
-                    .map!"a.to!string"
-                    .array
-                    .toJson,
-            ])
+            .map!joinToJson
             .array
             .toJson,
         "pileUps", collectPileUps(scaffold)
@@ -156,6 +164,25 @@ struct ScaffoldPayload
     {
         return merge!(ScaffoldPayload[])(payloads);
     }
+
+    /// Return the number of set types in this payload.
+    size_t numTypes() const pure nothrow
+    {
+        return bitsSet(cast(ubyte) types).walkLength;
+    }
+
+    Json toJson()
+    {
+        return [
+            "types": types.to!string.toJson,
+            "pileUpType": types.pileUp && readAlignments.length > 0
+                ? readAlignments.getType.to!string.toJson
+                : Json(null),
+            "readAlignments": shouldLog(LogLevel.debug_)
+                ? readAlignments.map!"a[]".array.toJson
+                : readAlignments.length.toJson,
+        ].toJson;
+    }
 }
 
 Join!ScaffoldPayload mergeJoins(Join!ScaffoldPayload[] joins...)
@@ -167,6 +194,11 @@ Join!ScaffoldPayload mergeJoins(Join!ScaffoldPayload[] joins...)
     mergedJoin.payload = ScaffoldPayload.merge(joins.map!"a.payload");
 
     return mergedJoin;
+}
+
+static Join!ScaffoldPayload selectMeanest(Join!ScaffoldPayload[] joins...)
+{
+    return joins.minElement!"a.payload.numTypes";
 }
 
 PileUp[] build(Options)(
@@ -197,7 +229,10 @@ PileUp[] build(Options)(
         chain(readAlignmentJoins, inputGapJoins),
     );
     debugLogPileUps("raw", alignmentsScaffold);
-    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins!ScaffoldPayload(options.bestPileUpMargin);
+    alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins(
+        options.bestPileUpMargin,
+        options.existingGapBonus,
+    );
     debugLogPileUps("unambiguous", alignmentsScaffold);
     alignmentsScaffold = alignmentsScaffold.enforceMinSpanningReads(options.minSpanningReads);
     debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
@@ -248,6 +283,7 @@ unittest
             {
                 size_t minSpanningReads = 1;
                 double bestPileUpMargin = 1.0;
+                double existingGapBonus = 1.0;
             }
 
             id_t alignmentChainId = 0;
@@ -352,6 +388,26 @@ unittest
             id_t c1 = 1;
             id_t c2 = 2;
             id_t c3 = 3;
+            auto inputGaps = [
+                GapSegment(
+                    c1, // beginGlobalContigId
+                    c2, // endGlobalContigId
+                    0,  // scaffoldId
+                    0,  // beginContigId
+                    1,  // endContigId
+                    15, // begin
+                    25, // end
+                ),
+                GapSegment(
+                    c2, // beginGlobalContigId
+                    c3, // endGlobalContigId
+                    0,  // scaffoldId
+                    1,  // beginContigId
+                    2,  // endContigId
+                    40, // begin
+                    50, // end
+                ),
+            ];
             auto pileUps = [
                 [
                     getDummyRead(c1,  5, c1, 18, Complement.no),  //  #1
@@ -386,7 +442,12 @@ unittest
                 .joiner
                 .map!"a.alignment"
                 .array;
-            auto computedPileUps = build(3, alignmentChains, Options());
+            auto computedPileUps = build(
+                3,
+                alignmentChains,
+                inputGaps,
+                Options(),
+            );
 
             foreach (pileUp, computedPileUp; zip(pileUps, computedPileUps))
             {
@@ -496,22 +557,36 @@ unittest
                         ],
                     )).front,
                 );
+                auto inputGap = GapSegment(
+                    1, // beginGlobalContigId
+                    2, // endGlobalContigId
+                    0,  // scaffoldId
+                    0,  // beginContigId
+                    1,  // endContigId
+                    15, // begin
+                    25, // end
+                );
 
-                auto join1 = frontExtension.to!(Join!ScaffoldPayload);
-                auto join2 = backExtension.to!(Join!ScaffoldPayload);
-                auto join3 = gap.to!(Join!ScaffoldPayload);
+                auto join1 = makeScaffoldJoin(frontExtension);
+                auto join2 = makeScaffoldJoin(backExtension);
+                auto join3 = makeScaffoldJoin(gap);
+                auto join4 = makeScaffoldJoin(inputGap);
 
                 assert(join1.start == ContigNode(1, ContigPart.pre));
                 assert(join1.end == ContigNode(1, ContigPart.begin));
-                assert(join1.payload == [frontExtension]);
+                assert(join1.payload == ScaffoldPayload.pileUp([frontExtension]));
 
                 assert(join2.start == ContigNode(1, ContigPart.end));
                 assert(join2.end == ContigNode(1, ContigPart.post));
-                assert(join2.payload == [backExtension]);
+                assert(join2.payload == ScaffoldPayload.pileUp([backExtension]));
 
                 assert(join3.start == ContigNode(1, ContigPart.end));
                 assert(join3.end == ContigNode(2, ContigPart.end));
-                assert(join3.payload == [gap]);
+                assert(join3.payload == ScaffoldPayload.pileUp([gap]));
+
+                assert(join4.start == ContigNode(1, ContigPart.end));
+                assert(join4.end == ContigNode(2, ContigPart.begin));
+                assert(join4.payload == ScaffoldPayload.inputGap());
             }
 }
 
@@ -805,6 +880,180 @@ unittest
             ]),
         ]));
     }
+}
+
+
+/// This removes ambiguous gap insertions.
+Scaffold!ScaffoldPayload discardAmbiguousJoins(
+    Scaffold!ScaffoldPayload scaffold,
+    in double bestPileUpMargin,
+    in double existingGapBonus,
+)
+{
+    auto incidentEdgesCache = scaffold.allIncidentEdges();
+    auto removePileUpsAcc = appender!(Join!ScaffoldPayload[]);
+
+    foreach (contigNode; scaffold.nodes)
+    {
+        assert(!contigNode.contigPart.isTranscendent || incidentEdgesCache[contigNode].length <= 1);
+
+        if (contigNode.contigPart.isReal && incidentEdgesCache[contigNode].length > 2)
+        {
+            auto incidentGapJoins = incidentEdgesCache[contigNode]
+                .filter!isGap
+                .filter!"a.payload.types.pileUp"
+                .array;
+
+            if (incidentGapJoins.length > 1)
+            {
+                auto correctGapJoinIdx = incidentGapJoins.findCorrectGapJoin(
+                    bestPileUpMargin,
+                    existingGapBonus,
+                );
+
+                if (correctGapJoinIdx < incidentGapJoins.length)
+                {
+                    // Keep correct gap join for diagnostic output
+                    auto correctGapJoin = incidentGapJoins[correctGapJoinIdx];
+
+                    // Remove correct gap join from the list
+                    incidentGapJoins = incidentGapJoins[0 .. correctGapJoinIdx] ~
+                                       incidentGapJoins[correctGapJoinIdx + 1 .. $];
+
+                    logJsonDiagnostic(
+                        "info", "removing bad gap pile ups",
+                        "sourceContigNode", contigNode.toJson,
+                        "correctGapJoin", joinToJson(correctGapJoin),
+                        "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
+                    );
+                }
+                else
+                {
+                    logJsonDiagnostic(
+                        "info", "skipping ambiguous gap pile ups",
+                        "sourceContigNode", contigNode.toJson,
+                        "removedGapJoins", incidentGapJoins.map!joinToJson.array.toJson,
+                    );
+                }
+
+                // Mark bad/ambiguous pile ups for removal
+                removePileUpsAcc ~= incidentGapJoins.filter!"a.payload.types.pileUp";
+            }
+        }
+    }
+
+    foreach (ref gapJoin; removePileUpsAcc.data)
+        gapJoin.payload.remove!(ScaffoldPayload.Type.pileUp);
+
+    scaffold.bulkAdd!selectMeanest(removePileUpsAcc.data);
+
+    return removeNoneJoins!ScaffoldPayload(scaffold);
+}
+
+///
+unittest
+{
+    ScaffoldPayload getDummyPayload(in size_t length, Flag!"hasInputGap" hasInputGap = No.hasInputGap)
+    {
+        auto payload = ScaffoldPayload.pileUp(new ReadAlignment[length]);
+
+        if (hasInputGap)
+            payload.types.inputGap = true;
+
+        return payload;
+    }
+
+    //             contig 1      contig 2
+    //
+    //            o        o     o        o
+    //                    / e1 e2 \      / e4
+    //              o -> o ------- o -> o
+    //               \        e3         \
+    //                \                   \ e5 (strong evidence)
+    // (input gap) e10 \   ____________   /
+    //                  \ /   e6       \ /
+    //    o <- o         o <- o         o <- o
+    //                         \ e7 e8 /      \ e9
+    //  o        o     o        o     o        o
+    //
+    //   contig 5       contig 4      contig 3
+    //
+    alias J = Join!ScaffoldPayload;
+    alias S = Scaffold!ScaffoldPayload;
+    alias CN = ContigNode;
+    alias CP = ContigPart;
+    auto scaffold = buildScaffold!(mergeJoins, ScaffoldPayload)(5, [
+        J(CN(1, CP.end), CN(1, CP.post ), getDummyPayload(1)), // e1
+        J(CN(1, CP.end), CN(1, CP.post ), getDummyPayload(1)), // e1
+        J(CN(2, CP.pre), CN(2, CP.begin), getDummyPayload(1)), // e2
+        J(CN(1, CP.end), CN(2, CP.begin), getDummyPayload(1)), // e3
+        J(CN(2, CP.end), CN(2, CP.post ), getDummyPayload(1)), // e4
+        J(CN(2, CP.end), CN(3, CP.end  ), getDummyPayload(2)), // e5
+        J(CN(4, CP.end), CN(3, CP.end  ), getDummyPayload(1)), // e6
+        J(CN(4, CP.end), CN(4, CP.post ), getDummyPayload(1)), // e7
+        J(CN(3, CP.pre), CN(3, CP.begin), getDummyPayload(1)), // e8
+        J(CN(3, CP.end), CN(3, CP.post ), getDummyPayload(1)), // e9
+        J(CN(4, CP.end), CN(1, CP.begin), getDummyPayload(1, Yes.hasInputGap)), // e10
+    ]).discardAmbiguousJoins(1.5, 2.0);
+    //
+    //   contig 1      contig 2
+    //
+    //            o        o     o        o
+    //                    / e1 e2 \      / e4
+    //              o -- o ------- o -- o
+    //               \        e3         \ e5
+    //            e10 \                  /
+    //    o -- o       o -- o           o -- o
+    //                       \ e7   e8 /      \ e9
+    //  o        o   o        o       o        o
+    //
+    //   contig 5       contig 4      contig 3
+
+    assert(J(CN(1, CP.end), CN(1, CP.post)) in scaffold); // e1
+    assert(J(CN(2, CP.pre), CN(2, CP.begin)) in scaffold); // e2
+    assert(J(CN(1, CP.end), CN(2, CP.begin)) in scaffold); // e3
+    assert(J(CN(2, CP.end), CN(2, CP.post)) in scaffold); // e4
+    assert(J(CN(2, CP.end), CN(3, CP.end)) in scaffold); // e5
+    assert(J(CN(4, CP.end), CN(3, CP.end)) !in scaffold); // e6
+    assert(J(CN(4, CP.end), CN(4, CP.post)) in scaffold); // e7
+    assert(J(CN(3, CP.pre), CN(3, CP.begin)) in scaffold); // e8
+    assert(J(CN(3, CP.end), CN(3, CP.post)) in scaffold); // e9
+    assert(J(CN(4, CP.end), CN(1, CP.begin)) in scaffold); // e10
+
+    assert(scaffold.get(J(CN(1, CP.end), CN(1, CP.post))).payload == getDummyPayload(2)); // e1
+}
+
+// Not meant for public usage.
+auto joinToJson(Join!ScaffoldPayload join)
+{
+    return [
+        "start": join.start.toJson,
+        "end": join.end.toJson,
+        "payload": join.payload.toJson,
+    ].toJson;
+}
+
+size_t findCorrectGapJoin(
+    Join!ScaffoldPayload[] incidentGapJoins,
+    in double bestPileUpMargin,
+    in double existingGapBonus,
+)
+{
+    auto pileUpsLengths = incidentGapJoins
+        .map!(gapJoin => gapJoin.payload.readAlignments.length * (gapJoin.payload.types.inputGap
+            ? existingGapBonus
+            : 1.0
+        ))
+        .enumerate
+        .array;
+    pileUpsLengths.sort!"a.value > b.value";
+    auto largestPileUp = pileUpsLengths[0];
+    auto sndLargestPileUp = pileUpsLengths[1];
+
+    if (sndLargestPileUp.value * bestPileUpMargin < largestPileUp.value)
+        return largestPileUp.index;
+    else
+        return size_t.max;
 }
 
 Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffold, size_t minSpanningReads)
