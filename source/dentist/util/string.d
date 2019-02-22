@@ -20,7 +20,14 @@ import std.array :
 import std.conv : to;
 import std.exception : basicExceptionCtors, enforce;
 import std.functional : binaryFun;
-import std.math : round, sqrt;
+import std.math :
+    ceil,
+    floor,
+    isInfinity,
+    isNaN,
+    round,
+    sgn,
+    sqrt;
 import std.range :
     chain,
     chunks,
@@ -30,7 +37,9 @@ import std.range :
     zip;
 import std.range.primitives : hasSlicing;
 import std.string : lineSplitter;
-import std.traits : isSomeString;
+import std.traits :
+    isFloatingPoint,
+    isSomeString;
 import std.typecons :
     Flag,
     No,
@@ -831,4 +840,50 @@ private struct DPMatrix(T)
 
         return result;
     `;
+}
+
+/// Convert a floating point number to a base-10 string at compile time.
+/// This function is very crude and will not work in many cases!
+string toString(Float)(in Float value, in uint precision) pure nothrow
+    if (isFloatingPoint!Float)
+{
+    if (value.isNaN)
+        return "nan";
+    else if (value.isInfinity)
+        return value > 0 ? "inf" : "-inf";
+
+    if (precision == 0)
+    {
+        auto intPart = cast(long) round(value);
+
+        return intPart.to!string;
+    }
+    else
+    {
+        auto intPart = cast(long) (value > 0 ? floor(value) : ceil(value));
+        auto fraction = sgn(value) * (value - intPart);
+        assert(fraction >= 0, "fractional part of value should be non-negative");
+        auto fracPart = cast(ulong) round(10^^precision * fraction);
+
+        return intPart.to!string ~ "." ~ fracPart.to!string;
+    }
+}
+
+///
+unittest
+{
+    enum x = 42.0;
+    enum y = -13.37f;
+    enum z = 0.9;
+
+    static assert(float.nan.toString(0) == "nan");
+    static assert(double.infinity.toString(0) == "inf");
+    static assert((-double.infinity).toString(0) == "-inf");
+    static assert(x.toString(0) == "42");
+    static assert(x.toString(1) == "42.0");
+    static assert(y.toString(2) == "-13.37");
+    static assert(y.toString(1) == "-13.4");
+    static assert(y.toString(0) == "-13");
+    static assert(z.toString(1) == "0.9");
+    static assert(z.toString(0) == "1");
 }

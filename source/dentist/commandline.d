@@ -54,6 +54,7 @@ import dentist.swinfo :
 import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
+import dentist.util.string : toString;
 import std.algorithm :
     among,
     each,
@@ -80,6 +81,7 @@ import std.traits :
     getSymbolsByUDA,
     getUDAs,
     isCallable,
+    isFloatingPoint,
     isStaticArray,
     Parameters,
     ReturnType;
@@ -1060,7 +1062,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("max-insertions-error")
-        @Help("insertion and existing contigs must match with less than <double> errors")
+        @Help(format!"
+            insertion and existing contigs must match with less than <double> errors (default: %s)
+        "(defaultValue!maxInsertionsError))
         @Validate!(value => enforce!CLIException(
             0.0 < value && value <= 0.3,
             "maximum insertions error rate must be in (0, 0.3]"
@@ -1136,7 +1140,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("min-spanning-reads", "s")
         @Help(format!q"{
-            require at least <uint> spanning reads to close a gap (default: %d)
+            require at least <ulong> spanning reads to close a gap (default: %d)
         }"(defaultValue!minSpanningReads))
         size_t minSpanningReads = defaultMinSpanningReads;
     }
@@ -1203,7 +1207,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("reads-error")
-        @Help("estimated error rate in reads")
+        @Help(format!"
+            estimated error rate in reads (default: %s)
+        "(defaultValue!readsErrorRate))
         @Validate!(value => enforce!CLIException(
             0.0 < value && value <= 0.3,
             "reads error rate must be in (0, 0.3]"
@@ -1218,7 +1224,9 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("reference-error")
-        @Help("estimated error rate in reference")
+        @Help(format!"
+            estimated error rate in reference (default: %s)
+        "(defaultValue!referenceErrorRate))
         @Validate!(value => enforce!CLIException(
             0.0 < value && value <= 0.3,
             "reference error rate must be in (0, 0.3]"
@@ -1498,13 +1506,17 @@ struct OptionsFor(DentistCommand command)
         }
     }
 
-    static auto defaultValue(alias property)() pure nothrow
+    static auto defaultValue(alias property)(in uint precision = 2) pure nothrow
     {
         OptionsFor!command defaultOptions;
 
-        return __traits(getMember, defaultOptions, property.stringof);
-    }
+        auto value = __traits(getMember, defaultOptions, property.stringof);
 
+        static if (isFloatingPoint!(typeof(value)))
+            return value.toString(precision);
+        else
+            return value;
+    }
 
     static auto numArguments() pure nothrow
     {
