@@ -2132,11 +2132,11 @@ bool isValid(in PileUp pileUp) pure nothrow
 
 bool isExtension(in PileUp pileUp) pure nothrow
 {
-    if (pileUp[0].isFrontExtension)
+    if (pileUp.length > 0 && pileUp[0].isFrontExtension)
     {
         return pileUp.all!(readAlignment => readAlignment.isFrontExtension);
     }
-    else if (pileUp[0].isBackExtension)
+    else if (pileUp.length > 0 && pileUp[0].isBackExtension)
     {
         return pileUp.all!(readAlignment => readAlignment.isBackExtension);
     }
