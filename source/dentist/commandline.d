@@ -300,6 +300,9 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.checkResults,
     );
 
+    @Option()
+    string executableVersion = version_;
+
     static if (command == DentistCommand.maskRepetitiveRegions)
     {
         @ArgumentsParser
