@@ -683,7 +683,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// Check if edge/node exists in this graph. Ignores the weight if weighted.
-    bool opBinaryRight(string op)(Node node) const pure nothrow if (op == "in")
+    bool opBinaryRight(string op)(in Node node) const pure nothrow if (op == "in")
     {
         auto sortedNodes = assumeSorted(nodes);
 
@@ -691,14 +691,14 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// ditto
-    bool has(Node node) const pure nothrow
+    bool has(in Node node) const pure nothrow
     {
         return node in this;
     }
 
     /// Check if edge exists in this graph. Only the `start` and `end` node
     /// will be compared.
-    bool opBinaryRight(string op)(Edge edge) const pure nothrow if (op == "in")
+    bool opBinaryRight(string op)(in Edge edge) const pure nothrow if (op == "in")
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
 
@@ -706,14 +706,14 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// ditto
-    bool has(Edge edge) const pure nothrow
+    bool has(in Edge edge) const pure nothrow
     {
         return edge in this;
     }
 
     /// Get the designated edge from this graph. Only the `start` and `end`
     /// node will be compared.
-    auto get(Edge edge)
+    auto get(in Edge edge)
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
         auto existingEdges = sortedEdges.equalRange(edge);
@@ -741,8 +741,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         assertThrown!MissingEdgeException(g1.get(g1.edge(1, 1)));
     }
 
-    /// Returns the ndex of node `n` in the list of nodes.
-    size_t indexOf(Node n) const
+    /// Returns the index of node `n` in the list of nodes.
+    size_t indexOf(in Node n) const
     {
         auto sortedNodes = assumeSorted(nodes);
         auto tristectedNodes = sortedNodes.trisect(n);
@@ -758,12 +758,38 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     ///
     unittest
     {
-
         auto g1 = Graph!(int, int)([1, 2]);
 
         assert(g1.indexOf(1) == 0);
         assert(g1.indexOf(2) == 1);
         assertThrown!MissingNodeException(g1.indexOf(3));
+    }
+
+    /// Returns the index of node `n` in the list of nodes.
+    size_t indexOf(in Edge edge) const
+    {
+        auto sortedEdges = assumeSorted!orderByNodes(edges);
+        auto trisectedEdges = sortedEdges.trisect(edge);
+
+        if (trisectedEdges[1].empty)
+        {
+            throw new MissingEdgeException();
+        }
+
+        return trisectedEdges[0].length;
+    }
+
+    ///
+    unittest
+    {
+        auto g1 = Graph!(int, int)([1, 2]);
+
+        auto e1 = g1.edge(1, 2, 1);
+
+        g1 ~= e1;
+
+        assert(g1.indexOf(g1.edge(1, 2)) == 0);
+        assertThrown!MissingEdgeException(g1.indexOf(g1.edge(1, 1)));
     }
 
     static if (isDirected)
