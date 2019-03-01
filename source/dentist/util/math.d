@@ -11,12 +11,14 @@ module dentist.util.math;
 import dentist.util.algorithm : cmpLexicographically, sliceBy;
 import std.algorithm :
     all,
+    among,
     copy,
     countUntil,
     cumulativeFold,
     filter,
     map,
     max,
+    min,
     maxElement,
     sort,
     sum,
@@ -25,6 +27,7 @@ import std.algorithm :
 import std.array : Appender, array;
 import std.conv : to;
 import std.exception : assertThrown;
+import std.format : format;
 import std.functional : binaryFun, unaryFun;
 import std.range :
     assumeSorted,
@@ -1580,6 +1583,84 @@ struct NaturalNumberSet
         return true;
     }
 
+    bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "in")
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+            if ((this.parts[i] & other.parts[i]) != this.parts[i])
+                return false;
+
+        static bool hasEmptyTail(ref in NaturalNumberSet set, in size_t tailStart)
+        {
+            foreach (i; tailStart .. set.parts.length)
+                if (set.parts[i] != emptyPart)
+                    return false;
+
+            return true;
+        }
+
+        if (this.parts.length > numCommonParts)
+            return hasEmptyTail(this, numCommonParts);
+
+        return true;
+    }
+
+    NaturalNumberSet opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op.among("|", "^", "&"))
+    {
+        NaturalNumberSet result;
+        result.parts.length = max(this.parts.length, other.parts.length);
+        result.nMax = max(this.nMax, other.nMax);
+
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+            result.parts[i] = mixin("this.parts[i] " ~ op ~ " other.parts[i]");
+
+        static if (op.among("|", "^"))
+        {
+            if (this.parts.length > numCommonParts)
+                result.parts[numCommonParts .. $] = this.parts[numCommonParts .. $];
+            if (other.parts.length > numCommonParts)
+                result.parts[numCommonParts .. $] = other.parts[numCommonParts .. $];
+        }
+
+        return result;
+    }
+
+    bool intersects(in NaturalNumberSet other) const pure nothrow
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+        {
+            if ((this.parts[i] & other.parts[i]) != emptyPart)
+                return true;
+        }
+
+        return false;
+    }
+
+    @property size_t size() const pure nothrow
+    {
+        size_t numSetBits;
+
+        foreach (i, part; parts)
+        {
+            size_t j = 0;
+
+            while ((part >> j) != emptyPart)
+            {
+                while (((part >> j) & firstBit) != firstBit)
+                    ++j;
+                ++numSetBits;
+                ++j;
+            }
+        }
+
+        return numSetBits;
+    }
+
     size_t minElement() const
     {
         foreach (i, part; parts)
@@ -1659,6 +1740,11 @@ struct NaturalNumberSet
                         popFront();
                     }
                 }
+            }
+
+            @property ElementsRange save() const pure nothrow
+            {
+                return this;
             }
 
             void popFront() pure nothrow
@@ -1757,6 +1843,11 @@ struct NaturalNumberSet
 
         auto expectedNumbers = iota(numElements).filter!"a == 0 || !((a - 1) % 10 == 0)";
         assert(equal(expectedNumbers, set.elements));
+    }
+
+    string toString() const pure
+    {
+        return format("[%(%d,%)]", this.elements);
     }
 }
 
