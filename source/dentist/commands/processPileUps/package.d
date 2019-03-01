@@ -42,7 +42,6 @@ import dentist.common.scaffold :
     isParallel;
 import dentist.util.log;
 import dentist.dazzler :
-    attachTracePoints,
     dbEmpty,
     dbSubset,
     getAlignments,
@@ -227,7 +226,6 @@ protected class PileUpProcessor
             if (shouldSkipSmallPileUp())
                 return;
 
-            fetchTracePoints();
             crop();
             selectReferenceRead();
             computeConsensus();
@@ -278,21 +276,6 @@ protected class PileUpProcessor
         }
 
         return false;
-    }
-
-    protected void fetchTracePoints()
-    {
-        mixin(traceExecution);
-
-        auto allAlignmentChains = pileUp.getAlignmentRefs();
-        allAlignmentChains.sort!"*a < *b";
-        allAlignmentChains.attachTracePoints(
-            options.refDb,
-            options.readsDb,
-            options.readsAlignmentFile,
-            options.tracePointDistance,
-            options.workdir
-        );
     }
 
     protected void crop()

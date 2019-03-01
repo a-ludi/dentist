@@ -101,6 +101,7 @@ class PileUpCollector
             options.readsDb,
             options.readsAlignmentFile,
             options.workdir,
+            options.tracePointDistance,
         );
         repetitiveRegions = ReferenceRegion(readMask!ReferenceInterval(
             options.refDb,

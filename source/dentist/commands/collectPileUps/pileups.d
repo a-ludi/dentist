@@ -1145,6 +1145,7 @@ private class BubbleResolver
             skippingPileUpDb,
             intermediateAlignmentsFile,
             options.workdir,
+            options.tracePointDistance,
         );
         foreach (ref ac; intermediateAlignments)
         {
