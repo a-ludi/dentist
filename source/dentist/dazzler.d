@@ -237,7 +237,7 @@ bool dbEmpty(in string dbFile, in string workdir)
     return numDbRecords(dbFile, workdir) == 0;
 }
 
-/// Build a new .db/.dam file by using the given subset of reads in inDbFile.
+/// Build outputDb file by using the given subset of reads in inDbFile.
 string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
@@ -249,12 +249,33 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
 
     outDb.file.close();
     remove(outDb.name);
-    buildSubsetDb(inDbFile, outDb.name, readIds, options.workdir);
-    dbsplit(outDb.name, options.dbsplitOptions, options.workdir);
 
-    return outDb.name;
+    return dbSubset(outDb.name, inDbFile, readIds, options);
 }
 
+/**
+    Build `outputDb` by using the given subset of reads in `inDbFile`. If no
+    `outputDb` is given a temporary file with the same extension as `inDbFile`
+    will be created.
+
+    Returns: DB file name
+*/
+string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options)
+        if (isSomeString!(typeof(options.workdir)) &&
+            isOptionsList!(typeof(options.dbsplitOptions)))
+{
+    assert(
+        outputDb.extension !is null || outputDb.extension == inDbFile.extension,
+        "mismatched DB file extensions",
+    );
+
+    buildSubsetDb(inDbFile, outputDb, readIds, options.workdir);
+    dbsplit(outputDb, options.dbsplitOptions, options.workdir);
+
+    return outputDb;
+}
+
+/// ditto
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
