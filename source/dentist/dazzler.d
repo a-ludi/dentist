@@ -2854,17 +2854,6 @@ void writeMask(Region)(
         MaskDataEntry, "end",
     );
 
-    if (regions.length == 0)
-    {
-        logJsonDiagnostic(
-            "notice", "skipping empty mask",
-            "dbFile", dbFile,
-            "maskDestination", maskDestination,
-        );
-
-        return;
-    }
-
     auto maskFileNames = getMaskFiles(dbFile, maskDestination);
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
