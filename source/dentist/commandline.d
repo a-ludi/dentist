@@ -844,6 +844,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
     {
@@ -980,6 +981,24 @@ struct OptionsFor(DentistCommand command)
         @Option()
         @Validate!((values, options) => validateInputMasks(options.refFile, values))
         string[] additionalMasks;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        enum numBubblesEscapeNodes = 2;
+        enum nodePerContig = 2;
+        enum numIntermediateContigs = 3;
+
+        /// Consider cyclic subgraphs of up to the size when detecting
+        /// _bubbles_ aka. _skipping pile ups.
+        @Option()
+        ubyte maxBubbleSize = numBubblesEscapeNodes + nodePerContig * numIntermediateContigs;
+
+        /// Run the solver at most this number of times
+        @Option()
+        ubyte maxBubbleResolverIterations = 1 + numIntermediateContigs;
     }
 
     static if (command.among(
@@ -1484,6 +1503,42 @@ struct OptionsFor(DentistCommand command)
                 DamapperOptions.oneDirection,
                 DamapperOptions.averageCorrelationRate ~ ".7",
             ];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        static struct AnchorSkippingPileUpsOptions
+        {
+            string[] damapperOptions;
+            string[] dbsplitOptions;
+            string workdir;
+        }
+
+        @property string[] intermediateContigsAlignmentOptions() const
+        {
+            return [
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                DamapperOptions.numThreads ~ numDaccordThreads.to!string,
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    refVsReadsAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
+        }
+
+        @property auto anchorSkippingPileUpsOptions() const
+        {
+            return const(AnchorSkippingPileUpsOptions)(
+                // dalignerOptions
+                intermediateContigsAlignmentOptions,
+                // dbsplitOptions
+                [],
+                // workdir
+                workdir,
+            );
         }
     }
 

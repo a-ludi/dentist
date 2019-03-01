@@ -8,6 +8,11 @@
 */
 module dentist.commands.collectPileUps.pileups;
 
+import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.common :
+    ReadInterval,
+    ReadRegion,
+    toInterval;
 import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
@@ -26,6 +31,7 @@ import dentist.common.scaffold :
     ContigNode,
     ContigPart,
     getUnkownJoin,
+    isExtension,
     isGap,
     isTranscendent,
     isReal,
@@ -33,31 +39,48 @@ import dentist.common.scaffold :
     mergeExtensionsWithGaps,
     removeNoneJoins,
     Scaffold;
-import dentist.dazzler : GapSegment;
-import dentist.util.algorithm : orderLexicographically;
+import dentist.dazzler :
+    dbSubset,
+    getAlignments,
+    getDamapping,
+    GapSegment;
+import dentist.util.algorithm :
+    backtracking,
+    orderLexicographically,
+    uniqInPlace;
 import dentist.util.math :
     add,
     bulkAdd,
     filterEdges,
+    findCyclicSubgraphs,
     mapEdges;
 import dentist.util.log;
+import dentist.util.region : empty;
 import std.algorithm :
+    among,
     any,
     canFind,
     chunkBy,
+    copy,
+    count,
     equal,
     filter,
+    find,
     fold,
     joiner,
     map,
     min,
     minElement,
     sort,
+    swap,
     SwapStrategy;
 import std.algorithm : equal;
 import std.array : appender, array;
 import std.bitmanip : bitsSet;
 import std.conv : to;
+import std.format : format;
+import std.parallelism : parallel;
+import std.path : buildPath;
 import std.range :
     chain,
     enumerate,
@@ -74,7 +97,6 @@ import std.typecons :
     No,
     Yes;
 import vibe.data.json : Json, toJson = serializeToJson;
-
 
 private auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
 {
@@ -130,6 +152,11 @@ struct ScaffoldPayload
         this.readAlignments = readAlignments;
     }
 
+    @property bool empty() const pure nothrow
+    {
+        return 0 == cast(ubyte) types;
+    }
+
     static ScaffoldPayload pileUp(ReadAlignment[] readAlignments) pure nothrow
     {
         return ScaffoldPayload(Type.pileUp, readAlignments);
@@ -171,7 +198,7 @@ struct ScaffoldPayload
         return bitsSet(cast(ubyte) types).walkLength;
     }
 
-    Json toJson()
+    Json toJson() const
     {
         return [
             "types": types.to!string.toJson,
@@ -201,26 +228,17 @@ static Join!ScaffoldPayload selectMeanest(Join!ScaffoldPayload[] joins...)
     return joins.minElement!"a.payload.numTypes";
 }
 
-PileUp[] build(Options)(
+/// Options for the `collectPileUps` command.
+alias Options = OptionsFor!(DentistCommand.collectPileUps);
+
+PileUp[] build(
     in size_t numReferenceContigs,
     AlignmentChain[] candidates,
     GapSegment[] inputGaps,
     in Options options,
 )
 {
-    alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
-    alias ReadAlignmentJoin = Join!ScaffoldPayload;
-
-    candidates.sort!("a.contigB.id < b.contigB.id", SwapStrategy.stable);
-
-    auto readAlignmentJoins = candidates
-        .filter!"!a.flags.disabled"
-        .chunkBy!isSameRead
-        .map!collectReadAlignments
-        .joiner
-        .filter!"a.isValid"
-        .map!"a.getInOrder()"
-        .map!makeScaffoldJoin;
+    auto readAlignmentJoins = collectScaffoldJoins!collectReadAlignments(candidates);
     auto inputGapJoins = inputGaps
         .map!makeScaffoldJoin;
 
@@ -229,6 +247,8 @@ PileUp[] build(Options)(
         chain(readAlignmentJoins, inputGapJoins),
     );
     debugLogPileUps("raw", alignmentsScaffold);
+    alignmentsScaffold = alignmentsScaffold.resolveBubbles(options);
+    debugLogPileUps("resolvedBubbles", alignmentsScaffold);
     alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins(
         options.bestPileUpMargin,
         options.existingGapBonus,
@@ -279,13 +299,6 @@ unittest
 
     with (AlignmentChain) with (LocalAlignment)
         {
-            static struct Options
-            {
-                size_t minSpanningReads = 1;
-                double bestPileUpMargin = 1.0;
-                double existingGapBonus = 1.0;
-            }
-
             id_t alignmentChainId = 0;
             id_t contReadId = 0;
             ReadAlignment getDummyRead(id_t beginContigId, arithmetic_t beginIdx,
@@ -442,11 +455,17 @@ unittest
                 .joiner
                 .map!"a.alignment"
                 .array;
+
+            Options options;
+            options.minSpanningReads = 1;
+            options.bestPileUpMargin = 1.0;
+            options.existingGapBonus = 1.0;
+
             auto computedPileUps = build(
                 3,
                 alignmentChains,
                 inputGaps,
-                Options(),
+                options,
             );
 
             foreach (pileUp, computedPileUp; zip(pileUps, computedPileUps))
@@ -463,6 +482,24 @@ unittest
                 }
             }
         }
+}
+
+auto collectScaffoldJoins(alias collect)(AlignmentChain[] alignments)
+{
+    alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
+
+    alignments.sort!"a.contigB.id < b.contigB.id";
+
+    auto scaffoldJoins = alignments
+        .filter!"!a.flags.disabled"
+        .chunkBy!isSameRead
+        .map!collect
+        .joiner
+        .filter!"a.isValid"
+        .map!"a.getInOrder()"
+        .map!makeScaffoldJoin;
+
+    return scaffoldJoins;
 }
 
 /// Generate join from read alignment.
@@ -882,6 +919,386 @@ unittest
     }
 }
 
+/// This find bubbles in the graph and tries to linearize them. Bubbles are
+/// cyclic subgraphs of at most maxBubbleSize nodes and can be sueezed into a
+/// linear subgraph iff they comprise two linear subgraphs being parallel wrt.
+/// the underlying genome.
+Scaffold!ScaffoldPayload resolveBubbles(Scaffold!ScaffoldPayload scaffold, in Options options)
+{
+    auto resolver = new BubbleResolver(scaffold, options);
+
+    return resolver.run();
+}
+
+private class BubbleResolver
+{
+    Scaffold!ScaffoldPayload scaffold;
+    const(Options) options;
+    Scaffold!ScaffoldPayload.IncidentEdgesCache incidentEdgesCache;
+
+    enum numEscapeNodes = 2;
+
+    this(Scaffold!ScaffoldPayload scaffold, in Options options)
+    {
+        this.scaffold = scaffold;
+        this.options = options;
+    }
+
+    Scaffold!ScaffoldPayload run()
+    {
+        mixin(traceExecution);
+
+        foreach (i; 0 .. options.maxBubbleResolverIterations)
+            if (resolveSimpleBubbles() == 0)
+                break;
+
+        return scaffold;
+    }
+
+    size_t resolveSimpleBubbles()
+    {
+        mixin(traceExecution);
+
+        incidentEdgesCache = scaffold.allIncidentEdges();
+        auto cyclicSubgraphBase = getCyclicSubgraphBase();
+        auto simpleBubbles = cyclicSubgraphBase
+            .filter!(cyclicSubgraph => cyclicSubgraph.length <= options.maxBubbleSize &&
+                                       isSimpleBubble(cyclicSubgraph))
+            .array;
+
+        logJsonDiagnostic(
+            "numSimpleBubbles", simpleBubbles.length,
+            "simpleBubbles", shouldLog(LogLevel.debug_)
+                ? simpleBubbles
+                    .map!(simpleBubble => cycleToJson(simpleBubble))
+                    .array
+                    .toJson
+                : Json(null),
+        );
+
+        if (simpleBubbles.length > 0)
+        {
+            foreach (bubble; parallel(simpleBubbles))
+                resolveSimpleBubble(bubble);
+
+            scaffold = removeNoneJoins!ScaffoldPayload(scaffold);
+        }
+
+        return simpleBubbles.length;
+    }
+
+    size_t[][] getCyclicSubgraphBase()
+    {
+        mixin(traceExecution);
+
+        auto cyclicSubgraphBase = scaffold.findCyclicSubgraphs(incidentEdgesCache);
+
+        logJsonDebug("cyclicSubgraphBase", cyclicSubgraphBase
+            .map!(cycle => cycleToJson(cycle))
+            .array
+            .toJson);
+
+        return cyclicSubgraphBase;
+    }
+
+    /**
+        A cyclic subgraph is a _simple bubble_ iff:
+
+        - all nodes but two have degree == 2 disregarding extension joins
+        - two nodes have degree >= 3 disregarding extension joins
+        - an edge between the latter two nodes exists and has a pile up attached
+
+        The aforementioned edge is called a _skipper_.
+    */
+    bool isSimpleBubble(size_t[] cycle)
+    {
+        bool noSimpleBubble(string reason)
+        {
+            logJsonDebug(
+                "info", "cycle is not a simple bubble",
+                "reason", reason,
+                "cycle", cycleToJson(cycle),
+            );
+
+            return false;
+        }
+
+        ContigNode[] escapeNodes;
+        escapeNodes.reserve(cycle.length);
+
+        foreach (nodeIdx; cycle)
+        {
+            if (isEscapeNode(nodeIdx))
+                if (escapeNodes.length < numEscapeNodes)
+                    escapeNodes ~= scaffold.nodes[nodeIdx];
+                else
+                    return noSimpleBubble("too many nodes with degree >= 3");
+            else
+                assert(isIntermediateNode(nodeIdx), "invalid cycle: node degree must be >= 2");
+        }
+
+        if (escapeNodes.length != numEscapeNodes)
+            return noSimpleBubble("not enough nodes with degree >= 3");
+
+        if (scaffold.edge(escapeNodes[0], escapeNodes[1]) !in scaffold)
+            return noSimpleBubble("missing 'skipping' edge");
+
+        auto skippingJoin = scaffold.get(scaffold.edge(escapeNodes[0], escapeNodes[1]));
+
+        if (!skippingJoin.payload.types.pileUp)
+            return noSimpleBubble("skipping edge has no pile up");
+
+        return true;
+    }
+
+    void resolveSimpleBubble(size_t[] bubble)
+    {
+        mixin(traceExecution);
+
+        auto escapeNodes = getEscapeNodes(bubble);
+        Join!ScaffoldPayload skippingJoin;
+
+        synchronized(this)
+            skippingJoin = scaffold.get(scaffold.edge(escapeNodes[0], escapeNodes[1]));
+
+        auto skippingPileUp = skippingJoin.payload.readAlignments;
+        auto intermediateContigIds = getIntermediateContigIds(bubble);
+        auto intermediateAlignments = getReadAlignmentsOnContigs(
+            skippingPileUp,
+            intermediateContigIds,
+        );
+        // Use existing and new alignments to `collectReadAlignments`
+        auto augmentedAlignments = chain(
+            skippingPileUp.map!"a[]".joiner,
+            intermediateAlignments[],
+        ).array;
+
+        auto augmentedJoins = collectScaffoldJoins!(
+            sameReadAlignments => collectFixedSimpleBubbles(
+                sameReadAlignments,
+                cast(id_t) skippingJoin.start.contigId,
+                cast(id_t) skippingJoin.end.contigId,
+                intermediateContigIds,
+            )
+        )(augmentedAlignments[]);
+
+        logJsonDiagnostic(
+            "skippingJoin", skippingJoin.joinToJson,
+            "intermediateContigIds", intermediateContigIds.toJson,
+            "augmentedJoins", augmentedJoins.save.map!joinToJson.array.toJson,
+        );
+
+        synchronized(this) {
+            // Remove pileup from `skippingJoin`
+            skippingJoin.payload.remove!(ScaffoldPayload.Type.pileUp);
+            scaffold.add!(scaffold.ConflictStrategy.replace)(skippingJoin);
+
+            // Add new readAlignments to the graph
+            scaffold.bulkAdd!mergeJoins(augmentedJoins);
+        }
+    }
+
+    AlignmentChain[] getReadAlignmentsOnContigs(
+        in PileUp skippingPileUp,
+        in id_t[] intermediateContigIds,
+    )
+    {
+        assert(skippingPileUp.isValid, "invalid pile up");
+
+        // Build DB of reads
+        auto skippingReadIds = skippingPileUp
+            .map!(readAlignment => cast(id_t) readAlignment[0].contigB.id)
+            .array;
+        skippingReadIds
+            .sort
+            .release
+            .uniqInPlace;
+        assert(skippingReadIds.length >= 1);
+        auto skippingPileUpDb = dbSubset(
+            buildPath(
+                options.workdir,
+                format!"skipper_%(%d-%)_pile-up.db"(intermediateContigIds),
+            ),
+            options.readsDb,
+            skippingReadIds[],
+            options.anchorSkippingPileUpsOptions,
+        );
+        // Build DB of intermediate contigs
+        auto intermediateContigsDb = dbSubset(
+            buildPath(
+                options.workdir,
+                format!"skipper_%(%d-%)_intermediate-contigs.dam"(intermediateContigIds),
+            ),
+            options.refDb,
+            intermediateContigIds[],
+            options.anchorSkippingPileUpsOptions,
+        );
+        // Align without any mask
+        auto intermediateAlignmentsFile = getDamapping(
+            intermediateContigsDb,
+            skippingPileUpDb,
+            options.anchorSkippingPileUpsOptions.damapperOptions,
+            options.workdir,
+        );
+        auto intermediateAlignments = getAlignments(
+            intermediateContigsDb,
+            skippingPileUpDb,
+            intermediateAlignmentsFile,
+            options.workdir,
+        );
+        foreach (ref ac; intermediateAlignments)
+        {
+            // Filter alignments covering the whole intermediate contig
+            ac.disableIf(!ac.completelyCovers!"contigA");
+            // Adjust contig/read IDs
+            ac.contigA.id = intermediateContigIds[ac.contigA.id - 1];
+            ac.contigB.id = skippingReadIds[ac.contigB.id - 1];
+        }
+
+        return intermediateAlignments;
+    }
+
+    /// Tries to find a valid sequence of alignments for one read.
+    static ReadAlignment[] collectFixedSimpleBubbles(Chunk)(
+        Chunk sameReadAlignmentsChunk,
+        in id_t startContigId,
+        in id_t endContigId,
+        in id_t[] intermediateContigIds,
+    )
+    {
+        alias toReadInterval = toInterval!(ReadInterval, "contigB");
+
+        auto sameReadAlignments = sameReadAlignmentsChunk.array;
+        auto readId = sameReadAlignments[0].contigB.id;
+        auto startAlignment = sameReadAlignments[]
+            .find!(ac => ac.contigA.id == startContigId).front;
+        auto endAlignment = sameReadAlignments[]
+            .find!(ac => ac.contigA.id == endContigId).front;
+        auto intermediateAlignments = sameReadAlignments[]
+            .filter!(ac => !ac.contigA.id.among(startContigId, endContigId))
+            .array;
+
+        assert(!toReadInterval(startAlignment).intersects(toReadInterval(endAlignment)));
+
+        static bool isFeasible(in AlignmentChain[] alignmentSubset)
+        {
+            auto newAlignmentArea = toReadInterval(alignmentSubset[$ - 1]);
+            auto coveredReadArea = ReadRegion(alignmentSubset[0 .. $ - 1]
+                .map!toReadInterval
+                .array);
+            auto coveredContigs = alignmentSubset
+                .map!(ac => 0 + ac.contigA.id)
+                .array;
+            coveredContigs.sort.release.uniqInPlace;
+
+            return coveredContigs.length == alignmentSubset.length &&
+                   (coveredReadArea - newAlignmentArea) == coveredReadArea;
+        }
+
+        static double score(in AlignmentChain[] alignmentSubset)
+        {
+            return alignmentSubset.length;
+        }
+
+        AlignmentChain[] optimalAlignmentSubset;
+
+        // Unless there are at least as many intermediate alignments as
+        // contigs no exeptable solution exists.
+        if (intermediateAlignments.length >= intermediateContigIds.length)
+            optimalAlignmentSubset = backtracking!(isFeasible, score)(
+                intermediateAlignments,
+                [startAlignment, endAlignment],
+            );
+
+        if (optimalAlignmentSubset.length == numEscapeNodes + intermediateContigIds.length)
+        {
+            logJsonDiagnostic(
+                "info", "resolved skipper",
+                "readId", readId,
+                "startContigId", startContigId,
+                "intermediateContigIds", intermediateContigIds.toJson,
+                "endContigId", endContigId,
+                "sameReadAlignments", shouldLog(LogLevel.debug_)
+                    ? sameReadAlignments.toJson
+                    : sameReadAlignments.length.toJson,
+                "optimalAlignmentSubset", shouldLog(LogLevel.debug_)
+                    ? optimalAlignmentSubset.toJson
+                    : optimalAlignmentSubset.length.toJson,
+            );
+
+            return collectReadAlignments(optimalAlignmentSubset);
+        }
+        else
+        {
+            logJsonDiagnostic(
+                "info", "failed to resolve skipper; discarding read",
+                "readId", readId,
+                "startContigId", startContigId,
+                "intermediateContigIds", intermediateContigIds.toJson,
+                "endContigId", endContigId,
+                "sameReadAlignments", shouldLog(LogLevel.debug_)
+                    ? sameReadAlignments.toJson
+                    : sameReadAlignments.length.toJson,
+                "optimalAlignmentSubset", shouldLog(LogLevel.debug_)
+                    ? optimalAlignmentSubset.toJson
+                    : optimalAlignmentSubset.length.toJson,
+            );
+
+            return [];
+        }
+    }
+
+    auto getEscapeNodes(size_t[] bubble) const nothrow
+    {
+        return bubble
+            .filter!(nodeIdx => isEscapeNode(nodeIdx))
+            .map!(i => scaffold.nodes[i])
+            .array;
+    }
+
+    auto getIntermediateContigIds(size_t[] bubble) const nothrow
+    {
+        auto intermediateContigIds = bubble
+            .filter!(nodeIdx => isIntermediateNode(nodeIdx))
+            .map!(i => cast(id_t) scaffold.nodes[i].contigId)
+            .array;
+
+        return intermediateContigIds
+            .sort
+            .release
+            .uniqInPlace;
+    }
+
+    bool isEscapeNode(in size_t nodeIdx) const pure nothrow
+    {
+        return incidentEdgesCache[nodeIdx].count!(join => !join.isExtension) >= 3;
+    }
+
+    bool isIntermediateNode(in size_t nodeIdx) const pure nothrow
+    {
+        return incidentEdgesCache[nodeIdx].count!(join => !join.isExtension) == 2;
+    }
+
+    private Json cycleToJson(in size_t[] cycle) const
+    {
+        return cycle
+            .map!(i => [
+                "node": scaffold.nodes[i].toJson,
+                "degree": incidentEdgesCache[i]
+                    .count!(join => !join.isExtension)
+                    .toJson,
+                //"incidentGapJoins": shouldLog(LogLevel.debug_)
+                //    ? incidentEdgesCache[i]
+                //        .filter!(join => !join.isExtension)
+                //        .map!joinToJson
+                //        .array
+                //        .toJson
+                //    : Json(null),
+            ])
+            .array
+            .toJson;
+    }
+}
 
 /// This removes ambiguous gap insertions.
 Scaffold!ScaffoldPayload discardAmbiguousJoins(
@@ -1024,7 +1441,7 @@ unittest
 }
 
 // Not meant for public usage.
-auto joinToJson(Join!ScaffoldPayload join)
+auto joinToJson(in Join!ScaffoldPayload join)
 {
     return [
         "start": join.start.toJson,

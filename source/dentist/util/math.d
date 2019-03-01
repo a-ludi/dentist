@@ -24,7 +24,7 @@ import std.algorithm :
     sum,
     swap,
     uniq;
-import std.array : Appender, array;
+import std.array : appender, Appender, array;
 import std.conv : to;
 import std.exception : assertThrown;
 import std.format : format;
@@ -38,6 +38,7 @@ import std.range :
     isRandomAccessRange,
     retro,
     save,
+    slide,
     walkLength;
 import std.traits : isCallable, isIntegral, isNumeric;
 import std.typecons : Flag, No, Yes;
@@ -2021,6 +2022,167 @@ private struct MaximalConnectedComponents(alias isConnected)
     {
         return unvisited.empty && currentComponent.empty;
     }
+}
+
+/**
+    Find a cycle base of an undirected graph using the Paton's
+    algorithm.
+
+    The algorithm is described in
+
+    > K. Paton, An algorithm for finding a fundamental set of cycles
+    > for an undirected linear graph, Comm. ACM 12 (1969), pp. 514-518.
+
+    and the implementation is adapted from the [Java implementation][1] of
+    K. Paton originally licensed under [Apache License 2.0][2].
+
+    [1]: https://code.google.com/archive/p/niographs/
+    [2]: http://www.apache.org/licenses/LICENSE-2.0
+
+    Returns: range of cycles in the graph represented as arrays of node indices
+*/
+auto findCyclicSubgraphs(G)(
+    G graph,
+    G.IncidentEdgesCache incidentEdgesCache = G.IncidentEdgesCache.init,
+)
+    if (is(G : Graph!Params, Params...))
+{
+    auto node(in size_t idx)
+    {
+        return graph.nodes[idx];
+    }
+
+    version(assert) void assertValidCycle(in size_t[] cycle)
+    {
+        enum errorMsg = "not a cycle";
+
+        assert(
+            cycle.length > 0 && graph.edge(node(cycle[0]), node(cycle[$ - 1])) in graph,
+            errorMsg
+        );
+
+        foreach (pair; cycle.slide!(No.withPartial)(2))
+            assert(graph.edge(node(pair[0]), node(pair[1])) in graph, errorMsg);
+    }
+
+    auto numNodes = graph.nodes.length;
+
+    NaturalNumberSet[] used;
+    used.length = numNodes;
+
+    long[] parent;
+    parent.length = numNodes;
+    parent[] = -1;
+
+    size_t[] stack;
+    stack.reserve(numNodes);
+
+    auto cycles = appender!(size_t[][]);
+
+    if (incidentEdgesCache == G.IncidentEdgesCache.init)
+        incidentEdgesCache = graph.allIncidentEdges();
+
+    foreach (rootIdx, root; graph.nodes)
+    {
+        // Loop over the connected
+        // components of the graph.
+        if (parent[rootIdx] >= 0)
+            continue;
+
+        // Prepare to walk the spanning tree.
+        parent[rootIdx] = rootIdx;
+        used[rootIdx].reserveFor(numNodes);
+        used[rootIdx].add(rootIdx);
+        stack ~= rootIdx;
+
+        // Do the walk. It is a BFS with
+        // a LIFO instead of the usual
+        // FIFO. Thus it is easier to
+        // find the cycles in the tree.
+        while (stack.length > 0)
+        {
+            auto currentIdx = stack[$ - 1];
+            --stack.length;
+            auto current = node(currentIdx);
+            auto currentUsed = &used[currentIdx];
+
+            foreach (edge; incidentEdgesCache[currentIdx])
+            {
+                auto neighbour = edge.target(current);
+                auto neighbourIdx = graph.indexOf(neighbour);
+                auto neighbourUsed = &used[neighbourIdx];
+
+                if (neighbourUsed.empty)
+                {
+                    // found a new node
+                    parent[neighbourIdx] = currentIdx;
+                    neighbourUsed.reserveFor(numNodes);
+                    neighbourUsed.add(currentIdx);
+
+                    stack ~= neighbourIdx;
+                }
+                else if (neighbourIdx == currentIdx)
+                {
+                    // found a self loop
+                    auto cycle = [currentIdx];
+                    cycles ~= cycle;
+                    version(assert) assertValidCycle(cycle);
+                }
+                else if (!currentUsed.has(neighbourIdx))
+                {
+                    // found a cycle
+                    auto cycle = appender!(size_t[]);
+                    cycle ~= neighbourIdx;
+                    cycle ~= currentIdx;
+
+                    auto p = parent[currentIdx];
+                    for (; !neighbourUsed.has(p); p = parent[p])
+                        cycle ~= p;
+
+                    cycle ~= p;
+                    cycles ~= cycle.data;
+                    version(assert) assertValidCycle(cycle.data);
+                    neighbourUsed.add(currentIdx);
+                }
+            }
+        }
+    }
+
+    return cycles.data;
+}
+
+///
+unittest
+{
+    alias G = Graph!int;
+
+    //   __
+    //   \ \
+    //    `-0 -- 1 -- 2 -- 3
+    //      |       / |    |
+    //      |      /  |    |
+    //      4 -- 5 -- 6    7
+    auto g = G([0, 1, 2, 3, 4, 5, 6, 7], [
+        G.edge(0, 0),
+        G.edge(0, 1),
+        G.edge(0, 4),
+        G.edge(1, 2),
+        G.edge(2, 3),
+        G.edge(2, 5),
+        G.edge(2, 6),
+        G.edge(3, 7),
+        G.edge(4, 5),
+        G.edge(5, 6),
+    ]);
+    auto cycles = g.findCyclicSubgraphs();
+
+    import std.algorithm : equal;
+
+    assert(cycles.equal([
+        [0],
+        [2, 6, 5],
+        [1, 2, 5, 4, 0],
+    ]));
 }
 
 /**
