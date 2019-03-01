@@ -413,3 +413,33 @@ unittest
     static assert("three" == numberName(3));
     static assert("many" == numberName(4));
 }
+
+/**
+    Find an optimal solution using backtracking.
+*/
+T[] backtracking(alias isFeasible, alias score, T)(
+    T[] candidates,
+    T[] solution = [],
+)
+{
+    auto optimalSolution = solution;
+    auto optimalScore = score(optimalSolution);
+
+    foreach (i, candidate; candidates)
+    {
+        if (isFeasible(cast(const(T[])) solution ~ candidate))
+        {
+            auto newSolution = backtracking!(isFeasible, score)(
+                candidates[0 .. i] ~ candidates[i + 1 .. $],
+                solution ~ candidate,
+            );
+            auto newScore = score(cast(const(T[])) newSolution);
+
+            if (newScore > optimalScore)
+                optimalSolution = newSolution;
+        }
+    }
+
+    return optimalSolution;
+}
+
