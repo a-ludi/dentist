@@ -25,7 +25,7 @@ import dentist.common.alignments :
     PileUp,
     ReadAlignment,
     SeededAlignment;
-import dentist.common.binio : ArrayStorage;
+import dentist.common.binio : writePileUpsDb;
 import dentist.common.scaffold :
     buildScaffold,
     ContigNode,
@@ -109,8 +109,11 @@ private auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
         .filter!(pileUp => pileUp.isValid);
 }
 
-private void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold)
+private void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold, in string dbStem)
 {
+    if (dbStem !is null)
+        writePileUpsDb(collectPileUps(scaffold).array, format!"%s.%s.db"(dbStem, state));
+
     logJsonDebug(
         "state", state,
         "joins", scaffold
@@ -246,20 +249,20 @@ PileUp[] build(
         numReferenceContigs + 0,
         chain(readAlignmentJoins, inputGapJoins),
     );
-    debugLogPileUps("raw", alignmentsScaffold);
+    debugLogPileUps("raw", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.resolveBubbles(options);
-    debugLogPileUps("resolvedBubbles", alignmentsScaffold);
+    debugLogPileUps("resolvedBubbles", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.discardAmbiguousJoins(
         options.bestPileUpMargin,
         options.existingGapBonus,
     );
-    debugLogPileUps("unambiguous", alignmentsScaffold);
+    debugLogPileUps("unambiguous", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.enforceMinSpanningReads(options.minSpanningReads);
-    debugLogPileUps("minSpanningEnforced", alignmentsScaffold);
+    debugLogPileUps("minSpanningEnforced", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.removeInputGaps();
-    debugLogPileUps("inputGapsRemoved", alignmentsScaffold);
+    debugLogPileUps("inputGapsRemoved", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!(ScaffoldPayload.merge, ScaffoldPayload);
-    debugLogPileUps("extensionsMerged", alignmentsScaffold);
+    debugLogPileUps("extensionsMerged", alignmentsScaffold, options.intermediatePileUpsStem);
     auto pileUps = collectPileUps(alignmentsScaffold).array;
 
     return pileUps;

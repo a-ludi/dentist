@@ -806,6 +806,17 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("debug-pile-ups")
+        @MetaVar("<db-stem>")
+        @Help("write pile ups of intermediate steps to `<db-stem>.<state>.db`")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string intermediatePileUpsStem;
+    }
+
+    static if (command.among(
         TestingCommand.translocateGaps,
         DentistCommand.output,
     ))
