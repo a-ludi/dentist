@@ -753,16 +753,21 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.processPileUps,
     ))
     {
-        @Option("daccord-threads")
-        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <threads>) )")
-        uint numDaccordThreads;
+        @Option("auxiliary-threads", "aux-threads")
+        @MetaVar("num-threads")
+        @Help("
+            use <num-threads> threads for auxiliary tools like `daligner`,
+            `damapper` and `daccord`
+            (defaults to floor(totalCpus / <threads>) )
+        ")
+        uint numAuxiliaryThreads;
 
         @PostValidate(Priority.low)
         void hookInitDaccordThreads()
         {
-            if (numDaccordThreads == 0)
+            if (numAuxiliaryThreads == 0)
             {
-                numDaccordThreads = totalCPUs / numThreads;
+                numAuxiliaryThreads = totalCPUs / numThreads;
             }
         }
     }
@@ -1342,7 +1347,7 @@ struct OptionsFor(DentistCommand command)
     static if (
         is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().readsErrorRate)) &&
-        is(typeof(OptionsFor!command().numDaccordThreads))
+        is(typeof(OptionsFor!command().numAuxiliaryThreads))
     ) {
         @Validate!validateAverageCorrelationRate
         @property auto pileUpAlignmentOptionsAverageCorrelationRate() const
@@ -1354,7 +1359,7 @@ struct OptionsFor(DentistCommand command)
         {
             return [
                 DalignerOptions.identity,
-                DalignerOptions.numThreads ~ numDaccordThreads.to!string,
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     pileUpAlignmentOptionsAverageCorrelationRate,
@@ -1365,7 +1370,7 @@ struct OptionsFor(DentistCommand command)
 
     static if (
         is(typeof(OptionsFor!command().maxInsertionsError)) &&
-        is(typeof(OptionsFor!command().numDaccordThreads)) &&
+        is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
         is(typeof(OptionsFor!command().tracePointDistance)) &&
         is(typeof(OptionsFor!command().workdir))
     ) {
@@ -1381,7 +1386,7 @@ struct OptionsFor(DentistCommand command)
         {
             return [
                 DalignerOptions.asymmetric,
-                DalignerOptions.numThreads ~ numDaccordThreads.to!string,
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
                 DalignerOptions.masks ~ flankingContigsRepeatMaskName,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
@@ -1419,7 +1424,7 @@ struct OptionsFor(DentistCommand command)
             return [
                 DamapperOptions.symmetric,
                 DamapperOptions.oneDirection,
-                DamapperOptions.numThreads ~ numDaccordThreads.to!string,
+                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
                 format!(DamapperOptions.averageCorrelationRate ~ "%f")(
                     refVsReadsAlignmentOptionsAverageCorrelationRate,
                 ),
@@ -1458,7 +1463,7 @@ struct OptionsFor(DentistCommand command)
                 // daccordOptions
                 [
                     DaccordOptions.produceFullSequences,
-                    DaccordOptions.numberOfThreads ~ numDaccordThreads.to!string,
+                    DaccordOptions.numberOfThreads ~ numAuxiliaryThreads.to!string,
                 ],
                 // dalignerOptions
                 pileUpAlignmentOptions,
