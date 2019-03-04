@@ -1132,7 +1132,7 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.processPileUps,
+        DentistCommand.output,
     ))
     {
         @Option("min-extension-length")

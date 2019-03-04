@@ -64,6 +64,7 @@ import dentist.util.math :
     add,
     bulkAdd,
     ceil,
+    filterEdges,
     floor,
     mean,
     RoundingMode;
@@ -179,7 +180,11 @@ class AssemblyWriter
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
-        if (!options.onlyFlags.extending)
+        if (options.onlyFlags.extending)
+        {
+            assemblyGraph.filterEdges!(insertion => skipShortExtension(insertion));
+        }
+        else
         {
             assemblyGraph = assemblyGraph.removeExtensions!InsertionInfo();
         }
@@ -199,7 +204,6 @@ class AssemblyWriter
             InsertionDb.write(options.assemblyGraphFile, assemblyGraph.edges);
     }
 
-
     protected void appendUnkownJoins()
     {
         auto unkownJoins = scaffoldStructure[]
@@ -211,6 +215,29 @@ class AssemblyWriter
                 InsertionInfo(CompressedSequence(), gapPart.length, []),
             ));
         assemblyGraph.bulkAddForce(unkownJoins);
+    }
+
+    protected Flag!"keepInsertion" skipShortExtension(Insertion insertion) const
+    {
+        assert(insertion.payload.overlaps.length == 1);
+
+        auto extensionOverlap = insertion.payload.overlaps[0];
+        auto extensionLength = extensionOverlap.seed == AlignmentLocationSeed.front
+            ? extensionOverlap.first.contigB.begin
+            : extensionOverlap.contigB.length - extensionOverlap.last.contigB.end;
+
+        if (extensionLength < options.minExtensionLength)
+        {
+            logJsonInfo(
+                "info", "skipping pile up due to `minExtensionLength`",
+                "reason", "minExtensionLength",
+                "flankingContigId", extensionOverlap.contigA.id,
+            );
+
+            return No.keepInsertion;
+        }
+
+        return Yes.keepInsertion;
     }
 
     void logStatistics()

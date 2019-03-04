@@ -233,9 +233,6 @@ protected class PileUpProcessor
             getInsertionAlignment();
             getInsertionSequence();
 
-            if (pileUp.isExtension && shouldSkipShortExtension())
-                return;
-
             *resultInsertion = makeInsertion();
         }
         catch(DentistException e)
@@ -461,31 +458,6 @@ protected class PileUpProcessor
     {
         auto fastaSequence = getFastaSequence(consensusDb, 1, options.workdir);
         insertionSequence = CompressedSequence.from(fastaSequence);
-    }
-
-    protected bool shouldSkipShortExtension() const
-    {
-        assert(croppingPositions.length == 1);
-
-        auto refPos = croppingPositions[0].value;
-        auto refLength = referenceRead[0].contigA.length;
-        ulong extensionLength = referenceRead.isFrontExtension
-            ? insertionSequence.length.to!ulong - refPos.to!ulong
-            : insertionSequence.length.to!ulong - (refLength - refPos).to!ulong;
-
-        if (extensionLength < options.minExtensionLength)
-        {
-            logJsonInfo(
-                "info", "skipping pile up due to `minExtensionLength`",
-                "reason", "minExtensionLength",
-                "pileUpId", pileUpId,
-                "pileUp", pileUp.pileUpToSimpleJson,
-            );
-
-            return true;
-        }
-
-        return false;
     }
 
     protected Insertion makeInsertion()
