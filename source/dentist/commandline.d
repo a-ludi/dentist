@@ -571,12 +571,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<out:mapped-regions-mask>")
-        @Help(q"{
-            write regions that were kept aka. output contigs into a Dazzler
-            mask. Given a path-like string without extension: the `dirname`
-            designates the directory to write the mask to. The mask comprises
-            two hidden files `.[REFERENCE].[MASK].{anno,data}`.
-        }")
+        @Help("write regions that were kept aka. output contigs into a Dazzler mask.")
         @Validate!((value, options) => validateOutputMask(options.trueAssemblyDb, value))
         string mappedRegionsMask;
     }
@@ -596,12 +591,7 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<out:repeat-mask>")
-        @Help(q"{
-            write inferred repeat mask into a Dazzler mask. Given a path-like
-            string without extension: the `dirname` designates the directory to
-            write the mask to. The mask comprises two hidden files
-            `.[REFERENCE].[MASK].{anno,data}`.
-        }")
+        @Help("write inferred repeat mask into a Dazzler mask.")
         @Validate!((value, options) => validateOutputMask(options.refDb, value))
         string repeatMask;
     }
