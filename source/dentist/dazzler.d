@@ -143,60 +143,6 @@ class DazzlerCommandException : Exception
     }
 }
 
-/// Determines how data should be provided in the working directory.
-enum ProvideMethod
-{
-    copy,
-    symlink,
-}
-enum provideMethods = __traits(allMembers, ProvideMethod);
-
-/**
-    Provide dbFile in `workdir`.
-
-    Returns: Path of the dbFile in `workdir`.
-*/
-string provideDamFileInWorkdir(in string dbFile, ProvideMethod provideMethod, in string workdir)
-{
-    foreach (hiddenDbFile; getHiddenDbFiles(dbFile))
-    {
-        provideFileInWorkdir(hiddenDbFile, provideMethod, workdir);
-    }
-
-    return provideFileInWorkdir(dbFile, provideMethod, workdir);
-}
-
-/**
-    Provide lasFile in `workdir`.
-
-    Returns: Path of the lasFile in `workdir`.
-*/
-string provideLasFileInWorkdir(in string lasFile, ProvideMethod provideMethod, in string workdir)
-{
-    return provideFileInWorkdir(lasFile, provideMethod, workdir);
-}
-
-/// Provide file in `workdir`.
-string provideFileInWorkdir(in string file, ProvideMethod provideMethod, in string workdir)
-{
-    import std.file : copy, symlink;
-    import std.path : absolutePath;
-
-    auto fileInWorkdir = buildPath(workdir, file.baseName);
-
-    final switch (provideMethod)
-    {
-    case ProvideMethod.copy:
-        copy(file.absolutePath, fileInWorkdir);
-        break;
-    case ProvideMethod.symlink:
-        symlink(file.absolutePath, fileInWorkdir);
-        break;
-    }
-
-    return fileInWorkdir;
-}
-
 /// Returns true iff lasFile contains zero parts.
 bool lasEmpty(in string lasFile, in string dbA, in string workdir)
 {
@@ -2718,10 +2664,12 @@ EOS";
 /**
     Get the hidden files comprising the designated mask.
 */
-auto getMaskFiles(in string dbFile, in string maskDestination)
+auto getMaskFiles(in string dbFile, in string maskName)
 {
-    auto destinationDir = maskDestination.dirName;
-    auto maskName = maskDestination.baseName;
+    enforce!DazzlerCommandException(!maskName.canFind("/"), "mask name mujst not contain slashes `/`");
+    enforce!DazzlerCommandException(!maskName.canFind("."), "mask name mujst not contain dots `.`");
+
+    auto destinationDir = dbFile.dirName;
     auto dbName = dbFile.baseName.stripExtension;
     auto maskHeader = format!"%s/.%s.%s.anno"(destinationDir, dbName, maskName);
     auto maskData = format!"%s/.%s.%s.data"(destinationDir, dbName, maskName);
@@ -2843,7 +2791,7 @@ private T[] getBinaryFile(T)(in string fileName)
 */
 void writeMask(Region)(
     in string dbFile,
-    in string maskDestination,
+    in string maskName,
     in Region[] regions,
     in string workdir,
 )
@@ -2854,7 +2802,7 @@ void writeMask(Region)(
         MaskDataEntry, "end",
     );
 
-    auto maskFileNames = getMaskFiles(dbFile, maskDestination);
+    auto maskFileNames = getMaskFiles(dbFile, maskName);
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
 

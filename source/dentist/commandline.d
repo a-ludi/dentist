@@ -40,11 +40,7 @@ import dentist.dazzler :
     getMaskFiles,
     getTracePointDistance,
     lasEmpty,
-    LasFilterAlignmentsOptions,
-    provideDamFileInWorkdir,
-    provideLasFileInWorkdir,
-    ProvideMethod,
-    provideMethods;
+    LasFilterAlignmentsOptions;
 import dentist.swinfo :
     copyright,
     executableName,
@@ -308,23 +304,23 @@ struct OptionsFor(DentistCommand command)
         @ArgumentsParser
         auto parseArguments(const(string)[] leftOver)
         {
-            alias referenceSymbol = Alias!(__traits(getMember, this, "refFile"));
+            alias referenceSymbol = Alias!(__traits(getMember, this, "refDb"));
             enum referenceUDA = getUDAs!(referenceSymbol, Argument)[0];
 
             enforce!ArgParseError(leftOver.length >= numArguments.lowerBound, referenceUDA.multiplicityError(0));
             enforce!ArgParseError(leftOver.length <= numArguments.upperBound, "Missing positional arguments.");
 
-            auto hasReadsFile = (leftOver.length == numArguments.upperBound);
-            handleArg!"refFile"(this, leftOver[0]);
+            auto hasReadsDb = (leftOver.length == numArguments.upperBound);
+            handleArg!"refDb"(this, leftOver[0]);
             leftOver = leftOver[1 .. $];
 
-            if (hasReadsFile)
+            if (hasReadsDb)
             {
-                handleArg!"readsFile"(this, leftOver[0]);
+                handleArg!"readsDb"(this, leftOver[0]);
                 leftOver = leftOver[1 .. $];
             }
 
-            handleArg!"dbAlignmentInputFile"(this, leftOver[0]);
+            handleArg!"dbAlignmentFile"(this, leftOver[0]);
             leftOver = leftOver[1 .. $];
 
             foreach (member; __traits(allMembers, typeof(this)))
@@ -334,7 +330,7 @@ struct OptionsFor(DentistCommand command)
 
                 static if (
                     argUDAs.length > 0 &&
-                    !member.among("refFile", "readsFile", "dbAlignmentInputFile")
+                    !member.among("refDb", "readsDb", "dbAlignmentFile")
                 )
                 {
                     handleArg!member(this, leftOver[0]);
@@ -355,15 +351,7 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:true-assembly>")
         @Help("the 'true' assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string trueAssemblyFile;
-        @Option()
         string trueAssemblyDb;
-
-        @PostValidate()
-        void hookProvideTrueAssemblyFileInWorkDir()
-        {
-            trueAssemblyDb = provideDamFileInWorkdir(trueAssemblyFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -373,15 +361,7 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:short-read-assembly>")
         @Help("short-read assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string shortReadAssemblyFile;
-        @Option()
         string shortReadAssemblyDb;
-
-        @PostValidate()
-        void hookProvideShortReadAssemblyFileInWorkDir()
-        {
-            shortReadAssemblyDb = provideDamFileInWorkdir(shortReadAssemblyFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -395,15 +375,7 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:reference>")
         @Help("reference assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string refFile;
-        @Option()
         string refDb;
-
-        @PostValidate()
-        void hookProvideRefFileInWorkDir()
-        {
-            refDb = provideDamFileInWorkdir(refFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -420,26 +392,17 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:reads>", argReadsMultiplicity)
         @Help("set of PacBio reads in .db/.dam format")
         @Validate!(validateReadsDb)
-        string readsFile;
-        @Option()
         string readsDb;
 
-        static void validateReadsDb(string readsFile)
+        static void validateReadsDb(string readsDb)
         {
-            if (argReadsMultiplicity == 1 || readsFile !is null)
-                validateDB(readsFile);
+            if (argReadsMultiplicity == 1 || readsDb !is null)
+                validateDB(readsDb);
         }
 
         @property bool hasReadsDb() const pure nothrow
         {
-            return readsFile !is null;
-        }
-
-        @PostValidate()
-        void hookProvideReadsFileInWorkDir()
-        {
-            if (hasReadsDb)
-                readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
+            return readsDb !is null;
         }
     }
 
@@ -450,15 +413,7 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:result>")
         @Help("result assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string resultFile;
-        @Option()
         string resultDb;
-
-        @PostValidate()
-        void hookProvideResultFileInWorkDir()
-        {
-            resultDb = provideDamFileInWorkdir(resultFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -470,20 +425,8 @@ struct OptionsFor(DentistCommand command)
             locals alignments of the short-read assembly against the 'true'
             assembly in form of a .las file as produced by `daligner`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.shortReadAssemblyFile))
-        string shortReadAssemblyAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyDb, options.shortReadAssemblyDb))
         string shortReadAssemblyAlignmentFile;
-
-        @PostValidate()
-        void hookProvideShortReadAssemblyAlignmentInWorkDir()
-        {
-            shortReadAssemblyAlignmentFile = provideLasFileInWorkdir(
-                shortReadAssemblyAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
@@ -492,22 +435,10 @@ struct OptionsFor(DentistCommand command)
     {
         @Argument("<in:alignment>")
         @Help("self-alignment of the reference assembly or reads vs. reference alignment")
-        @Validate!((value, options) => options.readsFile is null
-            ? validateLasFile(value, options.refFile)
-            : validateLasFile(value, options.refFile, options.readsFile))
-        string dbAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => options.readsDb is null
+            ? validateLasFile(value, options.refDb)
+            : validateLasFile(value, options.refDb, options.readsDb))
         string dbAlignmentFile;
-
-        @PostValidate()
-        void hookProvideShortReadAssemblyAlignmentInWorkDir()
-        {
-            dbAlignmentFile = provideLasFileInWorkdir(
-                dbAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
@@ -520,20 +451,8 @@ struct OptionsFor(DentistCommand command)
             alignments chains of the reads against the reference in form of a .las
             file as produced by `damapper`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.refFile, options.readsFile))
-        string readsAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb))
         string readsAlignmentFile;
-
-        @PostValidate()
-        void hookProvideReadsAlignmentInWorkDir()
-        {
-            readsAlignmentFile = provideLasFileInWorkdir(
-                readsAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
@@ -545,20 +464,8 @@ struct OptionsFor(DentistCommand command)
             alignments chains of the result assembly against the 'true'
             assembly in form of a .las file as produced by `damapper`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.resultFile))
-        string resultsAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyDb, options.resultDb))
         string resultsAlignmentFile;
-
-        @PostValidate()
-        void hookProvideResultsAlignmentInWorkDir()
-        {
-            resultsAlignmentFile = provideLasFileInWorkdir(
-                resultsAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
@@ -580,7 +487,7 @@ struct OptionsFor(DentistCommand command)
     {
         @Argument("<in:repeat-mask>")
         @Help("read <repeat-mask> generated by the `mask-repetitive-regions` command")
-        @Validate!((value, options) => validateInputMask(options.refFile, value))
+        @Validate!((value, options) => validateInputMask(options.refDb, value))
         string repeatMask;
     }
 
@@ -590,13 +497,8 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<in:mapped-regions-mask>")
-        @Help(q"{
-            read regions that were kept aka. output contigs from the Dazzler
-            mask. Given a path-like string without extension: the `dirname`
-            designates the directory to write the mask to. The mask comprises
-            two hidden files `.[REFERENCE].[MASK].{anno,data}`.
-        }")
-        @Validate!((value, options) => validateInputMask(options.trueAssemblyFile, value))
+        @Help("read regions that were kept aka. output contigs from the Dazzler mask.")
+        @Validate!((value, options) => validateInputMask(options.trueAssemblyDb, value))
         string mappedRegionsMask;
     }
 
@@ -675,7 +577,7 @@ struct OptionsFor(DentistCommand command)
             designates the directory to write the mask to. The mask comprises
             two hidden files `.[REFERENCE].[MASK].{anno,data}`.
         }")
-        @Validate!((value, options) => validateOutputMask(options.trueAssemblyFile, value))
+        @Validate!((value, options) => validateOutputMask(options.trueAssemblyDb, value))
         string mappedRegionsMask;
     }
 
@@ -700,7 +602,7 @@ struct OptionsFor(DentistCommand command)
             write the mask to. The mask comprises two hidden files
             `.[REFERENCE].[MASK].{anno,data}`.
         }")
-        @Validate!((value, options) => validateOutputMask(options.refFile, value))
+        @Validate!((value, options) => validateOutputMask(options.refDb, value))
         string repeatMask;
     }
 
@@ -919,17 +821,6 @@ struct OptionsFor(DentistCommand command)
         size_t fastaLineWidth = 50;
     }
 
-    static if (needWorkdir)
-    {
-        @Option("input-provide-method", "p")
-        @MetaVar(format!"{%-(%s,%)}"([provideMethods]))
-        @Help(format!q"{
-            use the given method to provide the input files in the working
-            directory (default: `%s`)
-        }"(defaultValue!provideMethod))
-        ProvideMethod provideMethod = ProvideMethod.symlink;
-    }
-
     static if (command.among(
         DentistCommand.output,
     ))
@@ -982,7 +873,7 @@ struct OptionsFor(DentistCommand command)
         }
 
         @Option()
-        @Validate!((values, options) => validateInputMasks(options.refFile, values))
+        @Validate!((values, options) => validateInputMasks(options.refDb, values))
         string[] additionalMasks;
     }
 
@@ -1479,13 +1370,6 @@ struct OptionsFor(DentistCommand command)
         is(typeof(OptionsFor!command().workdir))
     ) {
         enum flankingContigsRepeatMaskName = "rep";
-
-        @property string flankingContigsRepeatMaskPath() const
-        {
-            enum maskName = "rep";
-
-            return buildPath(workdir, maskName);
-        }
 
         @Validate!validateAverageCorrelationRate
         @property auto postConsensusAlignmentOptionsAverageCorrelationRate() const

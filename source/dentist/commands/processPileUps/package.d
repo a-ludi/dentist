@@ -356,7 +356,7 @@ protected class PileUpProcessor
             .array;
         writeMask(
             flankingContigsDb,
-            options.flankingContigsRepeatMaskPath,
+            options.flankingContigsRepeatMaskName,
             flankingContigsRepeatMask,
             options.workdir,
         );
