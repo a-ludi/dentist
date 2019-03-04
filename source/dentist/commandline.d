@@ -1314,7 +1314,10 @@ struct OptionsFor(DentistCommand command)
     }
 
     @Option("verbose", "v")
-    @Help("increase output to help identify problems; use up to three times")
+    @Help("
+        increase output to help identify problems; use up to three times.
+        Warning: performance may be drastically reduced if using three times.
+    ")
     void increaseVerbosity() pure
     {
         ++verbosity;
@@ -1325,6 +1328,13 @@ struct OptionsFor(DentistCommand command)
         "verbosity must used 0-3 times"
     ))
     size_t verbosity = 0;
+
+    @PostValidate()
+    void warnVerbosityLevel()
+    {
+        if (verbosity >= 3)
+            logJsonWarn("info", "high level of verbosity may drastically reduce performance");
+    }
 
     static if (needWorkdir)
     {
@@ -1372,7 +1382,7 @@ struct OptionsFor(DentistCommand command)
         }
     }
 
-    @PostValidate()
+    @PostValidate(Priority.high)
     void hookInitLogLevel()
     {
         switch (verbosity)
