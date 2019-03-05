@@ -18,13 +18,14 @@ import core.thread;
 
 private
 {
-    LogLevel minLevel = LogLevel.info;
+    __gshared LogLevel minLevel = LogLevel.info;
 }
 
 /// Sets the minimum log level to be printed.
 void setLogLevel(LogLevel level) nothrow
 {
-    minLevel = level;
+    synchronized
+        minLevel = level;
 }
 
 LogLevel getLogLevel()
@@ -168,32 +169,6 @@ void log(T...)(LogLevel level, string fmt, lazy T args) nothrow
 {
     if (level < minLevel)
         return;
-    string pref;
-    final switch (level)
-    {
-    case LogLevel.debug_:
-        pref = "TRACE";
-        break;
-    case LogLevel.diagnostic:
-        pref = "DEBUG";
-        break;
-    case LogLevel.info:
-        pref = "INFO";
-        break;
-    case LogLevel.warn:
-        pref = "WARN";
-        break;
-    case LogLevel.error:
-        pref = "ERROR";
-        break;
-    case LogLevel.fatal:
-        pref = "FATAL";
-        break;
-    case LogLevel.none:
-        assert(false);
-    }
-    auto threadid = () @trusted{ return cast(ulong) cast(void*) Thread.getThis(); }();
-    threadid ^= threadid >> 32;
 
     try
     {
