@@ -1051,7 +1051,7 @@ struct OptionsFor(DentistCommand _command)
             0.0 < value && value <= 0.3,
             "maximum insertions error rate must be in (0, 0.3]"
         ))
-        double maxInsertionsError = 1e-1;
+        double maxInsertionsError = 1e-2;
     }
 
     static if (command.among(
