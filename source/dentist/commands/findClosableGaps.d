@@ -8,7 +8,7 @@
 */
 module dentist.commands.findClosableGaps;
 
-import dentist.commandline : OptionsFor, TestingCommand;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     isTesting,
     ReferenceInterval,
@@ -17,6 +17,7 @@ import dentist.common.alignments :
     AlignmentChain,
     coord_t,
     id_t;
+import dentist.common.commands : TestingCommand;
 import dentist.dazzler :
     ContigSegment,
     GapSegment,

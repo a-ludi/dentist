@@ -8,7 +8,7 @@
 */
 module dentist.commands.processPileUps;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.commands.processPileUps.cropper : CropOptions, cropPileUp;
 import dentist.common :
     dentistEnforce,
@@ -33,6 +33,7 @@ import dentist.common.binio :
     CompressedSequence,
     InsertionDb,
     PileUpDb;
+import dentist.common.commands : DentistCommand;
 import dentist.common.insertions :
     Insertion,
     InsertionInfo;

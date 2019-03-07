@@ -8,7 +8,7 @@
 */
 module dentist.commands.maskRepetitiveRegions;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion;
@@ -16,6 +16,7 @@ import dentist.common.alignments :
     AlignmentChain,
     coord_t,
     id_t;
+import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     getAlignments,
     writeMask;

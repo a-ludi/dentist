@@ -36,7 +36,7 @@ import std.range :
     take,
     zip;
 import std.range.primitives : hasSlicing;
-import std.string : lineSplitter;
+import std.string : lineSplitter, tr;
 import std.traits :
     isFloatingPoint,
     isSomeString;
@@ -45,6 +45,10 @@ import std.typecons :
     No,
     tuple,
     Yes;
+import transforms : snakeCaseCT;
+
+/// Convert a string to `dash-case` at compile time.
+enum dashCaseCT(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
 
 /**
     Adds one level of indentation for a multi-line string. Adds indentSize

@@ -12,7 +12,7 @@ import dentist.common : isTesting;
 
 static if (isTesting):
 
-import dentist.commandline : TestingCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion,
@@ -20,6 +20,7 @@ import dentist.common :
 import dentist.common.alignments :
     AlignmentChain,
     id_t;
+import dentist.common.commands : TestingCommand;
 import dentist.dazzler :
     getAlignments,
     getNumContigs,

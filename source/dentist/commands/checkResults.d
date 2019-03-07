@@ -13,7 +13,7 @@ import dentist.common : isTesting;
 static if (isTesting):
 
 import core.atomic : atomicOp;
-import dentist.commandline : TestingCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion,
@@ -23,6 +23,7 @@ import dentist.common.alignments :
     AlignmentChain,
     coord_t,
     id_t;
+import dentist.common.commands : TestingCommand;
 import dentist.dazzler :
     ContigSegment,
     fingerprint,

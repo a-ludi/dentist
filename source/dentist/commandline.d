@@ -16,8 +16,6 @@ import darg :
     handleArg,
     Help,
     helpString,
-    isArgumentHandler,
-    isOptionHandler,
     MetaVar,
     Multiplicity,
     Option,
@@ -32,6 +30,15 @@ import dentist.common.alignments :
     coord_t,
     id_t,
     trace_point_t;
+import dentist.common.commands :
+    DentistCommand,
+    dentistCommands,
+    TestingCommand;
+import dentist.common.configfile :
+    initFromConfigFile,
+    fromBytes,
+    SizeUnit,
+    toBytes;
 import dentist.common.binio : PileUpDb;
 import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
@@ -52,7 +59,7 @@ import dentist.swinfo :
 import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
-import dentist.util.string : toString;
+import dentist.util.string : dashCaseCT, toString;
 import std.algorithm :
     among,
     canFind,
@@ -64,37 +71,49 @@ import std.algorithm :
     startsWith;
 import std.array : split;
 import std.conv;
-import std.exception : basicExceptionCtors,
+import std.exception :
+    basicExceptionCtors,
     enforce,
     ErrnoException;
-import std.file : exists,
+import std.file :
+    exists,
     FileException,
     getcwd,
     isDir,
     tempDir,
     remove,
     rmdirRecurse;
-import std.format : format,
+import std.format :
+    format,
     formattedRead;
-import std.math : ceil,
+import std.math :
+    ceil,
     floor,
     log_e = log;
-import std.meta : Alias,
+import std.meta :
+    Alias,
     AliasSeq,
+    allSatisfy,
     staticMap,
     staticSort;
-import std.parallelism : defaultPoolThreads,
+import std.parallelism :
+    defaultPoolThreads,
     totalCPUs;
-import std.path : absolutePath,
+import std.path :
+    absolutePath,
     buildPath;
-import std.range : ElementType,
+import std.range :
+    ElementType,
     only,
     takeOne;
-import std.regex : ctRegex,
+import std.regex :
+    ctRegex,
     matchFirst;
-import std.stdio : File,
+import std.stdio :
+    File,
     stderr;
-import std.string : join,
+import std.string :
+    join,
     tr,
     wrap;
 import std.traits :
@@ -108,6 +127,7 @@ import std.traits :
     isDynamicArray,
     isFloatingPoint,
     isIntegral,
+    isSomeString,
     isStaticArray,
     isUnsigned,
     Parameters,
@@ -116,10 +136,8 @@ import std.typecons :
     BitFlags,
     tuple,
     Yes;
-import transforms : camelCase, snakeCaseCT;
+import transforms : camelCase;
 import vibe.data.json :
-    Json,
-    parseJson,
     serializeToJsonString,
     toJson = serializeToJson;
 
@@ -131,43 +149,6 @@ enum ReturnCode
     commandlineError,
     runtimeError,
 }
-
-/// Possible returns codes of the command line execution.
-mixin("enum DentistCommand {" ~
-    testingOnly!"translocateGaps," ~
-    testingOnly!"findClosableGaps," ~
-    "generateDazzlerOptions," ~
-    "maskRepetitiveRegions," ~
-    "showMask," ~
-    "collectPileUps," ~
-    "showPileUps," ~
-    "processPileUps," ~
-    "showInsertions," ~
-    "mergeInsertions," ~
-    "output," ~
-    testingOnly!"translateCoords," ~
-    testingOnly!"checkResults," ~
-"}");
-
-struct TestingCommand
-{
-    @disable this();
-
-    static DentistCommand opDispatch(string command)() pure nothrow
-    {
-        static if (isTesting)
-            return mixin("DentistCommand." ~ command);
-        else
-            return cast(DentistCommand) size_t.max;
-    }
-}
-
-enum dashCase(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
-
-private enum dentistCommands = staticMap!(
-    dashCase,
-    __traits(allMembers, DentistCommand),
-);
 
 /// Start `dentist` with the given set of arguments.
 ReturnCode run(in string[] args)
@@ -321,6 +302,7 @@ class UsageRequested : Exception
 struct OptionsFor(DentistCommand _command)
 {
     enum command = _command;
+    enum commandName = dentistCommands[_command];
 
     static enum needWorkdir = command.among(
         TestingCommand.translocateGaps,
@@ -578,7 +560,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
     ))
     {
         @Argument("<coord-string>", Multiplicity.oneOrMore)
@@ -775,30 +757,33 @@ struct OptionsFor(DentistCommand _command)
         coord_t bucketSize = 500;
     }
 
-    @Option("config")
-    @MetaVar("<config-json>")
-    @Help("
+    static if (command == DentistCommand.validateConfig)
+    {
+        @Argument("<in:config>")
+        @Help(configHelpString)
+        @Validate!validateFileExists
+        string configFile;
+    }
+    else
+    {
+        @Option("config")
+        @MetaVar("<config-json>")
+        @Help(configHelpString)
+        @Validate!(value => (value is null).execUnless!(() => validateFileExists(value)))
+        string configFile;
+
+        @PreValidate(Priority.high)
+        void parseConfigFile()
+        {
+            if (configFile !is null)
+                this.initFromConfigFile(configFile);
+        }
+    }
+
+    enum configHelpString = "
         provide configuration values in a JSON file. See README.md for
         usage and examples.
-    ")
-    @Validate!(value => (value is null).execUnless!(() => validateFileExists(value)))
-    string configFile;
-
-    /// Identifier for the config object with default values.
-    enum configDefaultKey = "__default__";
-
-    /// Keys prefixed with this string are ignored.
-    enum configCommentPrefix = "//";
-
-    /// Maximum size of a valid config file.
-    enum maxConfigSize = toBytes(256, SizeUnit.MiB);
-
-    @PreValidate(Priority.high)
-    void parseConfigFile()
-    {
-        if (configFile !is null)
-            this.initFromConfigFile(configFile);
-    }
+    ";
 
     static if (command.among(
         DentistCommand.collectPileUps,
@@ -1606,7 +1591,12 @@ unittest
 /// A short summary for each command to be output underneath the usage.
 template commandSummary(DentistCommand command)
 {
-    static if (command == TestingCommand.translocateGaps)
+    static if (command == DentistCommand.validateConfig)
+        enum commandSummary = q"{
+            Validate config file. Exit with non-zero status if errors are
+            found.
+        }".wrap;
+    else static if (command == TestingCommand.translocateGaps)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
         }".wrap;
@@ -1707,8 +1697,7 @@ private
     ReturnCode runCommand(DentistCommand command)(in string[] args)
     {
         alias Options = OptionsFor!command;
-        enum commandName = command.to!string.snakeCaseCT.tr("_", "-");
-        enum usage = usageString!Options(executableName ~ " " ~ commandName);
+        enum usage = usageString!Options(executableName ~ " " ~ Options.commandName);
 
         Options options;
 
@@ -1946,339 +1935,6 @@ private
         assertThrown!Exception(processOptions(options));
     }
 
-    Options initFromConfigFile(Options)(ref Options options, in string configFile)
-    {
-        enum dentistCommand = dentistCommands[Options.command];
-        auto configContent = readConfigFile(configFile, options.maxConfigSize);
-        auto configValues = parseJson(
-            configContent,
-            null,
-            configFile,
-        );
-
-        validateConfig(configValues);
-
-        auto defaultValues = options.configDefaultKey in configValues
-            ? configValues[options.configDefaultKey]
-            : Json.emptyObject;
-        auto commandValues = dentistCommand in configValues
-            ? configValues[dentistCommand]
-            : Json.emptyObject;
-
-        foreach (member; __traits(allMembers, Options))
-        {
-            alias symbol = Alias!(__traits(getMember, options, member));
-            enum names = configNamesOf!symbol;
-
-            static if (names.length > 0)
-            {
-                foreach (name; names)
-                    if (name in commandValues)
-                        options.assignConfigValue!member(commandValues[name]);
-                    else if (name in defaultValues)
-                        options.assignConfigValue!member(defaultValues[name]);
-            }
-        }
-
-        return options;
-    }
-
-    void validateConfig(Json configValues)
-    {
-        enum configDefaultKey = OptionsFor!(cast(DentistCommand) 0).configDefaultKey;
-        enum configCommentPrefix = OptionsFor!(cast(DentistCommand) 0).configCommentPrefix;
-
-        enforce!CLIException(
-            configValues.type == Json.Type.object,
-            "config must contain a single object",
-        );
-
-        foreach (configKey, configValue; configValues.byKeyValue)
-            enforce!CLIException(
-                (
-                    configKey.startsWith(configCommentPrefix) ^
-                    (configKey == configDefaultKey) ^
-                    only(dentistCommands).canFind(configKey)
-                ),
-                format!"invalid key `%s` in config"(configKey),
-            );
-
-        if (configDefaultKey in configValues)
-            validateConfigDefault(configValues[configDefaultKey]);
-
-        static foreach (command; EnumMembers!DentistCommand)
-            if (dentistCommands[command] in configValues)
-                validateConfigCommand!command(configValues[dentistCommands[command]]);
-    }
-
-    void validateConfigDefault(Json defaultConfig)
-    {
-        enum configDefaultKey = OptionsFor!(cast(DentistCommand) 0).configDefaultKey;
-        enum configCommentPrefix = OptionsFor!(cast(DentistCommand) 0).configCommentPrefix;
-
-        enforce!CLIException(
-            defaultConfig.type == Json.Type.object,
-            "malformed default config: Got JSON of type " ~
-            defaultConfig.type.to!string ~ ", expected object",
-        );
-
-        configLoop: foreach (configKey, configValue; defaultConfig.byKeyValue)
-        {
-            if (configKey.startsWith(configCommentPrefix))
-                continue;
-
-            static foreach (command; EnumMembers!DentistCommand)
-            {{
-                alias Options = OptionsFor!command;
-
-                foreach (member; __traits(allMembers, Options))
-                {
-                    alias symbol = Alias!(__traits(getMember, Options, member));
-                    enum names = configNamesOf!symbol;
-
-                    static if (names.length > 0)
-                    {
-                        alias SymbolType = typeof(__traits(getMember, Options, member));
-
-                        foreach (name; names)
-                        {
-                            try
-                            {
-                                if (name == configKey)
-                                {
-                                    cast(void) getConfigValue!SymbolType(configValue);
-                                    continue configLoop;
-                                }
-                            }
-                            catch (Exception cause)
-                            {
-                                throw new CLIException(
-                                    format!"malformed config value `%s.%s`: %s"(
-                                        configDefaultKey,
-                                        configKey,
-                                        cause.msg,
-                                    ),
-                                    cause,
-                                );
-                            }
-                        }
-                    }
-                }
-            }}
-
-            throw new CLIException(
-                format!"invalid config key `%s.%s`"(
-                    configDefaultKey,
-                    configKey,
-                ),
-            );
-        }
-    }
-
-    void validateConfigCommand(DentistCommand command)(Json commandConfig)
-    {
-        alias Options = OptionsFor!command;
-        enum commandName = dentistCommands[command];
-        enum configCommentPrefix = Options.configCommentPrefix;
-
-        configLoop: foreach (configKey, configValue; commandConfig.byKeyValue)
-        {
-            if (configKey.startsWith(configCommentPrefix))
-                continue;
-
-            foreach (member; __traits(allMembers, Options))
-            {
-                alias symbol = Alias!(__traits(getMember, Options, member));
-                enum names = configNamesOf!symbol;
-
-                static if (names.length > 0)
-                {
-                    alias SymbolType = typeof(__traits(getMember, Options, member));
-
-                    foreach (name; names)
-                    {
-                        try
-                        {
-                            if (name == configKey)
-                            {
-                                cast(void) getConfigValue!SymbolType(configValue);
-                                continue configLoop;
-                            }
-                        }
-                        catch (Exception cause)
-                        {
-                            throw new CLIException(
-                                format!"malformed config value `%s.%s`: %s"(
-                                    commandName,
-                                    configKey,
-                                    cause.msg,
-                                ),
-                                cause,
-                            );
-                        }
-                    }
-                }
-            }
-
-            throw new CLIException(
-                format!"invalid config key `%s.%s`"(
-                    commandName,
-                    configKey,
-                ),
-            );
-        }
-    }
-
-    template configNamesOf(alias symbol)
-    {
-        alias optUDAs = getUDAs!(symbol, Option);
-        alias argUDAs = getUDAs!(symbol, Argument);
-
-        static if (argUDAs.length > 0)
-            enum argName = argUDAs[0].name.split(":")[$ - 1][0 .. $ - 1];
-
-        static if (optUDAs.length > 0 && argUDAs.length > 0)
-        {
-            enum configNamesOf = optUDAs[0].names ~ argName;
-        }
-        else static if (optUDAs.length > 0)
-        {
-            enum configNamesOf = optUDAs[0].names;
-        }
-        else static if (argUDAs.length > 0)
-        {
-            enum configNamesOf = [argName];
-        }
-        else
-        {
-            enum string[] configNamesOf = [];
-        }
-    }
-
-    void assignConfigValue(string member, Options)(ref Options options, Json configValue)
-    {
-        alias SymbolType = typeof(__traits(getMember, options, member));
-
-        static if (isOptionHandler!SymbolType)
-        {
-            if (configValue.type == Json.Type.int_)
-                foreach (i; 0 .. configValue.get!ulong)
-                    __traits(getMember, options, member)();
-            else if (configValue.type == Json.Type.bool_)
-            {
-                if (configValue.get!bool)
-                    __traits(getMember, options, member)();
-            }
-            else
-                throw new CLIException(
-                    "Got JSON of type " ~ configValue.type.to!string ~
-                    ", expected int_ or bool_."
-                );
-        }
-        else static if (isArgumentHandler!SymbolType)
-        {
-            if (configValue.type == Json.Type.array)
-                foreach (item; configValue.get!(Json[]))
-                    __traits(getMember, options, member)(item.get!string);
-            else if (configValue.type == Json.Type.string)
-                __traits(getMember, options, member)(configValue.get!string);
-            else
-                throw new CLIException(
-                    "Got JSON of type " ~ configValue.type.to!string ~
-                    ", expected array or string_."
-                );
-        }
-        else static if (isAssignable!SymbolType)
-        {
-            __traits(getMember, options, member) = getConfigValue!SymbolType(configValue);
-        }
-    }
-
-    auto getConfigValue(SymbolType)(Json configValue)
-    {
-        static if (is(SymbolType == OptionFlag))
-            return configValue.get!bool.to!SymbolType;
-        else static if (is(SymbolType == enum))
-            return configValue.get!string.to!SymbolType;
-        else static if (is(SymbolType == OptionFlag) || is(SymbolType : bool))
-            return configValue.get!bool.to!SymbolType;
-        else static if (isFloatingPoint!SymbolType)
-            return configValue.get!double.to!SymbolType;
-        else static if (isIntegral!SymbolType && isUnsigned!SymbolType)
-            return configValue.get!ulong.to!SymbolType;
-        else static if (isIntegral!SymbolType && !isUnsigned!SymbolType)
-            return configValue.get!long.to!SymbolType;
-        else static if (isSomeString!SymbolType)
-            return configValue.get!string.to!SymbolType;
-        else static if (isArray!SymbolType)
-        {
-            SymbolType value;
-
-            static if (isDynamicArray!SymbolType)
-                value.length = configValue.length;
-            else
-                enforce!CLIException(
-                    configValue.length == value.length,
-                    "array must have " ~ value.length ~ " elements",
-                );
-
-            foreach (size_t i, configElement; configValue.get!(Json[]))
-                value[i] = getConfigValue!(ElementType!SymbolType)(configElement);
-
-            return value;
-        }
-    }
-
-    string readConfigFile(in string configFileName, in size_t maxConfigSize)
-    {
-        auto configFile = File(configFileName, "r");
-        auto configFileSize = configFile.size;
-
-        enforce!CLIException(
-            configFileSize <= maxConfigSize,
-            format!"config file is too large; must be <= %.2f %s"(fromBytes(maxConfigSize).expand),
-        );
-
-        auto configContent = configFile.rawRead(new char[configFileSize]);
-
-        return cast(string) configContent;
-    }
-
-    enum SizeUnit
-    {
-        B,
-        KiB,
-        MiB,
-        GiB,
-        TiB,
-        PiB,
-        EiB,
-        ZiB,
-        YiB,
-    }
-    enum size_t sizeUnitBase = 2^^10;
-
-    auto toBytes(in size_t value, in SizeUnit unit)
-    {
-        return value * sizeUnitBase^^unit;
-    }
-
-    auto fromBytes(in size_t bytes)
-    {
-        alias converToUnit = exp => tuple!("value", "unit")(
-            bytes.to!double / (sizeUnitBase^^exp),
-            exp,
-        );
-
-        foreach (exp; EnumMembers!SizeUnit)
-        {
-            if (bytes <= sizeUnitBase^^exp)
-                return converToUnit(exp);
-        }
-
-        return converToUnit(SizeUnit.max);
-    }
-
     Options cleanUp(Options)(Options options)
     {
         alias cleanUpQueue = staticSort!(
@@ -2402,9 +2058,6 @@ private
     {
         enforce!CLIException(file.exists, format!msg(file));
     }
-
-    import std.meta : allSatisfy, staticMap;
-    import std.traits : isSomeString;
 
     alias typeOf(alias T) = typeof(T);
 

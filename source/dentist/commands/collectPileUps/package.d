@@ -8,7 +8,7 @@
 */
 module dentist.commands.collectPileUps;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.commands.collectPileUps.filter :
     AmbiguousAlignmentChainsFilter,
     ImproperAlignmentChainsFilter,
@@ -22,6 +22,7 @@ import dentist.common.alignments :
     AlignmentChain,
     getType,
     PileUp;
+import dentist.common.commands : DentistCommand;
 import dentist.common.binio : writePileUpsDb;
 import dentist.dazzler :
     GapSegment,

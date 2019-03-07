@@ -8,7 +8,7 @@
 */
 module dentist.commands.output;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion,
@@ -20,6 +20,7 @@ import dentist.common.alignments :
     id_t,
     SeededAlignment,
     trace_point_t;
+import dentist.common.commands : DentistCommand;
 import dentist.common.binio :
     CompressedSequence,
     InsertionDb;

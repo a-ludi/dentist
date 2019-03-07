@@ -8,7 +8,7 @@
 */
 module dentist.commands.collectPileUps.pileups;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReadInterval,
     ReadRegion,
@@ -26,6 +26,7 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment;
 import dentist.common.binio : writePileUpsDb;
+import dentist.common.commands : DentistCommand;
 import dentist.common.scaffold :
     buildScaffold,
     ContigNode,
