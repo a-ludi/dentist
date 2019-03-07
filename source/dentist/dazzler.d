@@ -2775,6 +2775,10 @@ private T[] getBinaryFile(T)(in string fileName)
 {
     auto file = File(fileName, "rb");
     auto bufferLength = file.size / T.sizeof;
+
+    if (bufferLength == 0)
+        return [];
+
     auto dataBuffer = file.rawRead(uninitializedArray!(T[])(bufferLength));
 
     enforce!MaskReaderException(dataBuffer.length == bufferLength,
