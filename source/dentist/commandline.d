@@ -644,10 +644,10 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.output,
     ))
     {
-        @Argument("<out:assembly>", Multiplicity.optional)
-        @Help("write output assembly to <assembly> (default: stdout)")
+        @Argument("<out:result>", Multiplicity.optional)
+        @Help("write output assembly to <result> (default: stdout)")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string assemblyFile;
+        string resultFile;
     }
 
     mixin HelpOption;

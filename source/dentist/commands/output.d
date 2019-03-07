@@ -128,16 +128,16 @@ class AssemblyWriter
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     ContigNode[] scaffoldStartNodes;
-    File assemblyFile;
+    File resultFile;
     FastaWriter writer;
 
     this(in ref Options options)
     {
         this.options = options;
-        this.assemblyFile = options.assemblyFile is null
+        this.resultFile = options.resultFile is null
             ? stdout
-            : File(options.assemblyFile, "w");
-        this.writer = wrapLines(assemblyFile.lockingTextWriter, options.fastaLineWidth);
+            : File(options.resultFile, "w");
+        this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
     }
 
     void run()

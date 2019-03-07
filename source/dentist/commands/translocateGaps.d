@@ -70,16 +70,16 @@ private struct Translocator
     size_t numContigsAssembly2;
     AlignmentChain[] alignments;
     ReferenceRegion mappedRegions;
-    File assemblyFile;
+    File resultFile;
     FastaWriter writer;
 
     this(in Options options)
     {
         this.options = options;
-        this.assemblyFile = options.assemblyFile is null
+        this.resultFile = options.resultFile is null
             ? stdout
-            : File(options.assemblyFile, "w");
-        this.writer = wrapLines(assemblyFile.lockingTextWriter, options.fastaLineWidth);
+            : File(options.resultFile, "w");
+        this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
     }
 
     void run()
