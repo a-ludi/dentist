@@ -28,7 +28,7 @@ import vibe.data.json :
 /// Execute the `showMask` command with `options`.
 void execute(Options)(in Options options)
 {
-    auto masks = [options.repeatMask] ~ options.additionalMasks;
+    auto masks = options.masks;
     ReferenceRegion mergedMask;
     Stats[] statsList;
 

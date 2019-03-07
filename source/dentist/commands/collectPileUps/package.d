@@ -104,13 +104,8 @@ class PileUpCollector
             options.workdir,
             options.tracePointDistance,
         );
-        repetitiveRegions = ReferenceRegion(readMask!ReferenceInterval(
-            options.refDb,
-            options.repeatMask,
-            options.workdir,
-        ));
 
-        foreach (mask; options.additionalMasks)
+        foreach (mask; options.repeatMasks)
             repetitiveRegions |= ReferenceRegion(readMask!ReferenceInterval(
                 options.refDb,
                 mask,
