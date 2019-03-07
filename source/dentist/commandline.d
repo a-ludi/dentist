@@ -974,12 +974,12 @@ struct OptionsFor(DentistCommand _command)
             enforce!CLIException(
                 maxCoverageReads != maxCoverageReads.init ||
                 readCoverage != readCoverage.init,
-                "must provide either --read-coverage or --acceptable-coverage-reads",
+                "must provide either --read-coverage or --max-coverage-reads",
             );
             enforce!CLIException(
                 (maxCoverageReads != maxCoverageReads.init) ^
                 (readCoverage != readCoverage.init),
-                "must not provide both --read-coverage and --acceptable-coverage-reads",
+                "must not provide both --read-coverage and --max-coverage-reads",
             );
 
             id_t upperBound(double x)
@@ -1162,7 +1162,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("read-coverage", "C")
         @Help(q"{
-            this is used to provide good default values for --acceptable-coverage-reads;
+            this is used to provide good default values for --max-coverage-reads;
             both options are mutually exclusive
         }")
         double readCoverage;
