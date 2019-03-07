@@ -19,6 +19,7 @@ import dentist.common.commands :
     DentistCommand,
     dentistCommands;
 import std.algorithm :
+    all,
     canFind,
     startsWith;
 import std.conv : to;
@@ -59,6 +60,9 @@ import vibe.data.json :
 enum configDefaultKey = "__default__";
 
 /// Keys prefixed with this string are ignored.
+enum configEmptyArgument = "-";
+
+/// Keys prefixed with this string are ignored.
 enum configCommentPrefix = "//";
 
 /// Maximum size of a valid config file.
@@ -73,8 +77,61 @@ class ConfigFileException : Exception
 }
 
 
-/// Validate config file and initialize options accordingly.
-Options initFromConfigFile(Options)(ref Options options, in string configFile)
+/// Retroactively initialize options from config.
+Options retroInitFromConfig(Options)(ref Options options, in string configFile)
+{
+    enum defaultOptions = Options.init;
+    Options optionsFromConfig = parseConfig!Options(configFile);
+
+    static foreach (member; __traits(allMembers, Options))
+    {{
+        alias symbol = Alias!(__traits(getMember, options, member));
+        enum isMemberAssignable = __traits(compiles,
+            __traits(getMember, options, member) = __traits(getMember, options, member)
+        );
+
+        static if (isMemberAssignable)
+        {
+            alias Member = typeof(__traits(getMember, options, member));
+            enum unaryMixin(string template_) = format!template_(member);
+            enum binaryMixin(string template_) = format!template_(member, member);
+            alias assignConfigValue = () => mixin(binaryMixin!"options.%s = optionsFromConfig.%s");
+
+            static if (getUDAs!(symbol, Argument).length > 0)
+            {
+                static if (isSomeString!Member)
+                {
+                    if (mixin(unaryMixin!"options.%s == configEmptyArgument"))
+                        assignConfigValue();
+                }
+                else static if (isArray!Member && isSomeString!(ElementType!Member))
+                {
+                    if (mixin(unaryMixin!"options.%s.all!(v => v == configEmptyArgument)"))
+                        assignConfigValue();
+                }
+            }
+            else
+            {
+                static if (isStaticArray!Member || is(Member == class))
+                {
+                    if (mixin(binaryMixin!"options.%s == defaultOptions.%s"))
+                        assignConfigValue();
+                }
+                else
+                {
+                    if (mixin(binaryMixin!"options.%s is defaultOptions.%s"))
+                        assignConfigValue();
+                }
+            }
+        }
+    }}
+
+    return options;
+}
+
+
+/// Initialize options using config.
+Options parseConfig(Options)(in string configFile)
 {
     enum dentistCommand = Options.commandName;
     auto configContent = readConfigFile(configFile);
@@ -92,6 +149,8 @@ Options initFromConfigFile(Options)(ref Options options, in string configFile)
     auto commandValues = dentistCommand in configValues
         ? configValues[dentistCommand]
         : Json.emptyObject;
+
+    Options options;
 
     foreach (member; __traits(allMembers, Options))
     {

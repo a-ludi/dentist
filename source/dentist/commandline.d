@@ -35,7 +35,7 @@ import dentist.common.commands :
     dentistCommands,
     TestingCommand;
 import dentist.common.configfile :
-    initFromConfigFile,
+    retroInitFromConfig,
     fromBytes,
     SizeUnit,
     toBytes;
@@ -771,10 +771,12 @@ struct OptionsFor(DentistCommand _command)
         string configFile;
 
         @PreValidate(Priority.high)
-        void parseConfigFile()
+        void retroMergeConfig()
         {
-            if (configFile !is null)
-                this.initFromConfigFile(configFile);
+            if (configFile is null)
+                return;
+
+            this.retroInitFromConfig(configFile);
         }
     }
 
