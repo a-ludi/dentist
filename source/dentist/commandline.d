@@ -545,7 +545,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
     ))
     {
         @Argument("<in:scaffolding>")
@@ -892,7 +892,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.showMask,
         DentistCommand.showPileUps,
         DentistCommand.showInsertions,
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
         TestingCommand.checkResults,
     ))
     {
@@ -1643,7 +1643,7 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Write output.
         }".wrap;
-    else static if (command == TestingCommand.translateCoords)
+    else static if (command == DentistCommand.translateCoords)
         enum commandSummary = q"{
             Translate coordinates of result assembly to coordinates of
             input assembly.
