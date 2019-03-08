@@ -27,6 +27,7 @@ import std.exception :
     basicExceptionCtors,
     enforce;
 import std.format : format;
+import std.math : isNaN;
 import std.meta : Alias;
 import std.range :
     ElementType,
@@ -115,6 +116,17 @@ Options retroInitFromConfig(Options)(ref Options options, in string configFile)
                 static if (isStaticArray!Member || is(Member == class))
                 {
                     if (mixin(binaryMixin!"options.%s == defaultOptions.%s"))
+                        assignConfigValue();
+                }
+                else static if (isFloatingPoint!Member)
+                {
+                    if (
+                        mixin(binaryMixin!"options.%s == defaultOptions.%s") ||
+                        (
+                            mixin(unaryMixin!"options.%s.isNaN") &&
+                            mixin(unaryMixin!"defaultOptions.%s.isNaN")
+                        )
+                    )
                         assignConfigValue();
                 }
                 else
