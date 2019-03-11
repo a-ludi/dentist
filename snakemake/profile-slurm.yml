@@ -1,0 +1,2 @@
+jobs:          65536
+drmaa:         " -J {cluster.jobname} --mem={cluster.memory} --mincpus={cluster.nCPUs} --partition={cluster.partition} --time={cluster.time}"

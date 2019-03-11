@@ -35,21 +35,61 @@ cd dentist
 dub build
 ```
 
+### Runtime Dependencies
+
+The following software packages are required to run `dentist`:
+
+- [The Dazzler Data Base][DAZZ_DB]
+- [`daligner`][daligner]
+- [`damapper`][damapper]
+- [`daccord`][daccord]
+
+Please see their own documentation for installtion instructions. Note, the
+available packages on Bioconda are outdated and should not be used at the
+moment.
+
 
 [DUB]: https://code.dlang.org/download "Download DUB"
+[DAZZ_DB]: https://github.com/thegenemyers/DAZZ_DB
+[daligner]: https://github.com/thegenemyers/DALIGNER
+[damapper]: https://github.com/thegenemyers/DAMAPPER
+[daccord]: https://gitlab.com/german.tischler/daccord
 
 Usage
 -----
 
-Suppose we have the genome assembly `reference.fasta` that is to be updated and a set of reads `reads.fasta` with 25× coverage and a directory structure like this:
+Suppose we have the genome assembly `reference.fasta` that is to be updated and a set of reads `reads.fasta` with 25× coverage.
+
+
+### Quick setup with `snakemake`
+
+Install [snakemake][snakemake] version >=5.4.0 and copy these files next to your data:
+
+    - `./snakemake/Snakefile`
+    - `./snakemake/snakemake.yml`
+
+Next execute `snakemake`. For small genomes of a few 100 Mbp this should run
+on a regular workstation. Larger data sets may require a cluster in which case
+you can use Snakemake's [cloud][snakemake-cloud] or
+[cluster][snakemake-cluster] facilities. The cluster config `cluster.yml` and
+Snakemake profile `profile-slurm.yml` under `./snakemake` provide a starting
+point for a cluster setup.
+
+
+[snakemake]: https://snakemake.readthedocs.io/en/stable/index.html
+[snakemake-cloud]: https://snakemake.readthedocs.io/en/stable/executable.html#cloud-support
+[snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executable.html#cluster-execution
+
+
+### Manual execution
+
+Create a directory structure like this:
 
 ```
-project
-|-- input
-|   |-- reference.fasta
-|   `-- reads.fasta
-|-- workdir
-`-- result
+project/
+|-- workdir/
+|-- reference.fasta
+`-- reads.fasta
 ```
 
 A typical sequence of commands to run `dentist` is:
@@ -75,29 +115,31 @@ dentist generate-dazzler-options
 daligner -I -l500 -e0.980100 reference.dam reference.dam
 
 # Generate a repeat mask from the self-alignment
-dentist mask reference.dam reference.reference.las rep-self
+dentist mask reference.dam reference.reference.las dentist-self
 
 # Align the reference to itself
 # NOTE: this may require parallelization on a cluster (see `HPC.damapper`).
-damapper -C -N -n.7 -e0.841500 reference.dam reads.db
+damapper -C -N -n.7 -e0.841500 -mdentist-self reference.dam reads.db
 
 # Generate a repeat mask from the reads-alignment
 # NOTE: adjust the read coverage to your data!
-dentist mask -C25 reference.dam reads.db reference.reads.las rep-reads
+dentist mask -C25 reference.dam reads.db reference.reads.las dentist-reads
 
 # Collect a set of candidates for gap filling (pileups)
-dentist collect reference.dam reads.db reference.reads.las rep-reads pileups.db
+dentist collect -m dentist-reads -m dentist-self \
+                reference.dam reads.db reference.reads.las pileups.db
 
 # Generate high-quality sequences from set of candidates.
 # NOTE: this may require parallelization on a cluster. Use the `show-pile-ups`
 #       sub-command to get the number of pileups and process them in batches
 #       using the `--batch` option of the `process` sub-command. Subsequently, 
 #       merge the results using the `merge-insertions` sub-command.
-dentist process reference.dam reads.db reference.reads.las rep-reads \\
-        pileups.db rep-reads insertions.db
+dentist process -m dentist-reads -m dentist-self \
+                reference.dam reads.db reference.reads.las pileups.db \
+                insertions.db
 
 # Generate a gap-closed assembly.
-dentist output reference.db insertions.db ../result/gap-closed.fasta
+dentist output reference.db insertions.db ../gap-closed.fasta
 ```
 
 

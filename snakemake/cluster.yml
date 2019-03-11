@@ -1,0 +1,59 @@
+__default__:
+    jobname:    dentist.{rule}
+    partition:  batch
+    nCPUs:      "{threads}"
+
+extend_dentist_config:
+    memory:     16
+    time:       00:01
+
+fasta2dam:
+    memory:     64
+    time:       00:01
+
+self_alignment_block:
+    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.block_reads}
+    memory:     32768
+    time:       00:30
+
+self_alignment:
+    memory:     2048
+    time:       00:10
+
+mask_self:
+    memory:     16384
+    time:       00:15
+
+fasta2db:
+    memory:     64
+    time:       00:15
+
+ref_vs_reads_alignment_block:
+    jobname:    dentist.{rule}.{wildcards.block_reads}
+    memory:     32768
+    time:       00:30
+
+ref_vs_reads_alignment:
+    memory:     2048
+    time:       00:10
+
+mask_reads:
+    memory:     16384
+    time:       00:15
+
+collect:
+    memory:     16384
+    time:       00:30
+
+process:
+    jobname:    dentist.{rule}.{wildcards.batch_id}
+    memory:     16384
+    time:       02:00
+
+merge:
+    memory:     1024
+    time:       00:10
+
+output:
+    memory:     16384
+    time:       00:30
