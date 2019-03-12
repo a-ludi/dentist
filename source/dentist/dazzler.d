@@ -2417,6 +2417,34 @@ id_t getNumBlocks(in string damFile)
     return numBlocks;
 }
 
+coord_t getContigCutoff(in string dbFile)
+{
+    // see also in dazzler's DB.h:394
+    //     #define DB_PARAMS "size = %10lld cutoff = %9d all = %1d\n"
+    enum paramsFormat = "size = %d cutoff = %d all = %d";
+    enum paramsFormatStart = paramsFormat[0 .. 6];
+    coord_t contigCutoff;
+    size_t dummy;
+    auto matchingLines = File(dbFile.stripBlock).byLine.filter!(
+            line => line.startsWith(paramsFormatStart));
+
+    if (matchingLines.empty)
+    {
+        auto errorMessage = format!"could not read the contig cutoff in `%s`"(dbFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    auto matchingLine = matchingLines.front;
+
+    if (matchingLine.formattedRead!paramsFormat(dummy, contigCutoff, dummy) != 3)
+    {
+        auto errorMessage = format!"could not read the contig cutoff in `%s`"(dbFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    return contigCutoff;
+}
+
 id_t getNumContigs(in string damFile, in string workdir)
 {
     enum contigNumFormat = "+ R %d";
