@@ -2397,14 +2397,16 @@ id_t getNumBlocks(in string damFile)
     enum blockNumFormat = "blocks = %d";
     enum blockNumFormatStart = blockNumFormat[0 .. 6];
     id_t numBlocks;
-    auto matchingLine = File(damFile.stripBlock).byLine.filter!(
-            line => line.startsWith(blockNumFormatStart)).front;
+    auto matchingLines = File(damFile.stripBlock).byLine.filter!(
+            line => line.startsWith(blockNumFormatStart));
 
-    if (!matchingLine)
+    if (matchingLines.empty)
     {
         auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
+
+    auto matchingLine = matchingLines.front;
 
     if (formattedRead!blockNumFormat(matchingLine, numBlocks) != 1)
     {
