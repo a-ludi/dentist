@@ -1456,6 +1456,9 @@ struct NaturalNumberSet
 
     static NaturalNumberSet create(size_t[] initialElements...)
     {
+        if (initialElements.length == 0)
+            return NaturalNumberSet();
+
         auto set = NaturalNumberSet(initialElements.maxElement);
 
         foreach (i; initialElements)
