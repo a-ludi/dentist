@@ -16,6 +16,7 @@ import dentist.util.algorithm : sliceUntil;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
 import dentist.util.math : absdiff, floor, ceil, RoundingMode;
+import dentist.util.process : executePipe = pipeLines;
 import dentist.util.range : arrayChunks, takeExactly;
 import dentist.util.region : convexHull, findTilings, min, sup;
 import dentist.util.string :
@@ -3362,131 +3363,6 @@ private
     string dbshow(in string dbFile, in string[] dbshowOptions)
     {
         return executeCommand(chain(only("DBshow"), dbshowOptions, only(dbFile)));
-    }
-
-    auto executePipe(Range)(Range command, in string workdir = null)
-            if (isInputRange!Range && isSomeString!(ElementType!Range))
-    {
-        static final class LinesPipe
-        {
-            static enum lineTerminator = "\n";
-
-            private const string[] command;
-            private const string workdir;
-            private ProcessPipes process;
-            private string currentLine;
-
-            this(in string[] command, in string workdir)
-            {
-                this.command = command;
-                this.workdir = workdir;
-            }
-
-            ~this()
-            {
-                if (!(process.pid is null))
-                    releaseProcess();
-            }
-
-            void releaseProcess()
-            {
-                if (!process.stdout.isOpen)
-                    return;
-
-                process.stdout.close();
-
-                version (Posix)
-                {
-                    import core.sys.posix.signal : SIGKILL;
-
-                    process.pid.kill(SIGKILL);
-                }
-                else
-                {
-                    static assert(0, "Only intended for use on POSIX compliant OS.");
-                }
-                process.pid.wait();
-            }
-
-            private void ensureInitialized()
-            {
-                if (!(process.pid is null))
-                    return;
-
-                logJsonDiagnostic(
-                    "action", "execute",
-                    "type", "pipe",
-                    "command", command.toJson,
-                    "state", "pre",
-                );
-                process = pipeProcess(command, Redirect.stdout, null, Config.none, workdir);
-
-                if (!empty)
-                    popFront();
-            }
-
-            void popFront()
-            {
-                ensureInitialized();
-                assert(!empty, "Attempting to popFront an empty LinesPipe");
-                currentLine = process.stdout.readln();
-
-                if (currentLine.empty)
-                {
-                    currentLine = null;
-                    releaseProcess();
-                }
-
-                if (currentLine.endsWith(lineTerminator))
-                    currentLine = currentLine[0 .. $ - lineTerminator.length];
-            }
-
-            @property string front()
-            {
-                ensureInitialized();
-                assert(!empty, "Attempting to fetch the front of an empty LinesPipe");
-
-                return currentLine;
-            }
-
-            @property bool empty()
-            {
-                ensureInitialized();
-
-                if (!process.stdout.isOpen || process.stdout.eof)
-                {
-                    releaseProcess();
-
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        auto sanitizedCommand = command.filter!"a != null".array;
-
-        return new LinesPipe(sanitizedCommand, workdir);
-    }
-
-    unittest
-    {
-        import std.algorithm : equal;
-        import std.range : take;
-
-        auto cheers = executePipe(only("yes", "Cheers!"), ".");
-        assert(cheers.take(5).equal([
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-        ]));
-
-        auto helloWorld = executePipe(only("echo", "Hello World!"), ".");
-        assert(helloWorld.equal(["Hello World!"]));
     }
 
     string executeCommand(Range)(Range command, in string workdir = null)
