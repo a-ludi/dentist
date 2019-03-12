@@ -1549,6 +1549,11 @@ struct NaturalNumberSet
         return (parts[partIdx(n)] & itemMask(n)) != emptyPart;
     }
 
+    bool opBinaryRight(string op)(in size_t n) const pure nothrow if (op == "in")
+    {
+        return this.has(n);
+    }
+
     bool empty() const pure nothrow
     {
         return parts.all!(part => part == emptyPart);
