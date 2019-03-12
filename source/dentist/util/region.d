@@ -630,9 +630,9 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             {
                 continue;
             }
-            else if (accInterval.intersects(intervalB))
+            else if (accInterval.intersects(intervalB) || accInterval.end == intervalB.begin)
             {
-                // If two intervals intersect their union is the same as the convex hull of both.
+                // If two intervals intersect or touch their union is the same as the convex hull of both.
                 accInterval = TaggedInterval.convexHull(accInterval, intervalB);
             }
             else
