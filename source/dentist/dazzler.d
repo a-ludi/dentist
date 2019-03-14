@@ -3329,6 +3329,13 @@ private
             )
         )
     {
+        version (assert)
+            auto numRecords = numDbRecords(dbFile, workdir);
+        assert(
+            recordNumbers.save.all!(n => 0 < n && n <= numRecords),
+            "illegal records for `DBdump`",
+        );
+
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
@@ -3345,6 +3352,13 @@ private
         in string workdir,
     )
     {
+        version (assert)
+            auto numRecords = numDbRecords(dbFile, workdir);
+        assert(
+            0 < firstRecord && firstRecord <= lastRecord && lastRecord <= numRecords,
+            "illegal record range for `DBdump`",
+        );
+
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
