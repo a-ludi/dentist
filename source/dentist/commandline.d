@@ -389,6 +389,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
+        TestingCommand.checkResults,
     ))
     {
         @Argument("<in:reference>")
@@ -472,19 +473,6 @@ struct OptionsFor(DentistCommand _command)
         }")
         @Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb))
         string readsAlignmentFile;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Argument("<in:result-vs-true-alignment>")
-        @Help(q"{
-            alignments chains of the result assembly against the 'true'
-            assembly in form of a .las file as produced by `damapper`
-        }")
-        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyDb, options.resultDb))
-        string resultsAlignmentFile;
     }
 
     static if (command.among(
@@ -824,27 +812,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.checkResults,
     ))
     {
-        @Option("only-contig")
-        @Help("restrict analysis to contig <uint> (experimental)")
-        id_t onlyContigId;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("debug-alignment")
-        @MetaVar("<file>")
-        @Help("write the result alignment to a tabular file <file>")
-        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string alignmentTabular;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("debug-gap-details")
+        @Option("gap-details")
         @MetaVar("<file>")
         @Help("write the statistics for every single gap to a tabular file <file>")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
@@ -1065,19 +1033,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("min-insertion-length")
-        @Help(format!q"{
-            an insertion must have at least this num ber base pairs to be
-            considered as (partial) insertion (default: %d)
-        }"(defaultValue!minInsertionLength))
-        @Validate!(value => enforce!CLIException(value > 0, "minimum insertion length must be greater than zero"))
-        size_t minInsertionLength = 50;
-    }
-
-    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1242,7 +1197,6 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
-        TestingCommand.checkResults,
     ))
     {
         @Option("trace-point-spacing", "s")

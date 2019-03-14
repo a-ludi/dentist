@@ -12,79 +12,91 @@ import dentist.common : isTesting;
 
 static if (isTesting):
 
-import core.atomic : atomicOp;
 import dentist.commandline : OptionsFor;
 import dentist.common :
+    dentistEnforce,
     ReferenceInterval,
     ReferenceRegion,
-    to,
-    toInterval;
+    ReferencePoint;
 import dentist.common.alignments :
     AlignmentChain,
     coord_t,
+    diff_t,
     id_t;
 import dentist.common.commands : TestingCommand;
 import dentist.dazzler :
     ContigSegment,
-    fingerprint,
     GapSegment,
-    getAlignments,
-    getExactAlignment,
+    getContigCutoff,
+    getFastaSequence,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm :
-    cmpLexicographically,
     first,
-    last,
+    orderLexicographically,
     sliceBy;
+import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
-    absdiff,
-    ceildiv,
-    longestIncreasingSubsequence,
-    mean,
     median,
     N,
     NaturalNumberSet;
+import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
 import std.algorithm :
     all,
-    among,
-    chunkBy,
     copy,
-    count,
     filter,
     find,
-    fold,
+    group,
     joiner,
     map,
     max,
     maxElement,
-    min,
-    remove,
+    minElement,
     sort,
+    startsWith,
     sum,
-    uniq;
-import std.array : appender, array;
-import std.format : format;
+    until;
+import std.array : array;
+import std.ascii :
+    newline,
+    toLower;
+import std.conv : to;
+import std.format :
+    format,
+    formattedRead;
 import std.math :
     ceil,
     log10;
 import std.parallelism : parallel;
 import std.range :
-    assumeSorted,
     chain,
     enumerate,
     only,
+    repeat,
+    slide,
     StoppingPolicy,
     zip;
 import std.range.primitives;
-import std.regex : ctRegex, replaceAll;
-import std.stdio : File, writeln;
-import std.string : join;
-import std.typecons : Tuple;
-import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import std.regex :
+    ctRegex,
+    replaceAll;
+import std.stdio :
+    File,
+    toFile,
+    writeln;
+import std.string :
+    join,
+    tr;
+import std.typecons :
+    No,
+    Tuple;
+import vibe.data.json :
+    Json,
+    toJson = serializeToJson,
+    toJsonString = serializeToPrettyJson;
 
 
 /// Options for the `collectPileUps` command.
@@ -104,22 +116,33 @@ void execute(in Options options)
 
 private struct ResultAnalyzer
 {
-    alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
-    alias Fingerprint = typeof(fingerprint(&resultAlignment[0]));
     static enum identityLevels = Stats.identityLevels;
+
+    static struct InsertionMapping
+    {
+        ReferenceInterval trueAssembly;
+        ReferencePoint resultBegin;
+        ReferencePoint resultEnd;
+        id_t leftRefContig;
+        id_t rightRefContig;
+    }
+
+    static struct MappingAnalysisResult
+    {
+        size_t[][identityLevels.length] correctGapsPerIdentityLevel;
+        size_t totalDiffsInFilledGaps;
+    }
 
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
     protected coord_t referenceOffset;
-    protected AlignmentChain[] resultAlignment;
-    protected ExactAlignment[Fingerprint] exactResultAlignments;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
-    protected ReferenceRegion reconstructedRegions;
-    protected ReferenceRegion[] reconstructedGaps;
-    protected size_t[][identityLevels.length] correctContigsPerIdentityLevel;
+    protected RawMummerAlignment[] contigAlignments;
+    protected InsertionMapping[] insertionMappings;
     protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
+    protected size_t totalDiffsInFilledGaps;
 
     Stats collect()
     {
@@ -127,33 +150,26 @@ private struct ResultAnalyzer
 
         init();
 
-        if (options.alignmentTabular !is null)
-            writeAlignmentTabular(
-                File(options.alignmentTabular, "w"),
-                resultAlignment,
-            );
-
         Stats stats;
 
         stats.numBpsExpected = getNumBpsExpected();
         stats.numBpsKnown = getNumBpsKnown();
         stats.numBpsResult = getNumBpsResult();
+        stats.numBpsInGaps = getNumBpsInGaps();
+        stats.numDiffsInGaps = totalDiffsInFilledGaps;
         stats.numTranslocatedGaps = getNumTranslocatedGaps();
-        stats.numBpsCorrect = getNumBpsCorrect();
         stats.numContigsExpected = getNumContigsExpected();
-        stats.numCorrectContigs = getNumCorrectContigs();
+        stats.numMappedContigs = getNumMappedContigs();
         stats.numCorrectGaps = getNumCorrectGaps();
         stats.numClosedGaps = getNumClosedGaps();
         stats.numPartlyClosedGaps = getNumPartlyClosedGaps();
-        stats.numUnaddressedGaps = getNumUnaddressedGaps();
-        stats.numBpsInClosedGaps = getNumBpsInClosedGaps();
-        stats.numBpsInGaps = getNumBpsInGaps();
         stats.maximumN50 = getMaximumN50();
         stats.inputN50 = getInputN50();
         stats.resultN50 = getResultN50();
         stats.gapMedian = getGapMedian();
         stats.closedGapMedian = getClosedGapMedian();
-        stats.maxClosedGap = getMaxClosedGap();
+        stats.minClosedGap = getExtremumClosedGap!minElement();
+        stats.maxClosedGap = getExtremumClosedGap!maxElement();
         if (options.bucketSize > 0)
         {
             stats.correctGapLengthHistograms = getCorrectGapLengthHistograms();
@@ -168,243 +184,163 @@ private struct ResultAnalyzer
     {
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        if (options.onlyContigId == 0)
-            resultAlignment = cleanUpAlignments(getAlignments(
-                options.trueAssemblyDb,
-                options.resultDb,
-                options.resultsAlignmentFile,
-                options.workdir,
-                options.tracePointDistance,
-            ));
-        else
-            resultAlignment = cleanUpAlignments(getAlignments(
-                options.trueAssemblyDb,
-                options.resultDb,
-                options.resultsAlignmentFile,
-                options.workdir,
-                options.tracePointDistance,
-            ).filter!(ac => ac.contigA.id == options.onlyContigId).array);
+        auto contigCutoff = getContigCutoff(options.refDb);
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
             options.workdir,
-        ));
+        ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
-        debug logJsonDebug("referenceOffset", referenceOffset);
-        referenceGaps = getReferenceGaps();
-        reconstructedRegions = getReconstructedRegions();
-        reconstructedGaps = getReconstructedGaps();
-        debug logJsonDebug(
-            "referenceGaps", referenceGaps.toJson,
-            "reconstructedRegions", reconstructedRegions.toJson,
-            "reconstructedGaps", reconstructedGaps.toJson,
-        );
-        calculateExactResultAlignments();
-        correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
-        if (options.gapDetailsTabular !is null)
-            correctGapsPerIdentityLevel = getCorrectRegions(
-                referenceGaps
-                    .intervals
-                    .array,
-                File(options.gapDetailsTabular, "w"),
-            );
-        else
-            correctGapsPerIdentityLevel = getCorrectRegions(
-                referenceGaps
-                    .intervals
-                    .array,
-            );
-    }
 
-    AlignmentChain[] cleanUpAlignments(AlignmentChain[] localAlignments)
-    {
-        mixin(traceExecution);
-
-        static struct AlignmentEvent
-        {
-            size_t contigId;
-            size_t position;
-            int diff;
-            AlignmentChain* alignmentChain;
-
-            int opCmp(in AlignmentEvent other) const pure nothrow
-            {
-                return cmpLexicographically!(
-                    const(AlignmentEvent),
-                    e => e.contigId,
-                    e => e.position,
-                    e => -e.diff,
-                )(this, other);
-            }
-        }
-
-        // 1. Prepare alignmentEvents
-        auto alignmentEvents = localAlignments
-            .map!((ref alignment) => only(
-                AlignmentEvent(alignment.contigA.id, alignment.first.contigA.begin, 1, &alignment),
-                AlignmentEvent(alignment.contigA.id, alignment.last.contigA.end, -1, &alignment),
-            ))
-            .joiner;
-        auto contigBoundaryEvents = localAlignments
-            .map!"a.contigA"
-            .uniq
-            .map!(contig => only(
-                AlignmentEvent(contig.id, 0, 0, null),
-                AlignmentEvent(contig.id, contig.length, 0, null),
-            ))
-            .joiner;
-        auto changeEvents = chain(alignmentEvents, contigBoundaryEvents).array;
-        changeEvents.sort();
-
-        if (changeEvents.length == 0)
-            return localAlignments;
-
-        // 2. Find overlapping alignments
-        int currentCoverage;
-        auto overlappingAlignments = appender!(AlignmentChain*[]);
-        auto goodAlignments = appender!(AlignmentChain*[]);
-        foreach (changeEvent; changeEvents)
-        {
-            currentCoverage += changeEvent.diff;
-
-            if (currentCoverage == 0 && overlappingAlignments.data.length > 0)
-            {
-                // Collected local group of overlapping alignments
-
-                auto locallyCleanedUpAlignments = overlappingAlignments.data.length == 1
-                    ? overlappingAlignments.data
-                    : locallyCleanUpAlignments(overlappingAlignments.data);
-                logJsonDebug(
-                    "overlappingAlignments", overlappingAlignments.data.map!"*a".array.toJson,
-                    "locallyCleanedUpAlignments", locallyCleanedUpAlignments.map!"*a".array.toJson,
-                );
-                assert(locallyCleanedUpAlignments.length > 0, "aligments empty after clean up");
-                goodAlignments ~= locallyCleanedUpAlignments;
-
-                overlappingAlignments.clear();
-            }
-            else if (currentCoverage >= 1 && changeEvent.diff > 0)
-            {
-                // Found overlapping alignments
-                assert(changeEvent.alignmentChain !is null);
-                overlappingAlignments ~= changeEvent.alignmentChain;
-            }
-        }
+        contigAlignments = findReferenceContigs();
+        insertionMappings = getInsertionMappings(contigAlignments);
 
         logJsonDiagnostic(
-            "numRawLocalAlignments", localAlignments.length,
-            "numCleanedLocalAlignments", goodAlignments.data.length,
-            "rawLocalAlignmentsCoveredBasePairs", ReferenceRegion(localAlignments
-                .map!(ac => ac.toInterval!(ReferenceInterval, "contigA"))
-                .array
-            ).size,
-            "cleanedLocalAlignmentsCoveredBasePairs", ReferenceRegion(goodAlignments
-                .data
-                .map!(ac => (*ac).toInterval!(ReferenceInterval, "contigA"))
-                .array
-            ).size,
+            "referenceOffset", referenceOffset,
+            "numContigAlignments", contigAlignments.length.toJson,
+            "contigAlignments", shouldLog(LogLevel.debug_)
+                ? contigAlignments.toJson
+                : toJson(null),
+            "numInsertionMappings", insertionMappings.length.toJson,
+            "insertionMappings", shouldLog(LogLevel.debug_)
+                ? insertionMappings.toJson
+                : toJson(null),
         );
 
-        return goodAlignments.data.map!"*a".array;
+        referenceGaps = getReferenceGaps();
+
+        debug logJsonDebug("referenceGaps", referenceGaps.toJson);
+
+        auto analysisResult = analyzeMappingQualities(
+            insertionMappings,
+            options.gapDetailsTabular !is null
+                ? File(options.gapDetailsTabular, "w")
+                : File(),
+        );
+        correctGapsPerIdentityLevel = analysisResult.correctGapsPerIdentityLevel;
+        totalDiffsInFilledGaps = analysisResult.totalDiffsInFilledGaps;
     }
 
-    AlignmentChain*[] locallyCleanUpAlignments(AlignmentChain*[] overlappingAlignments)
+    RawMummerAlignment[] findReferenceContigs()
     {
-        alias interval = ac => (*ac).toInterval!(ReferenceInterval, "contigA");
-        alias containedWithin = (lhs, rhs) => interval(lhs) in interval(rhs) &&
-                                              3*interval(lhs).size < 2*interval(rhs).size;
-        alias overlapEachOther = (lhs, rhs) =>
-                interval(lhs).intersects(interval(rhs));
+        auto duplicateContigIds = NaturalNumberSet.create(
+            findPerfectAlignments(options.refDb, null, options.workdir)
+                .map!(RawMummerAlignment.fromString)
+                .map!(selfAlignment => cast(size_t) selfAlignment.refContigId)
+                .array
+        );
+        logJsonDiagnostic(
+            "numDuplicateContigIds", duplicateContigIds.size,
+            "duplicateContigIds", shouldLog(LogLevel.debug_)
+                ? duplicateContigIds.elements.array.toJson
+                : toJson(null),
+        );
 
-        // 1. Remove LAs completely included in others and much smaller (2/3)
-        foreach (ac; overlappingAlignments)
-            foreach (other; overlappingAlignments)
-                ac.disableIf(
-                    !ac.flags.disabled &&
-                    !other.flags.disabled &&
-                    containedWithin(ac, other)
-                );
+        auto perfectContigAlignments = findPerfectAlignments(options.refDb, options.resultDb, options.workdir)
+            .map!(RawMummerAlignment.fromString)
+            // Ignore contigs that have exact copies in `refDb`
+            .filter!(rawAlignment => rawAlignment.refContigId !in duplicateContigIds)
+            .array;
 
-        // 2. Find combination of alignments, s.t.
-        //     - they are not disabled
-        //     - they do not overlap
-        //     - if more than one: cover maximum possible area
-        //     - if more than one: have best quality
-        //     - if more than one: have non-complementary alignment
+        auto bufferRest = perfectContigAlignments
+            .sort!((lhs, rhs) => lhs.refContigId < rhs.refContigId)
+            .group!((lhs, rhs) => lhs.refContigId == rhs.refContigId)
+            .filter!(group => group[1] == 1)
+            .map!(group => group[0])
+            .copy(perfectContigAlignments);
+        perfectContigAlignments.length -= bufferRest.length;
 
-        static struct ViableCombination
+        alias resultOrder = orderLexicographically!(RawMummerAlignment,
+            rawAlignment => rawAlignment.resultContigId,
+            rawAlignment => rawAlignment.resultBegin,
+            rawAlignment => rawAlignment.refContigId,
+        );
+
+        return perfectContigAlignments
+            .sort!resultOrder
+            .release;
+    }
+
+    auto getInsertionMappings(in RawMummerAlignment[] contigAlignments)
+    {
+        static bool isGapClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
         {
-            ReferenceRegion region;
-            AlignmentChain*[] acs;
+            return lhs.resultContigId == rhs.resultContigId;
         }
 
-        auto viableCombinationsAcc = appender!(ViableCombination[]);
-
-        void findNonOverlappingCombinations(AlignmentChain*[] candidates, ReferenceRegion region, AlignmentChain*[] included)
+        bool isGapPartlyClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
         {
-            size_t numExpansions;
-            foreach (i, candidate; candidates)
-            {
-                auto candidateInterval = interval(candidate);
-                auto newRegion = region | candidateInterval;
+            return lhs.resultContigId + 1 == rhs.resultContigId &&
+                   lhs.resultEnd < lhs.resultContigLength &&
+                   1 < rhs.resultBegin &&
+                   resultGapSize(lhs.resultContigId) > 0;
+        }
 
-                if (newRegion.size == region.size + candidateInterval.size)
-                {
-                    findNonOverlappingCombinations(
-                        candidates.remove(i),
-                        newRegion,
-                        included ~ [candidate],
-                    );
-                    ++numExpansions;
-                }
+        bool isConsecutiveContigs(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+        {
+            return lhs.refContigId + 1 == rhs.refContigId &&
+                   trueAssemblyContig(lhs).contigId == trueAssemblyContig(rhs).contigId;
+        }
+
+        InsertionMapping getInsertionMapping(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+        {
+            auto trueAssemblyInterval = ReferenceInterval(
+                trueAssemblyContig(lhs).contigId,
+                trueAssemblyContig(lhs).end,
+                trueAssemblyContig(rhs).begin,
+            );
+            ReferencePoint resultBegin;
+            ReferencePoint resultEnd;
+
+            if (
+                (isGapClosed(lhs, rhs) && lhs.resultEnd < rhs.resultBegin) ||
+                isGapPartlyClosed(lhs, rhs)
+            )
+            {
+                resultBegin = ReferencePoint(
+                    lhs.resultContigId,
+                    lhs.resultEnd,
+                );
+                resultEnd = ReferencePoint(
+                    rhs.resultContigId,
+                    rhs.resultBegin - 1,
+                );
             }
 
-            if (numExpansions == 0)
-                viableCombinationsAcc ~= ViableCombination(
-                    region,
-                    included,
-                );
+            return InsertionMapping(
+                trueAssemblyInterval,
+                resultBegin,
+                resultEnd,
+                lhs.refContigId,
+                rhs.refContigId,
+            );
         }
 
-        findNonOverlappingCombinations(
-            overlappingAlignments.filter!"!a.flags.disabled".array,
-            ReferenceRegion(),
-            [],
-        );
-
-        assert(viableCombinationsAcc.data.length > 0);
-
-        return viableCombinationsAcc
-            .data
-            .maxElement!(vc =>
-                // prefer large regions
-                +  1 * vc.region.size
-                // penalize bad alignment quality
-                -  1 * vc.acs.map!"a.totalDiffs".sum
-                // penalize complementary alignments
-                - 10 * vc.acs.map!"a.flags.complement ? 1 : 0".sum
-            )
-            .acs;
+        return contigAlignments
+            .slide!(No.withPartial)(2)
+            .filter!(mappedRegionPair => isGapClosed(mappedRegionPair[0], mappedRegionPair[1]) ||
+                                         isGapPartlyClosed(mappedRegionPair[0], mappedRegionPair[1]))
+            .filter!(mappedRegionPair => isConsecutiveContigs(mappedRegionPair[0], mappedRegionPair[1]))
+            .map!(mappedRegionPair => getInsertionMapping(mappedRegionPair[0], mappedRegionPair[1]))
+            .array;
     }
 
-    void calculateExactResultAlignments()
+    ReferenceInterval trueAssemblyContig(in RawMummerAlignment mapping)
     {
-        mixin(traceExecution);
+        return mappedRegionsMask.intervals[mapping.refContigId - 1];
+    }
 
-        foreach (alignmentChain; parallel(resultAlignment))
-        {
-            auto acFingerprint = fingerprint(&alignmentChain);
-            auto exactAlignment = getExactAlignment(
-                options.trueAssemblyDb,
-                options.resultDb,
-                alignmentChain,
-                options.workdir,
-                10*2^^30,
-            );
+    coord_t resultGapSize(in id_t contigId)
+    {
+        auto findGap = resultScaffoldStructure
+            .filter!(gapPart => gapPart.peek!GapSegment !is null)
+            .map!(gapPart => gapPart.get!GapSegment)
+            .find!(gapPart => gapPart.beginGlobalContigId == contigId);
 
-            synchronized
-                exactResultAlignments[acFingerprint] = exactAlignment;
-        }
+        if (findGap.empty)
+            return 0;
+        else
+            return cast(coord_t) findGap.front.length;
     }
 
     ReferenceRegion getReferenceGaps()
@@ -426,74 +362,6 @@ private struct ResultAnalyzer
             .filter!(gap => isInnerGap(gap))
             .array
         );
-    }
-
-    ReferenceRegion getReconstructedRegions()
-    {
-        mixin(traceExecution);
-
-        return ReferenceRegion(resultAlignment
-            .map!(ac => ac
-                .localAlignments
-                .map!(la => ReferenceInterval(
-                    ac.contigA.id,
-                    la.contigA.begin,
-                    la.contigA.end,
-                )))
-            .joiner
-            .array);
-    }
-
-    ReferenceRegion[] getReconstructedGaps()
-    {
-        mixin(traceExecution);
-
-        return referenceGaps
-            .intervals
-            .map!(gap => reconstructedRegions & gap)
-            .array;
-    }
-
-    void writeAlignmentTabular(File tabularFile, AlignmentChain[] alignmentChains)
-    {
-        coord_t contigBId;
-        coord_t contigBOffset;
-        foreach (alignmentChain; alignmentChains)
-        {
-            if (contigBId != alignmentChain.contigB.id)
-            {
-                contigBId = alignmentChain.contigB.id;
-                contigBOffset = getResultContigBegin(contigBId);
-            }
-
-            alias percentSimilarity = (la) => 1.0 - cast(double) la.numDiffs /
-                                                    cast(double) (la.contigA.end - la.contigA.begin);
-
-            foreach (i, localAlignment; alignmentChain.localAlignments)
-            {
-                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
-                    alignmentChain.contigA.id,
-                    alignmentChain.contigB.id,
-                    localAlignment.contigA.begin,
-                    alignmentChain.flags.complement
-                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.end)
-                        : contigBOffset + localAlignment.contigB.begin,
-                    0.0,
-                    alignmentChain.flags.complement ? -1 : 1,
-                );
-                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
-                    alignmentChain.contigA.id,
-                    alignmentChain.contigB.id,
-                    localAlignment.contigA.end,
-                    alignmentChain.flags.complement
-                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.begin)
-                        : contigBOffset + localAlignment.contigB.end,
-                    percentSimilarity(localAlignment),
-                    alignmentChain.flags.complement ? -1 : 1,
-                );
-            }
-            tabularFile.writeln();
-        }
     }
 
     coord_t getResultContigBegin(id_t contigId)
@@ -534,34 +402,18 @@ private struct ResultAnalyzer
             .sum;
     }
 
-    size_t getNumBpsCorrect()
+    size_t getNumBpsInGaps()
     {
         mixin(traceExecution);
 
-        return resultAlignment
-            .map!(ac => ac
-                .localAlignments
-                .map!(la => la.contigA.end - la.contigA.begin - la.numDiffs))
-            .joiner
+        return insertionMappings
+            .map!(mapping => mapping.trueAssembly.size)
             .sum;
     }
 
     size_t getNumTranslocatedGaps()
     {
         mixin(traceExecution);
-
-        version (assert)
-        {
-            foreach (pair; zip(referenceGaps.intervals, reconstructedGaps))
-                assert(
-                    isGapClosed(pair) ^ isGapPartlyClosed(pair) ^ isGapUnaddressed(pair),
-                    format!"%s-%s-%s"(
-                        isGapClosed(pair),
-                        isGapPartlyClosed(pair),
-                        isGapUnaddressed(pair),
-                    ),
-                );
-        }
 
         return referenceGaps.intervals.length;
     }
@@ -573,9 +425,9 @@ private struct ResultAnalyzer
         return mappedRegionsMask.intervals.length;
     }
 
-    size_t getNumCorrectContigs()
+    size_t getNumMappedContigs()
     {
-        return correctContigsPerIdentityLevel[0].length;
+        return contigAlignments.length;
     }
 
     size_t getNumCorrectGaps()
@@ -583,115 +435,178 @@ private struct ResultAnalyzer
         return correctGapsPerIdentityLevel[0].length;
     }
 
-    size_t[][identityLevels.length] getCorrectRegions(in ReferenceInterval[] intervals, File detailsTabular = File())
+    size_t getNumClosedGaps()
     {
+        mixin(traceExecution);
+
+        return insertionMappings
+            .filter!(mapping => mapping.resultBegin.contigId == mapping.resultEnd.contigId)
+            .walkLength;
+    }
+
+    size_t getNumPartlyClosedGaps()
+    {
+        mixin(traceExecution);
+
+        return insertionMappings
+            .filter!(mapping => mapping.resultBegin.contigId < mapping.resultEnd.contigId)
+            .walkLength;
+    }
+
+    MappingAnalysisResult analyzeMappingQualities(in InsertionMapping[] insertionMappings, File detailsTabular = File())
+    {
+        mixin(traceExecution);
+
         if (detailsTabular.isOpen)
-            detailsTabular.writefln!"%10s %10s %10s %10s %10s %s"(
+            detailsTabular.writefln!"%10s %10s %10s %10s %10s %s %s"(
                 "contigId",
                 "begin",
                 "end",
                 "numDiffs",
                 "percentIdentity",
                 "sequenceAlignment",
+                "gapId",
             );
 
-        auto sortedResultAlignment = resultAlignment.assumeSorted!"a.contigA.id < b.contigA.id";
-
         size_t[][identityLevels.length] identicalLengthsPerLevel;
+        size_t totalDiffs;
         foreach (identicalLengths; identicalLengthsPerLevel)
-            identicalLengths.reserve(intervals.length);
+            identicalLengths.reserve(insertionMappings.length);
 
-        foreach (interval; parallel(intervals))
+        foreach (insertionMapping; parallel(insertionMappings))
         {
-            auto overlappingAlignments = sortedResultAlignment
-                .equalRange(getDummyAC(interval));
-
-            auto overlappedRegion = overlappingAlignments
-                .map!(to!(ReferenceRegion, "contigA"))
-                .fold!"a | b"(ReferenceRegion());
-            size_t numDiffs = (ReferenceRegion(interval) - overlappedRegion).size;
-            auto alignmentString = appender!string;
-
-            foreach (overlappingAlignment; overlappingAlignments)
-            {
-                auto alignmentBegin = overlappingAlignment.first.contigA.begin;
-                auto alignmentEnd = overlappingAlignment.last.contigA.end;
-                if (interval.end <= alignmentBegin || alignmentEnd <= interval.begin)
-                    continue; // Ignore non-overlaps
-                auto overlapBegin = interval.begin > alignmentBegin
-                    ? interval.begin - alignmentBegin
-                    : 0;
-                auto overlapEnd = interval.end < alignmentEnd
-                    ? interval.end - alignmentBegin
-                    : alignmentEnd - alignmentBegin;
-
-                if (overlappingAlignment.flags.complement)
-                {
-                    // Inversions are not allowed
-                    numDiffs += overlapEnd - overlapBegin;
-                }
-                else
-                {
-                    auto exactAlignment = getOverlapAlignment(overlappingAlignment);
-                    auto overlappingExactAlignment = exactAlignment[overlapBegin..min(overlapEnd, $)];
-
-                    numDiffs += overlappingExactAlignment.score;
-
-                    if (detailsTabular.isOpen)
-                        alignmentString ~= overlappingExactAlignment
-                            .toString()
-                            .replaceAll(ctRegex!(r"\n", "g"), "\\n");
-                }
-                if (detailsTabular.isOpen)
-                    alignmentString ~= "\\n\\n";
-            }
+            auto insertionAlignment = computeInsertionQuality(insertionMapping);
 
             if (detailsTabular.isOpen)
-                synchronized detailsTabular.writefln!"%10d %10d %10d %10d %.8f %s"(
-                    interval.contigId,
-                    interval.begin,
-                    interval.end,
-                    numDiffs,
-                    1.0 - (numDiffs.to!double / interval.size.to!double),
-                    alignmentString.data,
+                synchronized detailsTabular.writefln!"%10d %10d %10d %10d %.8f %s %s"(
+                    insertionMapping.trueAssembly.contigId,
+                    insertionMapping.trueAssembly.begin,
+                    insertionMapping.trueAssembly.end,
+                    insertionAlignment.numDiffs,
+                    insertionAlignment.percentIdentity,
+                    insertionAlignment.alignmentString.replaceAll(ctRegex!("\n", `g`), `\n`),
+                    getGapId(insertionMapping),
                 );
 
             foreach (i, identityLevel; identityLevels)
-                if (numDiffs <= (1.0 - identityLevel) * interval.size)
-                    synchronized identicalLengthsPerLevel[i] ~= interval.size;
+                if (identityLevel < insertionAlignment.percentIdentity)
+                    synchronized
+                    {
+                        identicalLengthsPerLevel[i] ~= insertionMapping.trueAssembly.size;
+                        totalDiffs += insertionAlignment.numDiffs;
+                    }
         }
 
-        return identicalLengthsPerLevel;
+        return MappingAnalysisResult(identicalLengthsPerLevel, totalDiffs);
     }
 
-    auto getOverlapAlignment(in AlignmentChain alignmentChain)
+    StretcherAlignment computeInsertionQuality(in InsertionMapping insertionMapping)
     {
-        auto acFingerprint = fingerprint(&alignmentChain);
+        mixin(traceExecution);
 
-        return exactResultAlignments[acFingerprint];
-    }
-
-    static AlignmentChain getDummyAC(in ReferenceInterval refInterval)
-    {
-        return AlignmentChain(
-            0,
-            AlignmentChain.Contig(
-                cast(id_t) refInterval.contigId,
-                cast(coord_t) refInterval.end,
-            ),
-            AlignmentChain.Contig(0, 1),
-            AlignmentChain.emptyFlags,
-            [AlignmentChain.LocalAlignment(
-                AlignmentChain.LocalAlignment.Locus(
-                    cast(coord_t) refInterval.begin,
-                    cast(coord_t) refInterval.end,
-                ),
-                AlignmentChain.LocalAlignment.Locus(
-                    cast(coord_t) 0,
-                    cast(coord_t) 1,
-                ),
-            )],
+        auto gapId = getGapId(insertionMapping);
+        auto trueSequenceFile = trueAssemblySubseqFasta(insertionMapping.trueAssembly, gapId);
+        auto insertedSequenceFile = resultSubseqFasta(
+            insertionMapping.resultBegin,
+            insertionMapping.resultEnd,
+            gapId,
         );
+
+        return stretcher(trueSequenceFile, insertedSequenceFile);
+    }
+
+    static string getGapId(in InsertionMapping insertionMapping)
+    {
+        return format!"%d-%d@%d-%d"(
+            insertionMapping.resultBegin.contigId,
+            insertionMapping.resultEnd.contigId,
+            insertionMapping.leftRefContig,
+            insertionMapping.rightRefContig,
+        );
+    }
+
+    enum subseqFastaFileFormat = "%s/insertion-%s.%s.fasta";
+    enum subseqFastaHeaderFormat = ">%s-%s [contig-%d@%d, contig-%d@%d)";
+
+    string trueAssemblySubseqFasta(in ReferenceInterval interval, in string gapId)
+    {
+        enum origin = "true";
+        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaHeader = format!subseqFastaHeaderFormat(
+            origin,
+            gapId,
+            interval.contigId,
+            interval.begin,
+            interval.contigId,
+            interval.end,
+        );
+        auto subSequence = options.trueAssemblyDb.getFastaSequence(
+            cast(id_t) interval.contigId,
+            options.workdir,
+        )[interval.begin .. interval.end];
+
+        chain(
+            fastaHeader,
+            newline,
+            subSequence,
+            newline,
+        ).map!(to!(immutable(char))).toFile(fastaFile);
+
+        return fastaFile;
+    }
+
+    string resultSubseqFasta(in ReferencePoint begin, in ReferencePoint end, in string gapId)
+    {
+        enum origin = "inserted";
+        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaHeader = format!subseqFastaHeaderFormat(
+            origin,
+            gapId,
+            begin.contigId,
+            begin.value,
+            end.contigId,
+            end.value,
+        );
+        auto dbFile = origin == "true"
+            ? options.trueAssemblyDb
+            : options.resultDb;
+        string subSequence;
+
+        if (begin.contigId == end.contigId)
+        {
+            subSequence = options.resultDb.getFastaSequence(
+                cast(id_t) begin.contigId,
+                options.workdir,
+            )[begin.value .. end.value];
+        }
+        else
+        {
+            auto leftFlank = options.resultDb.getFastaSequence(
+                cast(id_t) begin.contigId,
+                options.workdir,
+            )[begin.value .. $];
+            auto rightFlank = options.resultDb.getFastaSequence(
+                cast(id_t) end.contigId,
+                options.workdir,
+            )[0 .. end.value];
+            auto gapSize = resultGapSize(cast(id_t) begin.contigId);
+
+            enum char unkownBase = 'n';
+            subSequence = chain(
+                leftFlank,
+                unkownBase.repeat(gapSize),
+                rightFlank,
+            ).map!(to!(immutable(char))).array;
+        }
+
+        chain(
+            fastaHeader,
+            newline,
+            subSequence,
+            newline,
+        ).map!(to!(immutable(char))).toFile(fastaFile);
+
+        return fastaFile;
     }
 
     bool isInnerGap(in ReferenceInterval gap)
@@ -707,92 +622,6 @@ private struct ResultAnalyzer
             .find!(contigPart => contigPart.globalContigId == contigId)
             .first
             .length;
-    }
-
-    size_t getNumClosedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("closedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapClosed(pair));
-    }
-
-    size_t getNumPartlyClosedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("partlyClosedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapPartlyClosed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapPartlyClosed(pair));
-    }
-
-    size_t getNumUnaddressedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("unaddressedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapUnaddressed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapUnaddressed(pair));
-    }
-
-    bool isGapClosed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return insertion.size == gap.size;
-    }
-
-    bool isGapPartlyClosed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return options.minInsertionLength <= insertion.size && insertion.size < gap.size;
-    }
-
-    bool isGapUnaddressed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return insertion.size < min(options.minInsertionLength, gap.size);
-    }
-
-    size_t getNumBpsInClosedGaps()
-    {
-        mixin(traceExecution);
-
-        return zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[1].size"
-            .sum;
-    }
-
-    size_t getNumBpsInGaps()
-    {
-        mixin(traceExecution);
-
-        return referenceGaps
-            .intervals
-            .map!(gap => gap.size)
-            .sum;
     }
 
     size_t getMaximumN50()
@@ -847,9 +676,8 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        auto values = zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[0].size"
+        auto values = insertionMappings
+            .map!(mapping => mapping.trueAssembly.size)
             .array;
 
         if (values.length == 0)
@@ -858,14 +686,16 @@ private struct ResultAnalyzer
             return median(values);
     }
 
-    ReferenceInterval getMaxClosedGap()
+    size_t getExtremumClosedGap(alias extremeElement)()
     {
         mixin(traceExecution);
 
-        return zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[0]"
-            .maxElement!"a.size"(ReferenceInterval(0, 0, 0));
+        auto values = insertionMappings.map!(mapping => mapping.trueAssembly.size);
+
+        if (values.length == 0)
+            return size_t.max;
+        else
+            return extremeElement(values);
     }
 
     Histogram!coord_t[identityLevels.length] getCorrectGapLengthHistograms()
@@ -893,9 +723,8 @@ private struct ResultAnalyzer
 
         return histogram(
             options.bucketSize,
-            zip(referenceGaps.intervals, reconstructedGaps)
-                .filter!(pair => isGapClosed(pair))
-                .map!(pair => cast(coord_t) pair[0].size)
+            insertionMappings
+                .map!(insertionMapping => cast(coord_t) insertionMapping.trueAssembly.size)
                 .array,
         );
     }
@@ -964,25 +793,29 @@ private struct Stats
     size_t numBpsExpected;
     size_t numBpsKnown;
     size_t numBpsResult;
-    size_t numBpsCorrect;
+    size_t numBpsInGaps;
+    size_t numDiffsInGaps;
     size_t numTranslocatedGaps;
     size_t numCorrectGaps;
     size_t numContigsExpected;
-    size_t numCorrectContigs;
+    size_t numMappedContigs;
     size_t numClosedGaps;
     size_t numPartlyClosedGaps;
-    size_t numUnaddressedGaps;
-    size_t numBpsInClosedGaps;
-    size_t numBpsInGaps;
     size_t maximumN50;
     size_t inputN50;
     size_t resultN50;
     size_t gapMedian;
     size_t closedGapMedian;
-    ReferenceInterval maxClosedGap;
+    size_t minClosedGap;
+    size_t maxClosedGap;
     Histogram!coord_t[identityLevels.length] correctGapLengthHistograms;
     Histogram!coord_t closedGapLengthHistogram;
     Histogram!coord_t gapLengthHistogram;
+
+    @property double averageInsertionError() const pure
+    {
+        return numDiffsInGaps.to!double / numBpsInGaps.to!double;
+    }
 
     string toJsonString() const
     {
@@ -990,21 +823,21 @@ private struct Stats
             "numBpsExpected": numBpsExpected.toJson,
             "numBpsKnown": numBpsKnown.toJson,
             "numBpsResult": numBpsResult.toJson,
-            "numBpsCorrect": numBpsCorrect.toJson,
+            "numBpsInGaps": numBpsInGaps.toJson,
+            "numDiffsInGaps": numDiffsInGaps.toJson,
+            "averageInsertionError": averageInsertionError.toJson,
             "numTranslocatedGaps": numTranslocatedGaps.toJson,
             "numCorrectGaps": numCorrectGaps.toJson,
             "numContigsExpected": numContigsExpected.toJson,
-            "numCorrectContigs": numCorrectContigs.toJson,
+            "numMappedContigs": numMappedContigs.toJson,
             "numClosedGaps": numClosedGaps.toJson,
             "numPartlyClosedGaps": numPartlyClosedGaps.toJson,
-            "numUnaddressedGaps": numUnaddressedGaps.toJson,
-            "numBpsInClosedGaps": numBpsInClosedGaps.toJson,
-            "numBpsInGaps": numBpsInGaps.toJson,
             "maximumN50": maximumN50.toJson,
             "inputN50": inputN50.toJson,
             "resultN50": resultN50.toJson,
             "gapMedian": gapMedian.toJson,
             "closedGapMedian": closedGapMedian.toJson,
+            "minClosedGap": minClosedGap.toJson,
             "maxClosedGap": maxClosedGap.toJson,
             "gapLengthHistogram": histsToJson(
                 correctGapLengthHistograms[0],
@@ -1022,28 +855,27 @@ private struct Stats
         auto columnWidth = columnWidth();
         auto rows =[
             format!"numContigsExpected:    %*d"(columnWidth, numContigsExpected),
-            format!"numCorrectContigs:     %*d"(columnWidth, numCorrectContigs),
+            format!"numMappedContigs:      %*d"(columnWidth, numMappedContigs),
 
             format!"numTranslocatedGaps:   %*d"(columnWidth, numTranslocatedGaps),
             format!"numClosedGaps:         %*d"(columnWidth, numClosedGaps),
             format!"numPartlyClosedGaps:   %*d"(columnWidth, numPartlyClosedGaps),
-            format!"numUnaddressedGaps:    %*d"(columnWidth, numUnaddressedGaps),
             format!"numCorrectGaps:        %*d"(columnWidth, numCorrectGaps),
 
             format!"numBpsExpected:        %*d"(columnWidth, numBpsExpected),
             format!"numBpsKnown:           %*d"(columnWidth, numBpsKnown),
             format!"numBpsResult:          %*d"(columnWidth, numBpsResult),
-            format!"numBpsCorrect:         %*d"(columnWidth, numBpsCorrect),
             format!"numBpsInGaps:          %*d"(columnWidth, numBpsInGaps),
-            format!"numBpsInClosedGaps:    %*d"(columnWidth, numBpsInClosedGaps),
-            format!"numBpsInNonClosedGaps: %*d"(columnWidth, numBpsInGaps - numBpsInClosedGaps),
+            format!"numDiffsInGaps:        %*d"(columnWidth, numDiffsInGaps),
+            format!"averageInsertionError: %*.3e"(columnWidth, averageInsertionError),
 
             format!"maximumN50:            %*d"(columnWidth, maximumN50),
             format!"inputN50:              %*d"(columnWidth, inputN50),
             format!"resultN50:             %*d"(columnWidth, resultN50),
             format!"gapMedian:             %*d"(columnWidth, gapMedian),
             format!"closedGapMedian:       %*d"(columnWidth, closedGapMedian),
-            format!"maxClosedGap:          %*s"(columnWidth, toString(maxClosedGap)),
+            format!"minClosedGap:          %*s"(columnWidth, minClosedGap),
+            format!"maxClosedGap:          %*s"(columnWidth, maxClosedGap),
             gapLengthHistogram.length > 0
                 ? format!"gapLengthHistogram:\n    \n%s"(histsToString(
                     correctGapLengthHistograms[0],
@@ -1057,11 +889,6 @@ private struct Stats
         ];
 
         return format!"%-(%s\n%)"(rows.filter!"a !is null");
-    }
-
-    const string toString(in ReferenceInterval interval)
-    {
-        return format!"[%d, %d) | len=%d"(interval.begin, interval.end, interval.size);
     }
 
     const string histsToString(Hists...)(in Hists hists)
@@ -1112,34 +939,354 @@ private struct Stats
             numBpsExpected,
             numBpsKnown,
             numBpsResult,
+            numBpsInGaps,
+            numDiffsInGaps,
             numTranslocatedGaps,
-            numBpsCorrect,
             numCorrectGaps,
             numContigsExpected,
-            numCorrectContigs,
+            numMappedContigs,
             numClosedGaps,
             numPartlyClosedGaps,
-            numUnaddressedGaps,
-            numBpsInClosedGaps,
-            numBpsInGaps,
             maximumN50,
             inputN50,
             resultN50,
             gapMedian,
             closedGapMedian,
+            minClosedGap,
+            maxClosedGap,
         ));
-        auto strWidth = max(
-            0, // dummy
-            toString(maxClosedGap).length,
-        );
+        auto strWidth = only(
+            format!"%.3e"(averageInsertionError).length,
+        ).maxElement;
 
         return max(numWidth, strWidth);
     }
 
     static protected size_t numWidth(Int)(Int i) nothrow
     {
+        if (i == 0)
+            return 1;
+
         auto numWidth = cast(size_t) ceil(log10(i));
 
         return numWidth;
     }
+}
+
+struct RawMummerAlignment
+{
+    coord_t resultBegin;
+    coord_t resultEnd;
+    coord_t refBegin;
+    coord_t refEnd;
+    double sequenceIdentity;
+    coord_t resultContigLength;
+    coord_t refContigLength;
+    id_t resultContigId;
+    id_t refContigId;
+
+    static RawMummerAlignment fromString(in string dumpLine) pure
+    {
+        enum dumpLineFormat = "%d %d %d %d %d %d %f %d %d result-%d ref-%d";
+        RawMummerAlignment rawAlignment;
+        coord_t dummy;
+
+        dumpLine[].formattedRead!dumpLineFormat(
+            rawAlignment.resultBegin,
+            rawAlignment.resultEnd,
+            rawAlignment.refBegin,
+            rawAlignment.refEnd,
+            dummy,
+            dummy,
+            rawAlignment.sequenceIdentity,
+            rawAlignment.resultContigLength,
+            rawAlignment.refContigLength,
+            rawAlignment.resultContigId,
+            rawAlignment.refContigId,
+        );
+
+        return rawAlignment;
+    }
+
+    T to(T : AlignmentChain)() const pure
+    {
+        import std.conv : to;
+
+        T ac;
+        T.LocalAlignment la;
+
+        ac.contigA.id = refContigId;
+        ac.contigA.length = refContigId;
+        ac.contigB.id = resultContigId;
+        ac.contigB.length = resultContigId;
+
+        la.contigA.begin = refBegin - 1;
+        la.contigA.end = refEnd;
+        la.contigB.begin = resultBegin - 1;
+        la.contigB.end = resultEnd;
+        la.numDiffs = to!diff_t(la.contigB.length * sequenceIdentity / 100.0);
+
+        ac.localAlignments = [la];
+
+        // ensure alignment chain is valid...
+        version (assert)
+            // trigger invariant of AlignmentChain
+            cast(void) ac.first;
+
+        return ac;
+    }
+}
+
+enum findPerfectAlignmentsScript = q"{
+    #!/bin/bash
+
+    function main()
+    {
+        while getopts "kT:" OPTION; do
+            case "$OPTION" in
+                k)
+                    KEEP_TEMP=1
+                    ;;
+                T)
+                    TEMP_DIR="$OPTARG"
+                    ;;
+                *)
+                    echo "$(basename "$0"): unkown option $OPTION" >&2
+                    echo >&2
+                    usage
+                    ;;
+            esac
+        done
+        shift $(($OPTIND - 1))
+
+        REFERENCE="$(realpath "$1")"
+        shift
+        TARGETS=($*)
+        for (( i = 0; i < ${#TARGETS[*]}; i++ )); do
+            TARGETS[i]="$(realpath "${TARGETS[i]}")"
+        done
+
+        WORKDIR="$(mktemp -d find-perfect-alignments.XXXXXX)"
+        cd "$WORKDIR"
+
+        REFERENCE_CONTIGS="$(assert_contigs_fasta "$REFERENCE" 'ref')"
+        for TARGET in ${TARGETS[*]}; do
+            TARGET_CONTIGS="$(assert_contigs_fasta "$TARGET" 'result')"
+            PREFIX="$(db_name "$TARGET")"
+
+            nucmer \
+                --threads=8 \
+                --forward \
+                --prefix=$PREFIX \
+                "$TARGET_CONTIGS" \
+                "$REFERENCE_CONTIGS"
+            delta-filter -i 100 -q "$PREFIX.delta" > "$PREFIX.F.delta"
+
+            if [[ $REFERENCE == $TARGET ]]; then
+                FILTER='{ if ($3 < $4 && ($5 == $9 || $6 == $9) && $10 != $11) print $0 }'
+            else
+                FILTER='{ if ($3 < $4 && $5 == $6 && $6 == $9) print $0 }'
+            fi
+
+            show-coords -l -T -q "$PREFIX.F.delta" | \
+                tail -n+5 | \
+                awk -F'\t' "$FILTER"
+        done
+    }
+
+    function assert_contigs_fasta()
+    {
+        DB="$1"
+        CONTIGS_FASTA="$(db_name "$1").contigs.fasta"
+
+        contigs_fasta "$DB" "$2" > "$CONTIGS_FASTA"
+
+        echo "$CONTIGS_FASTA"
+    }
+
+    function contigs_fasta()
+    {
+        contig_dump "$1" | awk -F'\t' '{ printf ">'"$2"'-%09d %s\n%s\n", $1, substr($2, 2), $3 }'
+    }
+
+    function contig_dump()
+    {
+        DBdump -rhs "$1" | sed -nE '/^R/ {s/^R\s+//;h;n; s/^H[^>]+//;H;n;n; s/^S[^actg]+//;H;x;s/\n/\t/g; p}'
+    }
+
+    function db_name()
+    {
+        basename "$1" ".dam"
+    }
+
+    function mktemp()
+    {
+        if ! [[ -v __TEMP_FILES ]]; then
+            declare -a __TEMP_FILES
+        fi
+
+        declare -a OPTS=()
+        if [[ -v TEMP_DIR ]]; then
+            OPTS+=("--tmpdir=$TEMP_DIR")
+        else
+            OPTS+=("--tmpdir")
+        fi
+
+        local TMPFILE="$(/usr/bin/env mktemp "${OPTS[@]}" "$@")"
+
+        local IFS=$'\n'
+        __TEMP_FILES+=($TMPFILE)
+
+        echo -n "$TMPFILE"
+    }
+
+    function __cleanup()
+    {
+        if [[ ! -v KEEP_TEMP && -v __TEMP_FILES ]]; then
+            local IFS=$'\n'
+
+            for TMPFILE in ${__TEMP_FILES[*]}; do
+                rm -rf "$TMPFILE"
+            done
+
+            unset __TEMP_FILES
+        fi
+    }
+
+    trap __cleanup exit err
+
+    function alternate_ifs()
+    {
+        OLD_IFS="$IFS"
+        IFS="$1"
+    }
+
+    function reset_ifs()
+    {
+        IFS="$OLD_IFS"
+        unset OLD_IFS
+    }
+
+    if ! [[ $- =~ i ]]; then
+        # Unofficial Bash Strict Mode (http://redsymbol.net/articles/unofficial-bash-strict-mode/)
+        set -euo pipefail
+        IFS=$'\n'
+
+        main "$@"
+    fi
+}";
+
+auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null)
+{
+    auto findPerfectAlignmentsCmd = only(
+        "bash",
+        "-c",
+        findPerfectAlignmentsScript,
+        "--",
+        "-k",
+        tmpDir !is null ? "-T" ~ tmpDir : null,
+        refDb,
+        queryDb !is null ? queryDb : refDb,
+    );
+
+    return findPerfectAlignmentsCmd.pipeLines();
+}
+
+struct StretcherAlignment
+{
+    diff_t numIdentical;
+    coord_t length;
+    string alignmentString;
+
+    @property diff_t numDiffs() const pure nothrow
+    {
+        return length - numIdentical;
+    }
+
+    @property double percentIdentity() const pure
+    {
+        return numIdentical.to!double / length.to!double;
+    }
+}
+
+StretcherAlignment stretcher(in string refFasta, in string queryFasta)
+{
+    if (refFasta.getFastaLength() == 0)
+        return StretcherAlignment();
+    if (queryFasta.getFastaLength() == 0)
+        return StretcherAlignment(0, cast(coord_t) refFasta.getFastaLength());
+
+    auto stretcherCmd = only(
+        "stretcher",
+        "--auto",
+        "--stdout",
+        "--aformat=pair",
+        "--awidth=" ~ uint.max.to!string,
+        refFasta,
+        queryFasta,
+    );
+
+    StretcherAlignment alignment;
+    auto stretcherResult = stretcherCmd.pipeLines();
+
+    stretcherResult.stretcherReadLength(alignment);
+    stretcherResult.stretcherReadIdentity(alignment);
+    stretcherResult.stretcherReadAlignmentString(alignment);
+
+    return alignment;
+}
+
+private void stretcherReadLength(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+{
+    enum lengthLineFormat = "# Length: %d";
+    enum lengthLinePrefix = lengthLineFormat.until(':', No.openRight);
+
+    auto findLengthLine = stretcherResult.find!(line => line.startsWith(lengthLinePrefix));
+
+    dentistEnforce(!findLengthLine.empty, "Missing length line in stretcher output");
+
+    findLengthLine.front.formattedRead!lengthLineFormat(alignment.length);
+}
+
+private void stretcherReadIdentity(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+{
+    enum identityLineFormat = "# Identity: %d/%d";
+    enum identityLinePrefix = identityLineFormat.until(':', No.openRight);
+    auto findIdentityLine = stretcherResult.find!(line => line.startsWith(identityLinePrefix));
+
+    dentistEnforce(!findIdentityLine.empty, "Missing identity line in stretcher output");
+
+    findIdentityLine.front.formattedRead!identityLineFormat(
+        alignment.numIdentical,
+        alignment.length,
+    );
+}
+
+private void stretcherReadAlignmentString(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+{
+    enum commentChar = '#';
+
+    auto alignmentLines = stretcherResult
+        .filter!(line => line.length > 0 && line[0] != commentChar)
+        .array;
+
+    dentistEnforce(alignmentLines.length > 0, "Missing alignment in stretcher output");
+    dentistEnforce(alignmentLines.length == 3, "Missing alignment in stretcher output");
+
+    enum sequenceRegex = ctRegex!`^\s*(?P<prefix>(?:true|inserted)-[0-9@-]+\s+\d+\s+)(?P<seq>[ACTGN-]+).*$`;
+    alias captureSequence = (line) => line
+        .replaceAll(sequenceRegex, `$2`)
+        .map!toLower;
+    alias sequencePrefix = (line) => line
+        .replaceAll(sequenceRegex, `$1`);
+    alias captureAlignment = (seqLine, alignmentLine) =>
+        alignmentLine[sequencePrefix(seqLine).length .. $].tr(" ", "-");
+
+    alignment.alignmentString = chain(
+        captureSequence(alignmentLines[0]),
+        newline,
+        captureAlignment(alignmentLines[0], alignmentLines[1]),
+        newline,
+        captureSequence(alignmentLines[2]),
+    ).map!(to!(immutable(char))).to!string;
 }
