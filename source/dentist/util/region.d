@@ -624,13 +624,16 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         TaggedInterval accInterval = _intervals[0];
         size_t insertIdx = 0;
 
+        alias intervalsTouch = (lhs, rhs) => lhs.tag == rhs.tag &&
+                                             (lhs.end == rhs.begin || lhs.begin == rhs.end);
+
         foreach (i, intervalB; _intervals[1 .. $])
         {
             if (intervalB.empty)
             {
                 continue;
             }
-            else if (accInterval.intersects(intervalB) || accInterval.end == intervalB.begin)
+            else if (accInterval.intersects(intervalB) || intervalsTouch(accInterval, intervalB))
             {
                 // If two intervals intersect or touch their union is the same as the convex hull of both.
                 accInterval = TaggedInterval.convexHull(accInterval, intervalB);
