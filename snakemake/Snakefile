@@ -42,7 +42,10 @@ def db_files(db):
                 else hidden_dam_file_suffixes
 
     def __hidden_file(suffix):
-        return "{}/.{}{}".format(root, db_name(db), suffix)
+        if root:
+            return "{}/.{}{}".format(root, db_name(db), suffix)
+        else:
+            return ".{}{}".format(db_name(db), suffix)
 
     return [db] + [__hidden_file(suffix)  for suffix in suffixes]
 
@@ -172,7 +175,10 @@ def mask_files(db, mask):
     root = dirname(db)
 
     def __mask_files(suffix):
-        return "{}/.{}.{}.{}".format(root, db_name(db), mask, suffix)
+        if root:
+            return "{}/.{}.{}.{}".format(root, db_name(db), mask, suffix)
+        else:
+            return ".{}.{}.{}".format(db_name(db), mask, suffix)
 
     return (__mask_files(suffix)  for suffix in suffixes)
 
