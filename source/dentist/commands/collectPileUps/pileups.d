@@ -73,6 +73,7 @@ import std.algorithm :
     min,
     minElement,
     sort,
+    sum,
     swap,
     SwapStrategy;
 import std.algorithm : equal;
@@ -183,11 +184,35 @@ struct ScaffoldPayload
     }
 
     static ScaffoldPayload merge(R)(R payloads)
-        if (isInputRange!R && is(ElementType!R == ScaffoldPayload))
+        if (isForwardRange!R && is(ElementType!R == ScaffoldPayload))
     {
+        static size_t cacheSize = 1000;
+        static ReadAlignment[] readAlignmentsCache;
+
+        if (payloads.save.walkLength(2) == 1)
+            return payloads.front;
+
+        auto numReadAlignments = payloads.save.map!"a.readAlignments.length".sum;
+
+        if (readAlignmentsCache.length < numReadAlignments)
+        {
+            readAlignmentsCache = new ReadAlignment[cacheSize];
+            cacheSize = (13 * cacheSize) / 10;
+        }
+
+        auto mergedReadAlignments = readAlignmentsCache[0 .. numReadAlignments];
+        readAlignmentsCache = readAlignmentsCache[numReadAlignments .. $];
+
+        auto bufferRest = payloads
+            .save
+            .map!"a.readAlignments"
+            .joiner
+            .copy(mergedReadAlignments);
+        assert(bufferRest.length == 0);
+
         return ScaffoldPayload(
             payloads.save.map!"a.types".fold!"a | b",
-            payloads.map!"a.readAlignments".joiner.array,
+            mergedReadAlignments,
         );
     }
 
@@ -1092,7 +1117,8 @@ private class BubbleResolver
             "augmentedJoins", augmentedJoins.save.map!joinToJson.array.toJson,
         );
 
-        synchronized(this) {
+        synchronized(this)
+        {
             // Remove pileup from `skippingJoin`
             skippingJoin.payload.remove!(ScaffoldPayload.Type.pileUp);
             scaffold.add!(scaffold.ConflictStrategy.replace)(skippingJoin);
