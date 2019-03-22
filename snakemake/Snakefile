@@ -28,6 +28,14 @@ def db_name(db_file):
     return basename(db_stub(db_file))
 
 
+def prepend_ext(filename, ext):
+    from os.path import splitext
+
+    parts = splitext(filename)
+
+    return parts[0] + ext + parts[1]
+
+
 def fasta_to_workdb(fasta_file, ext):
     return join(config["workdir"], "{ext}_{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
 
@@ -248,6 +256,7 @@ output_assembly = config["output_assembly"]
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads = fasta_to_workdb(reads_fasta, "db")
 dentist_config_file = join(workdir_, workflow_["config"])
+dentist_merge_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
 ref_vs_reads_alignment = alignment_file(reference, reads)
 self_mask = workflow_["self_mask"]
@@ -273,6 +282,7 @@ localrules:
     self_alignment,
     fasta2db,
     ref_vs_reads_alignment,
+    extend_dentist_config_for_merge,
     merge
 
 
@@ -432,9 +442,31 @@ rule process:
     shell:
         "dentist process --config={dentist_config_file} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
 
-rule merge:
+rule extend_dentist_config_for_merge:
     input:
         dentist_config_file,
+        insertions_batches = insertions_batches()
+    output:
+        temp(dentist_merge_config_file)
+    run:
+        merge_config = None
+        with open(dentist_config_file, 'r') as base_config:
+            merge_config = json.load(base_config)
+
+        if "merge-insertions" not in merge_config:
+            merge_config["merge-insertions"] = dict()
+        merge_config["merge-insertions"]["insertions"] = insertions
+        merge_config["merge-insertions"]["partitioned-insertions"] = input.insertions_batches
+
+        with open(output[0], 'w') as ext_config_file:
+            json.dump(merge_config, ext_config_file)
+
+        validate_dentist_config(output[0])
+
+
+rule merge:
+    input:
+        dentist_merge_config_file,
         await_db_files(reference),
         await_db_files(reads),
         await_pile_ups(),
@@ -443,7 +475,7 @@ rule merge:
         protected(insertions)
     log: log_file("merge")
     shell:
-        "dentist merge --config={dentist_config_file} {output} {input[insertions_batches]} 2> {log}"
+        "dentist merge --config={dentist_merge_config_file} - - 2> {log}"
 
 rule output:
     input:
