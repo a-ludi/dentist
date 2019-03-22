@@ -13,7 +13,7 @@ dentist_config:
     __default__:
         read-coverage:      73.0
         max-coverage-self:  3
-        verbose:            3
+        verbose:            2
     output:
         fasta-line-width:   80
 
