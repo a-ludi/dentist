@@ -2431,7 +2431,9 @@ coord_t getContigCutoff(in string dbFile)
 
     if (matchingLines.empty)
     {
-        auto errorMessage = format!"could not read the contig cutoff in `%s`"(dbFile.stripBlock);
+        enum msg = "could not read the contig cutoff in `%s`; " ~
+                   "try using DBsplit to fix";
+        auto errorMessage = format!msg(dbFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
 
