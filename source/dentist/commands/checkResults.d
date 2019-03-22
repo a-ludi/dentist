@@ -224,7 +224,12 @@ private struct ResultAnalyzer
     RawMummerAlignment[] findReferenceContigs()
     {
         auto duplicateContigIds = NaturalNumberSet.create(
-            findPerfectAlignments(options.refDb, null, options.workdir)
+            findPerfectAlignments(
+                options.refDb,
+                null,
+                options.workdir,
+                options.numAuxiliaryThreads
+            )
                 .map!(RawMummerAlignment.fromString)
                 .map!(selfAlignment => cast(size_t) selfAlignment.refContigId)
                 .array
@@ -236,7 +241,12 @@ private struct ResultAnalyzer
                 : toJson(null),
         );
 
-        auto perfectContigAlignments = findPerfectAlignments(options.refDb, options.resultDb, options.workdir)
+        auto perfectContigAlignments = findPerfectAlignments(
+            options.refDb,
+            options.resultDb,
+            options.workdir,
+            options.numAuxiliaryThreads
+        )
             .map!(RawMummerAlignment.fromString)
             // Ignore contigs that have exact copies in `refDb`
             .filter!(rawAlignment => rawAlignment.refContigId !in duplicateContigIds)
@@ -1042,13 +1052,16 @@ enum findPerfectAlignmentsScript = q"{
 
     function main()
     {
-        while getopts "kT:" OPTION; do
+        while getopts "kt:T:" OPTION; do
             case "$OPTION" in
                 k)
                     KEEP_TEMP=1
                     ;;
-                T)
+                t)
                     TEMP_DIR="$OPTARG"
+                    ;;
+                T)
+                    NUM_THREADS="$OPTARG"
                     ;;
                 *)
                     echo "$(basename "$0"): unkown option $OPTION" >&2
@@ -1075,7 +1088,7 @@ enum findPerfectAlignmentsScript = q"{
             PREFIX="$(db_name "$TARGET")"
 
             nucmer \
-                --threads=8 \
+                --threads="$NUM_THREADS" \
                 --forward \
                 --prefix=$PREFIX \
                 "$TARGET_CONTIGS" \
@@ -1176,7 +1189,7 @@ enum findPerfectAlignmentsScript = q"{
     fi
 }";
 
-auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null)
+auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null, in size_t numThreads = 1)
 {
     auto findPerfectAlignmentsCmd = only(
         "bash",
@@ -1184,7 +1197,8 @@ auto findPerfectAlignments(in string refDb, in string queryDb = null, in string 
         findPerfectAlignmentsScript,
         "--",
         "-k",
-        tmpDir !is null ? "-T" ~ tmpDir : null,
+        tmpDir !is null ? "-t" ~ tmpDir : null,
+        "-T" ~ numThreads.to!string,
         refDb,
         queryDb !is null ? queryDb : refDb,
     );
