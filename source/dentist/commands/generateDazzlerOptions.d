@@ -14,14 +14,14 @@ import std.stdio : writefln, writeln;
 /// Execute the `generateDazzlerOptions` command with `options`.
 void execute(Options)(in Options options)
 {
+    static if (isTesting)
+    {
+        writeln("# short vs true assembly alignment options (consider using `HPC.daligner`)");
+        writefln!"daligner %-(%s %) <true-assembly> <short-read-assembly>"(options.shortVsTrueAssemblyAlignmentOptions);
+    }
+
     writeln("# self alignment options (consider using `HPC.daligner`)");
     writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
     writeln("# ref vs reads alignment options (consider using `HPC.damapper`)");
     writefln!"damapper %-(%s %) <reference> <reads>"(options.refVsReadsAlignmentOptions);
-
-    static if (isTesting)
-    {
-        writeln("# true assembly vs result alignment options (consider using `HPC.damapper`)");
-        writefln!"damapper %-(%s %) <true-assembly> <result>"(options.trueAssemblyVsResultAlignmentOptions);
-    }
 }

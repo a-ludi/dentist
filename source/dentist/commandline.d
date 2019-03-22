@@ -1301,16 +1301,28 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    static if (
-        is(typeof(OptionsFor!command().minAnchorLength)) &&
-        is(typeof(OptionsFor!command().referenceErrorRate))
-    ) {
+    static if (is(typeof(OptionsFor!command().referenceErrorRate))) {
         @Validate!validateAverageCorrelationRate
         @property auto selfAlignmentOptionsAverageCorrelationRate() const
         {
             return (1 - referenceErrorRate)^^2;
         }
 
+        @property string[] shortVsTrueAssemblyAlignmentOptions() const
+        {
+            return [
+                DalignerOptions.asymmetric,
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
+        }
+    }
+
+    static if (
+        is(typeof(OptionsFor!command().minAnchorLength)) &&
+        is(typeof(OptionsFor!command().referenceErrorRate))
+    ) {
         @property string[] selfAlignmentOptions() const
         {
             return [
@@ -1394,18 +1406,6 @@ struct OptionsFor(DentistCommand _command)
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     postConsensusAlignmentOptionsAverageCorrelationRate,
                 ),
-            ];
-        }
-    }
-
-    static if (isTesting)
-    {
-        @property string[] trueAssemblyVsResultAlignmentOptions() const
-        {
-            return [
-                DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
-                DamapperOptions.averageCorrelationRate ~ ".7",
             ];
         }
     }
