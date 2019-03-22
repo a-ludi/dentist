@@ -1,0 +1,81 @@
+import json
+from math import *
+from os.path import join
+import subprocess
+
+include: "Snakefile"
+configfile: "snakemake.testing.yml"
+
+
+#-----------------------------------------------------------------------------
+# Variables for rules
+#-----------------------------------------------------------------------------
+
+# config shortcuts
+testing_inputs = config["inputs"]
+
+# workflow files
+ground_trouth = testing_inputs["ground_trouth"]
+contig_mapping = testing_inputs["contig_mapping"]
+result_db = fasta_to_workdb(output_assembly, "dam")
+testing_config_file = prepend_ext(dentist_config_file, ".check")
+
+result_stats = config["result_stats"]
+
+#-----------------------------------------------------------------------------
+# BEGIN rules
+#-----------------------------------------------------------------------------
+
+
+localrules:
+    CHECK,
+    extend_dentist_config_for_check,
+    result2dam,
+
+
+rule CHECK:
+    input: result_stats
+
+
+rule extend_dentist_config_for_check:
+    output: testing_config_file
+    run:
+        dentist_config = None
+        with open(dentist_config_file, 'r') as base_config:
+            dentist_config = json.load(base_config)
+
+        if "check-results" not in dentist_config:
+            dentist_config["check-results"] = dict()
+        dentist_config["check-results"]["true-assembly"] = ground_trouth
+        dentist_config["check-results"]["result"] = result_db
+        dentist_config["check-results"]["mapped-regions-mask"] = contig_mapping
+
+        with open(output[0], 'w') as ext_config_file:
+            json.dump(dentist_config, ext_config_file)
+
+        validate_dentist_config(output[0])
+
+
+rule result2dam:
+    input: output_assembly
+    output: *db_files(result_db)
+    shell:
+        "fasta2DAM {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
+
+
+rule check:
+    input:
+        testing_config_file,
+        db_files(ground_trouth),
+        mask_files(ground_trouth, contig_mapping),
+        db_files(reference),
+        db_files(result_db)
+    output: result_stats
+    log: log_file("check")
+    threads: max_threads
+    shell:
+        "dentist check --config={testing_config_file} --threads={threads} - - - - 2> {log} > {output}"
+
+#-----------------------------------------------------------------------------
+# END rules
+#-----------------------------------------------------------------------------
