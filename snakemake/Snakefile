@@ -61,14 +61,13 @@ def db_files(db):
 def await_db_files(db):
     from os.path import splitext
 
-    dbtype = splitext(db)[1]
-    seqname = db_name(db.partition("_")[2]);
-
     def __await_db_files(wildcards):
-        if dbtype == ".dam":
-            return checkpoints.fasta2dam.get(seqname=seqname, workdir=workdir_).output
+        if db == reference:
+            return checkpoints.reference2dam.get(workdir=workdir_).output
+        elif db == reads:
+            return checkpoints.reads2dam.get(workdir=workdir_).output
         else:
-            return checkpoints.fasta2db.get(seqname=seqname, workdir=workdir_).output
+            raise Exception("unknown db: {}".format(db));
 
     return __await_db_files
 
@@ -278,9 +277,9 @@ dalign_flags = make_flags(config["dalign_flags"])
 localrules:
     ALL,
     extend_dentist_config,
-    fasta2dam,
+    reference2dam,
     self_alignment,
-    fasta2db,
+    reads2dam,
     ref_vs_reads_alignment,
     extend_dentist_config_for_merge,
     merge
@@ -315,9 +314,9 @@ rule extend_dentist_config:
         validate_dentist_config(output[0])
 
 
-checkpoint fasta2dam:
-    input: "{seqname}.fasta"
-    output: *db_files(join(workdir_, "dam_{seqname}.dam"))
+checkpoint reference2dam:
+    input: reference_fasta
+    output: *db_files(reference)
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
 
@@ -356,9 +355,9 @@ rule mask_self:
         "dentist mask --config={dentist_config_file} {reference} {self_alignment} {self_mask} 2> {log}"
 
 
-checkpoint fasta2db:
-    input: "{seqname}.fasta"
-    output: *db_files(join(workdir_, "db_{seqname}.db"))
+checkpoint reads2dam:
+    input: reads_fasta
+    output: *db_files(reads)
     shell:
         "fasta2DB {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
 
