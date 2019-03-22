@@ -440,7 +440,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.translocateGaps,
     ))
     {
-        @Argument("<in:short-vs-true-read-alignment>")
+        @Argument("<in:short-vs-true-alignment>")
         @Help(q"{
             locals alignments of the short-read assembly against the 'true'
             assembly in form of a .las file as produced by `daligner`
@@ -632,8 +632,8 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.output,
     ))
     {
-        @Argument("<out:result>", Multiplicity.optional)
-        @Help("write output assembly to <result> (default: stdout)")
+        @Argument("<out:test-assembly>", Multiplicity.optional)
+        @Help("write output assembly to <test-assembly> (default: stdout)")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string resultFile;
     }
