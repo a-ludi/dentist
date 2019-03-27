@@ -717,7 +717,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
     /// Get the designated edge from this graph. Only the `start` and `end`
     /// node will be compared.
-    auto get(in Edge edge)
+    auto ref get(in Edge edge)
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
         auto existingEdges = sortedEdges.equalRange(edge);
