@@ -4,7 +4,6 @@ from os.path import join
 import subprocess
 
 include: "Snakefile"
-configfile: "snakemake.testing.yml"
 
 
 #-----------------------------------------------------------------------------
@@ -16,9 +15,11 @@ testing_inputs = config["inputs"]
 
 # workflow files
 ground_trouth = testing_inputs["ground_trouth"]
+short_read_assembly = testing_inputs["short_read_assembly"]
+short_vs_true_alignment = alignment_file(ground_trouth, short_read_assembly)
 contig_mapping = testing_inputs["contig_mapping"]
 result_db = fasta_to_workdb(output_assembly, "dam")
-testing_config_file = prepend_ext(dentist_config_file, ".check")
+testing_config_file = prepend_ext(dentist_config_file, ".testing")
 
 result_stats = config["result_stats"]
 
@@ -29,26 +30,26 @@ result_stats = config["result_stats"]
 
 localrules:
     CHECK,
-    extend_dentist_config_for_check,
+    extend_dentist_config_for_testing,
     result2dam,
 
 
-rule CHECK:
-    input: result_stats
-
-
-rule extend_dentist_config_for_check:
+rule extend_dentist_config_for_testing:
+    input: dentist_config_file
     output: testing_config_file
     run:
         dentist_config = None
         with open(dentist_config_file, 'r') as base_config:
             dentist_config = json.load(base_config)
 
-        if "check-results" not in dentist_config:
-            dentist_config["check-results"] = dict()
-        dentist_config["check-results"]["true-assembly"] = ground_trouth
-        dentist_config["check-results"]["result"] = result_db
-        dentist_config["check-results"]["mapped-regions-mask"] = contig_mapping
+        if "__default__" not in dentist_config:
+            dentist_config["__default__"] = dict()
+        dentist_config["__default__"]["true-assembly"] = ground_trouth
+        dentist_config["__default__"]["short-read-assembly"] = short_read_assembly
+        dentist_config["__default__"]["short-vs-true-alignment"] = short_vs_true_alignment
+        dentist_config["__default__"]["mapped-regions-mask"] = contig_mapping
+        dentist_config["__default__"]["test-assembly"] = reference_fasta
+        dentist_config["__default__"]["result"] = result_db
 
         with open(output[0], 'w') as ext_config_file:
             json.dump(dentist_config, ext_config_file)
@@ -56,6 +57,50 @@ rule extend_dentist_config_for_check:
         validate_dentist_config(output[0])
 
 
+rule short_vs_true_alignment_block:
+    input:
+        db_files(ground_trouth),
+        db_files(short_read_assembly)
+    output: temp(alignment_file(ground_trouth, short_read_assembly, block_a='{block_true}', block_b='{block_short}'))
+    params:
+        aligncmd = generate_options_for("short vs true assembly"),
+        true_stub = db_stub(rel_to_workdir(ground_trouth)),
+        short_stub = db_stub(rel_to_workdir(short_read_assembly)),
+        dalign_flags = prepare_flags(dalign_flags)
+    threads: max_threads
+    shell:
+        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} {params.true_stub}.{wildcards.block_true} {params.short_stub}.{wildcards.block_short}"
+
+
+rule short_vs_true_alignment:
+    input:
+        db_files(ground_trouth),
+        db_files(short_read_assembly),
+        block_alignments = block_alignments(ground_trouth, short_read_assembly)
+    output:
+        temp(short_vs_true_alignment)
+    shell:
+        "LAmerge {output} {input[block_alignments]}"
+
+
+rule prepare_test_assembly:
+    input:
+        testing_config_file,
+        db_files(ground_trouth),
+        db_files(short_read_assembly),
+        short_vs_true_alignment
+    output:
+        reference_fasta
+    log: log_file("translocate")
+    shell:
+        "dentist translocate --config={testing_config_file} - - - - - 2> {log}"
+
+
+rule CHECK:
+    input: result_stats
+
+
+_fast2dam_checkpoint[output_assembly] = "result2dam"
 rule result2dam:
     input: output_assembly
     output: *db_files(result_db)
@@ -71,10 +116,13 @@ rule check:
         db_files(reference),
         db_files(result_db)
     output: result_stats
-    log: log_file("check")
+    params:
+        main_threads = main_threads,
+        auxiliary_threads = auxiliary_threads
     threads: max_threads
+    log: log_file("check")
     shell:
-        "dentist check --config={testing_config_file} --threads={threads} - - - - 2> {log} > {output}"
+        "dentist check --config={testing_config_file} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} - - - - 2> {log} > {output}"
 
 #-----------------------------------------------------------------------------
 # END rules
