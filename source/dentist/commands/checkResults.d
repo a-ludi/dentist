@@ -1052,6 +1052,8 @@ enum findPerfectAlignmentsScript = q"{
 
     function main()
     {
+        NUM_THREADS=1
+
         while getopts "kt:T:" OPTION; do
             case "$OPTION" in
                 k)
