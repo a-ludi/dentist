@@ -3,8 +3,6 @@ from math import *
 from os.path import join
 import subprocess
 
-configfile: "snakemake.yml"
-
 
 #-----------------------------------------------------------------------------
 # BEGIN functions
@@ -58,14 +56,17 @@ def db_files(db):
     return [db] + [__hidden_file(suffix)  for suffix in suffixes]
 
 
+_fast2dam_checkpoint = dict()
+
+
 def await_db_files(db):
     from os.path import splitext
 
     def __await_db_files(wildcards):
-        if db == reference:
-            return checkpoints.reference2dam.get(workdir=workdir_).output
-        elif db == reads:
-            return checkpoints.reads2dam.get(workdir=workdir_).output
+        if db in _fast2dam_checkpoint:
+            _checkpoint = getattr(checkpoints, _fast2dam_checkpoint[db])
+
+            return _checkpoint.get(workdir=workdir_).output
         else:
             raise Exception("unknown db: {}".format(db));
 
@@ -279,7 +280,7 @@ localrules:
     extend_dentist_config,
     reference2dam,
     self_alignment,
-    reads2dam,
+    reads2db,
     ref_vs_reads_alignment,
     extend_dentist_config_for_merge,
     merge
@@ -314,6 +315,7 @@ rule extend_dentist_config:
         validate_dentist_config(output[0])
 
 
+_fast2dam_checkpoint[reference] = "reference2dam"
 checkpoint reference2dam:
     input: reference_fasta
     output: *db_files(reference)
@@ -355,7 +357,8 @@ rule mask_self:
         "dentist mask --config={dentist_config_file} {reference} {self_alignment} {self_mask} 2> {log}"
 
 
-checkpoint reads2dam:
+_fast2dam_checkpoint[reads] = "reads2db"
+checkpoint reads2db:
     input: reads_fasta
     output: *db_files(reads)
     shell:
