@@ -75,7 +75,7 @@ import std.algorithm :
     sort,
     sum,
     swap,
-    SwapStrategy;
+    until;
 import std.algorithm : equal;
 import std.array : appender, array;
 import std.bitmanip : bitsSet;
@@ -85,10 +85,13 @@ import std.parallelism : parallel;
 import std.path : buildPath;
 import std.range :
     chain,
+    cycle,
     enumerate,
     iota,
     only,
+    retro,
     slide,
+    StoppingPolicy,
     walkLength,
     zip;
 import std.range.primitives;
@@ -673,7 +676,7 @@ Join!ScaffoldPayload makeScaffoldJoin(GapSegment inputGap)
 }
 
 // Not meant for public usage.
-ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
+ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments, string* reasonForEmpty = null)
 {
     alias beginRelToContigB = (alignment) => alignment.complement
         ? alignment.contigB.length - alignment.last.contigB.end
@@ -692,26 +695,33 @@ ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
     );
     alias seededPartsOfOneAlignment = (a, b) => a.alignment == b.alignment && a.seed != b.seed;
     alias shareReadSequence = (a, b) => endRelToContigB(a) > beginRelToContigB(b);
-    alias emptyRange = () => cast(ReadAlignment[])[];
+
+    auto emptyRange(string reason)()
+    {
+        static if (reason !is null)
+            if (reasonForEmpty !is null)
+                *reasonForEmpty = reason;
+
+        return cast(ReadAlignment[])[];
+    }
 
     auto seededAlignments = sameReadAlignments.map!(SeededAlignment.from).joiner.array;
     seededAlignments.sort!orderByLocusAndSeed;
 
     if (seededAlignments.length == 0)
     {
-        return emptyRange();
+        return emptyRange!"empty input";
     }
 
-    // Validate seeded alignments
-    version (assert)
-        foreach (saPair; seededAlignments.slide!(No.withPartial)(2))
-            assert(
-                (
-                    !shareReadSequence(saPair[0], saPair[1]) ||
-                    seededPartsOfOneAlignment(saPair[0], saPair[1])
-                ),
-                "illegal overlap between seeded alignments",
-            );
+    foreach (saPair; seededAlignments.slide!(No.withPartial)(2))
+        if (
+            shareReadSequence(saPair[0], saPair[1]) &
+            !seededPartsOfOneAlignment(saPair[0], saPair[1])
+        )
+        {
+            // No region of the read must be used twice.
+            return emptyRange!"alignments overlap on read";
+        }
 
     // Collect read alignments
     bool startWithExtension = beginRelToContigB(seededAlignments[0]) > 0;
@@ -729,7 +739,7 @@ ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments)
     if (readAlignments.any!"!a.isValid")
     {
         // If one read alignment is invalid we should not touch this read at all.
-        return emptyRange();
+        return emptyRange!"invalid read alignment";
     }
 
     return readAlignments;
@@ -1107,7 +1117,7 @@ private class BubbleResolver
                 sameReadAlignments,
                 cast(id_t) skippingJoin.start.contigId,
                 cast(id_t) skippingJoin.end.contigId,
-                intermediateContigIds,
+                getSkippedPath(bubble, skippingJoin),
             )
         )(augmentedAlignments[]);
 
@@ -1189,94 +1199,101 @@ private class BubbleResolver
         return intermediateAlignments;
     }
 
-    /// Tries to find a valid sequence of alignments for one read.
+    /**
+        Validates "collects" read alignments and validates them. The read
+        alignments are valid iff they reflect the same order of contigs as
+        suggested by skippedPath, ie. the scaffolding graph.
+    */
     static ReadAlignment[] collectFixedSimpleBubbles(Chunk)(
         Chunk sameReadAlignmentsChunk,
         in id_t startContigId,
         in id_t endContigId,
-        in id_t[] intermediateContigIds,
+        in ContigNode[] skippedPath,
     )
     {
-        alias toReadInterval = toInterval!(ReadInterval, "contigB");
-
         auto sameReadAlignments = sameReadAlignmentsChunk.array;
         auto readId = sameReadAlignments[0].contigB.id;
-        auto startAlignment = sameReadAlignments[]
-            .find!(ac => ac.contigA.id == startContigId).front;
-        auto endAlignment = sameReadAlignments[]
-            .find!(ac => ac.contigA.id == endContigId).front;
-        auto intermediateAlignments = sameReadAlignments[]
-            .filter!(ac => !ac.contigA.id.among(startContigId, endContigId))
-            .array;
+        string failureReason;
+        auto readAlignments = collectReadAlignments(sameReadAlignments, &failureReason);
+        auto shouldReverseSkippedPath = readAlignments.length > 0 &&
+                                        skippedPath[0].contigId != readAlignments[0][0].contigA.id;
+        auto directedSkippedPath = shouldReverseSkippedPath
+            ? skippedPath.retro.array
+            : skippedPath;
+        auto seededAlignments = readAlignments
+            .map!"a[]"
+            .joiner
+            .find!(sa => contigNodeMatchesReadAlignment(directedSkippedPath[0], sa));
 
-        assert(!toReadInterval(startAlignment).intersects(toReadInterval(endAlignment)));
-
-        static bool isFeasible(in AlignmentChain[] alignmentSubset)
-        {
-            auto newAlignmentArea = toReadInterval(alignmentSubset[$ - 1]);
-            auto coveredReadArea = ReadRegion(alignmentSubset[0 .. $ - 1]
-                .map!toReadInterval
-                .array);
-            auto coveredContigs = alignmentSubset
-                .map!(ac => 0 + ac.contigA.id)
-                .array;
-            coveredContigs.sort.release.uniqInPlace;
-
-            return coveredContigs.length == alignmentSubset.length &&
-                   (coveredReadArea - newAlignmentArea) == coveredReadArea;
-        }
-
-        static double score(in AlignmentChain[] alignmentSubset)
-        {
-            return alignmentSubset.length;
-        }
-
-        AlignmentChain[] optimalAlignmentSubset;
-
-        // Unless there are at least as many intermediate alignments as
-        // contigs no exeptable solution exists.
-        if (intermediateAlignments.length >= intermediateContigIds.length)
-            optimalAlignmentSubset = backtracking!(isFeasible, score)(
-                intermediateAlignments,
-                [startAlignment, endAlignment],
-            );
-
-        if (optimalAlignmentSubset.length == numEscapeNodes + intermediateContigIds.length)
+        void diagonsticLogMessage(string info)(in string reason = null)
         {
             logJsonDiagnostic(
-                "info", "resolved skipper",
+                "info", info,
+                "reason", reason,
                 "readId", readId,
                 "startContigId", startContigId,
-                "intermediateContigIds", intermediateContigIds.toJson,
                 "endContigId", endContigId,
                 "sameReadAlignments", shouldLog(LogLevel.debug_)
                     ? sameReadAlignments.toJson
                     : sameReadAlignments.length.toJson,
-                "optimalAlignmentSubset", shouldLog(LogLevel.debug_)
-                    ? optimalAlignmentSubset.toJson
-                    : optimalAlignmentSubset.length.toJson,
+                "readAlignments", shouldLog(LogLevel.debug_)
+                    ? readAlignments.map!"a[]".array.toJson
+                    : readAlignments.length.toJson,
+                "seededAlignments", shouldLog(LogLevel.debug_)
+                    ? seededAlignments.save.array.toJson
+                    : seededAlignments.save.walkLength.toJson,
+                "directedSkippedPath", shouldLog(LogLevel.debug_)
+                    ? directedSkippedPath.toJson
+                    : directedSkippedPath.length.toJson,
             );
-
-            return collectReadAlignments(optimalAlignmentSubset);
         }
-        else
+
+        typeof(return) invalidSkipper(in string reason)
         {
-            logJsonDiagnostic(
-                "info", "failed to resolve skipper; discarding read",
-                "readId", readId,
-                "startContigId", startContigId,
-                "intermediateContigIds", intermediateContigIds.toJson,
-                "endContigId", endContigId,
-                "sameReadAlignments", shouldLog(LogLevel.debug_)
-                    ? sameReadAlignments.toJson
-                    : sameReadAlignments.length.toJson,
-                "optimalAlignmentSubset", shouldLog(LogLevel.debug_)
-                    ? optimalAlignmentSubset.toJson
-                    : optimalAlignmentSubset.length.toJson,
-            );
+            diagonsticLogMessage!"failed to resolve skipper; discarding read"(reason);
 
             return [];
         }
+
+        if (failureReason !is null)
+            return invalidSkipper(failureReason);
+        if (directedSkippedPath.length > seededAlignments.save.walkLength)
+            return invalidSkipper("not enough read alignments");
+        if (seededAlignments.empty)
+            return invalidSkipper("missing seeded alignment for bubble start");
+
+        foreach (skipped; zip(StoppingPolicy.shortest, directedSkippedPath, seededAlignments.save))
+        {
+            auto skippedNode = skipped[0];
+            auto seededAlignment = skipped[1];
+
+            if (!contigNodeMatchesReadAlignment(skippedNode, seededAlignment))
+                return invalidSkipper("unexpected order of alignments");
+        }
+
+        diagonsticLogMessage!"resolved skipper";
+
+        return readAlignments;
+    }
+
+    static bool contigPartMatchesSeed(in ContigPart contigPart, in AlignmentLocationSeed seed)
+    {
+        final switch (contigPart)
+        {
+            case ContigPart.begin:
+                return seed == AlignmentLocationSeed.front;
+            case ContigPart.end:
+                return seed == AlignmentLocationSeed.back;
+            case ContigPart.pre: goto case;
+            case ContigPart.post:
+                return false;
+        }
+    }
+
+    static bool contigNodeMatchesReadAlignment(in ContigNode contigNode, in SeededAlignment seededAlignment)
+    {
+        return contigNode.contigId == seededAlignment.contigA.id &&
+               contigPartMatchesSeed(contigNode.contigPart, seededAlignment.seed);
     }
 
     auto getEscapeNodes(size_t[] bubble) const nothrow
@@ -1298,6 +1315,35 @@ private class BubbleResolver
             .sort
             .release
             .uniqInPlace;
+    }
+
+    auto getSkippedPath(size_t[] bubble, Join!ScaffoldPayload skippingJoin)
+    {
+        assert(bubble.length > 0, "invalid bubble: empty path");
+
+        size_t[2] skipIndices = [
+            scaffold.indexOf(skippingJoin.start),
+            scaffold.indexOf(skippingJoin.end),
+        ];
+
+        auto skippedIndices = bubble
+            .cycle
+            .find(skipIndices[0])
+            .until(skipIndices[1], No.openRight)
+            .array;
+
+        if (skippedIndices.length == 2)
+            skippedIndices = bubble
+                .cycle
+                .find(skipIndices[1])
+                .until(skipIndices[0], No.openRight)
+                .array;
+
+        assert(skippedIndices.length > 2, "skipped path is too short");
+
+        return skippedIndices
+            .map!(nodeIdx => scaffold.nodes[nodeIdx])
+            .array;
     }
 
     bool isEscapeNode(in size_t nodeIdx) const pure nothrow
