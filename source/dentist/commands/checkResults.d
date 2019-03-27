@@ -46,6 +46,7 @@ import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
 import std.algorithm :
     all,
+    among,
     copy,
     filter,
     find,
@@ -1227,9 +1228,11 @@ struct StretcherAlignment
 
 StretcherAlignment stretcher(in string refFasta, in string queryFasta)
 {
+    alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));
+
     if (refFasta.getFastaLength() == 0)
         return StretcherAlignment();
-    if (queryFasta.getFastaLength() == 0)
+    if (queryFasta.getFastaLength() == 0 || onlyNs(queryFasta))
         return StretcherAlignment(0, cast(coord_t) refFasta.getFastaLength());
 
     auto stretcherCmd = only(
