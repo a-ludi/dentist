@@ -1047,7 +1047,7 @@ struct RawMummerAlignment
     }
 }
 
-enum findPerfectAlignmentsScript = q"{
+enum findPerfectAlignmentsScript = q"EOS
     #!/bin/bash
 
     function main()
@@ -1189,7 +1189,7 @@ enum findPerfectAlignmentsScript = q"{
 
         main "$@"
     fi
-}";
+EOS";
 
 auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null, in size_t numThreads = 1)
 {
