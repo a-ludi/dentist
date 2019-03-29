@@ -249,11 +249,11 @@ unittest
 }
 
 /// Returns array `uniq`ified in-place.
-Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
+auto ref Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
     auto bufferRest = array.uniq.copy(array);
 
-    array = array[0 .. $ - bufferRest.length];
+    array.length -= bufferRest.length;
 
     return array;
 }
