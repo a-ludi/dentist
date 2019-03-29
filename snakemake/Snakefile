@@ -1,6 +1,7 @@
 import json
 from math import *
 from os.path import join
+import re
 import subprocess
 
 
@@ -133,10 +134,7 @@ def main_threads(wildcards, threads):
 
 
 def validate_dentist_config(config_file):
-    validate_template = "dentist validate-config {}"
-    validate_cmd = validate_template.format(config_file)
-
-    subprocess.check_output(validate_cmd, shell=True)
+    subprocess.check_output(["dentist", "validate-config", config_file])
 
 
 def generate_options_for(alignment_name):
@@ -155,6 +153,22 @@ def get_num_blocks(db):
 
         raise EOFError("DB not split: {}".format(db))
     except FileNotFoundError:
+        return 1
+
+
+__num_contigs_regex = re.compile(r"^\+\s+R\s+(?P<num_contigs>\d+)\s*$", re.MULTILINE)
+
+
+def get_num_contigs(db):
+    try:
+        dbdump = subprocess.check_output(["DBdump", db]).decode()
+        match = __num_contigs_regex.match(dbdump)
+
+        if not match:
+            raise Exception("Could not read number of contigs in {}".format(db))
+
+        return int(match.group("num_contigs"))
+    except CalledProcessError:
         return 1
 
 
@@ -191,12 +205,16 @@ def mask_files(db, mask):
     return (__mask_files(suffix)  for suffix in suffixes)
 
 
-def batch_range(wildcards):
+def batch_range(wildcards, batch_size, num_elements):
     batch_id = int(wildcards.batch_id, base=10)
-    from_index = batch_id * config["batch_size"]
-    to_index = min(from_index + config["batch_size"], get_num_pile_ups())
+    from_index = batch_id * batch_size
+    to_index = min(from_index + batch_size, num_elements)
 
     return "{}..{}".format(from_index, to_index)
+
+
+def insertion_batch_range(wildcards):
+    return batch_range(wildcards, config["batch_size"], get_num_pile_ups())
 
 
 def get_num_pile_ups():
@@ -204,8 +222,8 @@ def get_num_pile_ups():
     from os.path import exists
 
     try:
-        info_cmd = "dentist show-pile-ups -j {pile_ups}".format(pile_ups=pile_ups)
-        pile_ups_info = subprocess.check_output(info_cmd, shell=True, stderr=subprocess.DEVNULL)
+        info_cmd = ["dentist", "show-pile-ups", "-j", pile_ups]
+        pile_ups_info = subprocess.check_output(info_cmd, stderr=subprocess.DEVNULL)
 
         return json.loads(pile_ups_info)["numPileUps"]
     except CalledProcessError as e:
@@ -436,7 +454,7 @@ rule process:
     output:
         temp(insertions_batch)
     params:
-        batch_range = batch_range,
+        batch_range = insertion_batch_range,
         main_threads = main_threads,
         auxiliary_threads = auxiliary_threads
     threads: max_threads
