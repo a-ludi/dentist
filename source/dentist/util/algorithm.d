@@ -224,6 +224,30 @@ unittest
     assert(a.sliceUntil(7, No.openRight) == [1, 2, 4, 7]);
 }
 
+/// Returns array filtered in-place.
+auto ref Array filterInPlace(alias pred = "a", Array)(auto ref Array array) if (isDynamicArray!Array)
+{
+    auto bufferRest = array.filter!pred.copy(array);
+
+    array.length -= bufferRest.length;
+
+    return array;
+}
+
+///
+unittest
+{
+    alias isEven = n => n % 2 == 0;
+    auto arr = [1, 2, 2, 2, 3, 3, 4];
+
+    assert(filterInPlace!isEven(arr) == [2, 2, 2, 4]);
+    // The input array gets modified.
+    assert(arr == [2, 2, 2, 4]);
+
+    // Can be called with non-lvalues
+    assert(filterInPlace!isEven([1, 2, 2, 2, 3, 3, 4]) == [2, 2, 2, 4]);
+}
+
 /// Returns array `uniq`ified in-place.
 Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
