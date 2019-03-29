@@ -48,6 +48,7 @@ import std.algorithm :
     all,
     among,
     copy,
+    countUntil,
     filter,
     find,
     group,
@@ -60,7 +61,7 @@ import std.algorithm :
     startsWith,
     sum,
     until;
-import std.array : array;
+import std.array : array, minimallyInitializedArray;
 import std.ascii :
     newline,
     toLower;
@@ -73,6 +74,7 @@ import std.math :
     log10;
 import std.parallelism : parallel;
 import std.range :
+    assumeSorted,
     chain,
     enumerate,
     only,
@@ -90,13 +92,16 @@ import std.stdio :
     writeln;
 import std.string :
     join,
+    splitLines,
     tr;
+import std.traits : Unqual;
 import std.typecons :
     No,
     Tuple;
 import vibe.data.json :
     Json,
     toJson = serializeToJson,
+    toJsonCompressed = serializeToJsonString,
     toJsonString = serializeToPrettyJson;
 
 
@@ -128,10 +133,33 @@ private struct ResultAnalyzer
         id_t rightRefContig;
     }
 
-    static struct MappingAnalysisResult
+    static enum GapState
     {
-        size_t[][identityLevels.length] correctGapsPerIdentityLevel;
-        size_t totalDiffsInFilledGaps;
+        /// Unsure what happened; probably due to an assembly error.
+        unkown,
+        /// Flanking contigs could be found but not in the expected configuration.
+        broken,
+        /// Flanking contigs could be found and no sequence was inserted.
+        unclosed,
+        /// Flanking contigs could be found and sequence was inserted but a gap remains.
+        partiallyClosed,
+        /// Flanking contigs could be found and contiguous sequence was inserted.
+        closed,
+        /// This is not a gap – ignore it.
+        ignored,
+    }
+
+    static struct GapSummary
+    {
+        id_t lhsContigId;
+        GapState state;
+        coord_t gapLength;
+        StretcherAlignment alignment;
+
+        @property id_t rhsContigId() const
+        {
+            return lhsContigId + 1;
+        }
     }
 
     const(Options) options;
@@ -141,9 +169,8 @@ private struct ResultAnalyzer
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
     protected RawMummerAlignment[] contigAlignments;
-    protected InsertionMapping[] insertionMappings;
+    protected GapSummary[] gapSummaries;
     protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
-    protected size_t totalDiffsInFilledGaps;
 
     Stats collect()
     {
@@ -157,13 +184,13 @@ private struct ResultAnalyzer
         stats.numBpsKnown = getNumBpsKnown();
         stats.numBpsResult = getNumBpsResult();
         stats.numBpsInGaps = getNumBpsInGaps();
-        stats.numDiffsInGaps = totalDiffsInFilledGaps;
+        stats.numDiffsInGaps = getTotalDiffsInClosedGaps();
         stats.numTranslocatedGaps = getNumTranslocatedGaps();
         stats.numContigsExpected = getNumContigsExpected();
         stats.numMappedContigs = getNumMappedContigs();
         stats.numCorrectGaps = getNumCorrectGaps();
         stats.numClosedGaps = getNumClosedGaps();
-        stats.numPartlyClosedGaps = getNumPartlyClosedGaps();
+        stats.numPartiallyClosedGaps = getNumPartiallyClosedGaps();
         stats.maximumN50 = getMaximumN50();
         stats.inputN50 = getInputN50();
         stats.resultN50 = getResultN50();
@@ -192,34 +219,22 @@ private struct ResultAnalyzer
             options.workdir,
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
-
         contigAlignments = findReferenceContigs();
-        insertionMappings = getInsertionMappings(contigAlignments);
+        referenceGaps = getReferenceGaps();
+        gapSummaries = analyzeGaps();
+        correctGapsPerIdentityLevel = makeIdentityLevelStats();
 
-        logJsonDiagnostic(
+        if (options.gapDetailsJson !is null)
+            writeGapDetailsJson();
+
+        logJsonDebug(
             "referenceOffset", referenceOffset,
             "numContigAlignments", contigAlignments.length.toJson,
             "contigAlignments", shouldLog(LogLevel.debug_)
                 ? contigAlignments.toJson
                 : toJson(null),
-            "numInsertionMappings", insertionMappings.length.toJson,
-            "insertionMappings", shouldLog(LogLevel.debug_)
-                ? insertionMappings.toJson
-                : toJson(null),
+            "referenceGaps", referenceGaps.toJson,
         );
-
-        referenceGaps = getReferenceGaps();
-
-        debug logJsonDebug("referenceGaps", referenceGaps.toJson);
-
-        auto analysisResult = analyzeMappingQualities(
-            insertionMappings,
-            options.gapDetailsTabular !is null
-                ? File(options.gapDetailsTabular, "w")
-                : File(),
-        );
-        correctGapsPerIdentityLevel = analysisResult.correctGapsPerIdentityLevel;
-        totalDiffsInFilledGaps = analysisResult.totalDiffsInFilledGaps;
     }
 
     RawMummerAlignment[] findReferenceContigs()
@@ -261,87 +276,130 @@ private struct ResultAnalyzer
             .copy(perfectContigAlignments);
         perfectContigAlignments.length -= bufferRest.length;
 
-        alias resultOrder = orderLexicographically!(RawMummerAlignment,
-            rawAlignment => rawAlignment.resultContigId,
-            rawAlignment => rawAlignment.resultBegin,
-            rawAlignment => rawAlignment.refContigId,
-        );
-
         return perfectContigAlignments
-            .sort!resultOrder
+            .sort!referenceOrder
             .release;
     }
 
-    auto getInsertionMappings(in RawMummerAlignment[] contigAlignments)
+    GapSummary[] analyzeGaps()
     {
-        static bool isGapClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+        mixin(traceExecution);
+
+        auto contigAlignments = this.contigAlignments.assumeSorted!referenceOrder;
+        const batchBegin = options.referenceContigBatch[0];
+        auto gapSummaries = new GapSummary[options.referenceContigBatchSize];
+
+        RawMummerAlignment needleForContig(in id_t contigId) const
         {
-            return lhs.resultContigId == rhs.resultContigId;
+            typeof(return) needleAlignment;
+
+            needleAlignment.refContigId = contigId;
+
+            return needleAlignment;
         }
 
-        bool isGapPartlyClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+        foreach (i, ref gapSummary; parallel(gapSummaries))
         {
-            return lhs.resultContigId + 1 == rhs.resultContigId &&
-                   lhs.resultEnd < lhs.resultContigLength &&
-                   1 < rhs.resultBegin &&
-                   resultGapSize(lhs.resultContigId) > 0;
+            id_t lhsContigId = cast(id_t) (batchBegin + i + 1);
+            id_t rhsContigId = lhsContigId + 1;
+
+            auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
+            auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
+
+            if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
+                // One contig alignment either does not exist or is ambiguous:
+                // the gap state is unkown (default)
+                continue;
+
+            auto lhsContigAlignment = lhsContigAlignments[0];
+            auto rhsContigAlignment = rhsContigAlignments[0];
+
+            gapSummary.lhsContigId = lhsContigId;
+            gapSummary.state = getGapState(lhsContigAlignment, rhsContigAlignment);
+            gapSummary.gapLength = inputGapSize(lhsContigId);
+
+            if (gapSummary.state.among(GapState.partiallyClosed, GapState.closed))
+                gapSummary.alignment = computeInsertionAlignment(getInsertionMapping(
+                    lhsContigAlignment,
+                    rhsContigAlignment,
+                ));
         }
 
-        bool isConsecutiveContigs(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
-        {
-            return lhs.refContigId + 1 == rhs.refContigId &&
-                   trueAssemblyContig(lhs).contigId == trueAssemblyContig(rhs).contigId;
-        }
-
-        InsertionMapping getInsertionMapping(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
-        {
-            auto trueAssemblyInterval = ReferenceInterval(
-                trueAssemblyContig(lhs).contigId,
-                trueAssemblyContig(lhs).end,
-                trueAssemblyContig(rhs).begin,
-            );
-            ReferencePoint resultBegin;
-            ReferencePoint resultEnd;
-
-            if (
-                (isGapClosed(lhs, rhs) && lhs.resultEnd < rhs.resultBegin) ||
-                isGapPartlyClosed(lhs, rhs)
-            )
-            {
-                resultBegin = ReferencePoint(
-                    lhs.resultContigId,
-                    lhs.resultEnd,
-                );
-                resultEnd = ReferencePoint(
-                    rhs.resultContigId,
-                    rhs.resultBegin - 1,
-                );
-            }
-
-            return InsertionMapping(
-                trueAssemblyInterval,
-                resultBegin,
-                resultEnd,
-                lhs.refContigId,
-                rhs.refContigId,
-            );
-        }
-
-        return contigAlignments
-            .slide!(No.withPartial)(2)
-            .filter!(mappedRegionPair => isGapClosed(mappedRegionPair[0], mappedRegionPair[1]) ||
-                                         isGapPartlyClosed(mappedRegionPair[0], mappedRegionPair[1]))
-            .filter!(mappedRegionPair => isConsecutiveContigs(mappedRegionPair[0], mappedRegionPair[1]))
-            .map!(mappedRegionPair => getInsertionMapping(mappedRegionPair[0], mappedRegionPair[1]))
-            .array;
+        return gapSummaries;
     }
 
-    ReferenceInterval trueAssemblyContig(in RawMummerAlignment mapping)
+    private GapState getGapState(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    {
+        if (!isGap(lhs, rhs))
+            return GapState.ignored;
+        else if (isGapClosed(lhs, rhs))
+            return GapState.closed;
+        else if (isGapPartiallyClosed(lhs, rhs))
+            return GapState.partiallyClosed;
+        else if (isGapUnclosed(lhs, rhs))
+            return GapState.unclosed;
+        else
+            return GapState.broken;
+    }
+
+    private bool isGap(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    {
+        return mappedIntervalOf(lhs).contigId == mappedIntervalOf(rhs).contigId;
+    }
+
+    private bool isGapClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    {
+        return lhs.resultContigId == rhs.resultContigId &&
+               lhs.resultEnd < rhs.resultBegin;
+    }
+
+    private bool isGapPartiallyClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    {
+        return lhs.resultContigId + 1 == rhs.resultContigId &&
+               lhs.resultEnd < lhs.resultContigLength &&
+               1 < rhs.resultBegin &&
+               resultGapSize(lhs.resultContigId) > 0;
+    }
+
+    private bool isGapUnclosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    {
+        return lhs.resultContigId + 1 == rhs.resultContigId &&
+               lhs.resultEnd == lhs.resultContigLength &&
+               1 == rhs.resultBegin &&
+               resultGapSize(lhs.resultContigId) > 0;
+    }
+
+    InsertionMapping getInsertionMapping(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+    {
+        auto trueAssemblyInterval = ReferenceInterval(
+            mappedIntervalOf(lhs).contigId,
+            mappedIntervalOf(lhs).end,
+            mappedIntervalOf(rhs).begin,
+        );
+        auto resultBegin = ReferencePoint(
+            lhs.resultContigId,
+            lhs.resultEnd,
+        );
+        auto resultEnd = ReferencePoint(
+            rhs.resultContigId,
+            rhs.resultBegin - 1,
+        );
+
+        return InsertionMapping(
+            trueAssemblyInterval,
+            resultBegin,
+            resultEnd,
+            lhs.refContigId,
+            rhs.refContigId,
+        );
+    }
+
+    ReferenceInterval mappedIntervalOf(in RawMummerAlignment mapping) const
     {
         return mappedRegionsMask.intervals[mapping.refContigId - 1];
     }
 
-    coord_t resultGapSize(in id_t contigId)
+    coord_t resultGapSize(in id_t contigId) const
     {
         auto findGap = resultScaffoldStructure
             .filter!(gapPart => gapPart.peek!GapSegment !is null)
@@ -352,6 +410,40 @@ private struct ResultAnalyzer
             return 0;
         else
             return cast(coord_t) findGap.front.length;
+    }
+
+    coord_t inputGapSize(in id_t contigId) const
+    {
+        auto lhsMappedContig = mappedRegionsMask.intervals[contigId - 1];
+        auto rhsMappedContig = mappedRegionsMask.intervals[contigId];
+
+        assert(lhsMappedContig.contigId == rhsMappedContig.contigId);
+        assert(rhsMappedContig.begin >= lhsMappedContig.end);
+
+        return cast(coord_t) (rhsMappedContig.begin - lhsMappedContig.end);
+    }
+
+    size_t[][identityLevels.length] makeIdentityLevelStats()
+    {
+        typeof(return) correctGapsPerIdentityLevel;
+        auto lengthsBuffer = minimallyInitializedArray!(size_t[])(
+            getNumClosedGaps() * identityLevels.length,
+        );
+
+        foreach (identityLevel, minIdentity; identityLevels)
+        {
+            auto bufferRest = gapSummaries
+                .filter!(gapSummary => gapSummary.state == GapState.closed)
+                .filter!(gapSummary => minIdentity <= gapSummary.alignment.percentIdentity)
+                .map!(gapSummary => gapSummary.gapLength)
+                .copy(lengthsBuffer);
+
+            correctGapsPerIdentityLevel[identityLevel] = lengthsBuffer;
+            correctGapsPerIdentityLevel[identityLevel].length -= bufferRest.length;
+            lengthsBuffer = bufferRest;
+        }
+
+        return correctGapsPerIdentityLevel;
     }
 
     ReferenceRegion getReferenceGaps()
@@ -417,9 +509,14 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return insertionMappings
-            .map!(mapping => mapping.trueAssembly.size)
-            .sum;
+        return getGapInfos!"gapLength".sum;
+    }
+
+    size_t getTotalDiffsInClosedGaps()
+    {
+        mixin(traceExecution);
+
+        return getGapInfos!"alignment.numDiffs"(GapState.closed).sum;
     }
 
     size_t getNumTranslocatedGaps()
@@ -438,7 +535,10 @@ private struct ResultAnalyzer
 
     size_t getNumMappedContigs()
     {
-        return contigAlignments.length;
+        return contigAlignments
+            .group!((lhs, rhs) => lhs.refContigId == rhs.refContigId)
+            .filter!(group => group[1] == 1)
+            .walkLength;
     }
 
     size_t getNumCorrectGaps()
@@ -450,68 +550,50 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return insertionMappings
-            .filter!(mapping => mapping.resultBegin.contigId == mapping.resultEnd.contigId)
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == GapState.closed)
             .walkLength;
     }
 
-    size_t getNumPartlyClosedGaps()
+    size_t getNumPartiallyClosedGaps()
     {
         mixin(traceExecution);
 
-        return insertionMappings
-            .filter!(mapping => mapping.resultBegin.contigId < mapping.resultEnd.contigId)
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == GapState.partiallyClosed)
             .walkLength;
     }
 
-    MappingAnalysisResult analyzeMappingQualities(in InsertionMapping[] insertionMappings, File detailsTabular = File())
+    void writeGapDetailsJson()
     {
         mixin(traceExecution);
 
-        if (detailsTabular.isOpen)
-            detailsTabular.writefln!"%10s %10s %10s %10s %10s %s %s"(
-                "contigId",
-                "begin",
-                "end",
-                "numDiffs",
-                "percentIdentity",
-                "sequenceAlignment",
-                "gapId",
-            );
+        assert(options.gapDetailsJson !is null);
 
-        size_t[][identityLevels.length] identicalLengthsPerLevel;
-        size_t totalDiffs;
-        foreach (identicalLengths; identicalLengthsPerLevel)
-            identicalLengths.reserve(insertionMappings.length);
+        auto gapDetailsFile = File(options.gapDetailsJson, "w");
 
-        foreach (insertionMapping; parallel(insertionMappings))
+        foreach (gapSummary; gapSummaries)
         {
-            auto insertionAlignment = computeInsertionQuality(insertionMapping);
-
-            if (detailsTabular.isOpen)
-                synchronized detailsTabular.writefln!"%10d %10d %10d %10d %.8f %s %s"(
-                    insertionMapping.trueAssembly.contigId,
-                    insertionMapping.trueAssembly.begin,
-                    insertionMapping.trueAssembly.end,
-                    insertionAlignment.numDiffs,
-                    insertionAlignment.percentIdentity,
-                    insertionAlignment.alignmentString.replaceAll(ctRegex!("\n", `g`), `\n`),
-                    getGapId(insertionMapping),
-                );
-
-            foreach (i, identityLevel; identityLevels)
-                if (identityLevel < insertionAlignment.percentIdentity)
-                    synchronized
-                    {
-                        identicalLengthsPerLevel[i] ~= insertionMapping.trueAssembly.size;
-                        totalDiffs += insertionAlignment.numDiffs;
-                    }
+            if (gapSummary.state != GapState.ignored)
+                gapDetailsFile.writeln([
+                    "leftContig": gapSummary.lhsContigId.toJson,
+                    "rightContig": gapSummary.rhsContigId.toJson,
+                    "state": gapSummary.state.to!string.toJson,
+                    "gapLength": gapSummary.gapLength.toJson,
+                    "details": gapSummary.state.among(GapState.closed, GapState.partiallyClosed)
+                        ? (alignment => [
+                            "length": alignment.length.toJson,
+                            "numIdentical": alignment.numIdentical.toJson,
+                            "numDiffs": alignment.numDiffs.toJson,
+                            "percentIdentity": alignment.percentIdentity.toJson,
+                            "alignment": alignment.alignmentString.splitLines.toJson,
+                        ].toJson)(gapSummary.alignment)
+                        : toJson(null)
+                ].toJsonCompressed);
         }
-
-        return MappingAnalysisResult(identicalLengthsPerLevel, totalDiffs);
     }
 
-    StretcherAlignment computeInsertionQuality(in InsertionMapping insertionMapping)
+    StretcherAlignment computeInsertionAlignment(in InsertionMapping insertionMapping)
     {
         mixin(traceExecution);
 
@@ -672,41 +754,36 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        auto values = referenceGaps
-            .intervals
-            .map!(gap => gap.size)
-            .array;
+        auto gapSizes = getGapInfos!"gapLength".array;
 
-        if (values.length == 0)
+        if (gapSizes.length == 0)
             return size_t.max;
         else
-            return median(values);
+            return median(gapSizes);
     }
 
     size_t getClosedGapMedian()
     {
         mixin(traceExecution);
 
-        auto values = insertionMappings
-            .map!(mapping => mapping.trueAssembly.size)
-            .array;
+        auto closedGapSizes = getGapInfos!"gapLength"(GapState.closed).array;
 
-        if (values.length == 0)
+        if (closedGapSizes.length == 0)
             return size_t.max;
         else
-            return median(values);
+            return median(closedGapSizes);
     }
 
     size_t getExtremumClosedGap(alias extremeElement)()
     {
         mixin(traceExecution);
 
-        auto values = insertionMappings.map!(mapping => mapping.trueAssembly.size);
+        auto closeGapLengths = getGapInfos!"gapLength"(GapState.closed);
 
-        if (values.length == 0)
+        if (closeGapLengths.empty)
             return size_t.max;
         else
-            return extremeElement(values);
+            return extremeElement(closeGapLengths);
     }
 
     Histogram!coord_t[identityLevels.length] getCorrectGapLengthHistograms()
@@ -734,9 +811,7 @@ private struct ResultAnalyzer
 
         return histogram(
             options.bucketSize,
-            insertionMappings
-                .map!(insertionMapping => cast(coord_t) insertionMapping.trueAssembly.size)
-                .array,
+            getGapInfos!"gapLength"(GapState.closed).array,
         );
     }
 
@@ -751,6 +826,22 @@ private struct ResultAnalyzer
                 .map!(gap => cast(coord_t) gap.size)
                 .array,
         );
+    }
+
+    auto getGapInfos(string what)(in GapState wantedState) const
+    {
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == wantedState)
+            .map!(gapSummary => mixin("gapSummary." ~ what))
+            .map!(info => cast(Unqual!(typeof(info))) info);
+    }
+
+    auto getGapInfos(string what)() const
+    {
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state != GapState.ignored)
+            .map!(gapSummary => mixin("gapSummary." ~ what))
+            .map!(info => cast(Unqual!(typeof(info))) info);
     }
 }
 
@@ -799,7 +890,14 @@ auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
 
 private struct Stats
 {
-    static enum identityLevels = [.999, .99, .95, .90];
+    static enum identityLevels = [
+        1.0,
+        0.999,
+        0.99,
+        0.95,
+        0.90,
+        0.70,
+    ];
 
     size_t numBpsExpected;
     size_t numBpsKnown;
@@ -811,7 +909,7 @@ private struct Stats
     size_t numContigsExpected;
     size_t numMappedContigs;
     size_t numClosedGaps;
-    size_t numPartlyClosedGaps;
+    size_t numPartiallyClosedGaps;
     size_t maximumN50;
     size_t inputN50;
     size_t resultN50;
@@ -842,7 +940,7 @@ private struct Stats
             "numContigsExpected": numContigsExpected.toJson,
             "numMappedContigs": numMappedContigs.toJson,
             "numClosedGaps": numClosedGaps.toJson,
-            "numPartlyClosedGaps": numPartlyClosedGaps.toJson,
+            "numPartiallyClosedGaps": numPartiallyClosedGaps.toJson,
             "maximumN50": maximumN50.toJson,
             "inputN50": inputN50.toJson,
             "resultN50": resultN50.toJson,
@@ -865,28 +963,28 @@ private struct Stats
     {
         auto columnWidth = columnWidth();
         auto rows =[
-            format!"numContigsExpected:    %*d"(columnWidth, numContigsExpected),
-            format!"numMappedContigs:      %*d"(columnWidth, numMappedContigs),
+            format!"numContigsExpected:     %*d"(columnWidth, numContigsExpected),
+            format!"numMappedContigs:       %*d"(columnWidth, numMappedContigs),
 
-            format!"numTranslocatedGaps:   %*d"(columnWidth, numTranslocatedGaps),
-            format!"numClosedGaps:         %*d"(columnWidth, numClosedGaps),
-            format!"numPartlyClosedGaps:   %*d"(columnWidth, numPartlyClosedGaps),
-            format!"numCorrectGaps:        %*d"(columnWidth, numCorrectGaps),
+            format!"numTranslocatedGaps:    %*d"(columnWidth, numTranslocatedGaps),
+            format!"numClosedGaps:          %*d"(columnWidth, numClosedGaps),
+            format!"numPartiallyClosedGaps: %*d"(columnWidth, numPartiallyClosedGaps),
+            format!"numCorrectGaps:         %*d"(columnWidth, numCorrectGaps),
 
-            format!"numBpsExpected:        %*d"(columnWidth, numBpsExpected),
-            format!"numBpsKnown:           %*d"(columnWidth, numBpsKnown),
-            format!"numBpsResult:          %*d"(columnWidth, numBpsResult),
-            format!"numBpsInGaps:          %*d"(columnWidth, numBpsInGaps),
-            format!"numDiffsInGaps:        %*d"(columnWidth, numDiffsInGaps),
-            format!"averageInsertionError: %*.3e"(columnWidth, averageInsertionError),
+            format!"numBpsExpected:         %*d"(columnWidth, numBpsExpected),
+            format!"numBpsKnown:            %*d"(columnWidth, numBpsKnown),
+            format!"numBpsResult:           %*d"(columnWidth, numBpsResult),
+            format!"numBpsInGaps:           %*d"(columnWidth, numBpsInGaps),
+            format!"numDiffsInGaps:         %*d"(columnWidth, numDiffsInGaps),
+            format!"averageInsertionError:  %*.3e"(columnWidth, averageInsertionError),
 
-            format!"maximumN50:            %*d"(columnWidth, maximumN50),
-            format!"inputN50:              %*d"(columnWidth, inputN50),
-            format!"resultN50:             %*d"(columnWidth, resultN50),
-            format!"gapMedian:             %*d"(columnWidth, gapMedian),
-            format!"closedGapMedian:       %*d"(columnWidth, closedGapMedian),
-            format!"minClosedGap:          %*s"(columnWidth, minClosedGap),
-            format!"maxClosedGap:          %*s"(columnWidth, maxClosedGap),
+            format!"maximumN50:             %*d"(columnWidth, maximumN50),
+            format!"inputN50:               %*d"(columnWidth, inputN50),
+            format!"resultN50:              %*d"(columnWidth, resultN50),
+            format!"gapMedian:              %*d"(columnWidth, gapMedian),
+            format!"closedGapMedian:        %*d"(columnWidth, closedGapMedian),
+            format!"minClosedGap:           %*s"(columnWidth, minClosedGap),
+            format!"maxClosedGap:           %*s"(columnWidth, maxClosedGap),
             gapLengthHistogram.length > 0
                 ? format!"gapLengthHistogram:\n    \n%s"(histsToString(
                     correctGapLengthHistograms[0],
@@ -957,7 +1055,7 @@ private struct Stats
             numContigsExpected,
             numMappedContigs,
             numClosedGaps,
-            numPartlyClosedGaps,
+            numPartiallyClosedGaps,
             maximumN50,
             inputN50,
             resultN50,
@@ -1047,6 +1145,11 @@ struct RawMummerAlignment
         return ac;
     }
 }
+
+
+alias referenceOrder = orderLexicographically!(const(RawMummerAlignment),
+    rawAlignment => rawAlignment.refContigId,
+);
 
 enum findPerfectAlignmentsScript = q"EOS
     #!/bin/bash

@@ -47,6 +47,7 @@ import dentist.dazzler :
     DamapperOptions,
     getHiddenDbFiles,
     getMaskFiles,
+    getNumContigs,
     getTracePointDistance,
     lasEmpty,
     LasFilterAlignmentsOptions;
@@ -641,6 +642,83 @@ struct OptionsFor(DentistCommand _command)
     mixin HelpOption;
 
     static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("batch", "b")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            process only a subset of the gaps in the given range (excluding <to>).
+            <from> and <to> are zero-based indices for the contigs of the
+            reference assembly or <to> may be `$` to indicate the end of the
+            reference.
+        }")
+        void parseReferenceContigBatch(string batchString) pure
+        {
+            try
+            {
+                if (batchString.endsWith("$"))
+                {
+                    batchString.formattedRead!"%d..$"(referenceContigBatch[0]);
+                    referenceContigBatch[1] = id_t.max;
+                }
+                else
+                {
+                    batchString.formattedRead!"%d..%d"(referenceContigBatch[0], referenceContigBatch[1]);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new CLIException("ill-formatted batch range");
+            }
+        }
+
+        @property id_t numReferenceContigs() inout
+        {
+            static id_t _numReferenceContigs;
+
+            if (_numReferenceContigs == 0)
+            {
+                _numReferenceContigs = getNumContigs(refDb, "/");
+            }
+
+            return _numReferenceContigs;
+        }
+
+
+        @Option()
+        @Validate!validateReferenceContigBatchRange
+        id_t[2] referenceContigBatch;
+
+        static void validateReferenceContigBatchRange(id_t[2] referenceContigBatch, OptionsFor!command options)
+        {
+            auto from = referenceContigBatch[0];
+            auto to = referenceContigBatch[1];
+
+            enforce!CLIException(
+                referenceContigBatch == referenceContigBatch.init ||
+                (0 <= from && from < to && (to == id_t.max || to <= options.numReferenceContigs)),
+                format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
+                        options.numReferenceContigs)
+            );
+        }
+
+        @PostValidate()
+        void hookEnsurePresenceOfBatchRange()
+        {
+            if (referenceContigBatch == referenceContigBatch.init || referenceContigBatch[1] == id_t.max)
+            {
+                referenceContigBatch[1] = numReferenceContigs;
+            }
+        }
+
+        @property id_t referenceContigBatchSize() const pure nothrow
+        {
+            return referenceContigBatch[1] - referenceContigBatch[0];
+        }
+    }
+
+    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -736,7 +814,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.checkResults,
     ))
     {
-        @Option("bucket-size", "b")
+        @Option("bucket-size", "B")
         @Help(format!q"{
             bucket size of the gap length histogram; use 0 to disable (default: %d)
         }"(defaultValue!bucketSize))
@@ -814,10 +892,10 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("gap-details")
-        @MetaVar("<file>")
-        @Help("write the statistics for every single gap to a tabular file <file>")
+        @MetaVar("<json>")
+        @Help("write the summary for all gaps to a JSON file <json>")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string gapDetailsTabular;
+        string gapDetailsJson;
     }
 
     static if (command.among(
