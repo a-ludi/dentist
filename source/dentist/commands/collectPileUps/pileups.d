@@ -1157,7 +1157,7 @@ private class BubbleResolver
         auto skippingPileUpDb = dbSubset(
             buildPath(
                 options.workdir,
-                format!"skipper_%(%d-%)_pile-up.db"(intermediateContigIds),
+                format!"skipper_%(%d-%)_pile-up"(intermediateContigIds),
             ),
             options.readsDb,
             skippingReadIds[],
@@ -1167,7 +1167,7 @@ private class BubbleResolver
         auto intermediateContigsDb = dbSubset(
             buildPath(
                 options.workdir,
-                format!"skipper_%(%d-%)_intermediate-contigs.dam"(intermediateContigIds),
+                format!"skipper_%(%d-%)_intermediate-contigs"(intermediateContigIds),
             ),
             options.refDb,
             intermediateContigIds[],

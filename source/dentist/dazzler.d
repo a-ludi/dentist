@@ -211,13 +211,12 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
-    assert(
-        outputDb.extension !is null || outputDb.extension == inDbFile.extension,
-        "mismatched DB file extensions",
-    );
+    auto _outputDb = outputDb.extension == inDbFile.extension
+        ? outputDb
+        : outputDb ~ inDbFile.extension;
 
-    buildSubsetDb(inDbFile, outputDb, readIds, options.workdir);
-    dbsplit(outputDb, options.dbsplitOptions, options.workdir);
+    buildSubsetDb(inDbFile, _outputDb, readIds, options.workdir);
+    dbsplit(_outputDb, options.dbsplitOptions, options.workdir);
 
     return outputDb;
 }
