@@ -39,6 +39,13 @@ def fasta_to_workdb(fasta_file, ext):
     return join(config["workdir"], "{ext}_{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
 
 
+def fasta2dazz_command(target_db):
+    if target_db.endswith(".db"):
+        return "fasta2DB"
+    else:
+        return "fasta2DAM"
+
+
 def db_files(db):
     from os.path import dirname
 
@@ -272,7 +279,8 @@ reference_fasta = inputs["reference"]
 reads_fasta = inputs["reads"]
 output_assembly = config["output_assembly"]
 reference = fasta_to_workdb(reference_fasta, "dam")
-reads = fasta_to_workdb(reads_fasta, "db")
+reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
+reads = fasta_to_workdb(reads_fasta, reads_db_type)
 dentist_config_file = join(workdir_, workflow_["config"])
 dentist_merge_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
@@ -379,8 +387,10 @@ _fast2dam_checkpoint[reads] = "reads2db"
 checkpoint reads2db:
     input: reads_fasta
     output: *db_files(reads)
+    params:
+        fasta2dazz = fasta2dazz_command(reads)
     shell:
-        "fasta2DB {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
+        "{params.fasta2dazz} {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
 
 
 rule ref_vs_reads_alignment_block:
@@ -464,8 +474,7 @@ rule process:
 
 rule extend_dentist_config_for_merge:
     input:
-        dentist_config_file,
-        insertions_batches = insertions_batches()
+        dentist_config_file
     output:
         temp(dentist_merge_config_file)
     run:
@@ -476,7 +485,7 @@ rule extend_dentist_config_for_merge:
         if "merge-insertions" not in merge_config:
             merge_config["merge-insertions"] = dict()
         merge_config["merge-insertions"]["insertions"] = insertions
-        merge_config["merge-insertions"]["partitioned-insertions"] = input.insertions_batches
+        merge_config["merge-insertions"]["partitioned-insertions"] = list(insertions_batches())
 
         with open(output[0], 'w') as ext_config_file:
             json.dump(merge_config, ext_config_file)

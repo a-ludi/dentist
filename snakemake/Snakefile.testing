@@ -70,6 +70,7 @@ gap_details_batch = join(workdir_, workflow_["gap_details_batch"])
 
 localrules:
     extend_dentist_config_for_testing,
+    short_vs_true_alignment,
     result2dam,
     merge_result_stats,
     merge_gap_details,
@@ -125,7 +126,7 @@ rule short_vs_true_alignment:
         db_files(short_read_assembly),
         block_alignments = block_alignments(ground_trouth, short_read_assembly)
     output:
-        temp(short_vs_true_alignment)
+        short_vs_true_alignment
     shell:
         "LAmerge {output} {input[block_alignments]}"
 
