@@ -630,11 +630,20 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         TestingCommand.translocateGaps,
-        DentistCommand.output,
     ))
     {
         @Argument("<out:test-assembly>", Multiplicity.optional)
         @Help("write output assembly to <test-assembly> (default: stdout)")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string resultFile;
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Argument("<out:result>", Multiplicity.optional)
+        @Help("write gap-closed assembly to <result> (default: stdout)")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
         string resultFile;
     }
