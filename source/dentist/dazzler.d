@@ -53,7 +53,12 @@ import std.algorithm :
     SwapStrategy,
     uniq,
     until;
-import std.array : appender, Appender, array, uninitializedArray;
+import std.array :
+    appender,
+    Appender,
+    array,
+    split,
+    uninitializedArray;
 import std.conv : to;
 import std.exception : enforce;
 import std.file : exists, remove;
@@ -2526,7 +2531,8 @@ struct GapSegment
 
 private struct ScaffoldStructureReader
 {
-    static enum scaffoldInfoLineFormat = "%s:: Contig %d[%d,%d]";
+    static enum scaffoldInfoLineSeparator = " :: ";
+    static enum scaffoldInfoLineFormat = "Contig %d[%d,%d]";
     alias RawScaffoldInfo = typeof("".lineSplitter);
 
     private RawScaffoldInfo rawScaffoldInfo;
@@ -2564,13 +2570,17 @@ private struct ScaffoldStructureReader
             lastContigPart.scaffoldId,
         );
 
-        rawScaffoldInfo.front.formattedRead!scaffoldInfoLineFormat(
-            nextContigPart.header,
+        auto currentLine = rawScaffoldInfo.front;
+        auto parts = rawScaffoldInfo.front.split(scaffoldInfoLineSeparator);
+
+        assert(parts.length == 2, "illegally formatted line from `DBshow -n`");
+        nextContigPart.header = parts[0];
+        parts[1].formattedRead!scaffoldInfoLineFormat(
             nextContigPart.contigId,
             nextContigPart.begin,
             nextContigPart.end,
         );
-        auto hasHeaderChanged = lastContigPart.header != nextContigPart.header[0 .. $ - 1];
+        auto hasHeaderChanged = lastContigPart.header != nextContigPart.header;
 
         if (hasHeaderChanged)
             ++nextContigPart.scaffoldId;
@@ -2578,9 +2588,6 @@ private struct ScaffoldStructureReader
         if (currentPart.peek!GapSegment !is null
                 || lastContigPart.scaffoldId != nextContigPart.scaffoldId)
         {
-            assert(nextContigPart.header[$ - 1] == ' ');
-            // Remove the trailing space
-            nextContigPart.header = nextContigPart.header[0 .. $ - 1];
             lastContigPart = nextContigPart;
             currentPart = nextContigPart;
             rawScaffoldInfo.popFront();
