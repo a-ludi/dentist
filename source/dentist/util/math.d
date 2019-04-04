@@ -111,7 +111,7 @@ unittest
 /// Calculate the Nxx (e.g. N50) of values.
 ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__traits(compiles, sort(values)))
 {
-    static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined for empty set");
+    static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined");
     assert(values.length > 0, "N" ~ xx.to!string ~ " is undefined for empty set");
     auto xxPercentile = xx/100.0 * totalSize;
     auto sortedValues = values.sort;
@@ -120,7 +120,7 @@ ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__trai
         .cumulativeFold!"a + b"(cast(ElementType!Range) 0)
         .countUntil!"a >= b"(xxPercentile);
 
-    if (targetIndex == values.length)
+    if (targetIndex.among(-1, values.length))
         return 0;
     else
         return sortedValues[$ - targetIndex - 1];
