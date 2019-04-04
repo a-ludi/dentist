@@ -16,7 +16,7 @@ import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion,
-    to;
+    toInterval;
 import dentist.common.alignments :
     AlignmentChain,
     id_t;
@@ -102,9 +102,8 @@ private struct Translocator
         );
         mappedRegions = ReferenceRegion(alignments
             .filter!"a.isProper"
-            .map!(to!(ReferenceRegion, "contigA"))
-            .map!"a.intervals.dup"
-            .joiner
+            .map!(ac => ac.toInterval!(ReferenceInterval, "contigA"))
+            .filter!"a.size > 0"
             .array);
         writeMask(
             options.trueAssemblyDb,
@@ -125,20 +124,22 @@ private struct Translocator
 
         foreach (id_t contigId; 1 .. numRefContigs + 1)
         {
-            getScaffoldHeader(contigId).copy(writer);
+            needle.contigId = contigId;
+            auto contigMappedRegions = mappedRegions.equalRange(needle);
+
+            if (contigMappedRegions.length == 0)
+                continue;
 
             auto contigSequence = getFastaSequence(
                 options.trueAssemblyDb,
                 contigId,
                 options.workdir,
             );
-            needle.contigId = contigId;
-            auto contigMappedRegions = chain(
-                only(needle),
-                mappedRegions.equalRange(needle)
-            );
+            auto keepRegionsPairs = chain(only(needle), contigMappedRegions)
+                .slide!(No.withPartial)(2);
 
-            foreach (keepRegions; contigMappedRegions.slide!(No.withPartial)(2))
+            getScaffoldHeader(contigId).copy(writer);
+            foreach (keepRegions; keepRegionsPairs)
             {
                 if (keepRegions[0].end > 0)
                     repeat(unknownBase)
