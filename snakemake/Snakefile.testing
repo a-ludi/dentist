@@ -111,7 +111,7 @@ rule short_vs_true_alignment_block:
         db_files(short_read_assembly)
     output: temp(alignment_file(ground_trouth, short_read_assembly, block_a='{block_true}', block_b='{block_short}'))
     params:
-        aligncmd = generate_options_for("short vs true assembly"),
+        aligncmd = generate_options_for("short vs true assembly", testing_config_file),
         true_stub = db_stub(rel_to_workdir(ground_trouth)),
         short_stub = db_stub(rel_to_workdir(short_read_assembly)),
         dalign_flags = prepare_flags(dalign_flags)

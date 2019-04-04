@@ -144,9 +144,9 @@ def validate_dentist_config(config_file):
     subprocess.check_output(["dentist", "validate-config", config_file])
 
 
-def generate_options_for(alignment_name):
-    generate_template = "dentist generate | sed -nE '/^#.*{}/ {{ n; s/^([^<]+).*/\\1/p }}'"
-    generate_cmd = generate_template.format(alignment_name)
+def generate_options_for(alignment_name, config_file):
+    generate_template = "dentist generate --config={} | sed -nE '/^#.*{}/ {{ n; s/^([^<]+).*/\\1/p }}'"
+    generate_cmd = generate_template.format(config_file, alignment_name)
 
     return subprocess.check_output(generate_cmd, shell=True).decode().rstrip()
 
@@ -353,7 +353,7 @@ rule self_alignment_block:
     input: await_db_files(reference)
     output: temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}'))
     params:
-        aligncmd = generate_options_for("self"),
+        aligncmd = generate_options_for("self", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
@@ -400,7 +400,7 @@ rule ref_vs_reads_alignment_block:
         await_db_files(reads)
     output: temp(alignment_file(reference, reads, block_b='{block_reads}'))
     params:
-        aligncmd = generate_options_for("reads"),
+        aligncmd = generate_options_for("reads", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         dalign_flags = prepare_flags(dalign_flags)
