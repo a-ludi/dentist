@@ -36,7 +36,7 @@ def prepend_ext(filename, ext):
 
 
 def fasta_to_workdb(fasta_file, ext):
-    return join(config["workdir"], "{ext}_{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
+    return join(config["workdir"], "{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
 
 
 def fasta2dazz_command(target_db):
@@ -175,7 +175,7 @@ def get_num_contigs(db):
             raise Exception("Could not read number of contigs in {}".format(db))
 
         return int(match.group("num_contigs"))
-    except CalledProcessError:
+    except subprocess.CalledProcessError:
         return 1
 
 
@@ -353,7 +353,7 @@ rule self_alignment_block:
     input: await_db_files(reference)
     output: temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}'))
     params:
-        aligncmd = generate_options_for("self", dentist_config_file),
+        aligncmd = lambda _: generate_options_for("self", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
@@ -400,7 +400,7 @@ rule ref_vs_reads_alignment_block:
         await_db_files(reads)
     output: temp(alignment_file(reference, reads, block_b='{block_reads}'))
     params:
-        aligncmd = generate_options_for("reads", dentist_config_file),
+        aligncmd = lambda _: generate_options_for("reads", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         dalign_flags = prepare_flags(dalign_flags)
@@ -474,7 +474,8 @@ rule process:
 
 rule extend_dentist_config_for_merge:
     input:
-        dentist_config_file
+        dentist_config_file,
+        await_pile_ups()
     output:
         temp(dentist_merge_config_file)
     run:
