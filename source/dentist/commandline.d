@@ -40,6 +40,9 @@ import dentist.common.configfile :
     SizeUnit,
     toBytes;
 import dentist.common.binio : PileUpDb;
+import dentist.common.external :
+    ExternalDependency,
+    externalDependencies;
 import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DaccordOptions,
@@ -103,6 +106,9 @@ import std.parallelism :
 import std.path :
     absolutePath,
     buildPath;
+import std.process :
+    spawnProcess,
+    wait;
 import std.range :
     ElementType,
     only,
@@ -154,6 +160,19 @@ enum ReturnCode
 /// Start `dentist` with the given set of arguments.
 ReturnCode run(in string[] args)
 {
+    try
+    {
+        assertExternalToolsAvailable();
+    }
+    catch (Exception e)
+    {
+        stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
+            ? e.to!string
+            : e.msg));
+
+        return ReturnCode.commandlineError;
+    }
+
     if (args.length == 1)
     {
         printBaseHelp();
@@ -239,6 +258,35 @@ unittest
     assert(run([executableName, "foobar"]) == ReturnCode.commandlineError);
     assert(run([executableName, "--foo"]) == ReturnCode.commandlineError);
     assert(run([executableName]) == ReturnCode.commandlineError);
+}
+
+void assertExternalToolsAvailable()
+{
+    alias devnull = () => File("/dev/null", "w+");
+    auto checkProcesses = externalDependencies
+        .map!(extDep => tuple(extDep, spawnProcess(
+            [
+                "/bin/which",
+                "--skip-alias",
+                "--skip-functions",
+                extDep.executable,
+            ],
+            devnull(),
+            devnull(),
+            devnull(),
+        )));
+
+    ExternalDependency[] missingExternalTools;
+    missingExternalTools.reserve(externalDependencies.length);
+
+    foreach (checkProcess; checkProcesses)
+        if (checkProcess[1].wait() != 0)
+            missingExternalTools ~= checkProcess[0];
+
+    if (missingExternalTools.length > 0)
+        throw new CLIException(format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
+            missingExternalTools
+        ));
 }
 
 string parseCommandName(in string[] args)

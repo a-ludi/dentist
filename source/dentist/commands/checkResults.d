@@ -24,6 +24,7 @@ import dentist.common.alignments :
     diff_t,
     id_t;
 import dentist.common.commands : TestingCommand;
+import dentist.common.external : ExternalDependency;
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
@@ -1295,6 +1296,13 @@ enum findPerfectAlignmentsScript = q"EOS
     fi
 EOS";
 
+@ExternalDependency("nucmer", "MUMmer >=4.0", "https://mummer4.github.io/")
+@ExternalDependency("delta-filter", "MUMmer >=4.0", "https://mummer4.github.io/")
+@ExternalDependency("show-coords", "MUMmer >=4.0", "https://mummer4.github.io/")
+@ExternalDependency("tail", "POSIX")
+@ExternalDependency("awk", "POSIX")
+@ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+@ExternalDependency("sed", "POSIX")
 auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null, in size_t numThreads = 1)
 {
     auto findPerfectAlignmentsCmd = only(
@@ -1329,6 +1337,7 @@ struct StretcherAlignment
     }
 }
 
+@ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
 StretcherAlignment stretcher(in string refFasta, in string queryFasta)
 {
     alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));

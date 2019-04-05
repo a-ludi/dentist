@@ -12,6 +12,7 @@ import core.memory : GC;
 import dentist.common : ReferenceInterval, ReferenceRegion;
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.common.binio : CompressedSequence;
+import dentist.common.external : ExternalDependency;
 import dentist.util.algorithm : sliceUntil;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
@@ -104,6 +105,7 @@ import std.variant : Algebraic;
 import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writeln;
+
 
 /// File suffixes of hidden .db files.
 private enum hiddenDbFileSuffixes = [".bps", ".idx"];
@@ -588,7 +590,7 @@ private struct LasDumpLineFormatTuple
     string format;
 }
 
-private enum LasDumpLineFormat
+private enum LasDumpLineFormat : LasDumpLineFormatTuple
 {
     totalChainPartsCount = LasDumpLineFormatTuple('+', 'P', "+ P %d"),
     totalTracePointsCount = LasDumpLineFormatTuple('+', 'T', "+ T %d"),
@@ -603,7 +605,7 @@ private enum LasDumpLineFormat
     tracePoint = LasDumpLineFormatTuple(' ', '\0', " %d %d"),
 }
 
-private enum ChainPartType
+private enum ChainPartType : char
 {
     start = '>',
     continuation = '-',
@@ -3046,7 +3048,7 @@ enum DamapperOptions : string
 }
 
 /// Options for `DBdump`.
-enum DBdumpOptions
+enum DBdumpOptions : string
 {
     readNumber = "-r",
     originalHeader = "-h",
@@ -3061,7 +3063,7 @@ enum DBdumpOptions
 }
 
 /// Options for `DBshow`.
-enum DBshowOptions
+enum DBshowOptions : string
 {
     untrimmedDatabase = "-u",
     showQuiva = "-q",
@@ -3075,7 +3077,7 @@ enum DBshowOptions
 }
 
 /// Options for `fasta2DAM` and `fasta2DB`.
-enum Fasta2DazzlerOptions
+enum Fasta2DazzlerOptions : string
 {
     verbose = "-v",
     /// Import files listed 1/line in given file.
@@ -3085,7 +3087,7 @@ enum Fasta2DazzlerOptions
 }
 
 /// Options for `LAdump`.
-enum LAdumpOptions
+enum LAdumpOptions : string
 {
     coordinates = "-c",
     numDiffs = "-d",
@@ -3095,14 +3097,14 @@ enum LAdumpOptions
 }
 
 /// Options for `computeintrinsicqv`.
-enum ComputeIntrinsicQVOptions
+enum ComputeIntrinsicQVOptions : string
 {
     /// Read depth aka. read coverage. (mandatory)
     readDepth = "-d",
 }
 
 /// Options for `lasfilteralignments`.
-enum LasFilterAlignmentsOptions
+enum LasFilterAlignmentsOptions : string
 {
     /// Error threshold for proper alignment termination (default: 0.35)
     errorThresold = "-e",
@@ -3121,6 +3123,7 @@ private
         dalign([refDam, readsDam], dalignerOpts, workdir);
     }
 
+    @ExternalDependency("daligner", null, "https://github.com/thegenemyers/DALIGNER")
     void dalign(in string[] dbList, in string[] dalignerOpts, in string workdir)
     {
         assert(dbList.length >= 1);
@@ -3143,6 +3146,7 @@ private
         damapper([refDam, readsDam], damapperOpts, workdir);
     }
 
+    @ExternalDependency("damapper", null, "https://github.com/thegenemyers/DAMAPPER")
     void damapper(in string[] dbList, in string[] damapperOpts, in string workdir)
     {
         const(string[]) dbListRelativeToWorkDir = dbList.map!(
@@ -3152,6 +3156,7 @@ private
                 damapperOpts, dbListRelativeToWorkDir), workdir);
     }
 
+    @ExternalDependency("computeintrinsicqv", "daccord", "https://gitlab.com/german.tischler/daccord")
     void computeIntrinsicQV(in string dbFile, in string lasFile, in size_t readDepth,
                              in string workdir)
     {
@@ -3165,6 +3170,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("lasfilteralignments", "daccord", "https://gitlab.com/german.tischler/daccord")
     string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options,
                              in string workdir)
     {
@@ -3183,6 +3189,8 @@ private
         return filteredLasFile;
     }
 
+    @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
+    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
     string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3201,6 +3209,7 @@ private
         return daccordedDb;
     }
 
+    @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
     void silentDaccord(in string dbFile, in string lasFile, in string[] daccordOpts,
             in string workdir)
     {
@@ -3212,6 +3221,9 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DB", null, "https://github.com/thegenemyers/DAZZ_DB")
     void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3231,6 +3243,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
     void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
@@ -3286,11 +3299,13 @@ private
         return;
     }
 
+    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
     void fasta2dam(in string inFile, in string outFile, in string workdir)
     {
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
+    @ExternalDependency("DBsplit", null, "https://github.com/thegenemyers/DAZZ_DB")
     void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir)
     {
         executeCommand(chain(only("DBsplit"), dbsplitOptions,
@@ -3303,6 +3318,7 @@ private
         return ladump(lasFile, dbA, dbB, [], ladumpOpts, workdir);
     }
 
+    @ExternalDependency("LAdump", null, "https://github.com/thegenemyers/DALIGNER")
     auto ladump(in string lasFile, in string dbA, in string dbB, in id_t[] readIds,
             in string[] ladumpOpts, in string workdir)
     {
@@ -3318,6 +3334,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir)
     {
         return executePipe(chain(
@@ -3327,6 +3344,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
             in string[] dbdumpOptions, in string workdir)
         if (
@@ -3355,6 +3373,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(
         in string dbFile,
         id_t firstRecord,
@@ -3383,11 +3402,13 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string contigId)
     {
         return executeCommand(only("DBshow", dbFile, contigId));
     }
 
+    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string[] dbshowOptions)
     {
         return executeCommand(chain(only("DBshow"), dbshowOptions, only(dbFile)));
