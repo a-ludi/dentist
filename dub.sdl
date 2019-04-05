@@ -10,6 +10,7 @@ dependency        "vibe-d:data"        version="~>0.8.4-alpha.1"
 
 targetType        "executable"
 mainSourceFile    "source/app.d"
+stringImportPaths "scripts"
 
 buildRequirements "allowWarnings"
 // NOTE: fixes deprecation warning in `std.typecons.BitFlags`
