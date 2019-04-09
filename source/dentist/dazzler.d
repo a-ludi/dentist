@@ -1850,11 +1850,23 @@ unittest
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir)
+auto getFastaSequences(in string dbFile, in string workdir = null)
+{
+    enum size_t[] allRecords = [];
+
+    return getFastaSequences(dbFile, allRecords, workdir);
+}
+
+/// ditto
+auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir = null)
         if (isForwardRange!Range && is(ElementType!Range : size_t))
 {
     string[] dbdumpOptions = [DBdumpOptions.sequenceString];
     auto numRecords = recordNumbers.save.walkLength;
+
+    if (numRecords == 0)
+        numRecords = getNumContigs(dbFile, workdir);
+
     auto sequences = readSequences(dbdump(dbFile, recordNumbers, dbdumpOptions, workdir));
     size_t numFoundSequences;
 
@@ -2454,7 +2466,7 @@ coord_t getContigCutoff(in string dbFile)
     return contigCutoff;
 }
 
-id_t getNumContigs(in string damFile, in string workdir)
+id_t getNumContigs(in string damFile, in string workdir = null)
 {
     enum contigNumFormat = "+ R %d";
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
@@ -3335,7 +3347,7 @@ private
     }
 
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
-    auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir)
+    auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir = null)
     {
         return executePipe(chain(
             only("DBdump"),
@@ -3346,7 +3358,7 @@ private
 
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
-            in string[] dbdumpOptions, in string workdir)
+            in string[] dbdumpOptions, in string workdir = null)
         if (
             isForwardRange!Range &&
             (
@@ -3506,8 +3518,11 @@ private
         assert("foo_bar.db".stripBlock == "foo_bar.db");
     }
 
-    string relativeToWorkdir(in string fileName, in string workdir)
+    string relativeToWorkdir(in string fileName, in string workdir = null)
     {
-        return relativePath(absolutePath(fileName), absolutePath(workdir));
+        if (workdir is null)
+            return fileName;
+        else
+            return relativePath(absolutePath(fileName), absolutePath(workdir));
     }
 }
