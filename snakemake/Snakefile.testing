@@ -3,7 +3,7 @@ from math import *
 from os.path import join
 import subprocess
 
-include: "Snakefile"
+include: "workflow_helper.py"
 
 
 #-----------------------------------------------------------------------------
