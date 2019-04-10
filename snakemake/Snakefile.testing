@@ -110,7 +110,7 @@ rule short_vs_true_alignment_block:
         db_files(ground_trouth),
         db_files(short_read_assembly),
         testing_config_file
-    output: temp(alignment_file(ground_trouth, short_read_assembly, block_a='{block_true}', block_b='{block_short}'))
+    output: temp(alignment_file(ground_trouth, short_read_assembly, block_b='{block_short}'))
     params:
         aligncmd = generate_options_for("short vs true assembly", testing_config_file),
         true_stub = db_stub(rel_to_workdir(ground_trouth)),
@@ -118,14 +118,14 @@ rule short_vs_true_alignment_block:
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
     shell:
-        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} {params.true_stub}.{wildcards.block_true} {params.short_stub}.{wildcards.block_short}"
+        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} {params.true_stub} {params.short_stub}.{wildcards.block_short}"
 
 
 rule short_vs_true_alignment:
     input:
         db_files(ground_trouth),
         db_files(short_read_assembly),
-        block_alignments = block_alignments(ground_trouth, short_read_assembly)
+        block_alignments = block_alignments(ground_trouth, short_read_assembly, damapper=True)
     output:
         short_vs_true_alignment
     shell:

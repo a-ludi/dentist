@@ -17,7 +17,7 @@ void execute(Options)(in Options options)
     static if (isTesting)
     {
         writeln("# short vs true assembly alignment options (consider using `HPC.daligner`)");
-        writefln!"daligner %-(%s %) <true-assembly> <short-read-assembly>"(options.shortVsTrueAssemblyAlignmentOptions);
+        writefln!"damapper %-(%s %) <true-assembly> <short-read-assembly>"(options.shortVsTrueAssemblyAlignmentOptions);
     }
 
     writeln("# self alignment options (consider using `HPC.daligner`)");

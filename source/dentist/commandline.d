@@ -1446,8 +1446,9 @@ struct OptionsFor(DentistCommand _command)
         @property string[] shortVsTrueAssemblyAlignmentOptions() const
         {
             return [
-                DalignerOptions.asymmetric,
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
                     selfAlignmentOptionsAverageCorrelationRate,
                 ),
             ];
