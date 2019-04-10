@@ -1658,7 +1658,7 @@ struct NaturalNumberSet
         {
             size_t j = 0;
 
-            while ((part >> j) != emptyPart)
+            while ((part >> j) != emptyPart && j < partSize)
             {
                 while (((part >> j) & firstBit) != firstBit)
                     ++j;
