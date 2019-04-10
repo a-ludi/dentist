@@ -13,8 +13,6 @@ mainSourceFile    "source/app.d"
 stringImportPaths "scripts"
 
 buildRequirements "allowWarnings"
-// NOTE: fixes deprecation warning in `std.typecons.BitFlags`
-dflags            "-transition=intpromote"
 
 preBuildCommands  "./update-swinfo.sh" "./update-modules.sh"
 
