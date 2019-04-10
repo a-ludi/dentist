@@ -49,18 +49,19 @@ def gap_details_batches():
 
 # config shortcuts
 testing_inputs = config["inputs"]
+testing_outputs = config["outputs"]
 
 # workflow files
 ground_trouth = testing_inputs["ground_trouth"]
 short_read_assembly = testing_inputs["short_read_assembly"]
 short_vs_true_alignment = alignment_file(ground_trouth, short_read_assembly)
 contig_mapping = testing_inputs["contig_mapping"]
-result_db = fasta_to_workdb(output_assembly, "dam")
+result_db = fasta_to_workdb(testing_outputs["output_assembly"], "dam")
 testing_config_file = prepend_ext(dentist_config_file, ".testing")
 
-result_stats = config["result_stats"]
+result_stats = testing_outputs["result_stats"]
 result_stats_batch = join(workdir_, workflow_["result_stats_batch"])
-gap_details = config["gap_details"]
+gap_details = testing_outputs["gap_details"]
 gap_details_batch = join(workdir_, workflow_["gap_details_batch"])
 
 #-----------------------------------------------------------------------------

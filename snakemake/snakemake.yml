@@ -4,11 +4,12 @@ inputs:
     # The set of long reads used for gap closing
     reads:              reads.fasta
 
-# The gap-closed reference assembly
-output_assembly:    gap-closed.fasta
+outputs:
+    # The gap-closed reference assembly
+    output_assembly:    gap-closed.fasta
 
-# Base config file for dentist; this file will be
-# copied and extended by `snakemake`
+# This will be used to generate a config file for dentist. Vital parameters
+# and options are automatically inserted by the workflow.
 dentist_config:
     __default__:
         read-coverage:      73.0
