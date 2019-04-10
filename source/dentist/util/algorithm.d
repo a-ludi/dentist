@@ -227,6 +227,8 @@ unittest
 /// Returns array filtered in-place.
 auto ref Array filterInPlace(alias pred = "a", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
+    import std.algorithm : filter;
+
     auto bufferRest = array.filter!pred.copy(array);
 
     array.length -= bufferRest.length;
