@@ -3,6 +3,7 @@ inputs:
     reference:          reference.fasta
     # The set of long reads used for gap closing
     reads:              reads.fasta
+    reads_type:         PACBIO_SMRT
 
 outputs:
     # The gap-closed reference assembly
