@@ -1349,6 +1349,13 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
+    @Option("quiet", "q")
+    @Help("
+        reduce output as much as possible reporting only fatal errors. If
+        given this option overrides --verbose.
+    ")
+    OptionFlag quiet;
+
     @Option("verbose", "v")
     @Help("
         increase output to help identify problems; use up to three times.
@@ -1369,6 +1376,9 @@ struct OptionsFor(DentistCommand _command)
     @PostValidate(Priority.high)
     void hookInitLogLevel()
     {
+        if (quiet)
+            verbosity = 0;
+
         if (verbosity >= 3)
             logJsonWarn("info", "high level of verbosity may drastically reduce performance");
 
