@@ -285,6 +285,11 @@ class AssemblyWriter
 
     void logSparseInsertionWalks()
     {
+        auto oldLogLevel = getLogLevel();
+        setLogLevel(LogLevel.fatal);
+        scope (exit)
+            setLogLevel(oldLogLevel);
+
         stderr.write(`{"scaffolds":[`);
 
         foreach (i, startNode; scaffoldStartNodes)
@@ -293,6 +298,9 @@ class AssemblyWriter
                 stderr.write(`[`);
             else
                 stderr.write(`,[`);
+
+            auto insertionBegin = startNode;
+            coord_t currentPosition;
 
             foreach (enumJoin; enumerate(linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)))
             {
@@ -303,23 +311,58 @@ class AssemblyWriter
                     stderr.write(`,`);
 
                 if (join.isDefault)
-                    stderr.writef!`{"action":"copy","contigId":%d}`(join.start.contigId);
-                else if (join.isOutputGap)
-                    stderr.writef!`{"action":"gap","length":%d}`(join.payload.contigLength);
-                else if (join.isGap)
-                    stderr.writef!`{"action":"insert","contigIds":[%d,%d],"length":%d}`(
+                {
+                    auto insertionInfo = getInfoForExistingContig(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"copy","contigId":%d,"length":%d,"position":%d}`(
                         join.start.contigId,
-                        join.end.contigId,
-                        join.payload.sequence.length
+                        insertionInfo.length,
+                        currentPosition,
                     );
+                    currentPosition += insertionInfo.length;
+                }
+                else if (join.isOutputGap)
+                {
+                    auto insertionInfo = getInfoForGap(join);
+
+                    stderr.writef!`{"action":"gap","length":%d,"position":%d}`(
+                        insertionInfo.length,
+                        currentPosition,
+                    );
+                    currentPosition += insertionInfo.length;
+                }
+                else if (join.isGap)
+                {
+                    auto insertionInfo = getInfoForNewSequenceInsertion(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"insert","contigs":[{"id":%d,"pos":"%s"},{"id":%d,"pos":"%s"}],"length":%d,"position":%d}`(
+                        join.start.contigId,
+                        join.start.contigPart.to!string,
+                        join.end.contigId,
+                        join.end.contigPart.to!string,
+                        insertionInfo.length,
+                        currentPosition,
+                    );
+                    currentPosition += insertionInfo.length;
+                }
                 else if (join.isExtension)
-                    stderr.writef!`{"action":"insert","contigIds":[%d],"contigPart":"%s","length":%d}`(
+                {
+                    auto insertionInfo = getInfoForNewSequenceInsertion(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"insert","contigs":[{"id":%d,"pos":"%s"}],"length":%d,"position":%d}`(
                         join.start.contigId,
                         join.isFrontExtension ? "front" : "back",
-                        join.payload.sequence.length
+                        join.payload.sequence.length,
+                        currentPosition,
                     );
+                    currentPosition += insertionInfo.length;
+                }
                 else
+                {
                     assert(0, "unexpected join type");
+                }
+
+                insertionBegin = join.target(insertionBegin);
             }
 
             stderr.write(`]`);
