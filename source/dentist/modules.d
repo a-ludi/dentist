@@ -12,7 +12,6 @@ module dentist.modules;
 
 
 import std.meta : AliasSeq;
-static import app;
 static import dentist.commandline;
 static import dentist.commands.checkResults;
 static import dentist.commands.collectPileUps;
@@ -55,11 +54,11 @@ static import dentist.util.process;
 static import dentist.util.range;
 static import dentist.util.region;
 static import dentist.util.string;
+static import dentist.util.suffixtree;
 static import dentist.util.tempfile;
 
 
 alias modules = AliasSeq!(
-    app,
     dentist.commandline,
     dentist.commands.checkResults,
     dentist.commands.collectPileUps,
@@ -102,5 +101,6 @@ alias modules = AliasSeq!(
     dentist.util.range,
     dentist.util.region,
     dentist.util.string,
+    dentist.util.suffixtree,
     dentist.util.tempfile,
 );

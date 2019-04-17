@@ -25,9 +25,12 @@ function main()
 function get_updated_modules()
 {
     MODULES=($(
-        find source -name '*.d' | \
-            xargs grep -hE '^module [^;]+;$' | \
+        find source -name '*.d' |
+            xargs grep -hE '^module [^;]+;$' |
             sed -E 's/^module\s+([^;]+);$/\1/' |
+            # NOTE: `app` module is excluded to fix linker error in unit tests;
+            #       it is irrelevant anyway. :o)
+            grep -vE '^app$' |
             sort
     ))
 
