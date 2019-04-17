@@ -81,7 +81,7 @@ int cmpLexicographically(T, fun...)(T a, T b)
     reflexive (`pred(x,x)` is always true), symmetric
     (`pred(x,y) == pred(y,x)`), and transitive (`pred(x,y) && pred(y,z)`
     implies `pred(x,z)`). If this is not the case, the range returned by
-    chunkBy may assert at runtime or behave erratically.
+    sliceBy may assert at runtime or behave erratically.
 
     Params:
      pred = Predicate for determining equivalence.
