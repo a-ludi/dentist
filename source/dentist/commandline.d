@@ -911,7 +911,6 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
-        TestingCommand.checkResults,
     ))
     {
         @Option("auxiliary-threads", "aux-threads")

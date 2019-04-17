@@ -27,9 +27,11 @@ import dentist.common.commands : TestingCommand;
 import dentist.common.external : ExternalDependency;
 import dentist.dazzler :
     ContigSegment,
+    DBdumpOptions,
     GapSegment,
     getContigCutoff,
     getFastaSequence,
+    getDbRecords,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
@@ -45,6 +47,7 @@ import dentist.util.math :
     NaturalNumberSet;
 import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
+import dentist.util.suffixtree : SuffixTree;
 import std.algorithm :
     all,
     among,
@@ -98,6 +101,7 @@ import std.string :
 import std.traits : Unqual;
 import std.typecons :
     No,
+    tuple,
     Tuple;
 import vibe.data.json :
     Json,
@@ -120,6 +124,22 @@ void execute(in Options options)
     else
         writeln(stats.toTabular());
 }
+
+alias GenomeIndex = SuffixTree!"acgt";
+
+struct ContigMapping
+{
+    ReferenceInterval reference;
+    coord_t referenceContigLength;
+    id_t queryContigId;
+}
+
+static alias queryOrder = orderLexicographically!(const(ContigMapping),
+    mapping => mapping.queryContigId,
+);
+static alias queryEquiv = (const(ContigMapping) a, const(ContigMapping) b) =>
+        a.queryContigId == b.queryContigId;
+
 
 private struct ResultAnalyzer
 {
@@ -169,7 +189,7 @@ private struct ResultAnalyzer
     protected coord_t referenceOffset;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
-    protected RawMummerAlignment[] contigAlignments;
+    protected ContigMapping[] contigAlignments;
     protected GapSummary[] gapSummaries;
     protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
 
@@ -238,17 +258,14 @@ private struct ResultAnalyzer
         );
     }
 
-    RawMummerAlignment[] findReferenceContigs()
+    ContigMapping[] findReferenceContigs()
     {
+
         auto duplicateContigIds = NaturalNumberSet.create(
             findPerfectAlignments(
                 options.refDb,
-                null,
-                options.workdir,
-                options.numAuxiliaryThreads
             )
-                .map!(RawMummerAlignment.fromString)
-                .map!(selfAlignment => cast(size_t) selfAlignment.refContigId)
+                .map!(selfAlignment => cast(size_t) selfAlignment.reference.contigId)
                 .array
         );
         logJsonDiagnostic(
@@ -259,42 +276,93 @@ private struct ResultAnalyzer
         );
 
         auto perfectContigAlignments = findPerfectAlignments(
-            options.refDb,
             options.resultDb,
-            options.workdir,
-            options.numAuxiliaryThreads
+            options.refDb,
         )
-            .map!(RawMummerAlignment.fromString)
             // Ignore contigs that have exact copies in `refDb`
-            .filter!(rawAlignment => rawAlignment.refContigId !in duplicateContigIds)
+            .filter!(contigAlignment => contigAlignment.reference.contigId !in duplicateContigIds)
             .array;
 
         auto bufferRest = perfectContigAlignments
-            .sort!((lhs, rhs) => lhs.refContigId < rhs.refContigId)
-            .group!((lhs, rhs) => lhs.refContigId == rhs.refContigId)
+            .sort!queryOrder
+            .group!queryEquiv
             .filter!(group => group[1] == 1)
             .map!(group => group[0])
             .copy(perfectContigAlignments);
         perfectContigAlignments.length -= bufferRest.length;
 
         return perfectContigAlignments
-            .sort!referenceOrder
+            .sort!queryOrder
             .release;
+    }
+
+    ContigMapping[] findPerfectAlignments(in string refDb, in string queryDb = null)
+    {
+        mixin(traceExecution);
+
+        static auto _getDbRecords(in string dbFile)
+        {
+            return getDbRecords(dbFile, [
+                DBdumpOptions.readNumber,
+                DBdumpOptions.sequenceString,
+            ]);
+        }
+
+        auto isSelfAlignment = queryDb is null;
+        auto referenceContigs = _getDbRecords(refDb).array;
+        auto referenceContigIds = referenceContigs.map!"a.readNumber";
+
+        logJsonDiagnostic("indexSize", GenomeIndex.memorySize(
+            referenceContigs.map!"a.sequence.length".sum,
+            referenceContigs.length,
+        ));
+        auto index = GenomeIndex.build(referenceContigs.map!"a.sequence");
+
+        scope (exit)
+        {
+            import core.memory : GC;
+
+            index = GenomeIndex.init;
+            GC.collect();
+            GC.minimize();
+        }
+
+        auto queryContigs = isSelfAlignment
+            ? referenceContigs
+            : _getDbRecords(queryDb).array;
+
+        return queryContigs
+            .map!(query => index
+                .findAll(query.sequence)
+                .map!(findResult => tuple!("queryContigId", "hit")(query.readNumber, findResult)))
+            .joiner
+            .filter!(findResult => findResult.hit &&
+                                   (!isSelfAlignment || findResult.queryContigId != referenceContigIds[findResult.hit.textId]))
+            .map!(findResult => ContigMapping(
+                ReferenceInterval(
+                    referenceContigIds[findResult.hit.textId],
+                    findResult.hit.begin,
+                    findResult.hit.end,
+                ),
+                cast(coord_t) index.getText(findResult.hit.textId).length,
+                findResult.queryContigId,
+            ))
+            .array;
     }
 
     GapSummary[] analyzeGaps()
     {
         mixin(traceExecution);
 
-        auto contigAlignments = this.contigAlignments.assumeSorted!referenceOrder;
+        auto contigAlignments = this.contigAlignments.assumeSorted!queryOrder;
         const batchBegin = options.referenceContigBatch[0];
         auto gapSummaries = new GapSummary[options.referenceContigBatchSize];
 
-        RawMummerAlignment needleForContig(in id_t contigId) const
+        ContigMapping needleForContig(in id_t contigId) const
         {
             typeof(return) needleAlignment;
 
-            needleAlignment.refContigId = contigId;
+            needleAlignment.queryContigId = contigId;
 
             return needleAlignment;
         }
@@ -307,10 +375,35 @@ private struct ResultAnalyzer
             auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
             auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
 
-            if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
-                // One contig alignment either does not exist or is ambiguous:
-                // the gap state is unkown (default)
+            if (!isGap(lhsContigId, rhsContigId))
+            {
+                gapSummary.state = GapState.ignored;
                 continue;
+            }
+
+            if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
+            {
+                logJsonDiagnostic(
+                    "info", "broken gap",
+                    "lhs", [
+                        "contigId": lhsContigId.toJson,
+                        "numContigAlignments": lhsContigAlignments.length.toJson,
+                        "contigAlignments": shouldLog(LogLevel.debug_)
+                            ? lhsContigAlignments.toJson
+                            : null.toJson,
+                    ].toJson,
+                    "rhs", [
+                        "contigId": rhsContigId.toJson,
+                        "numContigAlignments": rhsContigAlignments.length.toJson,
+                        "contigAlignments": shouldLog(LogLevel.debug_)
+                            ? rhsContigAlignments.toJson
+                            : null.toJson,
+                    ].toJson,
+                );
+                // One contig alignment either does not exist or is ambiguous:
+                // the gap state is unkown (initial value)
+                continue;
+            }
 
             auto lhsContigAlignment = lhsContigAlignments[0];
             auto rhsContigAlignment = rhsContigAlignments[0];
@@ -329,7 +422,7 @@ private struct ResultAnalyzer
         return gapSummaries;
     }
 
-    private GapState getGapState(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    private GapState getGapState(in ContigMapping lhs, in ContigMapping rhs) const
     {
         if (!isGap(lhs, rhs))
             return GapState.ignored;
@@ -343,34 +436,44 @@ private struct ResultAnalyzer
             return GapState.broken;
     }
 
-    private bool isGap(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    private bool isGap(in ContigMapping lhs, in ContigMapping rhs) const
     {
-        return mappedIntervalOf(lhs).contigId == mappedIntervalOf(rhs).contigId;
+        return isGap(lhs.queryContigId, rhs.queryContigId);
     }
 
-    private bool isGapClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    private bool isGap(in id_t lhsContigId, in id_t rhsContigId) const
     {
-        return lhs.resultContigId == rhs.resultContigId &&
-               lhs.resultEnd < rhs.resultBegin;
+        auto lhsTrueContigId = mappedIntervalOf(lhsContigId).contigId;
+        alias rhsTrueContigId = () => mappedIntervalOf(rhsContigId).contigId;
+
+        return lhsTrueContigId > 0 && lhsTrueContigId == rhsTrueContigId();
     }
 
-    private bool isGapPartiallyClosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    private bool isGapClosed(in ContigMapping lhs, in ContigMapping rhs) const
     {
-        return lhs.resultContigId + 1 == rhs.resultContigId &&
-               lhs.resultEnd < lhs.resultContigLength &&
-               1 < rhs.resultBegin &&
-               resultGapSize(lhs.resultContigId) > 0;
+        return lhs.reference.contigId == rhs.reference.contigId &&
+               lhs.reference.end <= rhs.reference.begin;
     }
 
-    private bool isGapUnclosed(in RawMummerAlignment lhs, in RawMummerAlignment rhs) const
+    private bool isGapPartiallyClosed(in ContigMapping lhs, in ContigMapping rhs) const
     {
-        return lhs.resultContigId + 1 == rhs.resultContigId &&
-               lhs.resultEnd == lhs.resultContigLength &&
-               1 == rhs.resultBegin &&
-               resultGapSize(lhs.resultContigId) > 0;
+        return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               (
+                   lhs.reference.end < lhs.referenceContigLength ||
+                   0 < rhs.reference.begin
+               ) &&
+               resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
     }
 
-    InsertionMapping getInsertionMapping(in RawMummerAlignment lhs, in RawMummerAlignment rhs)
+    private bool isGapUnclosed(in ContigMapping lhs, in ContigMapping rhs) const
+    {
+        return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               lhs.reference.end == lhs.referenceContigLength &&
+               0 == rhs.reference.begin &&
+               resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
+    }
+
+    InsertionMapping getInsertionMapping(in ContigMapping lhs, in ContigMapping rhs)
     {
         auto trueAssemblyInterval = ReferenceInterval(
             mappedIntervalOf(lhs).contigId,
@@ -378,26 +481,34 @@ private struct ResultAnalyzer
             mappedIntervalOf(rhs).begin,
         );
         auto resultBegin = ReferencePoint(
-            lhs.resultContigId,
-            lhs.resultEnd,
+            lhs.reference.contigId,
+            lhs.reference.end,
         );
         auto resultEnd = ReferencePoint(
-            rhs.resultContigId,
-            rhs.resultBegin - 1,
+            rhs.reference.contigId,
+            rhs.reference.begin,
         );
 
         return InsertionMapping(
             trueAssemblyInterval,
             resultBegin,
             resultEnd,
-            lhs.refContigId,
-            rhs.refContigId,
+            cast(id_t) lhs.reference.contigId,
+            cast(id_t) rhs.reference.contigId,
         );
     }
 
-    ReferenceInterval mappedIntervalOf(in RawMummerAlignment mapping) const
+    ReferenceInterval mappedIntervalOf(in ContigMapping mapping) const
     {
-        return mappedRegionsMask.intervals[mapping.refContigId - 1];
+        return mappedIntervalOf(mapping.queryContigId);
+    }
+
+    ReferenceInterval mappedIntervalOf(in id_t contigId) const
+    {
+        if (contigId > mappedRegionsMask.intervals.length)
+            return ReferenceInterval();
+
+        return mappedRegionsMask.intervals[contigId - 1];
     }
 
     coord_t resultGapSize(in id_t contigId) const
@@ -537,7 +648,7 @@ private struct ResultAnalyzer
     size_t getNumMappedContigs()
     {
         return contigAlignments
-            .group!((lhs, rhs) => lhs.refContigId == rhs.refContigId)
+            .group!queryEquiv
             .filter!(group => group[1] == 1)
             .walkLength;
     }
@@ -1083,98 +1194,6 @@ private struct Stats
     }
 }
 
-struct RawMummerAlignment
-{
-    coord_t resultBegin;
-    coord_t resultEnd;
-    coord_t refBegin;
-    coord_t refEnd;
-    double sequenceIdentity;
-    coord_t resultContigLength;
-    coord_t refContigLength;
-    id_t resultContigId;
-    id_t refContigId;
-
-    static RawMummerAlignment fromString(in string dumpLine) pure
-    {
-        enum dumpLineFormat = "%d %d %d %d %d %d %f %d %d result-%d ref-%d";
-        RawMummerAlignment rawAlignment;
-        coord_t dummy;
-
-        dumpLine[].formattedRead!dumpLineFormat(
-            rawAlignment.resultBegin,
-            rawAlignment.resultEnd,
-            rawAlignment.refBegin,
-            rawAlignment.refEnd,
-            dummy,
-            dummy,
-            rawAlignment.sequenceIdentity,
-            rawAlignment.resultContigLength,
-            rawAlignment.refContigLength,
-            rawAlignment.resultContigId,
-            rawAlignment.refContigId,
-        );
-
-        return rawAlignment;
-    }
-
-    T to(T : AlignmentChain)() const pure
-    {
-        import std.conv : to;
-
-        T ac;
-        T.LocalAlignment la;
-
-        ac.contigA.id = refContigId;
-        ac.contigA.length = refContigId;
-        ac.contigB.id = resultContigId;
-        ac.contigB.length = resultContigId;
-
-        la.contigA.begin = refBegin - 1;
-        la.contigA.end = refEnd;
-        la.contigB.begin = resultBegin - 1;
-        la.contigB.end = resultEnd;
-        la.numDiffs = to!diff_t(la.contigB.length * sequenceIdentity / 100.0);
-
-        ac.localAlignments = [la];
-
-        // ensure alignment chain is valid...
-        version (assert)
-            // trigger invariant of AlignmentChain
-            cast(void) ac.first;
-
-        return ac;
-    }
-}
-
-
-alias referenceOrder = orderLexicographically!(const(RawMummerAlignment),
-    rawAlignment => rawAlignment.refContigId,
-);
-
-@ExternalDependency("nucmer", "MUMmer >=4.0", "https://mummer4.github.io/")
-@ExternalDependency("delta-filter", "MUMmer >=4.0", "https://mummer4.github.io/")
-@ExternalDependency("show-coords", "MUMmer >=4.0", "https://mummer4.github.io/")
-@ExternalDependency("tail", "POSIX")
-@ExternalDependency("awk", "POSIX")
-@ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
-@ExternalDependency("sed", "POSIX")
-auto findPerfectAlignments(in string refDb, in string queryDb = null, in string tmpDir = null, in size_t numThreads = 1)
-{
-    auto findPerfectAlignmentsCmd = only(
-        "bash",
-        "-c",
-        import("find-perfect-alignments.sh"),
-        "--",
-        "-k",
-        tmpDir !is null ? "-t" ~ tmpDir : null,
-        "-T" ~ numThreads.to!string,
-        refDb,
-        queryDb !is null ? queryDb : refDb,
-    );
-
-    return findPerfectAlignmentsCmd.pipeLines();
-}
 
 struct StretcherAlignment
 {
