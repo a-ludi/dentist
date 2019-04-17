@@ -697,7 +697,7 @@ private:
 
         while (true)
         {
-            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c`"(currentLineType));
+            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c` (allowed: `%(%c%)`)"(currentLineType, allowedLineTypes));
 
             with (LasDumpLineFormat)
             {
@@ -1846,6 +1846,481 @@ unittest
 }
 
 /**
+    Get the designated records of `dbFile`.
+
+    Throws: DazzlerCommandException if recordNumber is not in dbFile
+*/
+auto getDbRecords(in string dbFile, in DBdumpOptions[] dbdumpOptions = [], in string workdir = null)
+{
+    enum size_t[] allRecords = [];
+
+    return getDbRecords(dbFile, allRecords, dbdumpOptions, workdir);
+}
+
+/// ditto
+auto getDbRecords(Range)(
+    in string dbFile,
+    Range recordNumbers,
+    in DBdumpOptions[] dbdumpOptions = [],
+    in string workdir = null,
+)
+        if (isForwardRange!Range && is(ElementType!Range : size_t))
+{
+    return readDbDump(dbdump(dbFile, recordNumbers, cast(string[]) dbdumpOptions, workdir));
+}
+
+
+private struct DbDumpLineFormatTuple
+{
+    char indicator;
+    char subIndicator;
+    string format;
+}
+
+private enum DbDumpLineFormat : DbDumpLineFormatTuple
+{
+    totalReadNumberCount = DbDumpLineFormatTuple('+', 'R', "+ R %d"),
+    totalMCount = DbDumpLineFormatTuple('+', 'M', "+ M %d"),
+    totalHeaderCount = DbDumpLineFormatTuple('+', 'H', "+ H %d"),
+    maxHeaderLength = DbDumpLineFormatTuple('@', 'H', "@ H %d"),
+    totalSequenceCount = DbDumpLineFormatTuple('+', 'S', "+ S %d"),
+    maxSequenceLength = DbDumpLineFormatTuple('@', 'S', "@ S %d"),
+    readNumber = DbDumpLineFormatTuple('R', '\0', "R %d"),
+    header = DbDumpLineFormatTuple('H', '\0', "H %d %s"),
+    pbLocation = DbDumpLineFormatTuple('L', '\0', "L %d %d %d"),
+    pbQuality = DbDumpLineFormatTuple('Q', '\0', "Q %f"),
+    sequence = DbDumpLineFormatTuple('S', '\0', "S %d %s"),
+    arrowSNR = DbDumpLineFormatTuple('N', '\0', "S %d %d %d %d"),
+    arrowPulseWidth = DbDumpLineFormatTuple('A', '\0', "A %d %s"),
+    intrinsicQualityVector = DbDumpLineFormatTuple('I', '\0', "I %d %s"),
+    quivaDeletionValues = DbDumpLineFormatTuple('d', '\0', "d %d %s"),
+    quivaDeletionString = DbDumpLineFormatTuple('c', '\0', "c %d %s"),
+    quivaInsertionValues = DbDumpLineFormatTuple('i', '\0', "i %d %s"),
+    quivaMergeValues = DbDumpLineFormatTuple('m', '\0', "m %d %s"),
+    quivaSubstitutionValues = DbDumpLineFormatTuple('s', '\0', "s %d %s"),
+    repeatProfileVector = DbDumpLineFormatTuple('P', '\0', "P %d %s"),
+    maskTrack = DbDumpLineFormatTuple('T', '\0', "T%d %d %(%d %d%)"),
+}
+
+struct DbRecord
+{
+    static struct PacBioReadInfo
+    {
+        id_t well;
+        coord_t pulseStart;
+        coord_t pulseEnd;
+        float readQuality;
+    }
+
+    id_t readNumber;
+    string header;
+    PacBioReadInfo pacBioReadInfo;
+    string sequence;
+}
+
+private struct DbDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
+{
+    static alias dstring = immutable(dchar)[];
+    static alias DbDump = ReturnType!getDumpLines;
+
+private:
+    DbDump dbDump;
+    bool _empty;
+    id_t numReads;
+    DbRecord currentRecord;
+    dstring currentDumpLine;
+    size_t currentDumpLineNumber;
+    dchar currentLineType;
+    dchar currentLineSubType;
+    debug dchar[] allowedLineTypes;
+
+public:
+    coord_t totalSequence;
+
+    this(S dbDump)
+    {
+        this.dbDump = getDumpLines(dbDump);
+        debug with (DbDumpLineFormat)
+        {
+            this.allowedLineTypes = [
+                totalReadNumberCount.indicator,
+                totalMCount.indicator,
+                totalHeaderCount.indicator,
+                maxHeaderLength.indicator,
+                totalSequenceCount.indicator,
+                maxSequenceLength.indicator,
+            ];
+        }
+        this.popFront();
+    }
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty DbDumpReader");
+
+        if (dbDump.empty)
+        {
+            return setEmpty();
+        }
+
+        readNextDbRecord();
+    }
+
+    @property bool empty() const pure nothrow
+    {
+        return _empty;
+    }
+
+    @property DbRecord front() pure nothrow
+    {
+        assert(!empty, "Attempting to fetch the front of an empty DbDumpReader");
+
+        return currentRecord;
+    }
+
+    @property size_t length() pure nothrow
+    {
+        return numReads;
+    }
+
+private:
+
+    static auto getDumpLines(S dbDump)
+    {
+        return dbDump.enumerate(1).filter!"!a[1].empty";
+    }
+
+    void setEmpty() pure nothrow
+    {
+        _empty = true;
+    }
+
+    void readNextDbRecord()
+    {
+        currentRecord = DbRecord.init;
+        peekDumpLine();
+
+        while (true)
+        {
+            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c` (allowed: `%(%c%)`)"(currentLineType, allowedLineTypes));
+
+            with (DbDumpLineFormat)
+            {
+                switch (currentLineType)
+                {
+                case totalReadNumberCount.indicator:
+                    static assert(totalMCount.indicator == totalReadNumberCount.indicator);
+                    static assert(totalHeaderCount.indicator == totalReadNumberCount.indicator);
+                    static assert(totalSequenceCount.indicator == totalReadNumberCount.indicator);
+
+                    switch (currentLineSubType)
+                    {
+                    case totalReadNumberCount.subIndicator:
+                        read!totalReadNumberCount();
+
+                        debug allowedLineTypes ~= [
+                            readNumber.indicator,
+                            header.indicator,
+                            pbLocation.indicator,
+                            pbQuality.indicator,
+                            sequence.indicator,
+                        ];
+
+                        // do not try to read empty dump
+                        if (numReads == 0)
+                            return setEmpty();
+                        break;
+                    case totalMCount.subIndicator:
+                        assert(readTotal!(totalMCount, size_t) == 0, "unexpected totalMCount != 0");
+                        break;
+                    case totalHeaderCount.subIndicator:
+                        break; // ignore
+                    case totalSequenceCount.subIndicator:
+                        read!totalSequenceCount();
+                        break;
+                    default:
+                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
+                    }
+                    break;
+                case maxHeaderLength.indicator:
+                    static assert(maxSequenceLength.indicator == maxHeaderLength.indicator);
+                    break; // ignore both
+                static foreach (lineTypeFormat; [readNumber, header, pbLocation, pbQuality, sequence])
+                {
+                    case lineTypeFormat.indicator:
+                        static if (lineTypeFormat == pbLocation)
+                        {
+                            auto pbReadInfo = currentRecord.pacBioReadInfo;
+                            auto wasLineTypeDone = pbReadInfo.well != pbReadInfo.well.init ||
+                                                   pbReadInfo.pulseStart != pbReadInfo.pulseStart.init ||
+                                                   pbReadInfo.pulseEnd != pbReadInfo.pulseEnd.init;
+                        }
+                        else static if (lineTypeFormat == pbQuality)
+                        {
+                            auto pbReadInfo = currentRecord.pacBioReadInfo;
+                            auto wasLineTypeDone = pbReadInfo.readQuality != pbReadInfo.readQuality.init;
+                        }
+                        else
+                        {
+                            auto wasLineTypeDone = mixin(
+                                "currentRecord." ~ lineTypeFormat.to!string ~ " != " ~
+                                "currentRecord." ~ lineTypeFormat.to!string ~ ".init"
+                            );
+                        }
+
+                        if (wasLineTypeDone)
+                        {
+                            debug allowedLineTypes = [
+                                readNumber.indicator,
+                                header.indicator,
+                                pbLocation.indicator,
+                                pbQuality.indicator,
+                                sequence.indicator,
+                            ];
+                            return; // DB record completed; stay on current dump line
+                        }
+
+                        read!lineTypeFormat();
+                        goto break_;
+                }
+                default:
+                    error(format!"unknown line type `%c`"(currentLineType));
+                }
+
+                break_: // pseudo-break for use with static foreach
+            }
+
+            if (popDumpLine() == Yes.empty)
+                return; // EOF reached
+        }
+    }
+
+    void peekDumpLine()
+    {
+        auto currentLine = dbDump.front;
+
+        currentDumpLineNumber = currentLine[0];
+        currentDumpLine = currentLine[1].array;
+        currentLineType = currentDumpLine[0];
+        currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
+    }
+
+    Flag!"empty" popDumpLine()
+    {
+        if (dbDump.empty)
+        {
+            return Yes.empty;
+        }
+
+        dbDump.popFront();
+        ++currentDumpLineNumber;
+
+        if (dbDump.empty)
+        {
+            return Yes.empty;
+        }
+        else
+        {
+            peekDumpLine();
+
+            return No.empty;
+        }
+    }
+
+    Int readTotal(DbDumpLineFormat lineTypeFormat, Int)()
+    {
+        Int total;
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(total);
+
+        return total;
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.totalReadNumberCount)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(numReads);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.totalSequenceCount)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(totalSequence);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.header)
+    {
+        coord_t headerLength;
+
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            headerLength,
+            currentRecord.header,
+        );
+
+        assert(currentRecord.header.length == headerLength, "mismatched header length");
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.readNumber)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(currentRecord.readNumber);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.pbLocation)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            currentRecord.pacBioReadInfo.well,
+            currentRecord.pacBioReadInfo.pulseStart,
+            currentRecord.pacBioReadInfo.pulseEnd,
+        );
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.pbQuality)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            currentRecord.pacBioReadInfo.readQuality,
+        );
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.sequence)
+    {
+        coord_t sequenceLength;
+
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            sequenceLength,
+            currentRecord.sequence,
+        );
+
+        assert(currentRecord.sequence.length == sequenceLength, "mismatched sequence length");
+    }
+
+    debug void disallowCurrentLineType() {
+        allowedLineTypes = allowedLineTypes
+            .filter!(type => type != currentLineType)
+            .array;
+    }
+
+    void error(in string reason)
+    {
+        _enforce(false, reason);
+    }
+
+    void _enforce(bool condition, lazy string reason)
+    {
+        enforce!DazzlerCommandException(condition, format!"ill-formatted DBdump output: %s (line %d)"(reason, currentDumpLineNumber));
+    }
+}
+
+private auto readDbDump(S)(S lasDump)
+{
+    return DbDumpReader!S(lasDump);
+}
+
+unittest
+{
+    enum testDbDump = q"EOF
+        + R 5
+        + M 0
+        + H 15
+        @ H 3
+        + S 281
+        @ S 63
+        R 1
+        H 3 Sim
+        L 1 0 62
+        Q 0.851
+        S 62 ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc
+        R 2
+        H 3 Sim
+        L 2 0 63
+        Q 0.852
+        S 63 cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat
+        R 3
+        H 3 Sim
+        L 3 0 62
+        Q 0.853
+        S 62 aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa
+        R 4
+        H 3 Sim
+        L 4 0 62
+        Q 0.854
+        S 62 ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca
+        R 5
+        H 3 Sim
+        L 5 0 32
+        Q 0.855
+        S 32 gtgtctgctgttttttttcttttagtggacat
+EOF".outdent;
+
+    import std.algorithm : equal;
+
+    auto dbDump = readDbDump(testDbDump);
+    auto expectedResult = [
+        DbRecord(
+            1,
+            "Sim",
+            PacBioReadInfo(
+                1,
+                0,
+                62,
+                0.851,
+            ),
+            "ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc",
+        ),
+        DbRecord(
+            2,
+            "Sim",
+            PacBioReadInfo(
+                2,
+                0,
+                63,
+                0.852,
+            ),
+            "cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat",
+        ),
+        DbRecord(
+            3,
+            "Sim",
+            PacBioReadInfo(
+                3,
+                0,
+                62,
+                0.853,
+            ),
+            "aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa",
+        ),
+        DbRecord(
+            4,
+            "Sim",
+            PacBioReadInfo(
+                4,
+                0,
+                62,
+                0.854,
+            ),
+            "ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca",
+        ),
+        DbRecord(
+            5,
+            "Sim",
+            PacBioReadInfo(
+                5,
+                0,
+                32,
+                0.855,
+            ),
+            "gtgtctgctgttttttttcttttagtggacat",
+        ),
+    ];
+
+    assert(dbDump.length == expectedResult.length);
+    assert(dbDump.equal(expectedResult));
+}
+
+/**
     Get the FASTA sequences of the designated records.
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
@@ -1989,11 +2464,11 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
         DBdumpOptions.sequenceString,
     ];
 
-    return readDbDump(dbdump(dbFile, recordNumbers, dbdumpOptions,
+    return readDbDumpForFastaEntries(dbdump(dbFile, recordNumbers, dbdumpOptions,
             options.workdir), recordNumbers, options.fastaLineWidth);
 }
 
-private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
+private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
         if (isInputRange!S && isSomeString!(ElementType!S)
             && isInputRange!Range && is(ElementType!Range : size_t))
 {
@@ -2095,7 +2570,7 @@ EOF".outdent;
 
     {
         size_t[] recordIds = [];
-        auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
+        auto fastaEntries = readDbDumpForFastaEntries(testDbDump.lineSplitter, recordIds, 50).array;
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/2/0_9 RQ=0.975\ncacattgtg",
@@ -2106,7 +2581,7 @@ EOF".outdent;
     }
     {
         size_t[] recordIds = [1, 3];
-        auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
+        auto fastaEntries = readDbDumpForFastaEntries(testDbDump.lineSplitter, recordIds, 50).array;
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/3/0_11 RQ=0.975\ngagtgcagtgg",
