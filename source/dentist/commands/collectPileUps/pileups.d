@@ -998,6 +998,11 @@ private class BubbleResolver
     {
         mixin(traceExecution);
 
+        logJsonDiagnostic("scaffold", [
+            "numNodes": scaffold.nodes.length,
+            "numEdges": scaffold.edges.length,
+        ].toJson);
+
         incidentEdgesCache = scaffold.allIncidentEdges();
         auto cyclicSubgraphBase = getCyclicSubgraphBase();
         auto simpleBubbles = cyclicSubgraphBase
