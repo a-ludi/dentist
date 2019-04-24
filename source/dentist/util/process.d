@@ -106,13 +106,29 @@ static final class LinesPipe(CommandInfo)
         {
             static assert(0, "Only intended for use on POSIX compliant OS.");
         }
-        process.pid.wait();
+
+        auto exitStatus = process.pid.wait();
+
+        logJsonDiagnostic(
+            "action", "execute",
+            "type", "pipe",
+            "command", processInfo.command.toJson,
+            "exitStatus", exitStatus,
+            "state", "post",
+        );
     }
 
     private void ensureInitialized()
     {
         if (!(process.pid is null))
             return;
+
+        logJsonDiagnostic(
+            "action", "execute",
+            "type", "pipe",
+            "command", processInfo.command.toJson,
+            "state", "pre",
+        );
 
         process = launchProcess();
 
@@ -123,13 +139,6 @@ static final class LinesPipe(CommandInfo)
     static if (is(CommandInfo == ProcessInfo))
         ProcessPipes launchProcess()
         {
-            logJsonDiagnostic(
-                "action", "execute",
-                "type", "pipe",
-                "command", processInfo.command.toJson,
-                "state", "pre",
-            );
-
             return pipeProcess(
                 processInfo.command,
                 Redirect.stdout,
@@ -141,13 +150,6 @@ static final class LinesPipe(CommandInfo)
     else static if (is(CommandInfo == ShellInfo))
         ProcessPipes launchProcess()
         {
-            logJsonDiagnostic(
-                "action", "execute",
-                "type", "pipe",
-                "shell", processInfo.command,
-                "state", "pre",
-            );
-
             return pipeShell(
                 processInfo.command,
                 Redirect.stdout,
