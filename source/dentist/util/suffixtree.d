@@ -111,43 +111,24 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
         Node* suffixLink;
         Node*[alphabet.length] children;
 
-        import std.typecons : Flag, Yes;
 
-        const(Bytes) str(Flag!"specialBytes" specialBytes = Yes.specialBytes)(in Bytes text) const
+        @property bool hasChildren() const
         {
-            auto fullStr = text[begin .. end];
+            import std.algorithm : canFind;
 
-            static if (specialBytes)
-            {
-                return fullStr;
-            }
-            else
-            {
-                import std.algorithm : countUntil;
-                import std.range : retro;
+            return children[].canFind!"a !is null";
+        }
 
-                if (fullStr.length == 0)
-                    return fullStr;
+        auto ref inout(Node*) getChild(string variable = "text")(in Byte char_) inout
+        {
+            return children[indexOf!variable(char_)];
+        }
 
-                if (isSpecialByte(fullStr[0]))
-                {
-                    auto startIndex = fullStr.countUntil!(c => !isSpecialByte(c));
+        alias opIndex = getChild;
 
-                    if (startIndex < 0)
-                        startIndex = fullStr.length;
-
-                    return fullStr[startIndex .. $];
-                }
-                else
-                {
-                    auto endIndex = fullStr.countUntil!isSpecialByte;
-
-                    if (endIndex < 0)
-                        endIndex = fullStr.length;
-
-                    return fullStr[0 .. endIndex];
-                }
-            }
+        const(Bytes) str(in Bytes text) const
+        {
+            return text[begin .. end];
         }
 
         @property size_t strLength() const
@@ -167,6 +148,32 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
             return children[].all!"a == null";
         }
 
+        string humanStr(in Bytes text) const
+        {
+            import std.regex : Captures, ctRegex, replaceAll;
+            import std.string : tr;
+
+            enum terminatorRegex = ctRegex!"\x00(?:([\x01\x02]+)\x03)?";
+            auto nodeString = cast(string) str(text);
+
+            static string humanReadableTerminator(Captures!string match)
+            {
+                import std.format : format;
+
+                if (match[1].length > 0)
+                    return format!"$%d;"(fromTextId(match[1].toBytes));
+                else
+                    return "$";
+            }
+
+            return nodeString
+                .replaceAll!humanReadableTerminator(terminatorRegex)
+                .tr(
+                    [cast(const(char)) EnumMembers!SpecialByte],
+                    "$01;",
+                );
+        }
+
         string toString(in Bytes text, size_t level = 0) const
         {
             import std.algorithm : copy, joiner, map;
@@ -182,9 +189,9 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
             ).map!"cast(char) a";
 
             enum nodeFormat = `"%s" (%d)`;
-            txt.formattedWrite!nodeFormat(cast(string) str(text), depth);
+            txt.formattedWrite!nodeFormat(humanStr(text), depth);
             if (suffixLink !is null)
-                txt.formattedWrite!(" ~> " ~ nodeFormat)(cast(string) suffixLink.str(text), suffixLink.depth);
+                txt.formattedWrite!(" ~> " ~ nodeFormat)(suffixLink.humanStr(text), suffixLink.depth);
 
             if (isLeaf)
             {
@@ -330,8 +337,7 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                             !currentNode.contains(currentDepth - 1);
                             k += currentNode.strLength
                         )
-                            // FIXME sometimes range violation
-                            currentNode = currentNode.children[indexText(k)];
+                            currentNode = currentNode.getChild(text[k]);
                     assert(currentNode !is null, "currentNode must not be null");
                 }
 
@@ -343,9 +349,9 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                         needsSuffixLink = null;
                     }
 
-                    if (currentNode.children[charIndex] is null)
+                    if (currentNode.getChild(char_) is null)
                     {
-                        currentNode.children[charIndex] = nodesAllocator.create(
+                        currentNode.getChild(char_) = nodesAllocator.create(
                             i,
                             text.length,
                             currentDepth,
@@ -355,7 +361,7 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                     }
                     else
                     {
-                        currentNode = currentNode.children[charIndex];
+                        currentNode = currentNode.getChild(char_);
                         assert(currentNode !is null, "currentNode must not be null");
 
                         lastRule = Rule.nextChar;
@@ -374,15 +380,15 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                             currentNode.depth,
                             currentNode.parent,
                         );
-                        newNode.children[charIndex] = nodesAllocator.create(
+                        newNode.getChild(char_) = nodesAllocator.create(
                             i,
                             text.length,
                             currentDepth,
                             newNode
                         );
 
-                        newNode.children[indexText(end)] = currentNode;
-                        currentNode.parent.children[indexText(currentNode.begin)] = newNode;
+                        newNode.getChild(text[end]) = currentNode;
+                        currentNode.parent.getChild(text[currentNode.begin]) = newNode;
 
                         if (needsSuffixLink !is null)
                             needsSuffixLink.suffixLink = newNode;
@@ -489,14 +495,13 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
     {
         import std.range : only;
 
-        return only(SpecialByte.eof, textId(textIndex).expand, SpecialByte.rs);
+        return only(SpecialByte.eof, toTextId(textIndex).expand, SpecialByte.rs);
     }
 
     private static enum textSeparatorSize = SpecialByte.eof.sizeof + TextId.length + SpecialByte.rs.sizeof;
 
-    private static TextId textId(in size_t recordIndex)
+    private static TextId toTextId(in size_t recordIndex)
     {
-        enum base = inputAlphabet.length;
         TextId textId;
 
         foreach (i, ref idByte; textId)
@@ -505,6 +510,50 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                 : SpecialByte.id0;
 
         return textId;
+    }
+
+    private static size_t fromTextId(in TextId textId)
+    {
+        size_t recordIndex;
+
+        foreach (i, idByte; textId)
+            if (idByte == SpecialByte.id1)
+                recordIndex |= 1UL << i;
+
+        return recordIndex;
+    }
+
+    private static size_t fromTextId(in Bytes textId)
+    {
+        size_t recordIndex;
+
+        assert(textId.length == TextId.length, "trying to convert textId with wrong length");
+        foreach (i, idByte; textId)
+            if (idByte == SpecialByte.id1)
+                recordIndex |= 1UL << i;
+
+        return recordIndex;
+    }
+
+    unittest
+    {
+        with (SpecialByte)
+        {
+            enum recordIndex = 0b01010101;
+            enum textId = TextId(
+                id1, id0, id1, id0, id1, id0, id1, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+                id0, id0, id0, id0, id0, id0, id0, id0,
+            );
+
+            assert(toTextId(recordIndex) == textId);
+            assert(fromTextId(textId) == recordIndex);
+        }
     }
 
     private size_t getTextIndex(in size_t hitEnd) const
@@ -685,11 +734,9 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
         );
         auto suffixTree = SuffixTree!"abelnprstwy"().build(words);
 
-        import std.stdio;
-        writeln(suffixTree.findAll("an"));
-        writeln(suffixTree.findAll("a"));
-        assert(suffixTree.findAll("a").length == 5);
-        assert(suffixTree.findAll("e").length == 2);
+        assert(suffixTree.findAll("a").length == 6);
+        assert(suffixTree.findAll("e").length == 3);
+        assert(suffixTree.findAll("an").length == 3);
     }
 
     unittest
@@ -715,6 +762,7 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
         in Bytes originalNeedle,
     ) const
     {
+        import dentist.util.algorithm : sliceUntil;
         import std.algorithm : min, startsWith;
         import std.typecons : No, Yes;
 
@@ -724,7 +772,7 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
         if (currentNode is null)
             return [];
 
-        auto currentNodeStr = currentNode.str!(No.specialBytes)(text);
+        auto currentNodeStr = currentNode.str(text).sliceUntil!isSpecialByte;
         auto croppedStr = currentNodeStr[0 .. min(currentNeedle.length, $)];
         if (currentNeedle.startsWith(croppedStr))
         {
@@ -744,7 +792,7 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
             else
             {
                 auto nextChar = currentNeedle[currentNodeStr.length];
-                auto nextNode = currentNode.children[indexOf!"needle"(nextChar)];
+                auto nextNode = currentNode.getChild!"needle"(nextChar);
 
                 return findRecursive!(Yes.findAll)(nextNode, currentNeedle[currentNodeStr.length .. $], originalNeedle);
             }
@@ -759,15 +807,13 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
         in Bytes originalNeedle,
     ) const
     {
-        import std.algorithm : find, min, startsWith;
+        import std.algorithm : filter,find, min, minElement, startsWith;
         import std.typecons : No, Yes;
 
         assert(0 <= originalNeedle.length && originalNeedle.length <= originalNeedle.length);
 
-        FindResult[] results;
-
         assert(begin >= currentNode.begin, "should not be called on this node");
-        auto currentNodeStr = currentNode.str!(No.specialBytes)(text);
+        auto currentNodeStr = currentNode.str(text);
         auto offset = min(begin - currentNode.begin, currentNodeStr.length);
         const(Node)* nextNode;
 
@@ -784,21 +830,19 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
                 if (croppedStr.length == originalNeedle.length)
                 {
                     auto matchEnd = currentNode.begin + currentNodeStr.length - nodeSubstr.length + croppedStr.length;
-                    results ~= FindResult(matchEnd);
-                    results ~= findRestRecursive(
+
+                    return [FindResult(matchEnd)] ~ findRestRecursive(
                         currentNode,
                         matchEnd + 1,
                         originalNeedle,
                     );
-
-                    return results;
                 }
                 else
                 {
                     auto nextChar = originalNeedle[croppedStr.length];
-                    nextNode = currentNode.children[indexOf!"needle"(nextChar)];
+                    nextNode = currentNode.getChild!"needle"(nextChar);
 
-                    results ~= findRecursive!(Yes.findAll)(
+                    return findRecursive!(Yes.findAll)(
                         nextNode,
                         originalNeedle[croppedStr.length .. $],
                         originalNeedle,
@@ -807,15 +851,22 @@ struct SuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
             }
         }
 
-        foreach (child; currentNode.children)
-            if (child !is null && child != nextNode)
-                results ~= findRestRecursive(child, child.begin, originalNeedle);
+        if (!currentNode.hasChildren)
+            return [];
 
-        return results;
+        const(Node)* nearestChild = currentNode
+            .children[]
+            .filter!(child => child !is null)
+            .minElement!(child => child.begin);
+        assert(currentNode.end <= nearestChild.begin);
+
+        return findRestRecursive(nearestChild, nearestChild.begin, originalNeedle);
     }
 
     private void finishFindResult(ref FindResult result, in Bytes needle) const
     {
+        assert(result, "cannot finish invalid result");
+
         result._length = needle.length;
 
         if (hasMultipleTexts)
@@ -917,78 +968,355 @@ unittest
     SuffixTree!"" dummy;
 }
 
-version (benchmark) unittest
+/// Multiple suffix trees combined for parallel usage.
+struct MultiSuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabet)))
 {
-    import std.array : array;
+    private SuffixTree!inputAlphabet[] suffixTrees;
+
+    /**
+        Build `numParallel` suffix trees from multiple `inputTexts`
+        distributing texts equally across them.
+
+        Throws: AlphabetException if `inputTexts` contain non-alphabet characters
+        See_also: SuffixTree.build
+    */
+    static MultiSuffixTree build(SS)(SS inputTexts, in size_t numParallel)
+        if (
+            isForwardRange!SS &&
+            (
+                isSomeBytes!(ElementType!SS) ||
+                (isInputRange!(ElementType!SS) && isSomeByte!(ElementType!(ElementType!SS)) && hasLength!(ElementType!SS))
+            )
+        )
+    {
+        import dentist.util.math : ceildiv;
+        import std.algorithm : cumulativeFold, group, joiner, map, min, sum;
+        import std.array : array;
+        import std.parallelism : parallel;
+        import std.range : chain, dropExactly, enumerate, only, takeExactly;
+        import std.range.primitives : walkLength;
+        import std.typecons : tuple;
+
+        alias TextBucket = typeof(inputTexts.dropExactly(0).takeExactly(0));
+
+        auto textsLengths = inputTexts.save.map!"a.length";
+        auto totalTextsLength = textsLengths.save.sum;
+        auto expectedBlockSize = ceildiv(totalTextsLength, numParallel);
+
+        auto textBuckets = new TextBucket[numParallel];
+        alias oneLess = n => n > 0 ? n - 1 : 0;
+        auto bucketInfoList = textsLengths
+            .save
+            .cumulativeFold!"a + b"
+            .map!(textAmount => min(oneLess(textAmount) / expectedBlockSize, numParallel))
+            .group;
+
+        size_t numTextsInBuckets;
+        foreach (bucketInfo; bucketInfoList)
+        {
+            auto bucketIndex = bucketInfo[0];
+            auto bucketSize = bucketInfo[1];
+
+            textBuckets[bucketIndex] = inputTexts
+                .dropExactly(numTextsInBuckets)
+                .takeExactly(bucketSize);
+
+            numTextsInBuckets += bucketSize;
+        }
+
+        MultiSuffixTree multiTree;
+        multiTree.suffixTrees.length = numParallel;
+
+        foreach (i, textBucket; parallel(textBuckets[]))
+            multiTree.suffixTrees[i] = SuffixTree!inputAlphabet.build(textBucket);
+
+        return multiTree;
+    }
+
+    unittest
+    {
+        import std.range : only;
+
+        auto words = only(
+            "banana",
+            "apple",
+            "strawberry",
+        );
+        auto mSuffixTree = MultiSuffixTree!(2, "abelnprstwy")().build(words);
+
+        assert(mSuffixTree.suffixTrees[0].numTexts == 2);
+        assert(mSuffixTree.suffixTrees[1].numTexts == 1);
+    }
+
+    static private alias FindResult = SuffixTree!inputAlphabet.FindResult;
+
+    /// Find the first occurrence of `needle` in this suffix tree.
+    FindResult findFirst(B)(in B needle) const if (isSomeBytes!B)
+    {
+        import std.algorithm : find, map;
+
+        auto hits = suffixTrees[]
+            .map!(suffixTree => suffixTree.findFirst(needle))
+            .find!"a";
+
+        if (hits.empty)
+            return FindResult.notFound;
+
+        return hits.front;
+    }
+
+    /// Find all non-overlapping occurrences of `needle` in this suffix tree.
+    FindResult[] findAll(B)(in B needle) const if (isSomeBytes!B)
+    {
+        import std.algorithm : joiner, map;
+        import std.array : array;
+
+        return suffixTrees[]
+            .map!(suffixTree => suffixTree.findAll(needle))
+            .joiner
+            .array;
+    }
+
+    /// Find all substrings of a single text.
+    unittest
+    {
+        import std.range : only;
+
+        auto words = only(
+            "banana",
+            "apple",
+            "strawberry",
+        );
+        auto mSuffixTree = MultiSuffixTree!(2, "abelnprstwy")().build(words);
+
+        assert(mSuffixTree.findAll("banana").length == 1);
+        assert(mSuffixTree.findAll("a").length == 5);
+    }
+}
+
+unittest
+{
+    /// Trigger unit tests for SuffixTree
+    MultiSuffixTree!(0, "") dummy;
+}
+
+version (benchmark)
+{
     import std.datetime.stopwatch : benchmark;
-    import std.random : uniform, uniform01, choice;
-    import std.range : generate, only, takeExactly;
     import std.stdio;
 
     enum alphabet = "acgt";
-    alias getGenome = (genomeSize) => generate!(() => choice(only('a', 'c', 'g', 't'))).takeExactly(genomeSize);
 
-    foreach (genomeSize; [
-             1_000,
-            10_000,
-            20_000,
-            30_000,
-            40_000,
-            50_000,
-            60_000,
-            70_000,
-            80_000,
-            90_000,
-           100_000,
-           200_000,
-           300_000,
-           400_000,
-           500_000,
-           600_000,
-           700_000,
-           800_000,
-           900_000,
-         1_000_000,
-         5_000_000,
-        10_000_000,
-    ])
+    void main()
     {
-        auto genome = getGenome(genomeSize);
-        auto result = benchmark!(() => SuffixTree!alphabet.build(genome))(3);
-
-        writefln!"build(len=%d) took %s"(genomeSize, result[0]);
+        benchmarkMultiIndexing();
+        benchmarkIndexing();
+        //benchmarkFindFirst();
     }
 
-    enum genomeSize = 10_000_000;
-
-    auto genome = getGenome(genomeSize).array.toBytes;
-    auto suffixTree = SuffixTree!alphabet.build(genome);
-
-    import core.time : Duration;
-    import std.algorithm : min;
-    import std.math : floor, log;
-
-    enum numIterations = 1_000;
-    enum expectedSubseqLength = 200_000;
-    enum logOneMinusP = log(1.0 - 1.0/expectedSubseqLength);
-
-    Duration totalRuntime;
-    foreach (_; 0 .. numIterations)
+    void benchmarkIndexing()
     {
-        auto begin = uniform(0, genomeSize);
-        auto length = min(genomeSize - begin, cast(size_t) floor(log(uniform01()) / logOneMinusP));
-
-        void findSubseq()
+        foreach (genomeSize; [
+                 1_000,
+                 2_000,
+                 3_000,
+                 4_000,
+                 5_000,
+                 6_000,
+                 7_000,
+                 8_000,
+                 9_000,
+                10_000,
+                20_000,
+                30_000,
+                40_000,
+                50_000,
+                60_000,
+                70_000,
+                80_000,
+                90_000,
+               100_000,
+               200_000,
+               300_000,
+               400_000,
+               500_000,
+               600_000,
+               700_000,
+               800_000,
+               900_000,
+             1_000_000,
+             5_000_000,
+            10_000_000,
+        ])
         {
-            auto findResult = suffixTree.findFirst(genome[begin .. begin + length]);
+            auto genome = getGenome(genomeSize);
+            auto result = benchmark!(() => SuffixTree!alphabet.build(genome))(3);
 
-            assert(findResult.begin == begin);
-            assert(findResult.length == length);
+            writefln!"build(len=%,d) took %s; index size %,d"(
+                genomeSize,
+                result[0],
+                SuffixTree!alphabet.memorySize(genomeSize),
+            );
         }
-        auto benchmarkResult = benchmark!findSubseq(3);
-
-        totalRuntime += benchmarkResult[0];
     }
 
-    writefln!"findFirst(len ~ Geo(1/%d)) took %s"(expectedSubseqLength, totalRuntime / numIterations);
+    void benchmarkFindFirst()
+    {
+        import core.time : Duration;
+        import std.algorithm : min;
+        import std.array : array;
+        import std.random : uniform;
+
+        enum genomeSize = 1_000_000;
+
+        auto genome = getGenome(genomeSize).array.toBytes;
+        auto suffixTree = SuffixTree!alphabet.build(genome);
+
+        enum numIterations = 1_000;
+        enum expectedSubseqLength = 200_000;
+
+        Duration totalRuntime;
+        foreach (_; 0 .. numIterations)
+        {
+            auto begin = uniform(0, genomeSize);
+            auto length = min(genomeSize - begin, randGeometric(1.0/expectedSubseqLength));
+
+            void findSubseq()
+            {
+                auto findResult = suffixTree.findFirst(genome[begin .. begin + length]);
+
+                assert(findResult.begin == begin);
+                assert(findResult.length == length);
+            }
+            auto benchmarkResult = benchmark!findSubseq(3);
+
+            totalRuntime += benchmarkResult[0];
+        }
+
+        writefln!"findFirst(len ~ Geo(1/%d)) took %s"(expectedSubseqLength, totalRuntime / numIterations);
+    }
+
+    void benchmarkMultiIndexing()
+    {
+        import std.algorithm : cumulativeFold, map, sum, until;
+        import std.array : array;
+        import std.parallelism : taskPool;
+        import std.range : generate, tee;
+        import std.typecons : No, tuple;
+
+        foreach (genomeSize; [
+                50_000,
+                60_000,
+                70_000,
+                80_000,
+                90_000,
+               100_000,
+               200_000,
+               300_000,
+               400_000,
+               500_000,
+               600_000,
+               700_000,
+               800_000,
+               900_000,
+             1_000_000,
+             5_000_000,
+            10_000_000,
+        ])
+        {
+            enum expectedContigSize = 50_000;
+
+            auto genome = generate!(() => getGenome(randGeometric(1.0/expectedContigSize)))
+                .cumulativeFold!((acc, contig) => tuple(acc[0] + contig.length, contig))(tuple(0UL, getGenome(0)))
+                .until!(acc => acc[0] > genomeSize)(No.openRight)
+                .map!(acc => acc[1].array)
+                .array;
+            auto realGenomeSize = genome.map!"a.length".sum;
+            auto numContigs = genome.length;
+            auto numParallel = taskPool.size + 1;
+            size_t totalMemorySize;
+            auto result = benchmark!(() => {
+                auto index = MultiSuffixTree!alphabet.build(genome, numParallel);
+
+                totalMemorySize = index
+                    .suffixTrees[]
+                    .map!(tree => tree.memorySize())
+                    .sum;
+            }())(3);
+
+            writefln!"build(totlen=%,d,numtxts=%,d,parallel=%d) took %s; index size %,d"(
+                realGenomeSize,
+                numContigs,
+                numParallel,
+                result[0],
+                totalMemorySize,
+            );
+        }
+    }
+
+    auto getGenome(in size_t genomeSize)
+    {
+        import std.random : choice;
+        import std.range : generate, only, takeExactly;
+
+        return generate!(() => choice(only('a', 'c', 'g', 't'))).takeExactly(genomeSize);
+    }
+
+    size_t randGeometric(in double p)
+    {
+        import std.math : floor, log, log1p;
+        import std.random : uniform, uniform01;
+
+        return cast(size_t) floor(log(uniform01()) / log1p(-p));
+    }
 }
+else
+{
+    version (Have_dentist) { } else:
+    version (unittest) { } else:
+
+    void main(in string[] args)
+    {
+        import dentist.util.region;
+        import std.algorithm;
+        import std.array;
+        import std.exception;
+        import std.range;
+        import std.stdio;
+
+        enforce(args.length == 3, "usage: ./suffixtree <reference> <query>");
+
+        auto referenceFile = File(args[1]);
+        auto suffixTree = MultiSuffixTree!(8, "acgt").build(referenceFile.byLine.map!(line => line.filter!(c => c.among('a', 'c', 'g', 't')).map!"cast(char) a".array).array);
+        alias MatchedRegion = Region!(size_t, size_t, "textId");
+
+        foreach (i, query; File(args[2]).byLine.enumerate)
+            if (suffixTree.findFirst(query))
+            {
+                MatchedRegion m;
+
+                foreach (hit; suffixTree.findAll(query))
+                {
+                    if (hit)
+                    {
+                        auto hitInterval = MatchedRegion.TaggedInterval(
+                            hit.textId,
+                            hit.begin,
+                            hit.end,
+                        );
+
+                        if (!empty(m & hitInterval))
+                            stderr.writefln!"overlap: %03d: %s"(i, hit);
+
+                        writefln!"%03d: %s"(i, hit);
+                        m |= hitInterval;
+                    }
+                    else
+                    {
+                        stderr.writefln!"%03d: %s"(i, hit);
+                    }
+                }
+            }
+    }
+}
+
