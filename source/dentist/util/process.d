@@ -107,15 +107,7 @@ static final class LinesPipe(CommandInfo)
             static assert(0, "Only intended for use on POSIX compliant OS.");
         }
 
-        auto exitStatus = process.pid.wait();
-
-        logJsonDiagnostic(
-            "action", "execute",
-            "type", "pipe",
-            "command", processInfo.command.toJson,
-            "exitStatus", exitStatus,
-            "state", "post",
-        );
+        process.pid.wait();
     }
 
     private void ensureInitialized()
