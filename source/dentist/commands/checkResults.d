@@ -331,13 +331,6 @@ private struct ResultAnalyzer
 
         assert(querySequenceList.exists, "file should have been created by a prior self-alignment");
 
-        enum findCommandTemplate = `fm-index %s %s`;
-
-        auto findCommand = format!findCommandTemplate(
-            escapeShellFileName(refSequenceList),
-            escapeShellFileName(querySequenceList),
-        );
-
         enum resultFieldSeparator = '\t';
         alias FmIndexResult = Tuple!(
             id_t, "refId",
@@ -347,7 +340,7 @@ private struct ResultAnalyzer
             coord_t, "end",
         );
 
-        return pipeLines(findCommand)
+        return pipeLines(["fm-index", refSequenceList, querySequenceList])
             .map!(resultLine => resultLine.split(resultFieldSeparator))
             .map!(resultFields => FmIndexResult(
                 resultFields[1].to!id_t,
@@ -374,6 +367,8 @@ private struct ResultAnalyzer
     @ExternalDependency("sed", "POSIX")
     string makeIndexedSequenceList(in string dbFile)
     {
+        mixin(traceExecution);
+
         enum commandTemplate = `DBdump -s %s | sed -nE 's/^S [0-9]+ //p' > %s && fm-index %2$s`;
 
         auto sequenceListFile = getSequenceListFile(dbFile);
@@ -418,14 +413,16 @@ private struct ResultAnalyzer
             id_t lhsContigId = cast(id_t) (batchBegin + i + 1);
             id_t rhsContigId = lhsContigId + 1;
 
-            auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
-            auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
+            gapSummary.lhsContigId = lhsContigId;
 
             if (!isGap(lhsContigId, rhsContigId))
             {
                 gapSummary.state = GapState.ignored;
                 continue;
             }
+
+            auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
+            auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
 
             if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
             {
@@ -448,13 +445,13 @@ private struct ResultAnalyzer
                 );
                 // One contig alignment either does not exist or is ambiguous:
                 // the gap state is unkown (initial value)
+                gapSummary.state = GapState.unkown;
                 continue;
             }
 
             auto lhsContigAlignment = lhsContigAlignments[0];
             auto rhsContigAlignment = rhsContigAlignments[0];
 
-            gapSummary.lhsContigId = lhsContigId;
             gapSummary.state = getGapState(lhsContigAlignment, rhsContigAlignment);
             gapSummary.gapLength = inputGapSize(lhsContigId);
 
