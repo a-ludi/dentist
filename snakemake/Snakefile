@@ -54,7 +54,7 @@ rule mask_self:
         *mask_files(reference, self_mask)
     log: log_file("mask-self")
     shell:
-        "dentist mask --config={dentist_config_file} {reference} {self_alignment} {self_mask} 2> {log}"
+        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {self_alignment} {self_mask} 2> {log}"
 
 
 _fast2dam_checkpoint[reads] = "reads2db"
@@ -104,7 +104,7 @@ rule mask_reads:
         *mask_files(reference, reads_mask)
     log: log_file("mask-reads")
     shell:
-        "dentist mask --config={dentist_config_file} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
+        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
 
 
 checkpoint collect:
@@ -123,7 +123,7 @@ checkpoint collect:
     threads: max_threads
     log: log_file("collect")
     shell:
-        "dentist collect --config={dentist_config_file} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} - - - - 2> {log}"
+        "dentist collect --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} - - - - 2> {log}"
 
 
 rule process:
@@ -144,7 +144,7 @@ rule process:
     threads: max_threads
     log: log_file("process.{batch_id}")
     shell:
-        "dentist process --config={dentist_config_file} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
+        "dentist process --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
 
 rule extend_dentist_config_for_merge:
     input:
@@ -179,7 +179,7 @@ rule merge:
         protected(insertions)
     log: log_file("merge")
     shell:
-        "dentist merge --config={dentist_merge_config_file} - - 2> {log}"
+        "dentist merge --config={dentist_merge_config_file} {dentist_flags} - - 2> {log}"
 
 rule output:
     input:
@@ -190,7 +190,7 @@ rule output:
         output_assembly
     log: log_file("output")
     shell:
-        "dentist output --config={dentist_config_file} - - - 2> {log}"
+        "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
 
 #-----------------------------------------------------------------------------
 # END rules

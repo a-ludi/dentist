@@ -287,6 +287,8 @@ insertions_batch = join(workdir_, workflow_["insertions_batch"])
 insertions = join(workdir_, workflow_["insertions"])
 
 # command-specific
+from os import environ
+dentist_flags = environ.get("DENTIST_FLAGS", "")
 dbsplit_flags = make_flags(config["dbsplit_flags"])
 dalign_flags = make_flags(config["dalign_flags"])
 
