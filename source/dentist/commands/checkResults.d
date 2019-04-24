@@ -65,11 +65,17 @@ import std.algorithm :
     startsWith,
     sum,
     until;
-import std.array : array, minimallyInitializedArray;
+import std.array :
+    array,
+    minimallyInitializedArray,
+    split;
 import std.ascii :
     newline,
     toLower;
 import std.conv : to;
+import std.file :
+    exists,
+    getSize;
 import std.format :
     format,
     formattedRead;
@@ -77,6 +83,13 @@ import std.math :
     ceil,
     log10;
 import std.parallelism : parallel;
+import std.path :
+    baseName,
+    buildPath,
+    setExtension;
+import std.process :
+    escapeShellFileName,
+    executeShell;
 import std.range :
     assumeSorted,
     chain,
@@ -262,9 +275,7 @@ private struct ResultAnalyzer
     {
 
         auto duplicateContigIds = NaturalNumberSet.create(
-            findPerfectAlignments(
-                options.refDb,
-            )
+            findPerfectAlignments(options.refDb)
                 .map!(selfAlignment => cast(size_t) selfAlignment.reference.contigId)
                 .array
         );
@@ -296,58 +307,93 @@ private struct ResultAnalyzer
             .release;
     }
 
+    @ExternalDependency("fm-index", "DENTIST", "README.testing")
     ContigMapping[] findPerfectAlignments(in string refDb, in string queryDb = null)
     {
         mixin(traceExecution);
 
-        static auto _getDbRecords(in string dbFile)
-        {
-            return getDbRecords(dbFile, [
-                DBdumpOptions.readNumber,
-                DBdumpOptions.sequenceString,
-            ]);
-        }
+        alias getContigIds = (dbFile) => getDbRecords(dbFile, [DBdumpOptions.readNumber])
+            .map!"a.readNumber"
+            .array;
 
         auto isSelfAlignment = queryDb is null;
-        auto referenceContigs = _getDbRecords(refDb).array;
-        auto referenceContigIds = referenceContigs.map!"a.readNumber";
+        auto referenceContigIds = getContigIds(refDb);
+        auto refSequenceList = makeIndexedSequenceList(refDb);
 
-        logJsonDiagnostic("indexSize", GenomeIndex.memorySize(
-            referenceContigs.map!"a.sequence.length".sum,
-            referenceContigs.length,
-        ));
-        auto index = GenomeIndex.build(referenceContigs.map!"a.sequence");
+        logJsonDiagnostic("indexSize", getSize(refSequenceList ~ ".fm9"));
 
-        scope (exit)
-        {
-            import core.memory : GC;
+        auto queryContigIds = isSelfAlignment
+            ? referenceContigIds
+            : getContigIds(queryDb);
+        auto querySequenceList = isSelfAlignment
+            ? refSequenceList
+            : getSequenceListFile(queryDb);
 
-            index = GenomeIndex.init;
-            GC.collect();
-            GC.minimize();
-        }
+        assert(querySequenceList.exists, "file should have been created by a prior self-alignment");
 
-        auto queryContigs = isSelfAlignment
-            ? referenceContigs
-            : _getDbRecords(queryDb).array;
+        enum findCommandTemplate = `fm-index %s %s`;
 
-        return queryContigs
-            .map!(query => index
-                .findAll(query.sequence)
-                .map!(findResult => tuple!("queryContigId", "hit")(query.readNumber, findResult)))
-            .joiner
-            .filter!(findResult => findResult.hit &&
-                                   (!isSelfAlignment || findResult.queryContigId != referenceContigIds[findResult.hit.textId]))
+        auto findCommand = format!findCommandTemplate(
+            escapeShellFileName(refSequenceList),
+            escapeShellFileName(querySequenceList),
+        );
+
+        enum resultFieldSeparator = '\t';
+        alias FmIndexResult = Tuple!(
+            id_t, "refId",
+            coord_t, "refLength",
+            id_t, "queryId",
+            coord_t, "begin",
+            coord_t, "end",
+        );
+
+        return pipeLines(findCommand)
+            .map!(resultLine => resultLine.split(resultFieldSeparator))
+            .map!(resultFields => FmIndexResult(
+                resultFields[1].to!id_t,
+                resultFields[2].to!coord_t,
+                resultFields[3].to!id_t,
+                resultFields[4].to!coord_t,
+                resultFields[5].to!coord_t,
+            ))
+            .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
             .map!(findResult => ContigMapping(
                 ReferenceInterval(
-                    referenceContigIds[findResult.hit.textId],
-                    findResult.hit.begin,
-                    findResult.hit.end,
+                    referenceContigIds[findResult.refId],
+                    findResult.begin,
+                    findResult.end,
                 ),
-                cast(coord_t) index.getText(findResult.hit.textId).length,
-                findResult.queryContigId,
+                findResult.refLength,
+                queryContigIds[findResult.queryId],
             ))
             .array;
+    }
+
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fm-index", "DENTIST", "README.testing")
+    @ExternalDependency("sed", "POSIX")
+    string makeIndexedSequenceList(in string dbFile)
+    {
+        enum commandTemplate = `DBdump -s %s | sed -nE 's/^S [0-9]+ //p' > %s && fm-index %2$s`;
+
+        auto sequenceListFile = getSequenceListFile(dbFile);
+
+        auto commandResult = executeShell(format!commandTemplate(
+            escapeShellFileName(dbFile),
+            escapeShellFileName(sequenceListFile),
+        ));
+
+        dentistEnforce(
+            commandResult.status == 0,
+            format!"failed to make sequence list `%s`: %s"(sequenceListFile, commandResult.output),
+        );
+
+        return sequenceListFile;
+    }
+
+    string getSequenceListFile(in string dbFile)
+    {
+        return buildPath(options.workdir, baseName(dbFile).setExtension(".seq"));
     }
 
     GapSummary[] analyzeGaps()
