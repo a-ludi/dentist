@@ -903,6 +903,19 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("crop")
+        @MetaVar("<num>")
+        @Help(format!q"{
+            crop <num> bp from both ends of each reference contig when searching for exact copies
+            (default: %d)
+        }"(defaultValue!cropContigsBps))
+        coord_t cropContigsBps = 50;
+    }
+
     enum configHelpString = "
         provide configuration values in a JSON file. See README.md for
         usage and examples.

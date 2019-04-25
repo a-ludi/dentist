@@ -98,6 +98,7 @@ import std.range :
     repeat,
     slide,
     StoppingPolicy,
+    tee,
     zip;
 import std.range.primitives;
 import std.regex :
@@ -352,10 +353,13 @@ private struct ResultAnalyzer
             .map!(resultLine => resultLine.split(resultFieldSeparator))
             .map!(resultFields => FmIndexResult(
                 resultFields[1].to!id_t,
-                resultFields[2].to!coord_t,
+                // NOTE: compensate for cropping to produce the original
+                //       contig boundaries
+                resultFields[2].to!coord_t + 2*options.cropContigsBps,
                 resultFields[3].to!id_t,
                 resultFields[4].to!coord_t,
-                resultFields[5].to!coord_t,
+                // see above
+                resultFields[5].to!coord_t + 2*options.cropContigsBps,
             ))
             .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
             .map!(findResult => ContigMapping(
@@ -367,6 +371,11 @@ private struct ResultAnalyzer
                 findResult.refLength,
                 queryContigIds[findResult.queryId],
             ))
+            .tee!(contigMapping => assert(
+                contigMapping.reference.begin < contigMapping.reference.end &&
+                contigMapping.reference.end <= contigMapping.referenceContigLength,
+                "non-sense alignment"
+            ))
             .array;
     }
 
@@ -377,13 +386,30 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        enum commandTemplate = `DBdump -s %s | sed -nE 's/^S [0-9]+ //p' > %s && fm-index %2$s`;
+        enum commandTemplate = `DBdump -s %s | sed -nE '
+            /^S/ {
+                # Extract sequence part of each dump line
+                s/^S [0-9]+ //;
+                # Crop leading sequence
+                s/^[actg]{%3$d}//;
+                # Crop trailing sequence
+                s/[actg]{%3$d}$//;
+                # Print to stdout
+                p;
+            }
+        '> %2$s && fm-index %2$s`;
+
+        auto minCutoff = 2 * options.cropContigsBps;
+        dentistEnforce(
+            minCutoff < getContigCutoff(dbFile),
+            format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, dbFile),
+        );
 
         auto sequenceListFile = getSequenceListFile(dbFile);
-
         auto commandResult = executeShell(format!commandTemplate(
             escapeShellFileName(dbFile),
             escapeShellFileName(sequenceListFile),
+            options.cropContigsBps,
         ));
 
         dentistEnforce(
