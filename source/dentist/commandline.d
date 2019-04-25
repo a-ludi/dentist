@@ -1409,7 +1409,7 @@ struct OptionsFor(DentistCommand _command)
         enum workdirTemplate = format!"dentist-%s-XXXXXX"(command);
 
         /// This is a temporary directory to store all working data.
-        @Option("workdir", "w")
+        @Option("workdir", "P")
         @Help("use <string> as a working directory")
         @Validate!(value => enforce!CLIException(
             value is null || value.isDir,
