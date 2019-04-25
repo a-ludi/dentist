@@ -61,6 +61,7 @@ import std.algorithm :
     map,
     max,
     maxElement,
+    min,
     minElement,
     sort,
     startsWith,
@@ -84,7 +85,9 @@ import std.format :
 import std.math :
     ceil,
     log10;
-import std.parallelism : parallel;
+import std.parallelism :
+    parallel,
+    taskPool;
 import std.path :
     baseName,
     buildPath,
@@ -96,6 +99,8 @@ import std.range :
     assumeSorted,
     chain,
     enumerate,
+    evenChunks,
+    iota,
     only,
     repeat,
     slide,
@@ -305,6 +310,8 @@ private struct ResultAnalyzer
             .filter!(contigAlignment => contigAlignment.reference.contigId !in duplicateContigIds)
             .array;
 
+        debug logJsonDebug("perfectContigAlignments", perfectContigAlignments.toJson);
+
         auto bufferRest = perfectContigAlignments
             .sort!queryOrder
             .group!queryEquiv
@@ -342,6 +349,35 @@ private struct ResultAnalyzer
 
         assert(querySequenceList.exists, "file should have been created by a prior self-alignment");
 
+        auto queryChunks = iota(queryContigIds.length.to!id_t)
+            .evenChunks(min(queryContigIds.length, taskPool.size + 1))
+            .map!(queryChunk => tuple!(
+                "queryChunk",
+                "querySequenceList",
+                "refSequenceList",
+                "cropContigsBps",
+                "isSelfAlignment",
+                "referenceContigIds",
+                "queryContigIds",
+            )(
+                queryChunk,
+                querySequenceList,
+                refSequenceList,
+                options.cropContigsBps,
+                isSelfAlignment,
+                referenceContigIds,
+                queryContigIds,
+            ));
+
+        return taskPool
+            .amap!findPerfectAlignmentsChunk(queryChunks)
+            .joiner
+            .array;
+    }
+
+    static auto findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
+    {
+        enum findCommandTemplate = `sed -n '%d,%d p' %s | fm-index %s`;
         enum resultFieldSeparator = '\t';
         alias FmIndexResult = Tuple!(
             id_t, "refId",
@@ -351,17 +387,30 @@ private struct ResultAnalyzer
             coord_t, "end",
         );
 
-        return pipeLines(["fm-index", refSequenceList, querySequenceList])
+        auto queryChunk = info.queryChunk;
+        auto querySequenceList = info.querySequenceList;
+        auto refSequenceList = info.refSequenceList;
+        auto cropContigsBps = info.cropContigsBps;
+        auto isSelfAlignment = info.isSelfAlignment;
+        auto referenceContigIds = info.referenceContigIds;
+        auto queryContigIds = info.queryContigIds;
+
+        return pipeLines(format!findCommandTemplate(
+            queryChunk.front + 1,
+            queryChunk.back + 1,
+            querySequenceList,
+            refSequenceList,
+        ))
             .map!(resultLine => resultLine.split(resultFieldSeparator))
             .map!(resultFields => FmIndexResult(
                 resultFields[1].to!id_t,
                 // NOTE: compensate for cropping to produce the original
                 //       contig boundaries
-                resultFields[2].to!coord_t + 2*options.cropContigsBps,
-                resultFields[3].to!id_t,
+                resultFields[2].to!coord_t + 2 * cropContigsBps,
+                resultFields[3].to!id_t + queryChunk.front,
                 resultFields[4].to!coord_t,
                 // see above
-                resultFields[5].to!coord_t + 2*options.cropContigsBps,
+                resultFields[5].to!coord_t + 2 * cropContigsBps,
             ))
             .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
             .map!(findResult => ContigMapping(
@@ -377,8 +426,7 @@ private struct ResultAnalyzer
                 contigMapping.reference.begin < contigMapping.reference.end &&
                 contigMapping.reference.end <= contigMapping.referenceContigLength,
                 "non-sense alignment"
-            ))
-            .array;
+            ));
     }
 
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
