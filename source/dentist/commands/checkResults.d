@@ -50,6 +50,7 @@ import dentist.util.range : tupleMap;
 import dentist.util.suffixtree : SuffixTree;
 import std.algorithm :
     all,
+    any,
     among,
     copy,
     countUntil,
@@ -73,6 +74,7 @@ import std.ascii :
     newline,
     toLower;
 import std.conv : to;
+import std.exception : enforce;
 import std.file :
     exists,
     getSize;
@@ -1292,12 +1294,27 @@ struct StretcherAlignment
 @ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
 StretcherAlignment stretcher(in string refFasta, in string queryFasta)
 {
-    alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));
-
-    if (refFasta.getFastaLength() == 0)
+    try
+    {
+        // Throws exception if FASTA file is empty
+        enforce(refFasta.getFastaLength() > 0);
+    }
+    catch (Exception e)
+    {
         return StretcherAlignment();
-    if (queryFasta.getFastaLength() == 0 || onlyNs(queryFasta))
+    }
+
+    try
+    {
+        alias notOnlyNs = (fasta) => fasta.any!(base => !base.among('n', 'N'));
+
+        // Throws exception if FASTA file is empty
+        enforce(queryFasta.getFastaLength() > 0 && notOnlyNs(queryFasta));
+    }
+    catch (Exception e)
+    {
         return StretcherAlignment(0, cast(coord_t) refFasta.getFastaLength());
+    }
 
     auto stretcherCmd = only(
         "stretcher",
