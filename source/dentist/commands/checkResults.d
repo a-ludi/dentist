@@ -370,7 +370,7 @@ private struct ResultAnalyzer
             ));
 
         return taskPool
-            .amap!findPerfectAlignmentsChunk(queryChunks)
+            .amap!findPerfectAlignmentsChunk(queryChunks, 1)
             .joiner
             .array;
     }
@@ -426,7 +426,8 @@ private struct ResultAnalyzer
                 contigMapping.reference.begin < contigMapping.reference.end &&
                 contigMapping.reference.end <= contigMapping.referenceContigLength,
                 "non-sense alignment"
-            ));
+            ))
+            .array;
     }
 
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
