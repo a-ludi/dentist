@@ -73,7 +73,9 @@ import std.algorithm :
     find,
     map,
     startsWith;
-import std.array : split;
+import std.array :
+    array,
+    split;
 import std.conv;
 import std.exception :
     basicExceptionCtors,
@@ -107,10 +109,11 @@ import std.path :
     absolutePath,
     buildPath;
 import std.process :
-    spawnProcess,
-    wait;
+    Config,
+    execute;
 import std.range :
     ElementType,
+    enumerate,
     only,
     takeOne;
 import std.regex :
@@ -121,6 +124,7 @@ import std.stdio :
     stderr;
 import std.string :
     join,
+    lineSplitter,
     tr,
     wrap;
 import std.traits :
@@ -262,31 +266,29 @@ unittest
 
 void assertExternalToolsAvailable()
 {
-    alias devnull = () => File("/dev/null", "w+");
-    auto checkProcesses = externalDependencies
-        .map!(extDep => tuple(extDep, spawnProcess(
-            [
-                "/bin/which",
-                "--skip-alias",
-                "--skip-functions",
-                extDep.executable,
-            ],
-            devnull(),
-            devnull(),
-            devnull(),
-        )));
+    static assert(externalDependencies.length > 0);
+
+    enum whichBinary = "/bin/which";
+    auto result = execute(
+        [whichBinary, "--skip-alias", "--skip-functions"] ~
+        externalDependencies
+            .map!(extDep => extDep.executable)
+            .array
+    );
 
     ExternalDependency[] missingExternalTools;
-    missingExternalTools.reserve(externalDependencies.length);
+    missingExternalTools.reserve(result.status);
 
-    foreach (checkProcess; checkProcesses)
-        if (checkProcess[1].wait() != 0)
-            missingExternalTools ~= checkProcess[0];
+    foreach (i, line; enumerate(lineSplitter(result.output)))
+        if (line.startsWith(whichBinary))
+            missingExternalTools ~= externalDependencies[i];
 
-    if (missingExternalTools.length > 0)
-        throw new CLIException(format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
+    enforce!CLIException(
+        missingExternalTools.length == 0,
+        format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
             missingExternalTools
-        ));
+        )
+    );
 }
 
 string parseCommandName(in string[] args)
