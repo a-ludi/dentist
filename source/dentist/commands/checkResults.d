@@ -282,6 +282,8 @@ private struct ResultAnalyzer
 
         auto duplicateContigIds = NaturalNumberSet.create(
             findPerfectAlignments(options.refDb)
+                .filter!(selfAlignment => selfAlignment.reference.begin == 0 &&
+                                          selfAlignment.reference.end == selfAlignment.referenceContigLength)
                 .map!(selfAlignment => cast(size_t) selfAlignment.reference.contigId)
                 .array
         );
