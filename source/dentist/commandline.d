@@ -913,7 +913,8 @@ struct OptionsFor(DentistCommand _command)
             crop <num> bp from both ends of each reference contig when searching for exact copies
             (default: %d)
         }"(defaultValue!cropContigsBps))
-        coord_t cropContigsBps = 50;
+        // This is the amount PBJelly may modify
+        coord_t cropContigsBps = 100;
     }
 
     enum configHelpString = "
