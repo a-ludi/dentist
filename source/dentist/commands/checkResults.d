@@ -244,6 +244,8 @@ private struct ResultAnalyzer
 
     void init()
     {
+        mixin(traceExecution);
+
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
         auto contigCutoff = getContigCutoff(options.refDb);
@@ -255,20 +257,24 @@ private struct ResultAnalyzer
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
         contigAlignments = findReferenceContigs();
         referenceGaps = getReferenceGaps();
-        gapSummaries = analyzeGaps();
-        correctGapsPerIdentityLevel = makeIdentityLevelStats();
 
-        if (options.gapDetailsJson !is null)
-            writeGapDetailsJson();
-
-        logJsonDebug(
+        logJsonDiagnostic(
             "referenceOffset", referenceOffset,
             "numContigAlignments", contigAlignments.length.toJson,
             "contigAlignments", shouldLog(LogLevel.debug_)
                 ? contigAlignments.toJson
                 : toJson(null),
-            "referenceGaps", referenceGaps.toJson,
+            "numReferenceGaps", referenceGaps.intervals.length,
+            "referenceGaps", shouldLog(LogLevel.debug_)
+                ? referenceGaps.toJson
+                : toJson(null),
         );
+
+        gapSummaries = analyzeGaps();
+        correctGapsPerIdentityLevel = makeIdentityLevelStats();
+
+        if (options.gapDetailsJson !is null)
+            writeGapDetailsJson();
     }
 
     ContigMapping[] findReferenceContigs()
