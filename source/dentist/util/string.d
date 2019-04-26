@@ -172,7 +172,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         if (freeShift)
         {
             auto firstSubstitution = editPath.countUntil(EditOp.substitution);
-            result.computedScore -= firstSubstitution > 0
+            result.computedScore -= firstSubstitution >= 0
                 ? firstSubstitution
                 : editPath.length;
         }
