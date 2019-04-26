@@ -94,6 +94,14 @@ enum EditOp: byte
 
 alias score_t = uint;
 
+static enum Strip : byte
+{
+    none = 0b00,
+    back = 0b01,
+    front = 0b10,
+    both = 0b11,
+}
+
 /// Represents an alignment of two sequences.
 struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 {
@@ -180,17 +188,23 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return result;
     }
 
+    /// Strip leading/trailing insertions.
+    auto stripInsertions(Strip strip) inout pure nothrow
+    {
+        return partial(0, reference.length, strip);
+    }
+
     /**
         Get a partial alignment with respect to `reference`.
     */
-    auto partial(in size_t begin, in size_t end) inout pure nothrow
+    auto partial(in size_t begin, in size_t end, Strip stripInsertions = Strip.none) inout pure nothrow
     in
     {
-        assert(this.isValid());
+        assert(this.isValid(), "Attempting to get a partial alignment of an invalid alignment");
     }
     out (partialAlignment)
     {
-        assert(partialAlignment.isValid());
+        assert(partialAlignment.isValid(), "Partial alignment is invalid");
     }
     do
     {
@@ -198,20 +212,31 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 
         if (end == begin)
             return typeof(this)(0, [], reference[0 .. 0], query[0 .. 0], indelPenalty);
-        else if (0 == begin && end == reference.length)
-            return this;
 
+        bool hasStarted;
         score_t newScore;
         size_t editBegin, editEnd;
         size_t queryBegin, queryEnd;
         size_t i, j;
         foreach (k, editOp; editPath)
         {
-            if (i == begin)
+            if (!hasStarted && i == begin)
             {
-                newScore = 0;
+                hasStarted = !(stripInsertions & Strip.front);
                 editBegin = k;
                 queryBegin = j;
+            }
+
+            if (freeShift && i == begin)
+                newScore = 0;
+
+            if (i >= end)
+            {
+                editEnd = k;
+                queryEnd = j;
+
+                if ((stripInsertions & Strip.back) || editOp != EditOp.insertion)
+                    break;
             }
 
             final switch (editOp)
@@ -230,13 +255,16 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
                 ++j;
                 break;
             }
+        }
 
-            if (i >= end)
-            {
-                editEnd = k + 1;
-                queryEnd = j;
-                break;
-            }
+        if (
+            !(stripInsertions & Strip.back) &&
+            editEnd < editPath.length &&
+            editPath[editEnd] == EditOp.insertion
+        )
+        {
+            ++editEnd;
+            queryEnd = j;
         }
 
         auto partialAlignment = typeof(this)(
@@ -567,6 +595,53 @@ unittest
         "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat\n" ~
         "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
         "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------");
+}
+
+unittest
+{
+    enum reference = "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa" ~
+                     "caacatatgattctaaaatttcaaaatgcttaaaggtctga";
+    enum query = "atatcctcaggtgaggactaacaacaaatatatatatatttatatctaac" ~
+                 "aacatatgatttctaaaatttcaaaaatcttaaggctgaattaat";
+    auto alignment = findAlignment(
+        reference,
+        query,
+        1,
+        Yes.freeShift,
+    );
+
+    assert(alignment.partial(0, reference.length, Strip.none).toString(50) ==
+        "-tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatct\n" ~
+        " ||||||||||||||| || ||||||||||||||||||| |*|| |||||\n" ~
+        "atatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatct\n" ~
+        "\n" ~
+        "aacaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------\n" ~
+        "|||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "aacaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat");
+    assert(alignment.partial(0, reference.length, Strip.front).toString(50) ==
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "\n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat");
+    assert(alignment.partial(0, reference.length, Strip.back).toString(50) ==
+        "-tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatct\n" ~
+        " ||||||||||||||| || ||||||||||||||||||| |*|| |||||\n" ~
+        "atatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatct\n" ~
+        "\n" ~
+        "aacaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga\n" ~
+        "|||||||||||||| ||||||||||||||**||||| || ||||\n" ~
+        "aacaacatatgatttctaaaatttcaaaaatcttaa-gg-ctga");
+    assert(alignment.partial(0, reference.length, Strip.both).toString(50) ==
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "\n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||\n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctga");
 }
 
 unittest
