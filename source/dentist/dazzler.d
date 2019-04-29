@@ -2373,7 +2373,7 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string w
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in id_t cacheSize = 1024)
+string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir = null, in id_t cacheSize = 1024)
 {
     // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
     // requirements of this function
