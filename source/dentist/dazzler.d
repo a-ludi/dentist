@@ -64,6 +64,7 @@ import std.conv : to;
 import std.exception : enforce;
 import std.file : exists, remove;
 import std.format : format, formattedRead;
+import std.math : isNaN;
 import std.meta : AliasSeq;
 import std.path :
     absolutePath,
@@ -2058,7 +2059,7 @@ private:
                         else static if (lineTypeFormat == pbQuality)
                         {
                             auto pbReadInfo = currentRecord.pacBioReadInfo;
-                            auto wasLineTypeDone = pbReadInfo.readQuality != pbReadInfo.readQuality.init;
+                            auto wasLineTypeDone = !isNaN(pbReadInfo.readQuality);
                         }
                         else
                         {
@@ -2256,13 +2257,14 @@ unittest
 EOF".outdent;
 
     import std.algorithm : equal;
+    import std.string : lineSplitter;
 
-    auto dbDump = readDbDump(testDbDump);
+    auto dbDump = readDbDump(testDbDump.lineSplitter);
     auto expectedResult = [
         DbRecord(
             1,
             "Sim",
-            PacBioReadInfo(
+            DbRecord.PacBioReadInfo(
                 1,
                 0,
                 62,
@@ -2273,7 +2275,7 @@ EOF".outdent;
         DbRecord(
             2,
             "Sim",
-            PacBioReadInfo(
+            DbRecord.PacBioReadInfo(
                 2,
                 0,
                 63,
@@ -2284,7 +2286,7 @@ EOF".outdent;
         DbRecord(
             3,
             "Sim",
-            PacBioReadInfo(
+            DbRecord.PacBioReadInfo(
                 3,
                 0,
                 62,
@@ -2295,7 +2297,7 @@ EOF".outdent;
         DbRecord(
             4,
             "Sim",
-            PacBioReadInfo(
+            DbRecord.PacBioReadInfo(
                 4,
                 0,
                 62,
@@ -2306,7 +2308,7 @@ EOF".outdent;
         DbRecord(
             5,
             "Sim",
-            PacBioReadInfo(
+            DbRecord.PacBioReadInfo(
                 5,
                 0,
                 32,

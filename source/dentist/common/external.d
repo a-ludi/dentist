@@ -25,13 +25,6 @@ struct ExternalDependency
     string package_;
     string url;
 
-    this(string executable, string package_ = null, string url = null)
-    {
-        this.executable = executable;
-        this.package_ = package_;
-        this.url = url;
-    }
-
     string toString() const pure nothrow
     {
         if (package_ is null && url is null)
@@ -52,11 +45,6 @@ struct ExternalDependency
         static assert(!isExternalDependency!"someTool");
     }
 
-    static enum ExternalDependency[] fromSymbol(alias symbol) = [Filter!(
-        isExternalDependency,
-        getUDAs!(symbol, ExternalDependency),
-    )];
-
     unittest
     {
         @ExternalDependency("someTool")
@@ -68,6 +56,11 @@ struct ExternalDependency
         static assert(fromSymbol!callSomeTool == [ExternalDependency("someTool")]);
     }
 }
+
+static enum ExternalDependency[] fromSymbol(alias symbol) = [Filter!(
+    ExternalDependency.isExternalDependency,
+    getUDAs!(symbol, ExternalDependency),
+)];
 
 ExternalDependency[] getExternalDependencies(Modules...)()
 {
@@ -81,7 +74,7 @@ ExternalDependency[] getExternalDependencies(Modules...)()
     alias byExecutableEq = (a, b) => a.executable == b.executable;
 
     return [staticMap!(
-        ExternalDependency.fromSymbol,
+        fromSymbol,
         staticMap!(
             _getSymbolsByUDA,
             Modules,
@@ -107,8 +100,8 @@ unittest
     }
 
     static assert(getExternalDependencies!Caller == [
-        ExternalDependency("someTool"),
         ExternalDependency("otherTool"),
+        ExternalDependency("someTool"),
     ]);
 }
 

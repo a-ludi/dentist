@@ -1042,7 +1042,7 @@ struct MultiSuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabe
             "apple",
             "strawberry",
         );
-        auto mSuffixTree = MultiSuffixTree!(2, "abelnprstwy")().build(words);
+        auto mSuffixTree = MultiSuffixTree!"abelnprstwy".build(words, 2);
 
         assert(mSuffixTree.suffixTrees[0].numTexts == 2);
         assert(mSuffixTree.suffixTrees[1].numTexts == 1);
@@ -1087,7 +1087,7 @@ struct MultiSuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabe
             "apple",
             "strawberry",
         );
-        auto mSuffixTree = MultiSuffixTree!(2, "abelnprstwy")().build(words);
+        auto mSuffixTree = MultiSuffixTree!"abelnprstwy".build(words, 2);
 
         assert(mSuffixTree.findAll("banana").length == 1);
         assert(mSuffixTree.findAll("a").length == 5);
@@ -1097,7 +1097,7 @@ struct MultiSuffixTree(alias inputAlphabet) if (isSomeBytes!(typeof(inputAlphabe
 unittest
 {
     /// Trigger unit tests for SuffixTree
-    MultiSuffixTree!(0, "") dummy;
+    MultiSuffixTree!"" dummy;
 }
 
 version (benchmark)
