@@ -223,6 +223,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             if (!hasStarted && i == begin)
             {
                 hasStarted = !(stripInsertions & Strip.front);
+                newScore = 0;
                 editBegin = k;
                 queryBegin = j;
             }
@@ -230,14 +231,8 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             if (freeShift && i == begin)
                 newScore = 0;
 
-            if (i >= end)
-            {
-                editEnd = k;
-                queryEnd = j;
-
-                if ((stripInsertions & Strip.back) || editOp != EditOp.insertion)
-                    break;
-            }
+            if (i == end && ((stripInsertions & Strip.back) || editOp != EditOp.insertion))
+                break;
 
             final switch (editOp)
             {
@@ -254,6 +249,12 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
                 newScore += indelPenalty;
                 ++j;
                 break;
+            }
+
+            if (i == end)
+            {
+                editEnd = k + 1;
+                queryEnd = j;
             }
         }
 
@@ -606,8 +607,7 @@ unittest
     auto alignment = findAlignment(
         reference,
         query,
-        1,
-        Yes.freeShift,
+        1
     );
 
     assert(alignment.partial(0, reference.length, Strip.none).toString(50) ==
@@ -642,6 +642,23 @@ unittest
         "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga\n" ~
         "||||||||||||| ||||||||||||||**||||| || ||||\n" ~
         "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctga");
+}
+
+unittest
+{
+    enum reference = "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa";
+    enum query = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
+    auto alignment = findAlignment!"1 - (a == b || a == 'n' || b == 'n')"(
+        reference,
+        query,
+        1
+    );
+
+    import std.stdio;
+    assert(alignment.partial(0, reference.length, Strip.front).toString(50) ==
+        "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa\n" ~
+        "**************************************************\n" ~
+        "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
 }
 
 unittest
