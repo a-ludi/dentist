@@ -35,13 +35,22 @@ import std.range :
     ElementType,
     enumerate,
     isForwardRange,
+    isInputRange,
     isRandomAccessRange,
     retro,
     save,
     slide,
-    walkLength;
-import std.traits : isCallable, isIntegral, isNumeric;
-import std.typecons : Flag, No, Yes;
+    StoppingPolicy,
+    walkLength,
+    zip;
+import std.traits :
+    isCallable,
+    isIntegral,
+    isNumeric;
+import std.typecons :
+    Flag,
+    No,
+    Yes;
 
 debug import std.stdio : writeln;
 
@@ -63,6 +72,38 @@ unittest
     {
         auto values = [1.0, 2.0, 3.0, 4.0];
         assert(values.mean == 2.5);
+    }
+}
+
+/// Calculate the weighted mean of values.
+double mean(Values, Weights)(Values values, Weights weights)
+    if (isInputRange!Values && isForwardRange!Weights)
+{
+    enum zeroWeight = cast(ElementType!Weights) 0;
+
+    auto weightedSum = zip(StoppingPolicy.requireSameLength, values, weights)
+        .map!(pair => (pair[0] * pair[1]).to!double)
+        .sum;
+    auto totalWeight = weights.sum;
+
+    return weightedSum / totalWeight;
+}
+
+unittest
+{
+    {
+        auto values = [2, 4, 6];
+        auto equalWeights = [1, 1, 1];
+        auto weights = [3, 4, 1];
+
+        assert(mean(values, equalWeights) == mean(values));
+        assert(mean(values, weights) == 3.5);
+    }
+    {
+        auto values = [1.0, 2.0, 3.0, 4.0];
+        auto weights = [4.0, 3.0, 2.0, 1.0];
+
+        assert(mean(values, weights) == 2.0);
     }
 }
 
