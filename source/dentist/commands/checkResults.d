@@ -42,12 +42,12 @@ import dentist.util.algorithm :
 import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
+    mean,
     median,
     N,
     NaturalNumberSet;
 import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
-import dentist.util.suffixtree : SuffixTree;
 import std.algorithm :
     all,
     any,
@@ -146,8 +146,6 @@ void execute(in Options options)
         writeln(stats.toTabular());
 }
 
-alias GenomeIndex = SuffixTree!"acgt";
-
 struct ContigMapping
 {
     ReferenceInterval reference;
@@ -226,7 +224,7 @@ private struct ResultAnalyzer
         stats.numBpsKnown = getNumBpsKnown();
         stats.numBpsResult = getNumBpsResult();
         stats.numBpsInGaps = getNumBpsInGaps();
-        stats.numDiffsInGaps = getTotalDiffsInClosedGaps();
+        stats.averageInsertionError = getAverageInsertionError();
         stats.numTranslocatedGaps = getNumTranslocatedGaps();
         stats.numContigsExpected = getNumContigsExpected();
         stats.numMappedContigs = getNumMappedContigs();
@@ -290,9 +288,7 @@ private struct ResultAnalyzer
 
         auto duplicateContigIds = NaturalNumberSet.create(
             findPerfectAlignments(options.refDb)
-                .filter!(selfAlignment => selfAlignment.reference.begin == 0 &&
-                                          selfAlignment.reference.end == selfAlignment.referenceContigLength)
-                .map!(selfAlignment => cast(size_t) selfAlignment.reference.contigId)
+                .map!(selfAlignment => cast(size_t) selfAlignment.queryContigId)
                 .array
         );
         logJsonDiagnostic(
@@ -307,7 +303,7 @@ private struct ResultAnalyzer
             options.refDb,
         )
             // Ignore contigs that have exact copies in `refDb`
-            .filter!(contigAlignment => contigAlignment.reference.contigId !in duplicateContigIds)
+            .filter!(contigAlignment => contigAlignment.queryContigId !in duplicateContigIds)
             .array;
 
         debug logJsonDebug("perfectContigAlignments", perfectContigAlignments.toJson);
@@ -506,6 +502,8 @@ private struct ResultAnalyzer
                 continue;
             }
 
+            gapSummary.gapLength = inputGapSize(lhsContigId);
+
             auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
             auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
 
@@ -538,7 +536,6 @@ private struct ResultAnalyzer
             auto rhsContigAlignment = rhsContigAlignments[0];
 
             gapSummary.state = getGapState(lhsContigAlignment, rhsContigAlignment);
-            gapSummary.gapLength = inputGapSize(lhsContigId);
 
             if (gapSummary.state.among(GapState.partiallyClosed, GapState.closed))
                 gapSummary.alignment = computeInsertionAlignment(getInsertionMapping(
@@ -752,11 +749,14 @@ private struct ResultAnalyzer
         return getGapInfos!"gapLength".sum;
     }
 
-    size_t getTotalDiffsInClosedGaps()
+    double getAverageInsertionError()
     {
         mixin(traceExecution);
 
-        return getGapInfos!"alignment.numDiffs"(GapState.closed).sum;
+        return mean(
+            getGapInfos!"alignment.percentIdentity"(),
+            getGapInfos!"gapLength"(),
+        );
     }
 
     size_t getNumTranslocatedGaps()
@@ -822,9 +822,8 @@ private struct ResultAnalyzer
                     "gapLength": gapSummary.gapLength.toJson,
                     "details": gapSummary.state.among(GapState.closed, GapState.partiallyClosed)
                         ? (alignment => [
-                            "length": alignment.length.toJson,
-                            "numIdentical": alignment.numIdentical.toJson,
-                            "numDiffs": alignment.numDiffs.toJson,
+                            "referenceLength": alignment.referenceLength.toJson,
+                            "queryLength": alignment.queryLength.toJson,
                             "percentIdentity": alignment.percentIdentity.toJson,
                             "alignment": alignment.alignmentString.splitLines.toJson,
                         ].toJson)(gapSummary.alignment)
@@ -1143,7 +1142,7 @@ private struct Stats
     size_t numBpsKnown;
     size_t numBpsResult;
     size_t numBpsInGaps;
-    size_t numDiffsInGaps;
+    double averageInsertionError;
     size_t numTranslocatedGaps;
     size_t numCorrectGaps;
     size_t numContigsExpected;
@@ -1161,11 +1160,6 @@ private struct Stats
     Histogram!coord_t closedGapLengthHistogram;
     Histogram!coord_t gapLengthHistogram;
 
-    @property double averageInsertionError() const pure
-    {
-        return numDiffsInGaps.to!double / numBpsInGaps.to!double;
-    }
-
     string toJsonString() const
     {
         return [
@@ -1173,7 +1167,6 @@ private struct Stats
             "numBpsKnown": numBpsKnown.toJson,
             "numBpsResult": numBpsResult.toJson,
             "numBpsInGaps": numBpsInGaps.toJson,
-            "numDiffsInGaps": numDiffsInGaps.toJson,
             "averageInsertionError": averageInsertionError.toJson,
             "numTranslocatedGaps": numTranslocatedGaps.toJson,
             "numCorrectGaps": numCorrectGaps.toJson,
@@ -1215,7 +1208,6 @@ private struct Stats
             format!"numBpsKnown:            %*d"(columnWidth, numBpsKnown),
             format!"numBpsResult:           %*d"(columnWidth, numBpsResult),
             format!"numBpsInGaps:           %*d"(columnWidth, numBpsInGaps),
-            format!"numDiffsInGaps:         %*d"(columnWidth, numDiffsInGaps),
             format!"averageInsertionError:  %*.3e"(columnWidth, averageInsertionError),
 
             format!"maximumN50:             %*d"(columnWidth, maximumN50),
@@ -1289,7 +1281,6 @@ private struct Stats
             numBpsKnown,
             numBpsResult,
             numBpsInGaps,
-            numDiffsInGaps,
             numTranslocatedGaps,
             numCorrectGaps,
             numContigsExpected,
@@ -1325,45 +1316,43 @@ private struct Stats
 
 struct StretcherAlignment
 {
-    diff_t numIdentical;
-    coord_t length;
+    coord_t referenceLength;
+    coord_t queryLength;
+    double percentIdentity;
     string alignmentString;
-
-    @property diff_t numDiffs() const pure nothrow
-    {
-        return length - numIdentical;
-    }
-
-    @property double percentIdentity() const pure
-    {
-        return numIdentical.to!double / length.to!double;
-    }
 }
 
 @ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
 StretcherAlignment stretcher(in string refFasta, in string queryFasta)
 {
-    try
-    {
-        // Throws exception if FASTA file is empty
-        enforce(refFasta.getFastaLength() > 0);
-    }
-    catch (Exception e)
-    {
-        return StretcherAlignment();
-    }
+    coord_t refLength;
+    coord_t queryLength;
 
     try
     {
-        alias notOnlyNs = (fasta) => fasta.any!(base => !base.among('n', 'N'));
-
         // Throws exception if FASTA file is empty
-        enforce(queryFasta.getFastaLength() > 0 && notOnlyNs(queryFasta));
+        refLength = cast(coord_t) refFasta.getFastaLength();
     }
-    catch (Exception e)
+    // Treat empty FASTA file as length == 0
+    catch (Exception e) { }
+
+    try
     {
-        return StretcherAlignment(0, cast(coord_t) refFasta.getFastaLength());
+        // Throws exception if FASTA file is empty
+        queryLength = cast(coord_t) queryFasta.getFastaLength();
     }
+    // Treat empty FASTA file as length == 0
+    catch (Exception e) { }
+
+    alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));
+    auto alignment = StretcherAlignment(refLength, queryLength);
+
+    if (
+        refLength == 0 ||
+        queryLength == 0 ||
+        onlyNs(queryFasta)
+    )
+        return alignment;
 
     auto stretcherCmd = only(
         "stretcher",
@@ -1375,29 +1364,17 @@ StretcherAlignment stretcher(in string refFasta, in string queryFasta)
         queryFasta,
     );
 
-    StretcherAlignment alignment;
-    auto stretcherResult = stretcherCmd.pipeLines();
+    import std.range : tee;
+    import std.stdio : stderr;
+    auto stretcherResult = stretcherCmd.pipeLines().tee!(line => stderr.writeln(line));
 
-    stretcherResult.stretcherReadLength(alignment);
-    stretcherResult.stretcherReadIdentity(alignment);
+    stretcherResult.stretcherReadPercentIdentity(alignment);
     stretcherResult.stretcherReadAlignmentString(alignment);
 
     return alignment;
 }
 
-private void stretcherReadLength(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
-{
-    enum lengthLineFormat = "# Length: %d";
-    enum lengthLinePrefix = lengthLineFormat.until(':', No.openRight);
-
-    auto findLengthLine = stretcherResult.find!(line => line.startsWith(lengthLinePrefix));
-
-    dentistEnforce(!findLengthLine.empty, "Missing length line in stretcher output");
-
-    findLengthLine.front.formattedRead!lengthLineFormat(alignment.length);
-}
-
-private void stretcherReadIdentity(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+private void stretcherReadPercentIdentity(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
 {
     enum identityLineFormat = "# Identity: %d/%d";
     enum identityLinePrefix = identityLineFormat.until(':', No.openRight);
@@ -1405,10 +1382,18 @@ private void stretcherReadIdentity(StretcherResult)(ref StretcherResult stretche
 
     dentistEnforce(!findIdentityLine.empty, "Missing identity line in stretcher output");
 
+    coord_t numIdentical;
+    coord_t alignmentLength;
+
     findIdentityLine.front.formattedRead!identityLineFormat(
-        alignment.numIdentical,
-        alignment.length,
+        numIdentical,
+        alignmentLength,
     );
+
+    if (alignmentLength > 0)
+        alignment.percentIdentity = numIdentical.to!double / alignmentLength.to!double;
+    else
+        alignment.percentIdentity = double.nan;
 }
 
 private void stretcherReadAlignmentString(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
