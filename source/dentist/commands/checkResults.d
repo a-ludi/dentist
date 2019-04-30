@@ -880,9 +880,9 @@ private struct ResultAnalyzer
                             "queryLength": alignment.queryLength.toJson,
                             "percentIdentity": alignment.percentIdentity.toJson,
                             "alignment": [
-                                alignment.referenceLine.to!string,
-                                alignment.editOps.to!string,
-                                alignment.queryLine.to!string,
+                                cast(string) alignment.referenceLine,
+                                cast(string) alignment.editOps,
+                                cast(string) alignment.queryLine,
                             ].toJson,
                         ].toJson)(gapSummary.alignment)
                         : toJson(null)
