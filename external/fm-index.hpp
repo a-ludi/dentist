@@ -22,7 +22,7 @@ void locateQueries(
     string sourceName,
     string queryBuffer
 );
-void locateQuery(
+size_t locateQuery(
     csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex,
     vector<size_t> recordStarts,
     string sourceName,

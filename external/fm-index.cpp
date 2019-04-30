@@ -160,12 +160,13 @@ void locateQueries(
          << "}" << endl;
 
     time_t start = time(NULL);
+    size_t numHits = 0;
     size_t queryId = 0;
     while (queriesData && !queriesData.eof())
     {
         getline(queriesData, queryBuffer);
         if (queryBuffer.size() > 0)
-            locateQuery(fmIndex, recordStarts, sourceName, queryId++, queryBuffer);
+            numHits += locateQuery(fmIndex, recordStarts, sourceName, queryId++, queryBuffer);
 
         if (sourceName == "stdin" && !hasStdin())
             break;
@@ -174,11 +175,12 @@ void locateQueries(
     cerr << "{\"level\":\"info\","
          << "\"info\":\"Finished queries.\","
          << "\"source\":\"" << sourceName << "\","
+         << "\"numHits\":" << numHits << ","
          << "\"elpasedSecs\":" << difftime(time(NULL), start)
          << "}" << endl;
 }
 
-void locateQuery(
+size_t locateQuery(
     csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex,
     vector<size_t> recordStarts,
     string sourceName,
@@ -205,6 +207,8 @@ void locateQuery(
              << hitBegin - sourceBegin << '\t'
              << hitEnd - sourceBegin << endl;
     }
+
+    return locations.size();
 }
 
 size_t findSourceId(vector<size_t> recordStarts, size_t hitBegin)
