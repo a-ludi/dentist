@@ -1201,6 +1201,17 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Option("min-contig-size")
+        @Help(format!"
+            minimum size for translocated contigs (default: %d)
+        "(defaultValue!minContigSize))
+        coord_t minContigSize = 1000;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1210,6 +1221,17 @@ struct OptionsFor(DentistCommand _command)
         }"(defaultValue!minExtensionLength))
         @Validate!(value => enforce!CLIException(value > 0, "minimum extension length must be greater than zero"))
         size_t minExtensionLength = 100;
+    }
+
+    static if (command.among(
+        TestingCommand.translocateGaps,
+    ))
+    {
+        @Option("min-gap-size")
+        @Help(format!"
+            minimum size for translocated gaps (default: %d)
+        "(defaultValue!minGapSize))
+        coord_t minGapSize = 25;
     }
 
     static enum defaultMinSpanningReads = 3;

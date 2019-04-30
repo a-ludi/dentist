@@ -47,6 +47,7 @@ import std.range :
     slide,
     takeExactly;
 import std.stdio : File, stdout;
+import std.traits : Unqual;
 import std.typecons : No;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -105,6 +106,30 @@ private struct Translocator
             .map!(ac => ac.toInterval!(ReferenceInterval, "contigA"))
             .filter!"a.size > 0"
             .array);
+        if (mappedRegions.intervals.length > 0)
+            mappedRegions = ReferenceRegion(mappedRegions
+                .intervals
+                // Remove small gaps
+                .slide!(No.withPartial)(2)
+                .map!(gapPair => gapPair[0].contigId == gapPair[1].contigId
+                    ? (gapPair[1].begin - gapPair[0].end >= options.minGapSize
+                        ? gapPair[0]
+                        : ReferenceInterval.convexHull(gapPair[0], gapPair[1])
+                    )
+                    : gapPair[0])
+                .chain(only(mappedRegions.intervals[$ - 1]))
+                .map!(mappedInterval => cast(Unqual!(typeof(mappedInterval))) mappedInterval)
+                .array
+            );
+        if (mappedRegions.intervals.length > 0)
+            mappedRegions = ReferenceRegion(mappedRegions
+                .intervals
+                // Remove small contigs
+                .filter!(mappedInterval => mappedInterval.size >= options.minContigSize)
+                .map!(mappedInterval => cast(Unqual!(typeof(mappedInterval))) mappedInterval)
+                .array
+            );
+
         writeMask(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
@@ -135,6 +160,7 @@ private struct Translocator
                 contigId,
                 options.workdir,
             );
+            // Prepend needle to produce the first contig.
             auto keepRegionsPairs = chain(only(needle), contigMappedRegions)
                 .slide!(No.withPartial)(2);
 
