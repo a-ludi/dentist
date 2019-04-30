@@ -909,14 +909,31 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.checkResults,
     ))
     {
-        @Option("crop")
+        @Option("crop-ambiguous")
         @MetaVar("<num>")
         @Help(format!q"{
             crop <num> bp from both ends of each reference contig when searching for exact copies
-            (default: %d)
-        }"(defaultValue!cropContigsBps))
+            in the reference itself in order to identify ambiguous contigs. If comparing different
+            gap closing tools use the same value for all tools. (default: %d)
+        }"(defaultValue!cropAmbiguous))
         // This is the amount PBJelly may modify
-        coord_t cropContigsBps = 100;
+        coord_t cropAmbiguous = 100;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("crop-alignment")
+        @MetaVar("<num>")
+        @Help(format!q"{
+            crop <num> bp from both ends of each reference contig when searching for exact copies
+            in the output of the gap closer. Keep this as low as possible, ie. if the contigs are
+            not modified use zero. (default: %d)
+        }"(defaultValue!cropAlignment))
+        @Validate!((value, options) => enforce!CLIException(value <= options.cropAmbiguous,
+                                                            "must be <= --crop-ambiguous"))
+        coord_t cropAlignment = 0;
     }
 
     enum configHelpString = "

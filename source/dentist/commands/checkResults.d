@@ -48,12 +48,16 @@ import dentist.util.math :
     NaturalNumberSet;
 import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
+import dentist.util.string :
+    findAlignment,
+    Strip;
 import std.algorithm :
     all,
-    any,
     among,
     copy,
+    count,
     countUntil,
+    cumulativeFold,
     filter,
     find,
     group,
@@ -91,7 +95,7 @@ import std.parallelism :
 import std.path :
     baseName,
     buildPath,
-    setExtension;
+    stripExtension;
 import std.process :
     escapeShellFileName,
     executeShell;
@@ -103,6 +107,7 @@ import std.range :
     iota,
     only,
     repeat,
+    retro,
     slide,
     StoppingPolicy,
     tee,
@@ -117,6 +122,7 @@ import std.stdio :
     writeln;
 import std.string :
     join,
+    outdent,
     splitLines,
     tr;
 import std.traits : Unqual;
@@ -321,7 +327,6 @@ private struct ResultAnalyzer
             .release;
     }
 
-    @ExternalDependency("fm-index", "DENTIST", "README.testing")
     ContigMapping[] findPerfectAlignments(in string refDb, in string queryDb = null)
     {
         mixin(traceExecution);
@@ -339,9 +344,10 @@ private struct ResultAnalyzer
         auto queryContigIds = isSelfAlignment
             ? referenceContigIds
             : getContigIds(queryDb);
-        auto querySequenceList = isSelfAlignment
-            ? refSequenceList
-            : getSequenceListFile(queryDb);
+        auto querySequenceList = makeCroppedSequenceList(
+            isSelfAlignment ? refDb : queryDb,
+            isSelfAlignment ? options.cropAmbiguous : options.cropAlignment,
+        );
 
         assert(querySequenceList.exists, "file should have been created by a prior self-alignment");
 
@@ -349,17 +355,19 @@ private struct ResultAnalyzer
             .evenChunks(min(queryContigIds.length, taskPool.size + 1))
             .map!(queryChunk => tuple!(
                 "queryChunk",
+                "queryDb",
                 "querySequenceList",
+                "refDb",
                 "refSequenceList",
-                "cropContigsBps",
                 "isSelfAlignment",
                 "referenceContigIds",
                 "queryContigIds",
             )(
                 queryChunk,
+                queryDb,
                 querySequenceList,
+                refDb,
                 refSequenceList,
-                options.cropContigsBps,
                 isSelfAlignment,
                 referenceContigIds,
                 queryContigIds,
@@ -371,7 +379,7 @@ private struct ResultAnalyzer
             .array;
     }
 
-    static auto findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
+    static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
     {
         enum findCommandTemplate = `sed -n '%d,%d p' %s | fm-index %s`;
         enum resultFieldSeparator = '\t';
@@ -386,7 +394,6 @@ private struct ResultAnalyzer
         auto queryChunk = info.queryChunk;
         auto querySequenceList = info.querySequenceList;
         auto refSequenceList = info.refSequenceList;
-        auto cropContigsBps = info.cropContigsBps;
         auto isSelfAlignment = info.isSelfAlignment;
         auto referenceContigIds = info.referenceContigIds;
         auto queryContigIds = info.queryContigIds;
@@ -400,13 +407,10 @@ private struct ResultAnalyzer
             .map!(resultLine => resultLine.split(resultFieldSeparator))
             .map!(resultFields => FmIndexResult(
                 resultFields[1].to!id_t,
-                // NOTE: compensate for cropping to produce the original
-                //       contig boundaries
-                resultFields[2].to!coord_t + 2 * cropContigsBps,
+                resultFields[2].to!coord_t,
                 resultFields[3].to!id_t + queryChunk.front,
                 resultFields[4].to!coord_t,
-                // see above
-                resultFields[5].to!coord_t + 2 * cropContigsBps,
+                resultFields[5].to!coord_t,
             ))
             .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
             .map!(findResult => ContigMapping(
@@ -428,48 +432,104 @@ private struct ResultAnalyzer
 
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fm-index", "DENTIST", "README.testing")
-    @ExternalDependency("sed", "POSIX")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("grep", "POSIX")
     string makeIndexedSequenceList(in string dbFile)
     {
         mixin(traceExecution);
 
-        enum commandTemplate = `DBdump -s %s | sed -nE '
-            /^S/ {
-                # Extract sequence part of each dump line
-                s/^S [0-9]+ //;
-                # Crop leading sequence
-                s/^[actg]{%3$d}//;
-                # Crop trailing sequence
-                s/[actg]{%3$d}$//;
-                # Print to stdout
-                p;
-            }
-        '> %2$s && fm-index %2$s`;
+        enum commandTemplate = `DBdump -s %s | grep -E '^S' | cut -d' ' -f3 > %2$s && fm-index %s`;
 
-        auto minCutoff = 2 * options.cropContigsBps;
+        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir);
+
+        if (!exists(sequenceListFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(dbFile),
+                escapeShellFileName(sequenceListFile),
+            );
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            auto commandResult = executeShell(command);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make indexed sequence list `%s`: %s"(sequenceListFile, commandResult.output),
+            );
+        }
+
+        assert(exists(sequenceListFile ~ ".fm9"), "missing FM-index");
+
+        return sequenceListFile;
+    }
+
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("grep", "POSIX")
+    @ExternalDependency("rev", "POSIX")
+    string makeCroppedSequenceList(in string dbFile, in coord_t crop)
+    {
+        mixin(traceExecution);
+
+        enum commandTemplate = `
+            set -o pipefail;
+            DBdump -s %1$s |
+            grep -E '^S' |
+            cut -d' ' -f3 |
+            cut -c%3$d- |
+            rev |
+            cut -c%3$d- |
+            rev
+            > %2$s`.outdent.tr("\n", "", "d");
+
+        auto minCutoff = 2 * crop;
         dentistEnforce(
             minCutoff < getContigCutoff(dbFile),
             format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, dbFile),
         );
 
-        auto sequenceListFile = getSequenceListFile(dbFile);
-        auto commandResult = executeShell(format!commandTemplate(
-            escapeShellFileName(dbFile),
-            escapeShellFileName(sequenceListFile),
-            options.cropContigsBps,
-        ));
+        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir, crop);
 
-        dentistEnforce(
-            commandResult.status == 0,
-            format!"failed to make sequence list `%s`: %s"(sequenceListFile, commandResult.output),
-        );
+        if (!exists(sequenceListFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(dbFile),
+                escapeShellFileName(sequenceListFile),
+                crop + 1,
+            );
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            auto commandResult = executeShell(command);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make cropped sequence list `%s`: %s"(sequenceListFile, commandResult.output),
+            );
+        }
 
         return sequenceListFile;
     }
 
-    string getSequenceListFile(in string dbFile)
+    static string getSequenceListFile(in string dbFile, in string workdir, coord_t crop = 0)
     {
-        return buildPath(options.workdir, baseName(dbFile).setExtension(".seq"));
+        enum baseExtension = ".seq";
+        auto seqExtension = crop == 0
+            ? baseExtension
+            : "-crop-" ~ crop.to!string ~ baseExtension;
+
+        return buildPath(workdir, stripExtension(baseName(dbFile)) ~ seqExtension);
     }
 
     GapSummary[] analyzeGaps()
@@ -480,7 +540,7 @@ private struct ResultAnalyzer
         const batchBegin = options.referenceContigBatch[0];
         auto gapSummaries = new GapSummary[options.referenceContigBatchSize];
 
-        ContigMapping needleForContig(in id_t contigId) const
+        static ContigMapping needleForContig(in id_t contigId)
         {
             typeof(return) needleAlignment;
 
@@ -514,16 +574,10 @@ private struct ResultAnalyzer
                     "lhs", [
                         "contigId": lhsContigId.toJson,
                         "numContigAlignments": lhsContigAlignments.length.toJson,
-                        "contigAlignments": shouldLog(LogLevel.debug_)
-                            ? lhsContigAlignments.toJson
-                            : null.toJson,
                     ].toJson,
                     "rhs", [
                         "contigId": rhsContigId.toJson,
                         "numContigAlignments": rhsContigAlignments.length.toJson,
-                        "contigAlignments": shouldLog(LogLevel.debug_)
-                            ? rhsContigAlignments.toJson
-                            : null.toJson,
                     ].toJson,
                 );
                 // One contig alignment either does not exist or is ambiguous:
@@ -602,8 +656,8 @@ private struct ResultAnalyzer
     {
         auto trueAssemblyInterval = ReferenceInterval(
             mappedIntervalOf(lhs).contigId,
-            mappedIntervalOf(lhs).end,
-            mappedIntervalOf(rhs).begin,
+            mappedIntervalOf(lhs).end - options.cropAlignment,
+            mappedIntervalOf(rhs).begin + options.cropAlignment,
         );
         auto resultBegin = ReferencePoint(
             lhs.reference.contigId,
@@ -825,7 +879,11 @@ private struct ResultAnalyzer
                             "referenceLength": alignment.referenceLength.toJson,
                             "queryLength": alignment.queryLength.toJson,
                             "percentIdentity": alignment.percentIdentity.toJson,
-                            "alignment": alignment.alignmentString.splitLines.toJson,
+                            "alignment": [
+                                alignment.referenceLine.to!string,
+                                alignment.editOps.to!string,
+                                alignment.queryLine.to!string,
+                            ].toJson,
                         ].toJson)(gapSummary.alignment)
                         : toJson(null)
                 ].toJsonCompressed);
@@ -843,8 +901,12 @@ private struct ResultAnalyzer
             insertionMapping.resultEnd,
             gapId,
         );
+        auto alignment = stretcher(trueSequenceFile, insertedSequenceFile);
 
-        return stretcher(trueSequenceFile, insertedSequenceFile);
+        if (options.cropAlignment > 0)
+            alignment.cropReference(options.cropAlignment);
+
+        return alignment;
     }
 
     static string getGapId(in InsertionMapping insertionMapping)
@@ -1316,10 +1378,93 @@ private struct Stats
 
 struct StretcherAlignment
 {
+    static enum EditOp : char
+    {
+        match = '|',
+        mismatch = '.',
+        indel = '-',
+    }
+
+    static enum SeqChar : char
+    {
+        a = 'a',
+        c = 'c',
+        g = 'g',
+        t = 't',
+        unkownBase = 'n',
+        indel = '-',
+    }
+
+    static bool isBase(in SeqChar c)
+    {
+        return c.among(SeqChar.a, SeqChar.c, SeqChar.g, SeqChar.t) != 0;
+    }
+
     coord_t referenceLength;
     coord_t queryLength;
     double percentIdentity;
-    string alignmentString;
+    const(SeqChar)[] referenceLine;
+    const(EditOp)[] editOps;
+    const(SeqChar)[] queryLine;
+
+    invariant
+    {
+        assert(
+            referenceLine.length == editOps.length && editOps.length == queryLine.length,
+            "alignment lines must have same length",
+        );
+    }
+
+    private void triggerInvariant() { }
+
+    StretcherAlignment cropReference(in coord_t crop) const
+    {
+        /// Count cropped base pairs and return the position in `alignmentSeq`.
+        alias cropIndex = alignmentSeq => alignmentSeq
+            .cumulativeFold!((numBPs, c) => numBPs + isBase(c))(0UL)
+            .countUntil(crop);
+
+        auto gapBegin = cropIndex(referenceLine) + 1;
+        auto gapEnd = referenceLength - cropIndex(referenceLine.retro) + 1;
+
+
+        StretcherAlignment croppedAlignment;
+
+        croppedAlignment.referenceLine = cast(const(const(SeqChar)[])) referenceLine[gapBegin .. gapEnd];
+        croppedAlignment.editOps = cast(const(const(EditOp)[])) editOps[gapBegin .. gapEnd];
+        croppedAlignment.queryLine = cast(const(const(SeqChar)[])) queryLine[gapBegin .. gapEnd];
+
+        alias countBPs = alignmentSeq => cast(coord_t) alignmentSeq.count!isBase;
+
+        croppedAlignment.referenceLength = countBPs(croppedAlignment.referenceLine);
+        croppedAlignment.queryLength = countBPs(croppedAlignment.queryLine);
+        croppedAlignment.percentIdentity = croppedAlignment.editOps.count(EditOp.match).to!double /
+                                           croppedAlignment.editOps.length.to!double;
+
+        return croppedAlignment;
+    }
+
+    unittest
+    {
+        enum alignment = StretcherAlignment(
+            50,
+            51,
+            45.0/52.0,
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatattt--atatcta",
+            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.--|||||||",
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatattt--atatcta",
+        );
+        enum crop = 10;
+        enum croppedAlignment = StretcherAlignment(
+            30,
+            30,
+            28.0/30.0,
+            cast(const(SeqChar)[]) "gtgaggactaacaacaaaaatatatatata",
+            cast(const(EditOp)[])  "||||||..||||||||||||||||||||||",
+            cast(const(SeqChar)[]) "gtgaggactaacaacaaaaatatatatata",
+        );
+        assert(alignment.cropReference(crop) == croppedAlignment);
+    }
 }
 
 @ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
@@ -1364,12 +1509,13 @@ StretcherAlignment stretcher(in string refFasta, in string queryFasta)
         queryFasta,
     );
 
-    import std.range : tee;
-    import std.stdio : stderr;
-    auto stretcherResult = stretcherCmd.pipeLines().tee!(line => stderr.writeln(line));
+    auto stretcherResult = stretcherCmd.pipeLines();
 
     stretcherResult.stretcherReadPercentIdentity(alignment);
     stretcherResult.stretcherReadAlignmentString(alignment);
+
+    version (assert)
+        alignment.triggerInvariant();
 
     return alignment;
 }
@@ -1410,17 +1556,17 @@ private void stretcherReadAlignmentString(StretcherResult)(ref StretcherResult s
     enum sequenceRegex = ctRegex!`^\s*(?P<prefix>(?:true|inserted)-[0-9@-]+\s+\d+\s+)(?P<seq>[ACTGN-]+).*$`;
     alias captureSequence = (line) => line
         .replaceAll(sequenceRegex, `$2`)
-        .map!toLower;
+        .map!toLower
+        .map!(c => c.to!(StretcherAlignment.SeqChar))
+        .array;
     alias sequencePrefix = (line) => line
         .replaceAll(sequenceRegex, `$1`);
     alias captureAlignment = (seqLine, alignmentLine) =>
-        alignmentLine[sequencePrefix(seqLine).length .. $].tr(" ", "-");
+        alignmentLine[sequencePrefix(seqLine).length .. $].tr(" ", "-")
+            .map!(c => c.to!(StretcherAlignment.EditOp))
+            .array;
 
-    alignment.alignmentString = chain(
-        captureSequence(alignmentLines[0]),
-        newline,
-        captureAlignment(alignmentLines[0], alignmentLines[1]),
-        newline,
-        captureSequence(alignmentLines[2]),
-    ).map!(to!(immutable(char))).to!string;
+    alignment.referenceLine = captureSequence(alignmentLines[0]);
+    alignment.editOps = captureAlignment(alignmentLines[0], alignmentLines[1]);
+    alignment.queryLine = captureSequence(alignmentLines[2]);
 }
