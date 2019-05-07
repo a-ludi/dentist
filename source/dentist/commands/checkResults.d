@@ -672,8 +672,8 @@ private struct ResultAnalyzer
             trueAssemblyInterval,
             resultBegin,
             resultEnd,
-            cast(id_t) lhs.reference.contigId,
-            cast(id_t) rhs.reference.contigId,
+            lhs.queryContigId,
+            rhs.queryContigId,
         );
     }
 
