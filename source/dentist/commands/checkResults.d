@@ -1425,7 +1425,7 @@ struct StretcherAlignment
             .countUntil(crop);
 
         auto gapBegin = cropIndex(referenceLine) + 1;
-        auto gapEnd = referenceLength - cropIndex(referenceLine.retro) + 1;
+        auto gapEnd = referenceLine.length - cropIndex(referenceLine.retro) + 1;
 
 
         StretcherAlignment croppedAlignment;
