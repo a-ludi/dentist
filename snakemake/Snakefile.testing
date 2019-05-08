@@ -171,7 +171,7 @@ rule check_batch:
     threads: max_threads
     log: log_file("check.{batch_id}")
     shell:
-        "dentist check --config={testing_config_file} {dentist_flags} --threads={params.main_threads} --batch={params.batch_range} --gap-details={output[gap_details]} - - - - 2> {log} > {output[result_stats]}"
+        "dentist check --config={testing_config_file} {dentist_flags} --threads={threads} --batch={params.batch_range} --gap-details={output[gap_details]} - - - - 2> {log} > {output[result_stats]}"
 
 
 rule merge_result_stats:
