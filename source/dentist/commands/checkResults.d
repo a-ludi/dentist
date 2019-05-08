@@ -134,6 +134,7 @@ import std.typecons :
     Tuple;
 import vibe.data.json :
     Json,
+    JSONException,
     parseJson,
     toJson = serializeToJson,
     toJsonCompressed = serializeToJsonString,
@@ -271,14 +272,19 @@ private struct ResultAnalyzer
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
 
-        auto contigAlignmentsCache = options.contigAlignmentsCache;
-        contigAlignments = contigAlignmentsCache !is null && exists(contigAlignmentsCache)
-            ? deserializeContigAlignmentsCache()
+        auto contigAlignmentsCache = ContigAlignmentsCache(
+            options.contigAlignmentsCache,
+            options.resultDb,
+            options.refDb,
+        );
+
+        contigAlignments = contigAlignmentsCache.isValid
+            ? contigAlignmentsCache.read()
             : findReferenceContigs();
         referenceGaps = getReferenceGaps();
 
-        if (contigAlignmentsCache !is null && !exists(contigAlignmentsCache))
-            contigAlignmentsCache.write(contigAlignments.toJsonCompressed());
+        if (contigAlignmentsCache.canWrite)
+            contigAlignmentsCache.write(contigAlignments);
 
         logJsonDiagnostic(
             "referenceOffset", referenceOffset,
@@ -297,32 +303,6 @@ private struct ResultAnalyzer
 
         if (options.gapDetailsJson !is null)
             writeGapDetailsJson();
-    }
-
-    ContigMapping[] deserializeContigAlignmentsCache()
-    {
-        auto cachedContent = cast(string) read(options.contigAlignmentsCache);
-        auto cachedAlignments = parseJson(
-            cachedContent,
-            null,
-            options.contigAlignmentsCache,
-        );
-
-        ContigMapping[] contigAlignments;
-        contigAlignments.length = cachedAlignments.length;
-
-        foreach (size_t i, cachedAlignment; cachedAlignments)
-            contigAlignments[i] = ContigMapping(
-                ReferenceInterval(
-                    cast(size_t) cachedAlignment["reference"]["contigId"],
-                    cast(size_t) cachedAlignment["reference"]["begin"],
-                    cast(size_t) cachedAlignment["reference"]["end"],
-                ),
-                cast(coord_t) cachedAlignment["referenceContigLength"],
-                cast(id_t) cachedAlignment["queryContigId"],
-            );
-
-        return contigAlignments;
     }
 
     ContigMapping[] findReferenceContigs()
@@ -1179,6 +1159,95 @@ private struct ResultAnalyzer
             .filter!(gapSummary => gapSummary.state != GapState.ignored)
             .map!(gapSummary => mixin("gapSummary." ~ what))
             .map!(info => cast(Unqual!(typeof(info))) info);
+    }
+}
+
+private struct ContigAlignmentsCache
+{
+    string contigAlignmentsCache;
+    string dbA;
+    string dbB;
+    Json _cachedAlignments = Json.undefined;
+
+    @property bool isValid()
+    {
+        return contigAlignmentsCache !is null &&
+               exists(contigAlignmentsCache) &&
+               cachedAlignments["dbA"] == dbA &&
+               cachedAlignments["dbB"] == dbB;
+    }
+
+    @property bool canWrite()
+    {
+        return contigAlignmentsCache !is null && !isValid;
+    }
+
+    @property Json cachedAlignments()
+    {
+        if (_cachedAlignments.type != Json.Type.object)
+        {
+            auto cachedContent = cast(string) contigAlignmentsCache.read();
+            try
+            {
+                _cachedAlignments = parseJson(
+                    cachedContent,
+                    null,
+                    contigAlignmentsCache,
+                );
+            }
+            catch (JSONException e)
+            {
+                _cachedAlignments = Json.emptyObject;
+            }
+        }
+
+        return _cachedAlignments;
+    }
+
+    void write(ContigMapping[] contigAlignments)
+    {
+        assert(!isValid, "refusing to overwrite a valid ContigAlignmentsCache");
+        assert(contigAlignmentsCache !is null, "cannot write ContigAlignmentsCache: no file given");
+        assert(canWrite);
+
+        logJsonDiagnostic(
+            "info", "caching contig alignments",
+            "contigAlignmentsCache", contigAlignmentsCache,
+        );
+
+        auto cache = File(contigAlignmentsCache, "w");
+
+        cache.writefln!`{"dbA":%s,"dbB":%s,"contigAlignments":%s}`(
+            dbA.toJsonCompressed,
+            dbB.toJsonCompressed,
+            contigAlignments.toJsonCompressed,
+        );
+    }
+
+    ContigMapping[] read()
+    {
+        assert(isValid, "must not read invalid ContigAlignmentsCache");
+
+        logJsonDiagnostic(
+            "info", "reading contig alignments from cache",
+            "contigAlignmentsCache", contigAlignmentsCache,
+        );
+
+        ContigMapping[] contigAlignments;
+        contigAlignments.length = cachedAlignments["contigAlignments"].length;
+
+        foreach (size_t i, cachedAlignment; cachedAlignments["contigAlignments"])
+            contigAlignments[i] = ContigMapping(
+                ReferenceInterval(
+                    cast(size_t) cachedAlignment["reference"]["contigId"],
+                    cast(size_t) cachedAlignment["reference"]["begin"],
+                    cast(size_t) cachedAlignment["reference"]["end"],
+                ),
+                cast(coord_t) cachedAlignment["referenceContigLength"],
+                cast(id_t) cachedAlignment["queryContigId"],
+            );
+
+        return contigAlignments;
     }
 }
 
