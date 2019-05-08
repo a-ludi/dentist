@@ -82,7 +82,9 @@ import std.conv : to;
 import std.exception : enforce;
 import std.file :
     exists,
-    getSize;
+    getSize,
+    read,
+    write;
 import std.format :
     format,
     formattedRead;
@@ -132,6 +134,7 @@ import std.typecons :
     Tuple;
 import vibe.data.json :
     Json,
+    parseJson,
     toJson = serializeToJson,
     toJsonCompressed = serializeToJsonString,
     toJsonString = serializeToPrettyJson;
@@ -267,8 +270,15 @@ private struct ResultAnalyzer
             options.workdir,
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
-        contigAlignments = findReferenceContigs();
+
+        auto contigAlignmentsCache = options.contigAlignmentsCache;
+        contigAlignments = contigAlignmentsCache !is null && exists(contigAlignmentsCache)
+            ? deserializeContigAlignmentsCache()
+            : findReferenceContigs();
         referenceGaps = getReferenceGaps();
+
+        if (contigAlignmentsCache !is null && !exists(contigAlignmentsCache))
+            contigAlignmentsCache.write(contigAlignments.toJsonCompressed());
 
         logJsonDiagnostic(
             "referenceOffset", referenceOffset,
@@ -287,6 +297,32 @@ private struct ResultAnalyzer
 
         if (options.gapDetailsJson !is null)
             writeGapDetailsJson();
+    }
+
+    ContigMapping[] deserializeContigAlignmentsCache()
+    {
+        auto cachedContent = cast(string) read(options.contigAlignmentsCache);
+        auto cachedAlignments = parseJson(
+            cachedContent,
+            null,
+            options.contigAlignmentsCache,
+        );
+
+        ContigMapping[] contigAlignments;
+        contigAlignments.length = cachedAlignments.length;
+
+        foreach (size_t i, cachedAlignment; cachedAlignments)
+            contigAlignments[i] = ContigMapping(
+                ReferenceInterval(
+                    cast(size_t) cachedAlignment["reference"]["contigId"],
+                    cast(size_t) cachedAlignment["reference"]["begin"],
+                    cast(size_t) cachedAlignment["reference"]["end"],
+                ),
+                cast(coord_t) cachedAlignment["referenceContigLength"],
+                cast(id_t) cachedAlignment["queryContigId"],
+            );
+
+        return contigAlignments;
     }
 
     ContigMapping[] findReferenceContigs()

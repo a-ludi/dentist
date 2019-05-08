@@ -880,6 +880,17 @@ struct OptionsFor(DentistCommand _command)
         coord_t bucketSize = 500;
     }
 
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("cache-contig-alignments")
+        @Help(format!q"{
+            if given results of contig alignments will be cached as JSON (default: %s)
+        }"(defaultValue!contigAlignmentsCache))
+        string contigAlignmentsCache;
+    }
+
     static if (command == DentistCommand.validateConfig)
     {
         @Argument("<in:config>")
