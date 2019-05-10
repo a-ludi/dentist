@@ -129,6 +129,7 @@ import std.string :
     tr;
 import std.traits : Unqual;
 import std.typecons :
+    Flag,
     No,
     tuple,
     Tuple;
@@ -156,11 +157,14 @@ void execute(in Options options)
         writeln(stats.toTabular());
 }
 
+alias Complement = Flag!"complement";
+
 struct ContigMapping
 {
     ReferenceInterval reference;
     coord_t referenceContigLength;
     id_t queryContigId;
+    Complement complement;
 }
 
 static alias queryOrder = orderLexicographically!(const(ContigMapping),
@@ -365,7 +369,7 @@ private struct ResultAnalyzer
             isSelfAlignment ? options.cropAmbiguous : options.cropAlignment,
         );
 
-        assert(querySequenceList.exists, "file should have been created by a prior self-alignment");
+        assert(querySequenceList.exists);
 
         auto queryChunks = iota(queryContigIds.length.to!id_t)
             .evenChunks(min(queryContigIds.length, taskPool.size + 1))
@@ -397,7 +401,7 @@ private struct ResultAnalyzer
 
     static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
     {
-        enum findCommandTemplate = `sed -n '%d,%d p' %s | fm-index %s`;
+        enum findCommandTemplate = `sed -n '%d,%d p' %s | fm-index -r %s`;
         enum resultFieldSeparator = '\t';
         alias FmIndexResult = Tuple!(
             id_t, "refId",
@@ -405,6 +409,7 @@ private struct ResultAnalyzer
             id_t, "queryId",
             coord_t, "begin",
             coord_t, "end",
+            Complement, "complement",
         );
 
         auto queryChunk = info.queryChunk;
@@ -427,6 +432,7 @@ private struct ResultAnalyzer
                 resultFields[3].to!id_t + queryChunk.front,
                 resultFields[4].to!coord_t,
                 resultFields[5].to!coord_t,
+                cast(Complement) (resultFields[6] == "yes"),
             ))
             .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
             .map!(findResult => ContigMapping(
@@ -437,6 +443,7 @@ private struct ResultAnalyzer
                 ),
                 findResult.refLength,
                 queryContigIds[findResult.queryId],
+                findResult.complement,
             ))
             .tee!(contigMapping => assert(
                 contigMapping.reference.begin < contigMapping.reference.end &&
@@ -597,7 +604,7 @@ private struct ResultAnalyzer
                     ].toJson,
                 );
                 // One contig alignment either does not exist or is ambiguous:
-                // the gap state is unkown (initial value)
+                // the gap state is unkown
                 gapSummary.state = GapState.unkown;
                 continue;
             }
@@ -647,12 +654,14 @@ private struct ResultAnalyzer
     private bool isGapClosed(in ContigMapping lhs, in ContigMapping rhs) const
     {
         return lhs.reference.contigId == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
                lhs.reference.end <= rhs.reference.begin;
     }
 
     private bool isGapPartiallyClosed(in ContigMapping lhs, in ContigMapping rhs) const
     {
         return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
                (
                    lhs.reference.end < lhs.referenceContigLength ||
                    0 < rhs.reference.begin
@@ -663,6 +672,7 @@ private struct ResultAnalyzer
     private bool isGapUnclosed(in ContigMapping lhs, in ContigMapping rhs) const
     {
         return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
                lhs.reference.end == lhs.referenceContigLength &&
                0 == rhs.reference.begin &&
                resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
@@ -1245,6 +1255,7 @@ private struct ContigAlignmentsCache
                 ),
                 cast(coord_t) cachedAlignment["referenceContigLength"],
                 cast(id_t) cachedAlignment["queryContigId"],
+                cast(Complement) cachedAlignment["complement"].get!bool,
             );
 
         return contigAlignments;
