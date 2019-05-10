@@ -13,7 +13,7 @@ using namespace std;
 
 int main(int argc, char** argv);
 void printUsage();
-int parseArgs(int argc, char** argv, string *tempDir);
+int parseArgs(int argc, char** argv, string *tempDir, bool *includeReverseComplement);
 void buildIndex(csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex, string referenceFile);
 vector<size_t> getRecordStarts(csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex, string referenceFile);
 int hasStdin();
@@ -22,15 +22,18 @@ void locateQueries(
     vector<size_t> recordStarts,
     istream &queries,
     string sourceName,
-    string queryBuffer
+    string queryBuffer,
+    bool reverseComplement
 );
 size_t locateQuery(
     csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex,
     vector<size_t> recordStarts,
     string sourceName,
     size_t queryId,
-    string query
+    string query,
+    bool reverseComplement
 );
+void getReverseComplement(string &revCompBuffer, string query);
 size_t findSourceId(vector<size_t> recordStarts, size_t hitBegin);
 
 template<class int_type, class t_int_vec>

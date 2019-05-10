@@ -25,10 +25,11 @@ int main(int argc, char** argv)
     try
     {
         int positionalBegin;
+        bool includeReverseComplement = false;
 
         try
         {
-            positionalBegin = parseArgs(argc, argv, &(sdsl_config.dir));
+            positionalBegin = parseArgs(argc, argv, &(sdsl_config.dir), &includeReverseComplement);
 
             if (argc - positionalBegin <  1)
                 throw FmIndexException("Missing arguments.");
@@ -58,7 +59,7 @@ int main(int argc, char** argv)
         queryBuffer.reserve(10 * (2 << 20));
 
         if (hasStdin())
-            locateQueries(fmIndex, recordStarts, cin, "stdin", queryBuffer);
+            locateQueries(fmIndex, recordStarts, cin, "stdin", queryBuffer, includeReverseComplement);
 
         for (int i = 0; i < numQueries; ++i)
         {
@@ -74,7 +75,7 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            locateQueries(fmIndex, recordStarts, queryData, queryFile, queryBuffer);
+            locateQueries(fmIndex, recordStarts, queryData, queryFile, queryBuffer, includeReverseComplement);
         }
     }
     catch (const FmIndexException& e)
@@ -117,7 +118,7 @@ string getDefaultTempDir()
 
 void printUsage()
 {
-    cerr << "Usage " << executable << " [-P<dir>] <in:reference> [<in:queries> ...]" << endl;
+    cerr << "Usage " << executable << " [-P<dir>] [-r] <in:reference> [<in:queries> ...]" << endl;
     cerr << "    This program constructs a very compact FM-index" << endl;
     cerr << "    of <reference> and locates <queries> if given." << endl;
     cerr << endl;
@@ -129,22 +130,20 @@ void printUsage()
     cerr << endl;
     cerr << "Optional arguments:" << endl;
     cerr << "    -P<dir>        Use <dir> as temporary directory (default: " << getDefaultTempDir() << ")." << endl;
-    cerr << "    <in:queries>   List of queries (one per line) to locate in <reference>." << endl;
-    cerr << "                   Queries given on standard input will be located before" << endl;
-    cerr << "                   all others." <<endl;
+    cerr << "    -r             Search the reverse complement of each query as well" << endl;
     cerr << endl;
     cerr << "Output:" << endl;
     cerr << "    Creates an FM-index <reference>.fm9 if not present. Then produces" << endl;
     cerr << "    a list of exact matches for all queries in a TAB-separated format:" << endl;
     cerr << endl;
-    cerr << "        refName  refId  refLength  queryId  hitBegin  hitEnd" << endl;
+    cerr << "        refName  refId  refLength  queryId  hitBegin  hitEnd  revComp" << endl;
     cerr << endl;
     cerr << "    IDs and coordinates are zero-based. Coordinates are right-open." << endl;
     cerr << endl;
     cerr << "    Note: no output will be produced if no queries are given." << endl;
 }
 
-int parseArgs(int argc, char** argv, string *tempDir)
+int parseArgs(int argc, char** argv, string *tempDir, bool *includeReverseComplement)
 {
     *tempDir = getDefaultTempDir();
 
@@ -157,6 +156,12 @@ int parseArgs(int argc, char** argv, string *tempDir)
 
                 if (tempDir->size() == 0)
                     throw FmIndexException("Missing value for -P.");
+                break;
+            case 'r':
+                *includeReverseComplement = true;
+
+                if (*(argv[i] + 2) != '\0')
+                    throw FmIndexException("Flag -r takes no value.");
                 break;
             default:
                 throw FmIndexException(string("Invalid option -") + argv[i][1] + ".");
@@ -254,7 +259,8 @@ void locateQueries(
     vector<size_t> recordStarts,
     istream &queriesData,
     string sourceName,
-    string queryBuffer
+    string queryBuffer,
+    bool includeReverseComplement
 )
 {
     cerr << "{\"level\":\"info\","
@@ -265,11 +271,22 @@ void locateQueries(
     time_t start = time(NULL);
     size_t numHits = 0;
     size_t queryId = 0;
+    static string revCompBuffer;
     while (queriesData && !queriesData.eof())
     {
         getline(queriesData, queryBuffer);
         if (queryBuffer.size() > 0)
-            numHits += locateQuery(fmIndex, recordStarts, sourceName, queryId++, queryBuffer);
+        {
+            numHits += locateQuery(fmIndex, recordStarts, sourceName, queryId, queryBuffer, false);
+
+            if (includeReverseComplement)
+            {
+                getReverseComplement(revCompBuffer, queryBuffer);
+                numHits += locateQuery(fmIndex, recordStarts, sourceName, queryId, revCompBuffer, true);
+            }
+
+            ++queryId;
+        }
 
         if (sourceName == "stdin" && !hasStdin())
             break;
@@ -288,7 +305,8 @@ size_t locateQuery(
     vector<size_t> recordStarts,
     string sourceName,
     size_t queryId,
-    string query
+    string query,
+    bool reverseComplement
 )
 {
     auto locations = locate(fmIndex, query);
@@ -308,10 +326,35 @@ size_t locateQuery(
              << sourceLength << '\t'
              << queryId << '\t'
              << hitBegin - sourceBegin << '\t'
-             << hitEnd - sourceBegin << endl;
+             << hitEnd - sourceBegin << '\t'
+             << (reverseComplement ? "yes" : "no") << endl;
     }
 
     return locations.size();
+}
+
+char revCompTable[256] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+//      A       C             G                      N                   T
+    0, 'T', 0, 'G', 0, 0, 0, 'C', 0, 0, 0, 0, 0, 0, 'N', 0, 0, 0, 0, 0, 'A', 0, 0, 0, 0, 0, 0, 0, 0,
+
+//               a       c             g                      n                   t
+    0, 0, 0, 0, 't', 0, 'g', 0, 0, 0, 'c', 0, 0, 0, 0, 0, 0, 'n', 0, 0, 0, 0, 0, 'a', 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0
+};
+
+void getReverseComplement(string &revCompBuffer, string query)
+{
+    auto queryLen = query.size();
+    revCompBuffer.resize(queryLen);
+
+    for (int i = 0; i < queryLen; ++i)
+        revCompBuffer[queryLen - i - 1] = revCompTable[query[i]];
 }
 
 size_t findSourceId(vector<size_t> recordStarts, size_t hitBegin)
