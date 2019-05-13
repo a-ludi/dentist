@@ -401,7 +401,7 @@ private struct ResultAnalyzer
 
     static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
     {
-        enum findCommandTemplate = `sed -n '%d,%d p' %s | fm-index -r %s`;
+        enum findCommandTemplate = `set -o pipefail; sed -n '%d,%d p' %s | fm-index -r %s`;
         enum resultFieldSeparator = '\t';
         alias FmIndexResult = Tuple!(
             id_t, "refId",

@@ -51,32 +51,29 @@ int main(int argc, char** argv)
         buildIndex(fmIndex, referenceFile);
         auto recordStarts = getRecordStarts(fmIndex, referenceFile);
 
-        if (!hasStdin() && numQueries == 0)
-            return 0;
-
         string queryBuffer;
         // Reserve 10 Mb for a single query
         queryBuffer.reserve(10 * (2 << 20));
 
-        if (hasStdin())
+        if (numQueries == 0)
             locateQueries(fmIndex, recordStarts, cin, "stdin", queryBuffer, includeReverseComplement);
-
-        for (int i = 0; i < numQueries; ++i)
-        {
-            string queryFile(queriesFiles[i]);
-            ifstream queryData(queryFile);
-
-            if (!queryData)
+        else
+            for (int i = 0; i < numQueries; ++i)
             {
-                cerr << "{\"level\":\"warning\","
-                     << "\"info\":\"File does not exist. Skipping.\","
-                     << "\"file\":\"" << queryFile << "\"}" << endl;
+                string queryFile(queriesFiles[i]);
+                ifstream queryData(queryFile);
 
-                continue;
+                if (!queryData)
+                {
+                    cerr << "{\"level\":\"warning\","
+                         << "\"info\":\"File does not exist. Skipping.\","
+                         << "\"file\":\"" << queryFile << "\"}" << endl;
+
+                    continue;
+                }
+
+                locateQueries(fmIndex, recordStarts, queryData, queryFile, queryBuffer, includeReverseComplement);
             }
-
-            locateQueries(fmIndex, recordStarts, queryData, queryFile, queryBuffer, includeReverseComplement);
-        }
     }
     catch (const FmIndexException& e)
     {
@@ -125,8 +122,7 @@ void printUsage()
     cerr << "Positional arguments:" << endl;
     cerr << "    <in:refernce>  Original text file with one record per line." << endl;
     cerr << "    <in:queries>   List of queries (one per line) to locate in <reference>." << endl;
-    cerr << "                   Queries given on standard input will be located before" << endl;
-    cerr << "                   all others." <<endl;
+    cerr << "                   Reads standard input if no <queries> given." <<endl;
     cerr << endl;
     cerr << "Optional arguments:" << endl;
     cerr << "    -P<dir>        Use <dir> as temporary directory (default: " << getDefaultTempDir() << ")." << endl;
@@ -242,18 +238,6 @@ vector<size_t> getRecordStarts(csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmI
     return recordStarts;
 }
 
-int hasStdin()
-{
-    int ret;
-    struct pollfd pfd[1] = {0};
-
-    pfd[0].fd = STDIN_FILENO;
-    pfd[0].events = POLLIN;
-    ret = poll(pfd, 1, 0);
-
-    return (ret>0);
-}
-
 void locateQueries(
     csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex,
     vector<size_t> recordStarts,
@@ -287,9 +271,6 @@ void locateQueries(
 
             ++queryId;
         }
-
-        if (sourceName == "stdin" && !hasStdin())
-            break;
     }
 
     cerr << "{\"level\":\"info\","

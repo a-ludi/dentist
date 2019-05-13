@@ -16,7 +16,6 @@ void printUsage();
 int parseArgs(int argc, char** argv, string *tempDir, bool *includeReverseComplement);
 void buildIndex(csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex, string referenceFile);
 vector<size_t> getRecordStarts(csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex, string referenceFile);
-int hasStdin();
 void locateQueries(
     csa_wt<wt_huff<rrr_vector<127> >, 512, 1024> &fmIndex,
     vector<size_t> recordStarts,
