@@ -1582,7 +1582,7 @@ struct StretcherAlignment
             .countUntil(crop);
 
         auto gapBegin = cropIndex(referenceLine) + 1;
-        auto gapEnd = referenceLine.length - cropIndex(referenceLine.retro) + 1;
+        auto gapEnd = referenceLine.length - cropIndex(referenceLine.retro) - 1;
 
 
         StretcherAlignment croppedAlignment;
@@ -1605,21 +1605,24 @@ struct StretcherAlignment
     {
         enum alignment = StretcherAlignment(
             50,
-            51,
-            45.0/52.0,
-            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatattt--atatcta",
-            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.--|||||||",
-            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatattt--atatcta",
+            50,
+            No.complement,
+            45.0/51.0,
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatatttata-tcta",
+            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.|||-||||",
+            cast(const(SeqChar)[]) "tatcc-tcaggtgaggcataacaacaaaaatatatatataataataatcta",
         );
         enum crop = 10;
         enum croppedAlignment = StretcherAlignment(
             30,
             30,
+            No.complement,
             28.0/30.0,
             cast(const(SeqChar)[]) "gtgaggactaacaacaaaaatatatatata",
             cast(const(EditOp)[])  "||||||..||||||||||||||||||||||",
-            cast(const(SeqChar)[]) "gtgaggactaacaacaaaaatatatatata",
+            cast(const(SeqChar)[]) "gtgaggcataacaacaaaaatatatatata",
         );
+
         assert(alignment.cropReference(crop) == croppedAlignment);
     }
 }
