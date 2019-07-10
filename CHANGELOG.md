@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - batch ranges may end with a `$` indicating the end of the pileup DB
 - some mechanisms for early error detection
 - write duplicate contig IDs to contig alignment cache for easier debugging
+- added support for complementary contig alignments in `check-results`
 
 ### Changed
 - cropping and splicing of insertions:
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - bug that caused `check-results` to discard all alignments in certain loci
+- added missing logic for cropped contigs in `getGapState` in `check-results`
 
 
 [standard-readme]: https://github.com/RichardLitt/standard-readme

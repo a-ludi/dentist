@@ -132,7 +132,8 @@ import std.typecons :
     Flag,
     No,
     tuple,
-    Tuple;
+    Tuple,
+    Yes;
 import vibe.data.json :
     Json,
     JSONException,
@@ -185,6 +186,7 @@ private struct ResultAnalyzer
         ReferencePoint resultEnd;
         id_t leftRefContig;
         id_t rightRefContig;
+        Complement complement;
     }
 
     static enum GapState
@@ -651,30 +653,51 @@ private struct ResultAnalyzer
         return lhsTrueContigId > 0 && lhsTrueContigId == rhsTrueContigId();
     }
 
-    private bool isGapClosed(in ContigMapping lhs, in ContigMapping rhs) const
+    private bool isGapClosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
     {
+        if (!noSwap && lhs.complement)
+            return isGapClosed(rhs, lhs, Yes.noSwap);
+
         return lhs.reference.contigId == rhs.reference.contigId &&
                lhs.complement == rhs.complement &&
                lhs.reference.end <= rhs.reference.begin;
     }
 
-    private bool isGapPartiallyClosed(in ContigMapping lhs, in ContigMapping rhs) const
+    private bool isGapPartiallyClosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
     {
+        if (!noSwap && lhs.complement)
+            return isGapPartiallyClosed(rhs, lhs, Yes.noSwap);
+
         return lhs.reference.contigId + 1 == rhs.reference.contigId &&
                lhs.complement == rhs.complement &&
                (
-                   lhs.reference.end < lhs.referenceContigLength ||
-                   0 < rhs.reference.begin
+                   lhs.reference.end + options.cropAlignment < lhs.referenceContigLength ||
+                   options.cropAlignment < rhs.reference.begin
                ) &&
                resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
     }
 
-    private bool isGapUnclosed(in ContigMapping lhs, in ContigMapping rhs) const
+    private bool isGapUnclosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
     {
+        if (!noSwap && lhs.complement)
+            return isGapUnclosed(rhs, lhs, Yes.noSwap);
+
         return lhs.reference.contigId + 1 == rhs.reference.contigId &&
                lhs.complement == rhs.complement &&
-               lhs.reference.end == lhs.referenceContigLength &&
-               0 == rhs.reference.begin &&
+               lhs.reference.end + options.cropAlignment == lhs.referenceContigLength &&
+               options.cropAlignment == rhs.reference.begin &&
                resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
     }
 
@@ -685,21 +708,23 @@ private struct ResultAnalyzer
             mappedIntervalOf(lhs).end - options.cropAlignment,
             mappedIntervalOf(rhs).begin + options.cropAlignment,
         );
-        auto resultBegin = ReferencePoint(
-            lhs.reference.contigId,
-            lhs.reference.end,
+
+        alias resultBegin = (contigMapping) => ReferencePoint(
+            contigMapping.reference.contigId,
+            contigMapping.reference.end,
         );
-        auto resultEnd = ReferencePoint(
-            rhs.reference.contigId,
-            rhs.reference.begin,
+        alias resultEnd = (contigMapping) => ReferencePoint(
+            contigMapping.reference.contigId,
+            contigMapping.reference.begin,
         );
 
         return InsertionMapping(
             trueAssemblyInterval,
-            resultBegin,
-            resultEnd,
+            resultBegin(lhs.complement ? rhs : lhs),
+            resultEnd(lhs.complement ? lhs : rhs),
             lhs.queryContigId,
             rhs.queryContigId,
+            lhs.complement,
         );
     }
 
@@ -904,6 +929,7 @@ private struct ResultAnalyzer
                         ? (alignment => [
                             "referenceLength": alignment.referenceLength.toJson,
                             "queryLength": alignment.queryLength.toJson,
+                            "complement": alignment.complement.toJson,
                             "percentIdentity": alignment.percentIdentity.toJson,
                             "alignment": [
                                 cast(string) alignment.referenceLine,
@@ -927,7 +953,11 @@ private struct ResultAnalyzer
             insertionMapping.resultEnd,
             gapId,
         );
-        auto alignment = stretcher(trueSequenceFile, insertedSequenceFile);
+        auto alignment = stretcher(
+            trueSequenceFile,
+            insertedSequenceFile,
+            insertionMapping.complement,
+        );
 
         if (options.cropAlignment > 0)
             alignment.cropReference(options.cropAlignment);
@@ -1519,6 +1549,7 @@ struct StretcherAlignment
 
     coord_t referenceLength;
     coord_t queryLength;
+    Complement complement;
     double percentIdentity;
     const(SeqChar)[] referenceLine;
     const(EditOp)[] editOps;
@@ -1585,7 +1616,7 @@ struct StretcherAlignment
 }
 
 @ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
-StretcherAlignment stretcher(in string refFasta, in string queryFasta)
+StretcherAlignment stretcher(in string refFasta, in string queryFasta, Complement complement)
 {
     coord_t refLength;
     coord_t queryLength;
@@ -1607,7 +1638,7 @@ StretcherAlignment stretcher(in string refFasta, in string queryFasta)
     catch (Exception e) { }
 
     alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));
-    auto alignment = StretcherAlignment(refLength, queryLength);
+    auto alignment = StretcherAlignment(refLength, queryLength, complement);
 
     if (
         refLength == 0 ||
@@ -1622,6 +1653,7 @@ StretcherAlignment stretcher(in string refFasta, in string queryFasta)
         "--stdout",
         "--aformat=pair",
         "--awidth=" ~ uint.max.to!string,
+        complement ? "--sreverse2" : null,
         refFasta,
         queryFasta,
     );
