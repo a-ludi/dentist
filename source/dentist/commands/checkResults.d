@@ -595,7 +595,7 @@ private struct ResultAnalyzer
             if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
             {
                 logJsonDiagnostic(
-                    "info", "broken gap",
+                    "info", "unkown gap",
                     "lhs", [
                         "contigId": lhsContigId.toJson,
                         "numContigAlignments": lhsContigAlignments.length.toJson,
@@ -615,6 +615,15 @@ private struct ResultAnalyzer
             auto rhsContigAlignment = rhsContigAlignments[0];
 
             gapSummary.state = getGapState(lhsContigAlignment, rhsContigAlignment);
+
+            if (gapSummary.state == GapState.broken)
+                logJsonDiagnostic(
+                    "info", "broken gap",
+                    "lhs", lhsContigAlignment.toJson,
+                    "lhsMappedInterval", mappedIntervalOf(lhsContigAlignment).toJson,
+                    "rhs", rhsContigAlignment.toJson,
+                    "rhsMappedInterval", mappedIntervalOf(rhsContigAlignment).toJson,
+                );
 
             if (gapSummary.state.among(GapState.partiallyClosed, GapState.closed))
                 gapSummary.alignment = computeInsertionAlignment(getInsertionMapping(
