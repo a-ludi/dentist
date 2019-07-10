@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   turned off with `--no-highlight-insertions`
 - batch ranges may end with a `$` indicating the end of the pileup DB
 - some mechanisms for early error detection
+- write duplicate contig IDs to contig alignment cache for easier debugging
 
 ### Changed
 - cropping and splicing of insertions:

@@ -223,6 +223,7 @@ private struct ResultAnalyzer
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
     protected ContigMapping[] contigAlignments;
+    protected NaturalNumberSet duplicateContigIds;
     protected GapSummary[] gapSummaries;
     protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
 
@@ -288,7 +289,7 @@ private struct ResultAnalyzer
         referenceGaps = getReferenceGaps();
 
         if (contigAlignmentsCache.canWrite)
-            contigAlignmentsCache.write(contigAlignments);
+            contigAlignmentsCache.write(contigAlignments, duplicateContigIds);
 
         logJsonDiagnostic(
             "referenceOffset", referenceOffset,
@@ -311,8 +312,7 @@ private struct ResultAnalyzer
 
     ContigMapping[] findReferenceContigs()
     {
-
-        auto duplicateContigIds = NaturalNumberSet.create(
+        duplicateContigIds = NaturalNumberSet.create(
             findPerfectAlignments(options.refDb)
                 .map!(selfAlignment => cast(size_t) selfAlignment.queryContigId)
                 .array
@@ -1214,7 +1214,7 @@ private struct ContigAlignmentsCache
         return _cachedAlignments;
     }
 
-    void write(ContigMapping[] contigAlignments)
+    void write(ContigMapping[] contigAlignments, NaturalNumberSet duplicateContigIds)
     {
         assert(!isValid, "refusing to overwrite a valid ContigAlignmentsCache");
         assert(contigAlignmentsCache !is null, "cannot write ContigAlignmentsCache: no file given");
@@ -1227,10 +1227,11 @@ private struct ContigAlignmentsCache
 
         auto cache = File(contigAlignmentsCache, "w");
 
-        cache.writefln!`{"dbA":%s,"dbB":%s,"contigAlignments":%s}`(
+        cache.writefln!`{"dbA":%s,"dbB":%s,"contigAlignments":%s,"duplicateContigIds":%s}`(
             dbA.toJsonCompressed,
             dbB.toJsonCompressed,
             contigAlignments.toJsonCompressed,
+            duplicateContigIds.elements.array.toJsonCompressed,
         );
     }
 
