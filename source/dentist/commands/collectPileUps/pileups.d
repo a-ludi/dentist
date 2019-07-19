@@ -1150,11 +1150,20 @@ private class BubbleResolver
     {
         assert(skippingPileUp.isValid, "invalid pile up");
 
+        id_t[] involvedContigs = skippingPileUp
+            .map!(readAlignment => cast(id_t) readAlignment[0].contigA.id)
+            .chain(intermediateContigIds)
+            .array;
+        involvedContigs = involvedContigs
+            .sort
+            .release
+            .uniqInPlace;
+
         // Build DB of reads
         auto skippingReadIds = skippingPileUp
             .map!(readAlignment => cast(id_t) readAlignment[0].contigB.id)
             .array;
-        skippingReadIds
+        skippingReadIds = skippingReadIds
             .sort
             .release
             .uniqInPlace;
@@ -1162,7 +1171,7 @@ private class BubbleResolver
         auto skippingPileUpDb = dbSubset(
             buildPath(
                 options.workdir,
-                format!"skipper_%(%d-%)_pile-up"(intermediateContigIds),
+                format!"skipper_%(%d-%)_pile-up"(involvedContigs),
             ),
             options.readsDb,
             skippingReadIds[],
@@ -1172,7 +1181,7 @@ private class BubbleResolver
         auto intermediateContigsDb = dbSubset(
             buildPath(
                 options.workdir,
-                format!"skipper_%(%d-%)_intermediate-contigs"(intermediateContigIds),
+                format!"skipper_%(%d-%)_intermediate-contigs"(involvedContigs),
             ),
             options.refDb,
             intermediateContigIds[],
