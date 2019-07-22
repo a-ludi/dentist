@@ -57,6 +57,7 @@ import dentist.util.math :
     mapEdges;
 import dentist.util.log;
 import dentist.util.region : empty;
+import dentist.util.tempfile : mkstemp;
 import std.algorithm :
     among,
     any,
@@ -80,9 +81,14 @@ import std.algorithm : equal;
 import std.array : appender, array;
 import std.bitmanip : bitsSet;
 import std.conv : to;
+import std.file :
+    exists,
+    remove;
 import std.format : format;
 import std.parallelism : parallel;
-import std.path : buildPath;
+import std.path :
+    buildPath,
+    extension;
 import std.range :
     chain,
     cycle,
@@ -1169,24 +1175,22 @@ private class BubbleResolver
             .uniqInPlace;
         assert(skippingReadIds.length >= 1);
         auto skippingPileUpDb = dbSubset(
-            buildPath(
-                options.workdir,
-                format!"skipper_%(%d-%)_pile-up"(involvedContigs),
-            ),
+            getSkippingPileUpDb(involvedContigs),
             options.readsDb,
             skippingReadIds[],
             options.anchorSkippingPileUpsOptions,
         );
+
         // Build DB of intermediate contigs
-        auto intermediateContigsDb = dbSubset(
-            buildPath(
-                options.workdir,
-                format!"skipper_%(%d-%)_intermediate-contigs"(involvedContigs),
-            ),
-            options.refDb,
-            intermediateContigIds[],
-            options.anchorSkippingPileUpsOptions,
-        );
+        auto intermediateContigsDb = getIntermediateContigsDb(involvedContigs);
+        if (!exists(intermediateContigsDb))
+            intermediateContigsDb = dbSubset(
+                intermediateContigsDb,
+                options.refDb,
+                intermediateContigIds[],
+                options.anchorSkippingPileUpsOptions,
+            );
+
         // Align without any mask
         auto intermediateAlignmentsFile = getDamapping(
             intermediateContigsDb,
@@ -1211,6 +1215,31 @@ private class BubbleResolver
         }
 
         return intermediateAlignments;
+    }
+
+    string getSkippingPileUpDb(in id_t[] involvedContigs)
+    {
+        auto targetFilename = buildPath(
+            options.workdir,
+            format!"skipper_%(%d-%)_pile-up-XXXXXX"(involvedContigs),
+        );
+        auto targetExtension = options.readsDb.extension;
+        auto tempFile = mkstemp(targetFilename, targetExtension);
+
+        tempFile.file.close();
+        remove(tempFile.name);
+
+        return tempFile.name;
+    }
+
+    string getIntermediateContigsDb(in id_t[] involvedContigs)
+    {
+        auto dbExtension = options.refDb.extension;
+
+        return buildPath(
+            options.workdir,
+            format!"skipper_%(%d-%)_intermediate-contigs%s"(involvedContigs, dbExtension),
+        );
     }
 
     /**
