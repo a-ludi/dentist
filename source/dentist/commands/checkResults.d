@@ -531,8 +531,10 @@ private struct ResultAnalyzer
 
         ContigMapping recoveredAlignment;
 
-        foreach (lhsAlignment; lhsAlignments)
+        allCombinations: foreach (lhsAlignment; lhsAlignments)
+        {
             foreach (rhsAlignment; rhsAlignments)
+            {
                 if (
                     lhsAlignment.reference.contigId == rhsAlignment.reference.contigId &&
                     lhsAlignment.complement == rhsAlignment.complement
@@ -550,11 +552,16 @@ private struct ResultAnalyzer
                             lhsAlignment.complement,
                         );
                     else
+                    {
                         logJsonDiagnostic(
                             "info", "could not recover slightly imperfect alignment",
                             "reason", "partial alignments are ambiguous",
                         );
+                        break allCombinations;
+                    }
                 }
+            }
+        }
 
 
         return recoveredAlignment;
