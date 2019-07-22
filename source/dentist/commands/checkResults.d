@@ -36,6 +36,7 @@ import dentist.dazzler :
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm :
+    filterInPlace,
     first,
     orderLexicographically,
     sliceBy;
@@ -67,11 +68,13 @@ import std.algorithm :
     maxElement,
     min,
     minElement,
+    setDifference,
     sort,
     startsWith,
     sum,
     until;
 import std.array :
+    appender,
     array,
     minimallyInitializedArray,
     split;
@@ -82,6 +85,7 @@ import std.conv : to;
 import std.exception : enforce;
 import std.file :
     exists,
+    FileException,
     getSize,
     read,
     write;
@@ -99,8 +103,12 @@ import std.path :
     buildPath,
     stripExtension;
 import std.process :
+    Config,
     escapeShellFileName,
-    executeShell;
+    executeShell,
+    pipe,
+    pipeProcess,
+    Redirect;
 import std.range :
     assumeSorted,
     chain,
@@ -166,6 +174,11 @@ struct ContigMapping
     coord_t referenceContigLength;
     id_t queryContigId;
     Complement complement;
+
+    T opCast(T)() const pure nothrow if (is(bool : T))
+    {
+        return cast(T) queryContigId != 0;
+    }
 }
 
 static alias queryOrder = orderLexicographically!(const(ContigMapping),
@@ -395,10 +408,37 @@ private struct ResultAnalyzer
                 queryContigIds,
             ));
 
-        return taskPool
+        auto perfectAlignments = taskPool
             .amap!findPerfectAlignmentsChunk(queryChunks, 1)
             .joiner
             .array;
+
+        if (isSelfAlignment)
+        {
+            return perfectAlignments;
+        }
+        else
+        {
+            auto mappedContigIds = perfectAlignments
+                .map!"a.queryContigId"
+                .array
+                .sort
+                .release;
+            auto unmappedContigIds = setDifference(queryContigIds, mappedContigIds).array;
+            auto recoveredAlignments = new ContigMapping[unmappedContigIds.length];
+
+            foreach (i, unmappedContigId; parallel(unmappedContigIds))
+                recoveredAlignments[i] = recoverSlightlyImperfectAlignment(
+                    unmappedContigId,
+                    queryDb,
+                    refSequenceList,
+                    referenceContigIds,
+                );
+
+            recoveredAlignments.filterInPlace;
+
+            return perfectAlignments ~ recoveredAlignments;
+        }
     }
 
     static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
@@ -455,6 +495,199 @@ private struct ResultAnalyzer
             .array;
     }
 
+    private enum SplitDirection : ubyte
+    {
+        front,
+        back,
+    }
+
+    ContigMapping recoverSlightlyImperfectAlignment(
+        id_t queryContigId,
+        string queryDb,
+        string refSequenceList,
+        id_t[] referenceContigIds,
+    )
+    {
+        auto querySequence = getFastaSequence(queryDb, queryContigId);
+        assert(querySequence.length > 2 * options.cropAlignment);
+        querySequence = querySequence[options.cropAlignment .. $ - options.cropAlignment];
+
+        auto lhsAlignments = recoverSlightlyImperfectAlignments(
+            queryContigId,
+            querySequence[0 .. $ / 2],
+            refSequenceList,
+            referenceContigIds,
+            SplitDirection.front,
+            options.quiet || options.verbosity == 0,
+        );
+        auto rhsAlignments = recoverSlightlyImperfectAlignments(
+            queryContigId,
+            querySequence[$ / 2 .. $],
+            refSequenceList,
+            referenceContigIds,
+            SplitDirection.back,
+            options.quiet || options.verbosity == 0,
+        );
+
+        ContigMapping recoveredAlignment;
+
+        foreach (lhsAlignment; lhsAlignments)
+            foreach (rhsAlignment; rhsAlignments)
+                if (
+                    lhsAlignment.reference.contigId == rhsAlignment.reference.contigId &&
+                    lhsAlignment.complement == rhsAlignment.complement
+                )
+                {
+                    if (!recoveredAlignment)
+                        recoveredAlignment = ContigMapping(
+                            ReferenceInterval(
+                                lhsAlignment.reference.contigId,
+                                lhsAlignment.reference.begin,
+                                rhsAlignment.reference.end,
+                            ),
+                            lhsAlignment.referenceContigLength,
+                            queryContigId,
+                            lhsAlignment.complement,
+                        );
+                    else
+                        logJsonDiagnostic(
+                            "info", "could not recover slightly imperfect alignment",
+                            "reason", "partial alignments are ambiguous",
+                        );
+                }
+
+
+        return recoveredAlignment;
+    }
+
+    static ContigMapping[] recoverSlightlyImperfectAlignments(
+        id_t queryContigId,
+        string querySequence,
+        string refSequenceList,
+        id_t[] referenceContigIds,
+        SplitDirection splitDirection,
+        bool quiet = true,
+    )
+    {
+        enum minQueryLength = 10;
+        enum resultFieldSeparator = '\t';
+
+        while (querySequence.length >= minQueryLength)
+        {
+            auto redirect = Redirect.stdin | Redirect.stdout;
+            if (quiet)
+                redirect |= Redirect.stderr;
+
+            auto findProcess = pipeProcess(["fm-index", "-r", refSequenceList], redirect);
+            findProcess.stdin.writeln(querySequence);
+            findProcess.stdin.flush();
+            findProcess.stdin.close();
+
+            auto foundAlignments = findProcess
+                .stdout
+                .byLine
+                .map!(resultLine => resultLine.split(resultFieldSeparator))
+                .map!(resultFields => ContigMapping(
+                    ReferenceInterval(
+                        referenceContigIds[resultFields[1].to!size_t],
+                        resultFields[4].to!coord_t,
+                        resultFields[5].to!coord_t,
+                    ),
+                    resultFields[2].to!coord_t,
+                    queryContigId,
+                    cast(Complement) (resultFields[6] == "yes"),
+                ))
+                .tee!(contigMapping => assert(
+                    contigMapping.reference.begin < contigMapping.reference.end &&
+                    contigMapping.reference.end <= contigMapping.referenceContigLength,
+                    "non-sense alignment"
+                ));
+
+            if (!foundAlignments.empty)
+                return foundAlignments.array;
+
+            final switch (splitDirection)
+            {
+                case SplitDirection.front:
+                    querySequence = querySequence[0 .. $ / 2];
+                    break;
+                case SplitDirection.back:
+                    querySequence = querySequence[$ / 2 .. $];
+                    break;
+            }
+        }
+
+        return [];
+    }
+
+    unittest
+    {
+        import dentist.util.tempfile : mkstemp;
+        import std.file : remove;
+
+        enum refSequence = "ggcgctcctatctcccagatgtgtctacctccaatattaactccgcttactttataccttcatctggatttagttgagag";
+        auto refSequenceList = mkstemp("ref-unittest-XXXXXX", ".seq");
+        refSequenceList.file.writeln(refSequence);
+        refSequenceList.file.close();
+
+        scope (exit)
+        {
+            refSequenceList.file.close();
+            remove(refSequenceList.name);
+
+            if (exists(refSequenceList.name ~ ".fm9"))
+                remove(refSequenceList.name ~ ".fm9");
+            if (exists(refSequenceList.name ~ ".idx"))
+                remove(refSequenceList.name ~ ".idx");
+        }
+
+        enum querySequence = "ggcgctcctaactcccagatgtgtctacctccaatattaactccgcttactttataccttcatctggatttagttgagag";
+
+        auto lhsAlignments = recoverSlightlyImperfectAlignments(
+            1,
+            querySequence[],
+            refSequenceList.name,
+            [1],
+            SplitDirection.front,
+        );
+
+        assert(lhsAlignments == [ContigMapping(ReferenceInterval(1, 0, 10), 80, 1, Complement.no)]);
+    }
+
+    unittest
+    {
+        import dentist.util.tempfile : mkstemp;
+        import std.file : remove;
+
+        enum refSequence = "ggcgctcctatctcccagatgtgtctacctccaatattaactccgcttactttataccttcatctggatttagttgagag";
+        auto refSequenceList = mkstemp("ref-unittest-XXXXXX", ".seq");
+        refSequenceList.file.writeln(refSequence);
+        refSequenceList.file.close();
+
+        scope (exit)
+        {
+            refSequenceList.file.close();
+            remove(refSequenceList.name);
+
+            if (exists(refSequenceList.name ~ ".fm9"))
+                remove(refSequenceList.name ~ ".fm9");
+            if (exists(refSequenceList.name ~ ".idx"))
+                remove(refSequenceList.name ~ ".idx");
+        }
+
+        enum querySequence = "ggcgctcctatctcccagatgtgtctacctccaatattaactccgcttactttataccttcatctggatctagttgagag";
+
+        auto rhsAlignments = recoverSlightlyImperfectAlignments(
+            1,
+            querySequence[],
+            refSequenceList.name,
+            [1],
+            SplitDirection.back,
+        );
+
+        assert(rhsAlignments == [ContigMapping(ReferenceInterval(1, 70, 80), 80, 1, Complement.no)]);
+    }
+
     @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fm-index", "DENTIST", "README.testing")
     @ExternalDependency("cut", "POSIX")
@@ -463,7 +696,7 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        enum commandTemplate = `DBdump -s %s | grep -E '^S' | cut -d' ' -f3 > %2$s && fm-index %s`;
+        enum commandTemplate = `DBdump -s %s | grep -E '^S' | cut -d' ' -f3 > %2$s && fm-index %s < /dev/null`;
 
         auto sequenceListFile = getSequenceListFile(dbFile, options.workdir);
 
