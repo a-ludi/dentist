@@ -685,22 +685,20 @@ public:
     }
 
     static if (__traits(hasMember, lasDump, "destroy"))
-        void closePipe()
-        {
+        alias closePipe = setEmpty;
+
+    void setEmpty() pure nothrow
+    {
+        static if (__traits(hasMember, lasDump, "destroy"))
             lasDump.destroy();
-            setEmpty();
-        }
+        _empty = true;
+    }
 
 private:
 
     static auto getDumpLines(S lasDump)
     {
         return lasDump.enumerate(1).filter!"!a[1].empty";
-    }
-
-    void setEmpty() pure nothrow
-    {
-        _empty = true;
     }
 
     void readNextAlignmentChain()
@@ -1999,22 +1997,20 @@ public:
     }
 
     static if (__traits(hasMember, dbDump, "destroy"))
-        void closePipe()
-        {
+        alias closePipe = setEmpty;
+
+    void setEmpty() pure nothrow
+    {
+        static if (__traits(hasMember, dbDump, "destroy"))
             dbDump.destroy();
-            setEmpty();
-        }
+        _empty = true;
+    }
 
 private:
 
     static auto getDumpLines(S dbDump)
     {
         return dbDump.enumerate(1).filter!"!a[1].empty";
-    }
-
-    void setEmpty() pure nothrow
-    {
-        _empty = true;
     }
 
     void readNextDbRecord()
