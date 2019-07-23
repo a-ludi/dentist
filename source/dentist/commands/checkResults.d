@@ -366,9 +366,14 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        alias getContigIds = (dbFile) => getDbRecords(dbFile, [DBdumpOptions.readNumber])
-            .map!"a.readNumber"
-            .array;
+        id_t[] getContigIds(string dbFile)
+        {
+            auto dbRecords = getDbRecords(dbFile, [DBdumpOptions.readNumber]);
+            scope (exit) dbRecords.closePipe();
+            auto contigIds = dbRecords.map!"a.readNumber".array;
+
+            return contigIds;
+        }
 
         auto isSelfAlignment = queryDb is null;
         auto referenceContigIds = getContigIds(refDb);
@@ -586,6 +591,20 @@ private struct ResultAnalyzer
                 redirect |= Redirect.stderr;
 
             auto findProcess = pipeProcess(["fm-index", "-r", refSequenceList], redirect);
+            scope (exit)
+            {
+                findProcess.stdin.close();
+                findProcess.stdout.close();
+
+                if (redirect & Redirect.stderr)
+                    findProcess.stderr.close();
+
+                import std.process : kill, wait;
+                import core.sys.posix.signal : SIGKILL;
+
+                kill(findProcess.pid, SIGKILL);
+                wait(findProcess.pid);
+            }
             findProcess.stdin.writeln(querySequence);
             findProcess.stdin.flush();
             findProcess.stdin.close();

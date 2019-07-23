@@ -178,10 +178,13 @@ bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir
 /// Returns the number of records in dbFile.
 id_t numDbRecords(in string dbFile, in string workdir)
 {
-    auto recordNumberLine = dbdump(dbFile, [], workdir).find!(l => l.startsWith("+ R")).front;
+    auto dbdumpLines = dbdump(dbFile, [], workdir);
+    scope (exit) dbdumpLines.destroy();
+    auto recordNumberLine = dbdumpLines.find!(l => l.startsWith("+ R")).front;
     id_t numRecords;
 
     recordNumberLine.formattedRead!"+ R %d"(numRecords);
+    // Clean up child process
 
     return numRecords;
 }
@@ -324,13 +327,15 @@ AlignmentChain[] getAlignments(
     if (tracePointDistance > 0)
         ladumpOptions ~= LAdumpOptions.tracePoints;
 
-    auto alignmentChains = readLasDump(ladump(
+    auto lasdumpReader = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         ladumpOptions,
         workdir,
-    )).array;
+    ));
+    scope (exit) lasdumpReader.closePipe();
+    auto alignmentChains = lasdumpReader.array;
     alignmentChains.sort!("a < b", SwapStrategy.stable);
 
     if (tracePointDistance > 0)
@@ -357,14 +362,16 @@ void attachTracePoints(
     // NOTE: dump only for matching A reads; better would be for matching
     //       B reads but that is not possible with `LAdump`.
     auto aReadIds = alignmentChains.map!"a.contigA.id".uniq.array;
-    auto acsWithTracePoints = readLasDump(ladump(
+    auto lasdumpReader = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         aReadIds,
         ladumpOptions,
         workdir,
-    )).array;
+    ));
+    scope (exit) lasdumpReader.closePipe();
+    auto acsWithTracePoints = lasdumpReader.array;
     acsWithTracePoints.sort!"a < b";
     assert(isSorted!"*a < *b"(alignmentChains), "alignmentChains must be sorted");
 
@@ -676,6 +683,13 @@ public:
 
         return currentAC;
     }
+
+    static if (__traits(hasMember, lasDump, "destroy"))
+        void closePipe()
+        {
+            lasDump.destroy();
+            setEmpty();
+        }
 
 private:
 
@@ -1984,6 +1998,13 @@ public:
         return numReads;
     }
 
+    static if (__traits(hasMember, dbDump, "destroy"))
+        void closePipe()
+        {
+            dbDump.destroy();
+            setEmpty();
+        }
+
 private:
 
     static auto getDumpLines(S dbDump)
@@ -2405,13 +2426,15 @@ string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir =
     {
         enum string[] dbdumpOptions = [DBdumpOptions.sequenceString];
         _cache[_dbIdx].length = cacheSize;
-        auto bufferRest = readSequences(dbdump(
+        auto dbdumpLines = dbdump(
             dbFile,
             recordNumber,
             min(recordNumber + cacheSize - 1, _numRecords[_dbIdx]),
             dbdumpOptions,
             workdir,
-        )).copy(_cache[_dbIdx]);
+        );
+        scope (exit) dbdumpLines.destroy();
+        auto bufferRest = readSequences(dbdumpLines).copy(_cache[_dbIdx]);
         _cache[_dbIdx] = _cache[_dbIdx][0 .. $ - bufferRest.length];
         _firstRecord[_dbIdx] = recordNumber;
         enforce!DazzlerCommandException(_cache[_dbIdx].length > 0, "cannot read sequence: empty dump");
@@ -2949,7 +2972,9 @@ id_t getNumContigs(in string damFile, in string workdir = null)
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
-    auto matchingLine = dbdump(damFile, empty, [], workdir)
+    auto dbdumpLines = dbdump(damFile, empty, [], workdir);
+    scope (exit) dbdumpLines.destroy();
+    auto matchingLine = dbdumpLines
         .filter!(line => line.startsWith(contigNumFormatStart))
         .front;
 
