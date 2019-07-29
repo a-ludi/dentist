@@ -999,6 +999,16 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("gap-details-context")
+        @MetaVar("<num>")
+        @Help("add <num> base pairs of context to inserted sequence in gap details")
+        coord_t gapDetailsContext;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {

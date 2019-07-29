@@ -229,11 +229,15 @@ private struct ResultAnalyzer
         {
             return lhsContigId + 1;
         }
+
+        ContigMapping lhsContigMapping;
+        ContigMapping rhsContigMapping;
     }
 
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
+    protected coord_t[] resultContigLengths;
     protected coord_t referenceOffset;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
@@ -284,6 +288,11 @@ private struct ResultAnalyzer
 
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
+        resultContigLengths = resultScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => cast(coord_t) contigPart.peek!ContigSegment.length)
+            .array;
+
         auto contigCutoff = getContigCutoff(options.refDb);
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
@@ -870,24 +879,24 @@ private struct ResultAnalyzer
                 continue;
             }
 
-            auto lhsContigAlignment = lhsContigAlignments[0];
-            auto rhsContigAlignment = rhsContigAlignments[0];
+            gapSummary.lhsContigMapping = lhsContigAlignments[0];
+            gapSummary.rhsContigMapping = rhsContigAlignments[0];
 
-            gapSummary.state = getGapState(lhsContigAlignment, rhsContigAlignment);
+            gapSummary.state = getGapState(gapSummary.lhsContigMapping, gapSummary.rhsContigMapping);
 
             if (gapSummary.state == GapState.broken)
                 logJsonDiagnostic(
                     "info", "broken gap",
-                    "lhs", lhsContigAlignment.toJson,
-                    "lhsMappedInterval", mappedIntervalOf(lhsContigAlignment).toJson,
-                    "rhs", rhsContigAlignment.toJson,
-                    "rhsMappedInterval", mappedIntervalOf(rhsContigAlignment).toJson,
+                    "lhs", gapSummary.lhsContigMapping.toJson,
+                    "lhsMappedInterval", mappedIntervalOf(gapSummary.lhsContigMapping).toJson,
+                    "rhs", gapSummary.rhsContigMapping.toJson,
+                    "rhsMappedInterval", mappedIntervalOf(gapSummary.rhsContigMapping).toJson,
                 );
 
             if (gapSummary.state.among(GapState.partiallyClosed, GapState.closed))
                 gapSummary.alignment = computeInsertionAlignment(getInsertionMapping(
-                    lhsContigAlignment,
-                    rhsContigAlignment,
+                    gapSummary.lhsContigMapping,
+                    gapSummary.rhsContigMapping,
                 ));
         }
 
@@ -1205,9 +1214,41 @@ private struct ResultAnalyzer
                                 cast(string) alignment.queryLine,
                             ].toJson,
                         ].toJson)(gapSummary.alignment)
-                        : toJson(null)
+                        : toJson(null),
+                    "sequence": gapSummary.state.among(GapState.closed, GapState.unclosed, GapState.partiallyClosed)
+                        ? getInsertionSequence(gapSummary).toJson
+                        : toJson(null),
                 ].toJsonCompressed);
         }
+    }
+
+    string getInsertionSequence(GapSummary gapSummary)
+    {
+        if (options.gapDetailsContext == 0)
+            return null;
+
+        auto insertionMapping = getInsertionMapping(
+            gapSummary.lhsContigMapping,
+            gapSummary.rhsContigMapping,
+        );
+        auto gapId = getGapId(insertionMapping);
+
+        auto subseqBegin = insertionMapping.resultBegin;
+        subseqBegin.value = subseqBegin.value >= options.gapDetailsContext
+            ? subseqBegin.value - options.gapDetailsContext
+            : 0;
+
+        auto rhsContigLength = resultContigLengths[insertionMapping.resultEnd.contigId - 1];
+        auto subseqEnd = insertionMapping.resultEnd;
+        subseqEnd.value = subseqEnd.value + options.gapDetailsContext < rhsContigLength
+            ? subseqEnd.value + options.gapDetailsContext
+            : rhsContigLength;
+
+        return resultSubseqString(
+            subseqBegin,
+            subseqEnd,
+            gapId,
+        );
     }
 
     StretcherAlignment computeInsertionAlignment(in InsertionMapping insertionMapping)
@@ -1285,9 +1326,20 @@ private struct ResultAnalyzer
             end.contigId,
             end.value,
         );
-        auto dbFile = origin == "true"
-            ? options.trueAssemblyDb
-            : options.resultDb;
+
+        chain(
+            fastaHeader,
+            newline,
+            resultSubseqString(begin, end, gapId),
+            newline,
+        ).map!(to!(immutable(char))).toFile(fastaFile);
+
+        return fastaFile;
+    }
+
+    string resultSubseqString(in ReferencePoint begin, in ReferencePoint end, in string gapId)
+    {
+        auto dbFile = options.resultDb;
         string subSequence;
 
         if (begin.contigId == end.contigId)
@@ -1317,14 +1369,7 @@ private struct ResultAnalyzer
             ).map!(to!(immutable(char))).array;
         }
 
-        chain(
-            fastaHeader,
-            newline,
-            subSequence,
-            newline,
-        ).map!(to!(immutable(char))).toFile(fastaFile);
-
-        return fastaFile;
+        return subSequence;
     }
 
     bool isInnerGap(in ReferenceInterval gap)
