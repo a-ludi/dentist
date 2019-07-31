@@ -2616,27 +2616,27 @@ EOF".outdent;
 
     Returns: DB file name
 */
-string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
+string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [])
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     enum tempDbNameTemplate = "auxiliary-XXXXXX";
 
-    auto tempDbTemplate = buildPath(workdir, tempDbNameTemplate);
+    auto tempDbTemplate = buildPath(tmpdir, tempDbNameTemplate);
     auto tempDb = mkstemp(tempDbTemplate, damFileExtension);
 
     tempDb.file.close();
     remove(tempDb.name);
 
-    return buildDamFile(tempDb.name, fastaRecords, workdir, dbsplitOptions);
+    return buildDamFile(tempDb.name, fastaRecords, dbsplitOptions);
 }
 
 /// ditto
-string buildDamFile(Range)(string outputDb, Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
+string buildDamFile(Range)(string outputDb, Range fastaRecords, in string[] dbsplitOptions = [])
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     assert(outputDb.endsWith(damFileExtension), "outputDb must end with " ~ damFileExtension);
-    fasta2dam(outputDb, fastaRecords, workdir);
-    dbsplit(outputDb, dbsplitOptions, workdir);
+    fasta2dam(outputDb, fastaRecords);
+    dbsplit(outputDb, dbsplitOptions);
 
     return outputDb;
 }
@@ -2664,7 +2664,7 @@ unittest
     }
     {
         string wantedDbName = buildPath(tmpDir, "unit-test.dam");
-        string dbName = buildDamFile(wantedDbName, fastaRecords[], tmpDir);
+        string dbName = buildDamFile(wantedDbName, fastaRecords[]);
 
         assert(dbName == wantedDbName);
         assert(dbName.isFile);
@@ -3754,7 +3754,7 @@ private
     }
 
     @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir)
+    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : each, joiner;
@@ -3810,13 +3810,13 @@ private
     }
 
     @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(in string inFile, in string outFile, in string workdir)
+    void fasta2dam(in string inFile, in string outFile, in string workdir = null)
     {
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
     @ExternalDependency("DBsplit", null, "https://github.com/thegenemyers/DAZZ_DB")
-    void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir)
+    void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir = null)
     {
         executeCommand(chain(only("DBsplit"), dbsplitOptions,
                 only(dbFile.stripBlock.relativeToWorkdir(workdir))), workdir);

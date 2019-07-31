@@ -102,7 +102,6 @@ private struct PileUpCropper
         buildDamFile(
             croppedDb,
             croppedSequences,
-            options.workdir,
         );
     }
 
