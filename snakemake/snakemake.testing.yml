@@ -21,5 +21,6 @@ check_batch_size:       1000
 
 # Workflow files that are created inside of workdir
 workflow:
+    contig_alignments_cache: contig-alignments-cache.json
     result_stats_batch:     stats/stats.{batch_id}.json
     gap_details_batch:      stats/gap_details.{batch_id}.json

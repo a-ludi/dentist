@@ -58,6 +58,7 @@ short_vs_true_alignment = alignment_file(ground_trouth, short_read_assembly)
 contig_mapping = testing_inputs["contig_mapping"]
 result_db = fasta_to_workdb(testing_outputs["output_assembly"], "dam")
 testing_config_file = prepend_ext(dentist_config_file, ".testing")
+contig_alignments_cache = join(workdir_, workflow_["contig_alignments_cache"])
 
 result_stats = testing_outputs["result_stats"]
 result_stats_batch = join(workdir_, workflow_["result_stats_batch"])
@@ -99,6 +100,7 @@ rule extend_dentist_config_for_testing:
             dentist_config["check-results"] = dict()
         dentist_config["check-results"]["json"] = True
         dentist_config["check-results"]["bucket-size"] = 0
+        dentist_config["check-results"]["cache-contig-alignments"] = contig_alignments_cache
 
         with open(output[0], 'w') as ext_config_file:
             json.dump(dentist_config, ext_config_file)
@@ -154,13 +156,32 @@ checkpoint result2dam:
         "fasta2DAM {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
 
 
-rule check_batch:
+rule check_prepare_cache:
     input:
         testing_config_file,
         db_files(ground_trouth),
         mask_files(ground_trouth, contig_mapping),
         db_files(reference),
         await_db_files(result_db)
+    output:
+        contig_alignments_cache
+    params:
+        main_threads = main_threads,
+        auxiliary_threads = auxiliary_threads
+    threads: max_threads
+    log: log_file("check.cache")
+    shell:
+        "dentist check --config={testing_config_file} {dentist_flags} --threads={threads} --batch=0..1 - - - - 2> {log} > /dev/null"
+
+
+rule check_batch:
+    input:
+        testing_config_file,
+        db_files(ground_trouth),
+        mask_files(ground_trouth, contig_mapping),
+        db_files(reference),
+        await_db_files(result_db),
+        contig_alignments_cache
     output:
         result_stats = temp(result_stats_batch),
         gap_details = temp(gap_details_batch)
