@@ -26,19 +26,25 @@ import dentist.common.alignments :
 import dentist.common.commands : TestingCommand;
 import dentist.common.external : ExternalDependency;
 import dentist.dazzler :
+    buildDamFile,
     ContigSegment,
+    DamapperOptions,
     DBdumpOptions,
     GapSegment,
+    getAlignments,
     getContigCutoff,
+    getDamapping,
     getFastaSequence,
     getDbRecords,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm :
+    filterInPlace,
     first,
     orderLexicographically,
-    sliceBy;
+    sliceBy,
+    uniqInPlace;
 import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
@@ -67,6 +73,7 @@ import std.algorithm :
     maxElement,
     min,
     minElement,
+    setDifference,
     sort,
     startsWith,
     sum,
@@ -104,6 +111,7 @@ import std.process :
 import std.range :
     assumeSorted,
     chain,
+    chunks,
     enumerate,
     evenChunks,
     iota,
@@ -436,10 +444,29 @@ private struct ResultAnalyzer
                 queryContigIds,
             ));
 
-        return taskPool
-            .amap!findPerfectAlignmentsChunk(queryChunks, 1)
-            .joiner
-            .array;
+        auto perfectAlignments = taskPool
+             .amap!findPerfectAlignmentsChunk(queryChunks, 1)
+             .joiner
+             .array;
+
+        if (options.recoverImperfectContigs && !isSelfAlignment)
+        {
+            auto mappedContigIds = perfectAlignments
+                .map!"a.queryContigId"
+                .array
+                .sort
+                .release
+                .uniqInPlace;
+            auto unmappedContigIds = setDifference(
+                setDifference(queryContigIds, mappedContigIds),
+                duplicateContigIds.elements,
+            ).array;
+            auto recoveredAlignments = recoverSlightlyImperfectAlignments(unmappedContigIds);
+
+            perfectAlignments = perfectAlignments ~ recoveredAlignments;
+        }
+
+        return perfectAlignments;
     }
 
     static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
@@ -493,6 +520,76 @@ private struct ResultAnalyzer
                 contigMapping.reference.end <= contigMapping.referenceContigLength,
                 "non-sense alignment"
             ))
+            .array;
+    }
+
+    ContigMapping[] recoverSlightlyImperfectAlignments(id_t[] unmappedContigIds)
+    {
+        mixin(traceExecution);
+
+        auto queryChunks = unmappedContigIds
+            .evenChunks(min(unmappedContigIds.length, taskPool.size + 1))
+            .map!(queryChunk => tuple!(
+                "queryChunk",
+                "options",
+            )(
+                queryChunk,
+                options,
+            ));
+
+        return taskPool
+             .amap!recoverSlightlyImperfectAlignments(queryChunks, 1)
+             .joiner
+             .array;
+    }
+
+    static ContigMapping[] recoverSlightlyImperfectAlignments(ChunkInfo)(ChunkInfo info)
+    {
+        id_t[] queryChunk = info.queryChunk;
+        Options options = info.options;
+
+        auto croppedContigDb = makeCroppedSubsetDb(
+            options.refDb,
+            options.cropAlignment,
+            queryChunk,
+            options.workdir,
+        );
+        auto croppedContigMappingFile = getDamapping(
+            options.resultDb,
+            croppedContigDb,
+            options.recoverImperfectContigsAlignmentOptions,
+            options.workdir,
+        );
+        auto croppedContigAlignments = getAlignments(
+            options.resultDb,
+            croppedContigDb,
+            croppedContigMappingFile,
+            options.workdir,
+        );
+
+        foreach (ref ac; croppedContigAlignments)
+            ac.contigB.id = queryChunk[ac.contigB.id - 1];
+
+        alias wholeContigMaps = (ac) => ac.first.contigB.begin == 0 &&
+                                        ac.last.contigB.end == ac.contigB.length;
+        croppedContigAlignments.filterInPlace!wholeContigMaps;
+        croppedContigAlignments.sort!"a.contigB.id < b.contigB.id";
+
+        return croppedContigAlignments
+            .sliceBy!"a.contigB.id == b.contigB.id"
+            .map!(recoveredAlignments => recoveredAlignments.length == 1
+                ? ContigMapping(
+                    ReferenceInterval(
+                        recoveredAlignments[0].contigA.id,
+                        recoveredAlignments[0].first.contigA.begin,
+                        recoveredAlignments[0].last.contigA.end,
+                    ),
+                    recoveredAlignments[0].contigA.length,
+                    recoveredAlignments[0].contigB.id,
+                    recoveredAlignments[0].complement,
+                )
+                : ContigMapping())
+            .filter!"a"
             .array;
     }
 
@@ -586,6 +683,74 @@ private struct ResultAnalyzer
         }
 
         return sequenceListFile;
+    }
+
+    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("fold", "POSIX")
+    @ExternalDependency("grep", "POSIX")
+    @ExternalDependency("paste", "POSIX")
+    @ExternalDependency("rev", "POSIX")
+    static string makeCroppedSubsetDb(in string inDbFile, in coord_t crop, id_t[] contigIds, string workdir)
+    {
+        mixin(traceExecution);
+
+        enum commandTemplate = `
+            set -o pipefail;
+            DBdump -s %1$s %4$(%d %) |
+            grep -E '^S' |
+            cut -d' ' -f3 |
+            cut -c%3$d- |
+            rev |
+            cut -c%3$d- |
+            rev |
+            paste -d '\n' <(
+                DBdump -r %1$s %4$(%d %) |
+                sed -nE 's/^R />contig-/p'
+            ) - |
+            fold |
+            fasta2DAM -i %2$s`.outdent.tr("\n", "", "d");
+
+        auto minCutoff = 2 * crop;
+        dentistEnforce(
+            minCutoff < getContigCutoff(inDbFile),
+            format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, inDbFile),
+        );
+
+        import std.digest.crc : CRC32;
+        import std.digest : hexDigest;
+
+        auto outDbFile = buildPath(workdir, format!"cropped-subset-%s.dam"(hexDigest!CRC32(contigIds)));
+
+        if (!exists(outDbFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(inDbFile),
+                escapeShellFileName(outDbFile),
+                crop + 1,
+                contigIds,
+            );
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            import std.process : Config;
+            enum bash = "/bin/bash";
+
+            auto commandResult = executeShell(command, null, Config.none, size_t.max, null, bash);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make cropped subset DB `%s`: %s"(outDbFile, commandResult.output),
+            );
+        }
+
+        return outDbFile;
     }
 
     static string getSequenceListFile(in string dbFile, in string workdir, coord_t crop = 0)
