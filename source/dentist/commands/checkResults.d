@@ -150,12 +150,27 @@ alias Options = OptionsFor!(TestingCommand.checkResults);
 void execute(in Options options)
 {
     auto analyzer = ResultAnalyzer(options);
-    auto stats = analyzer.collect();
+    Stats stats;
+    try
+    {
+        stats = analyzer.collect();
+    }
+    catch (StopExecution)
+    {
+        return;
+    }
 
     if (options.useJson)
         writeln(stats.toJsonString());
     else
         writeln(stats.toTabular());
+}
+
+class StopExecution : Exception
+{
+    this() {
+        super(null);
+    }
 }
 
 alias Complement = Flag!"complement";
@@ -318,6 +333,13 @@ private struct ResultAnalyzer
                 ? referenceGaps.toJson
                 : toJson(null),
         );
+
+        if (options.cacheOnly)
+        {
+            dentistEnforce(contigAlignmentsCache.isValid, "invalid cache with --cache-only");
+
+            throw new StopExecution();
+        }
 
         gapSummaries = analyzeGaps();
         correctGapsPerIdentityLevel = makeIdentityLevelStats();

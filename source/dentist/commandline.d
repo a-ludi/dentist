@@ -891,6 +891,19 @@ struct OptionsFor(DentistCommand _command)
         string contigAlignmentsCache;
     }
 
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("cache-only")
+        @Help("stop execution after writing the contig alignments cache")
+        @Validate!((value, options) => enforce!CLIException(
+            !value || options.contigAlignmentsCache !is null,
+            "requires --cache-contig-alignments",
+        ))
+        OptionFlag cacheOnly;
+    }
+
     static if (command == DentistCommand.validateConfig)
     {
         @Argument("<in:config>")
@@ -955,6 +968,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        TestingCommand.checkResults,
     ))
     {
         @Option("auxiliary-threads", "aux-threads")
@@ -1351,6 +1365,31 @@ struct OptionsFor(DentistCommand _command)
             "reads error rate must be in (0, 0.3]"
         ))
         double readsErrorRate = .15;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("recover-imperfect-contigs", "R")
+        @Help("try to recover imperfect contigs")
+        OptionFlag recoverImperfectContigs;
+
+        @Option()
+        double maxImperfectContigError = 0.015;
+
+        @property string[] recoverImperfectContigsAlignmentOptions() const
+        {
+            return [
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DamapperOptions.kMerSize ~ "32",
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    1.0 - maxImperfectContigError,
+                ),
+            ];
+        }
     }
 
     static if (command.among(
