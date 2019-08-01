@@ -158,6 +158,14 @@ Contributions are warmly welcome. Just create an [issue][gh-issues] or [pull req
 - your code is covered with unit tests (if feasible) and
 - `dub test` runs successfully.
 
+It is recommended to install the Git hooks included in the repository to avoid premature pull requests. You can enable all shipped hooks with this command:
+
+```sh
+git config --local core.hooksPath .githooks/
+```
+
+If you do not want to enable just a subset use `ln -s .githooks/{hook} .git/hooks`. If you want to audit code changes before they get executed on your machine you can you `cp .githooks/{hook} .git/hooks` instead.
+
 
 [gh-issues]: https://github.com/a-ludi/dentist/issues
 [gh-pr]: https://github.com/a-ludi/dentist/pulls
