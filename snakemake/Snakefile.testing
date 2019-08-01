@@ -142,7 +142,8 @@ rule translocate:
         db_files(short_read_assembly),
         short_vs_true_alignment
     output:
-        reference_fasta
+        protected(reference_fasta),
+        protected(mask_files(ground_trouth, contig_mapping))
     log: log_file("translocate")
     shell:
         "dentist translocate --config={testing_config_file} {dentist_flags} - - - - - 2> {log}"
