@@ -1771,13 +1771,13 @@ struct NaturalNumberSet
     {
         static struct ElementsRange
         {
-            const NaturalNumberSet* set;
+            const(NaturalNumberSet)* set;
             bool _empty = false;
             size_t i = 0;
             size_t part;
             size_t j = 0;
 
-            this(const NaturalNumberSet* set) pure nothrow
+            this(const(NaturalNumberSet)* set) pure nothrow
             {
                 this.set = set;
                 this._empty = set.empty;
