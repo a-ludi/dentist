@@ -133,22 +133,27 @@ class PileUpCollector
             "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
         );
 
-        foreach (i, filter; filters)
-        {
-            readsAlignment = filter(readsAlignment);
-
-            logJsonDiagnostic(
-                "filterStage", typeof(filter).stringof,
-                "readsAlignment", shouldLog(LogLevel.debug_)
-                    ? readsAlignment.toJson
-                    : toJson(null),
-                "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
-            );
-        }
+        foreach (filter; filters)
+            applyFilter!(typeof(filter))(filter);
 
         enforce!DentistException(
             readsAlignment.canFind!"!a.flags.disabled",
             "no alignment chains left after filtering",
+        );
+    }
+
+    protected void applyFilter(alias Filter)(Filter filter)
+    {
+        mixin(traceExecution);
+
+        readsAlignment = filter(readsAlignment);
+
+        logJsonDiagnostic(
+            "filterStage", typeof(filter).stringof,
+            "readsAlignment", shouldLog(LogLevel.debug_)
+                ? readsAlignment.toJson
+                : toJson(null),
+            "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
         );
     }
 
