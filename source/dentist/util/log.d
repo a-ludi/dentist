@@ -213,6 +213,40 @@ enum LogLevel
     none
 }
 
+struct ExecutionTracer(LogLevel logLevel = LogLevel.diagnostic)
+{
+    import std.datetime.stopwatch : StopWatch;
+    import std.typecons : Yes;
+
+    string functionName;
+    StopWatch timer;
+
+    this(int dummy, string fnName = __FUNCTION__)
+    {
+        this.functionName = fnName;
+
+        logJson(
+            logLevel,
+            `state`, `enter`,
+            `function`, this.functionName,
+        );
+
+        this.timer = StopWatch(Yes.autoStart);
+    }
+
+    ~this()
+    {
+        timer.stop();
+
+        logJson(
+            logLevel,
+            `state`, `exit`,
+            `function`, functionName,
+            `timeElapsed`, timer.peek().total!`hnsecs`,
+        );
+    }
+}
+
 string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
 {
     import std.conv : to;
@@ -220,44 +254,12 @@ string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
     import std.traits : moduleName;
 
     return q"{
-        import std.datetime.stopwatch : $prefix__StopWatch = StopWatch;
+        static import $thisModule;
 
-        $prefix__StopWatch $prefix__enter() {
-            import $thisModule : LogLevel;
-            import std.traits : fullyQualifiedName;
-            import std.typecons : Yes;
-
-            logJson(
-                $logLevel,
-                `state`, `enter`,
-                `function`, $function,
-            );
-
-            return $prefix__StopWatch(Yes.autoStart);
-        }
-
-        void $prefix__exit($prefix__StopWatch timer) {
-            import $thisModule : LogLevel;
-            import std.traits : fullyQualifiedName;
-
-            timer.stop();
-            logJson(
-                $logLevel,
-                `state`, `exit`,
-                `function`, $function,
-                `timeElapsed`, timer.peek().total!`hnsecs`,
-            );
-        }
-
-        auto $prefix__timer = $prefix__enter();
-
-        scope (exit)
-            $prefix__exit($prefix__timer);
+        scope __executionTracer = $thisModule.ExecutionTracer!($logLevel)(0);
     }"
         .replace("$thisModule", moduleName!LogLevel)
-        .replace("$function", "fullyQualifiedName!(__traits(parent, $prefix__enter))")
-        .replace("$logLevel", "LogLevel." ~ logLevel.to!string)
-        .replace("$prefix", `__traceExecution`);
+        .replace("$logLevel", "LogLevel." ~ logLevel.to!string);
 }
 
 unittest
