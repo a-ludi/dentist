@@ -190,7 +190,8 @@ bool isValid(J)(in J join) pure nothrow
 Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceContigs, R rawJoins)
 {
     auto scaffold = initScaffold!T(numReferenceContigs)
-        .addJoins!(mergeMultiEdges, T)(rawJoins);
+        .addJoins!(mergeMultiEdges, T)(rawJoins)
+        .removeNoneJoins!T;
 
     return scaffold;
 }
