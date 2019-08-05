@@ -217,7 +217,7 @@ private struct ResultAnalyzer
         Complement complement;
     }
 
-    static enum GapState
+    static enum GapState : ubyte
     {
         /// Unsure what happened; probably due to an assembly error.
         unkown,
