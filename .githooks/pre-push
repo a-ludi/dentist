@@ -38,8 +38,8 @@ function git_stash_push()
 
 function git_stash_pop()
 {
-    git checkout -f --quiet stash@{0} .
-    git stash drop --quiet
+    git checkout HEAD .
+    git stash pop --quiet
     echo "--- restoring changes to working tree after unit tests"
 }
 
