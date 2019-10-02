@@ -36,9 +36,15 @@ function git_stash_push()
 }
 
 
-function git_stash_pop()
+function git_checkout_head()
 {
     git checkout HEAD .
+}
+
+
+function git_stash_pop()
+{
+    git_checkout_head
     git stash pop --quiet
     echo "--- restoring changes to working tree after unit tests"
 }
@@ -46,7 +52,12 @@ function git_stash_pop()
 
 function stash_working_tee_changes_for_testing()
 {
-    git_stash_push && trap git_stash_pop exit
+    if (( $(git status --porcelain | wc -l) > 0 ));
+    then
+        git_stash_push && trap git_stash_pop exit
+    else
+        trap git_checkout_head exit
+    fi
 }
 
 
