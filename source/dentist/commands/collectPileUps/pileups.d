@@ -993,6 +993,8 @@ private class BubbleResolver
     {
         mixin(traceExecution);
 
+        scaffold = removeNoneJoins!ScaffoldPayload(scaffold);
+
         foreach (i; 0 .. options.maxBubbleResolverIterations)
             if (resolveSimpleBubbles() == 0)
                 break;
