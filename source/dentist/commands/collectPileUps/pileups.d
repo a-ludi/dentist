@@ -993,8 +993,6 @@ private class BubbleResolver
     {
         mixin(traceExecution);
 
-        scaffold = removeNoneJoins!ScaffoldPayload(scaffold);
-
         foreach (i; 0 .. options.maxBubbleResolverIterations)
             if (resolveSimpleBubbles() == 0)
                 break;
@@ -1112,6 +1110,18 @@ private class BubbleResolver
 
         synchronized(this)
             skippingJoin = scaffold.get(scaffold.edge(escapeNodes[0], escapeNodes[1]));
+
+        if (!skippingJoin.payload.types.pileUp)
+        {
+            logJsonDiagnostic(
+                "info", "bubble was resolved in other thread",
+                "bubble", bubble.toJson,
+                "escapeNodes", escapeNodes.toJson,
+                "skippingJoin", joinToJson(skippingJoin),
+            );
+
+            return;
+        }
 
         auto skippingPileUp = skippingJoin.payload.readAlignments;
         auto intermediateContigIds = getIntermediateContigIds(bubble);
