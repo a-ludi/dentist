@@ -296,8 +296,11 @@ PileUp[] build(
     debugLogPileUps("minSpanningEnforced", alignmentsScaffold, options.intermediatePileUpsStem);
     alignmentsScaffold = alignmentsScaffold.removeInputGaps();
     debugLogPileUps("inputGapsRemoved", alignmentsScaffold, options.intermediatePileUpsStem);
-    alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!(ScaffoldPayload.merge, ScaffoldPayload);
-    debugLogPileUps("extensionsMerged", alignmentsScaffold, options.intermediatePileUpsStem);
+    if (options.mergeExtensions)
+    {
+        alignmentsScaffold = alignmentsScaffold.mergeExtensionsWithGaps!(ScaffoldPayload.merge, ScaffoldPayload);
+        debugLogPileUps("extensionsMerged", alignmentsScaffold, options.intermediatePileUpsStem);
+    }
     auto pileUps = collectPileUps(alignmentsScaffold).array;
 
     return pileUps;

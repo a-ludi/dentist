@@ -1296,6 +1296,20 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("no-merge-extension")
+        @Help("Do not merge extension reads into spanning pile ups.")
+        OptionFlag noMergeExtensions;
+
+        @property bool mergeExtensions() const pure nothrow
+        {
+            return !noMergeExtensions;
+        }
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
