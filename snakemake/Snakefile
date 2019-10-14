@@ -25,7 +25,9 @@ rule ALL:
 
 rule self_alignment_block:
     input: await_db_files(reference)
-    output: temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}'))
+    output:
+        temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}')),
+        temp(alignment_file(reference, block_b='{block_ref}', block_a='{block_reads}'))
     params:
         aligncmd = lambda _: generate_options_for("self", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
