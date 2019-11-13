@@ -120,7 +120,7 @@ class PileUpCollector
         mixin(traceExecution);
 
         auto filters = tuple(
-            new ImproperAlignmentChainsFilter(),
+            new ImproperAlignmentChainsFilter(options.properAlignmentAllowance),
             new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
             new AmbiguousAlignmentChainsFilter(&unusedReads),
             new RedundantAlignmentChainsFilter(&unusedReads),

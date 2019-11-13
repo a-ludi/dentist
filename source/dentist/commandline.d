@@ -1353,6 +1353,20 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("proper-alignment-allowance")
+        @MetaVar("num")
+        @Help(format!"
+            An alignment is called proper if it is end-to-end with at most <num> bp allowance.
+            (default: %d)
+        "(defaultValue!properAlignmentAllowance))
+        coord_t properAlignmentAllowance = 50;
+    }
+
+    static if (command.among(
         DentistCommand.maskRepetitiveRegions,
     ))
     {

@@ -9,6 +9,7 @@
 module dentist.commands.collectPileUps.filter;
 
 import dentist.common :
+    coord_t,
     ReadInterval,
     ReadRegion,
     ReferenceInterval,
@@ -88,11 +89,18 @@ abstract class ReadFilter : AlignmentChainFilter
 /// Discard improper alignments.
 class ImproperAlignmentChainsFilter : AlignmentChainFilter
 {
+    coord_t properAlignmentAllowance;
+
+    this(coord_t properAlignmentAllowance)
+    {
+        this.properAlignmentAllowance = properAlignmentAllowance;
+    }
+
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
         foreach (ref alignmentChain; alignmentChains)
         {
-            alignmentChain.disableIf(!alignmentChain.isProper);
+            alignmentChain.disableIf(!alignmentChain.isProper(properAlignmentAllowance));
         }
 
         return alignmentChains;
@@ -111,8 +119,6 @@ class RedundantAlignmentChainsFilter : ReadFilter
 
     override InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains)
     {
-        assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
-
         return inputRangeObject(alignmentChains.filter!"!a.flags.disabled && a.isFullyContained");
     }
 }
@@ -137,8 +143,6 @@ class AmbiguousAlignmentChainsFilter : AlignmentChainFilter
 
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
-        assert(alignmentChains.map!"a.isProper || a.flags.disabled".all);
-
         auto alignmentsGroupedByRead = alignmentChains
             .sort!orderByReadAndErrorRate
             .filter!"!a.flags.disabled"

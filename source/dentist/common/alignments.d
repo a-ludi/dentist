@@ -370,7 +370,7 @@ struct AlignmentChain
             }
     }
 
-    @property ref const(LocalAlignment) first() const pure nothrow
+    @property ref const(LocalAlignment) first() const pure nothrow @safe
     {
         return localAlignments[0];
     }
@@ -387,7 +387,7 @@ struct AlignmentChain
             }
     }
 
-    @property ref const(LocalAlignment) last() const pure nothrow
+    @property ref const(LocalAlignment) last() const pure nothrow @safe
     {
         return localAlignments[$ - 1];
     }
@@ -416,17 +416,13 @@ struct AlignmentChain
     }
 
     /// This alignment is called proper iff it starts and ends at a read boundary.
-    @property bool isProper() const pure nothrow
+    @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
-        return (
-            first.contigA.begin == 0 ||
-            first.contigB.begin == 0
-        )
-        &&
-        (
-            last.contigA.end == contigA.length ||
-            last.contigB.end == contigB.length
-        );
+        enum beginsWith(string contig) = "first."~contig~".begin <= allowance";
+        enum endsWith(string contig) = "first."~contig~".end + allowance >= "~contig~".length";
+
+        return (mixin(beginsWith!"contigA") || mixin(beginsWith!"contigB")) &&
+               (mixin(endsWith!"contigA") || mixin(endsWith!"contigB"));
     }
 
     /// Returns true iff this alignment covers `contig` completely.

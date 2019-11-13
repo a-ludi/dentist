@@ -374,7 +374,10 @@ protected class PileUpProcessor
             ac.contigA.id = croppingPositions[ac.contigA.id - 1]
                 .contigId
                 .to!id_t;
-            ac.disableIf(!ac.isProper || ac.averageErrorRate >= options.maxInsertionsError);
+            ac.disableIf(
+                !ac.isProper(options.properAlignmentAllowance) ||
+                ac.averageErrorRate >= options.maxInsertionsError
+            );
         }
 
         dentistEnforce(
