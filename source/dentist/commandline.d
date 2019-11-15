@@ -1359,11 +1359,20 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("proper-alignment-allowance")
         @MetaVar("num")
-        @Help(format!"
+        @Help("
             An alignment is called proper if it is end-to-end with at most <num> bp allowance.
-            (default: %d)
-        "(defaultValue!properAlignmentAllowance))
-        coord_t properAlignmentAllowance = 50;
+            (default: --trace-point-spacing)
+        ")
+        coord_t properAlignmentAllowance;
+
+        @PostValidate(Priority.low)
+        void hookEnsurePresenceOfProperAlignmentAllowance()
+        {
+            if (properAlignmentAllowance > 0)
+                return;
+
+            properAlignmentAllowance = tracePointDistance;
+        }
     }
 
     static if (command.among(
