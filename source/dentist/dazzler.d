@@ -1921,13 +1921,25 @@ struct DbRecord
     {
         id_t well;
         coord_t pulseStart;
+        alias begin = pulseStart;
         coord_t pulseEnd;
+        alias end = pulseEnd;
         float readQuality;
+
+
+        @property coord_t pulseLength() const pure nothrow @safe
+        {
+            return pulseEnd - pulseStart;
+        }
+
+        alias length = pulseLength;
     }
 
     id_t readNumber;
+    alias contigId = readNumber;
     string header;
     PacBioReadInfo pacBioReadInfo;
+    alias location = pacBioReadInfo;
     string sequence;
 }
 
@@ -2962,13 +2974,19 @@ coord_t getContigCutoff(in string dbFile)
     return contigCutoff;
 }
 
-id_t getNumContigs(in string damFile, in string workdir = null)
+id_t getNumContigs(in string damFile, in string workdir)
+{
+    return getNumContigs(damFile, No.untrimmedDb, workdir);
+}
+
+id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb, in string workdir = null)
 {
     enum contigNumFormat = "+ R %d";
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
-    auto dbdumpLines = dbdump(damFile, empty, [], workdir);
+    string[] options = untrimmedDb ? [DBdumpOptions.untrimmedDatabase] : [];
+    auto dbdumpLines = dbdump(damFile, empty, options, workdir);
     scope (exit) dbdumpLines.destroy();
     auto matchingLine = dbdumpLines
         .filter!(line => line.startsWith(contigNumFormatStart))
@@ -3265,9 +3283,21 @@ Region[] readMask(Region)(in string dbFile, in string maskName, in string workdi
     alias RegionContigId = typeof(maskRegions.data[0].tag);
     alias RegionBegin = typeof(maskRegions.data[0].begin);
     alias RegionEnd = typeof(maskRegions.data[0].end);
-    auto numReads = getNumContigs(dbFile, workdir).to!int;
+    auto numReads = getNumContigs(dbFile, No.untrimmedDb, workdir).to!int;
+    id_t[] trimmedDbTranslateTable;
 
     size_t currentContig = 1;
+
+    if (dbFile.endsWith(damFileExtension) && maskHeader.numReads > numReads)
+    {
+        logJsonWarn(
+            "info", "reading mask for untrimmed DB",
+            "dbFile", dbFile,
+            "maskName", maskName,
+        );
+        numReads = getNumContigs(dbFile, Yes.untrimmedDb, workdir).to!int;
+        trimmedDbTranslateTable = getTrimmedDbTranslateTable(dbFile);
+    }
 
     if (maskHeader.numReads != numReads)
         logJsonWarn(
@@ -3298,7 +3328,11 @@ Region[] readMask(Region)(in string dbFile, in string maskName, in string workdi
             newRegion.begin = interval[0].to!RegionBegin;
             newRegion.end = interval[1].to!RegionEnd;
 
-            maskRegions ~= newRegion;
+            if (trimmedDbTranslateTable.length > 0)
+                newRegion.tag = trimmedDbTranslateTable[newRegion.tag - 1].to!RegionContigId;
+
+            if (newRegion.tag < id_t.max)
+                maskRegions ~= newRegion;
         }
 
         ++currentContig;
@@ -3340,6 +3374,28 @@ private T[] getBinaryFile(T)(in string fileName)
     return dataBuffer;
 }
 
+private id_t[] getTrimmedDbTranslateTable(in string dbFile)
+{
+    assert(dbFile.endsWith(damFileExtension), "only implemented for DAM files");
+
+    auto cutoff = getContigCutoff(dbFile);
+    auto untrimmedSize = getNumContigs(dbFile, Yes.untrimmedDb);
+    auto dbRecords = getDbRecords(dbFile, [
+        DBdumpOptions.readNumber,
+        DBdumpOptions.originalHeader,
+        DBdumpOptions.untrimmedDatabase,
+    ]);
+
+    auto trimmedDbTranslateTable = uninitializedArray!(id_t[])(untrimmedSize);
+    trimmedDbTranslateTable[] = id_t.max;
+    id_t untrimmedReadNumber;
+    foreach (dbRecord; dbRecords)
+        if (dbRecord.location.length >= cutoff)
+            trimmedDbTranslateTable[dbRecord.contigId - 1] = (++untrimmedReadNumber);
+
+    return trimmedDbTranslateTable;
+}
+
 /**
     Write the list of regions to a Dazzler mask for `dbFile`.
 
@@ -3371,7 +3427,7 @@ void writeMask(Region)(
         .array;
     maskRegions.sort();
 
-    auto numReads = getNumContigs(dbFile, workdir).to!MaskHeaderEntry;
+    auto numReads = getNumContigs(dbFile, Yes.untrimmedDb, workdir).to!MaskHeaderEntry;
     MaskHeaderEntry size = 0; // Mark the DAZZ_TRACK as a mask (see DAZZ_DB/DB.c:1183)
     MaskHeaderEntry currentContig = 1;
     MaskDataPointer dataPointer = 0;
