@@ -3253,11 +3253,11 @@ private
     Throws: MaskReaderException
     See_Also: `writeMask`, `getMaskFiles`
 */
-Region[] readMask(Region)(in string dbFile, in string maskDestination, in string workdir)
+Region[] readMask(Region)(in string dbFile, in string maskName, in string workdir)
 {
     alias _enforce = enforce!MaskReaderException;
 
-    auto maskFileNames = getMaskFiles(dbFile, maskDestination);
+    auto maskFileNames = getMaskFiles(dbFile, maskName);
     auto maskHeader = readMaskHeader(maskFileNames.header);
     auto maskData = getBinaryFile!MaskDataEntry(maskFileNames.data);
 
@@ -3271,8 +3271,9 @@ Region[] readMask(Region)(in string dbFile, in string maskDestination, in string
 
     if (maskHeader.numReads != numReads)
         logJsonWarn(
-            "info",
-            "mask does not match DB: number of reads does not match",
+            "info", "mask does not match DB: number of reads does not match",
+            "dbFile", dbFile,
+            "maskName", maskName,
         );
     _enforce(maskHeader.size == 0, "corrupted mask: expected 0");
     _enforce(maskHeader.dataPointers.length == maskHeader.numReads + 1,
