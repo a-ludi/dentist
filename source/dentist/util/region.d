@@ -131,6 +131,29 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         {
             mixin("alias " ~ tagAlias ~ " = tag;");
         }
+
+        /// Returns true iff `this` is in `interval`.
+        bool opBinary(string op)(in TaggedInterval interval) const pure nothrow if (op == "in")
+        {
+            return this.tag == interval.tag &&
+                   interval.begin <= this.value &&
+                   this.value < interval.end;
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TP = R.TaggedPoint;
+            alias TI = R.TaggedInterval;
+
+            enum interval = TI(0, 10, 20);
+
+            assert(TP(0, 10)  in interval);
+            assert(TP(1, 10) !in interval);
+            assert(TP(0,  0) !in interval);
+            assert(TP(0, 20) !in interval);
+        }
     }
 
     /**
