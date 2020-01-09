@@ -3217,8 +3217,8 @@ EOS";
 */
 auto getMaskFiles(in string dbFile, in string maskName)
 {
-    enforce!DazzlerCommandException(!maskName.canFind("/"), "mask name mujst not contain slashes `/`");
-    enforce!DazzlerCommandException(!maskName.canFind("."), "mask name mujst not contain dots `.`");
+    enforce!DazzlerCommandException(!maskName.canFind("/"), "mask name must not contain slashes `/`");
+    enforce!DazzlerCommandException(!maskName.canFind("."), "mask name must not contain dots `.`");
 
     auto destinationDir = dbFile.dirName;
     auto dbName = dbFile.baseName.stripExtension;
