@@ -239,8 +239,23 @@ private struct ResultAnalyzer
         GapState state;
         coord_t gapLength;
         StretcherAlignment alignment;
+        coord_t numDustOps;
+        coord_t numDustMatches;
+        coord_t numNoneDustOps;
+        coord_t numNoneDustMatches;
 
-        @property id_t rhsContigId() const
+
+        @property double dustPercentIdentity() const pure nothrow
+        {
+            return cast(double) numDustMatches / numDustOps;
+        }
+
+        @property double noneDustPercentIdentity() const pure nothrow
+        {
+            return cast(double) numNoneDustMatches / numNoneDustOps;
+        }
+
+        @property id_t rhsContigId() const pure nothrow
         {
             return lhsContigId + 1;
         }
@@ -254,6 +269,7 @@ private struct ResultAnalyzer
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
     protected coord_t[] resultContigLengths;
     protected coord_t referenceOffset;
+    protected ReferenceRegion dustMask;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
     protected ContigMapping[] contigAlignments;
@@ -315,6 +331,13 @@ private struct ResultAnalyzer
             options.workdir,
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
+
+        if (options.dustMask !is null)
+            dustMask = ReferenceRegion(readMask!ReferenceInterval(
+                options.trueAssemblyDb,
+                options.dustMask,
+                options.workdir,
+            ).array);
 
         auto contigAlignmentsCache = ContigAlignmentsCache(
             options.contigAlignmentsCache,
@@ -836,6 +859,9 @@ private struct ResultAnalyzer
                     gapSummary.lhsContigMapping,
                     gapSummary.rhsContigMapping,
                 ));
+
+            if (options.dustMask !is null && gapSummary.state == GapState.closed)
+                addDustAnalysis(gapSummary);
         }
 
         return gapSummaries;
@@ -1146,6 +1172,8 @@ private struct ResultAnalyzer
                             "queryLength": alignment.queryLength.toJson,
                             "complement": alignment.complement.toJson,
                             "percentIdentity": alignment.percentIdentity.toJson,
+                            "dustPercentIdentity": gapSummary.dustPercentIdentity.toJson,
+                            "noneDustPercentIdentity": gapSummary.noneDustPercentIdentity.toJson,
                             "alignment": [
                                 cast(string) alignment.referenceLine,
                                 cast(string) alignment.editOps,
@@ -1308,6 +1336,81 @@ private struct ResultAnalyzer
         }
 
         return subSequence;
+    }
+
+    void addDustAnalysis(ref GapSummary gapSummary)
+    {
+        import std.ascii : toUpper;
+
+        auto lhsMappedContig = mappedIntervalOf(gapSummary.lhsContigId);
+        auto rhsMappedContig = mappedIntervalOf(gapSummary.rhsContigId);
+        auto gapInterval = ReferenceInterval(
+            lhsMappedContig.contigId,
+            lhsMappedContig.end,
+            rhsMappedContig.begin,
+        );
+        auto gapDust = dustMask & gapInterval;
+
+        alias EditOp = StretcherAlignment.EditOp;
+        alias SeqChar = StretcherAlignment.SeqChar;
+        alias isBase = StretcherAlignment.isBase;
+
+        auto newReferenceLine = cast(SeqChar[]) gapSummary.alignment.referenceLine.dup;
+        auto newQueryLine = cast(SeqChar[]) gapSummary.alignment.queryLine.dup;
+        auto refPos = ReferencePoint(gapInterval.contigId, gapInterval.begin);
+        auto nextRefPos = refPos;
+        coord_t numDustOps;
+        coord_t numDustMatches;
+        coord_t numNoneDustOps;
+        coord_t numNoneDustMatches;
+
+        foreach (i, refChar, editOp, queryChar; gapSummary.alignment)
+        {
+            nextRefPos.value = refPos.value + 1;
+
+            if (refPos in gapDust || (refChar == SeqChar.indel && nextRefPos in gapDust))
+            {
+                if (editOp == EditOp.match)
+                    ++numDustMatches;
+                ++numDustOps;
+                newReferenceLine[i] = cast(SeqChar) toUpper(refChar);
+                newQueryLine[i] = cast(SeqChar) toUpper(queryChar);
+            }
+            else
+            {
+                if (editOp == EditOp.match)
+                    ++numNoneDustMatches;
+                ++numNoneDustOps;
+            }
+
+            if (editOp.among(EditOp.match, EditOp.mismatch) || isBase(refChar))
+                ++refPos.value;
+        }
+
+        logJsonDebug(
+            "gapInterval", gapInterval.toJson,
+            "gapDust", gapDust.intervals.toJson,
+            "alignment", [
+                cast(string) gapSummary.alignment.referenceLine,
+                cast(string) gapSummary.alignment.editOps,
+                cast(string) gapSummary.alignment.queryLine,
+            ].toJson,
+            "newAlignment", [
+                cast(string) newReferenceLine,
+                cast(string) gapSummary.alignment.editOps,
+                cast(string) newQueryLine,
+            ].toJson,
+        );
+
+        // highlight mask in alignment
+        gapSummary.alignment.referenceLine = cast(const) newReferenceLine;
+        gapSummary.alignment.queryLine = cast(const) newQueryLine;
+
+        // add masked %id
+        gapSummary.numDustOps = numDustOps;
+        gapSummary.numDustMatches = numDustMatches;
+        gapSummary.numNoneDustOps = numNoneDustOps;
+        gapSummary.numNoneDustMatches = numNoneDustMatches;
     }
 
     bool isInnerGap(in ReferenceInterval gap)
@@ -1789,13 +1892,26 @@ struct StretcherAlignment
         c = 'c',
         g = 'g',
         t = 't',
+        A = 'A',
+        C = 'C',
+        G = 'G',
+        T = 'T',
         unkownBase = 'n',
         indel = '-',
     }
 
     static bool isBase(in SeqChar c)
     {
-        return c.among(SeqChar.a, SeqChar.c, SeqChar.g, SeqChar.t) != 0;
+        return c.among(
+            SeqChar.a,
+            SeqChar.c,
+            SeqChar.g,
+            SeqChar.t,
+            SeqChar.A,
+            SeqChar.C,
+            SeqChar.G,
+            SeqChar.T,
+        ) != 0;
     }
 
     coord_t referenceLength;
@@ -1866,6 +1982,26 @@ struct StretcherAlignment
         );
 
         assert(alignment.cropReference(crop) == croppedAlignment);
+    }
+
+    @property size_t length() const pure nothrow
+    {
+        return editOps.length;
+    }
+
+    int opApply(scope int delegate(size_t, SeqChar, EditOp, SeqChar) dg)
+    {
+        int result = 0;
+
+        foreach (i; 0 .. this.length)
+        {
+            result = dg(i, referenceLine[i], editOps[i], queryLine[i]);
+
+            if (result)
+                break;
+        }
+
+        return result;
     }
 }
 

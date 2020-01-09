@@ -991,6 +991,36 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("dust", "d")
+        @MetaVar("<string>")
+        @Help("
+            Dazzler mask for low complexity regions. Uses " ~ defaultValue!dustMask ~ "
+            by default but only if present.
+        ")
+        @Validate!((value, options) => value == defaultValue!dustMask || validateInputMask(options.trueAssemblyDb, value))
+        string dustMask = "dust";
+
+        @PostValidate(Priority.medium)
+        void fixDefaultDustMask()
+        {
+            if (dustMask != defaultValue!dustMask)
+                return;
+
+            try
+            {
+                validateInputMask(trueAssemblyDb, dustMask);
+            }
+            catch(CLIException e)
+            {
+                dustMask = null;
+            }
+        }
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
