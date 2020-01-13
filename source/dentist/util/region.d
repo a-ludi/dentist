@@ -590,6 +590,16 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region2.intervals == [TI(0, 5, 10), TI(0, 15, 20)]);
     }
 
+    /// Return a list of the tagged intervals in this region.
+    TaggedInterval[] releaseIntervals() pure nothrow
+    {
+        auto intervals = _intervals;
+
+        this._intervals = [];
+
+        return intervals;
+    }
+
     /// Returns the size of this region.
     Number size() pure const nothrow
     {
