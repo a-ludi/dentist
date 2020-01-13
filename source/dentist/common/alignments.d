@@ -419,7 +419,7 @@ struct AlignmentChain
     @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
         enum beginsWith(string contig) = "first."~contig~".begin <= allowance";
-        enum endsWith(string contig) = "first."~contig~".end + allowance >= "~contig~".length";
+        enum endsWith(string contig) = "last."~contig~".end + allowance >= "~contig~".length";
 
         return (mixin(beginsWith!"contigA") || mixin(beginsWith!"contigB")) &&
                (mixin(endsWith!"contigA") || mixin(endsWith!"contigB"));
