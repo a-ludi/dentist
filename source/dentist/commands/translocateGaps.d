@@ -28,6 +28,7 @@ import dentist.dazzler :
     writeMask;
 import dentist.util.log;
 import dentist.util.range : wrapLines;
+import dentist.util.algorithm : filterInPlace;
 import std.algorithm :
     cache,
     copy,
@@ -101,34 +102,15 @@ private struct Translocator
             options.shortReadAssemblyAlignmentFile,
             options.workdir,
         );
+
         mappedRegions = ReferenceRegion(alignments
-            .filter!"a.isProper"
+            .filter!(a => a.isProper(options.properAlignmentAllowance))
             .map!(ac => ac.toInterval!(ReferenceInterval, "contigA"))
             .filter!"a.size > 0"
             .array);
-        if (mappedRegions.intervals.length > 0)
-            mappedRegions = ReferenceRegion(mappedRegions
-                .intervals
-                // Remove small gaps
-                .slide!(No.withPartial)(2)
-                .map!(gapPair => gapPair[0].contigId == gapPair[1].contigId
-                    ? (gapPair[1].begin - gapPair[0].end >= options.minGapSize
-                        ? gapPair[0]
-                        : ReferenceInterval.convexHull(gapPair[0], gapPair[1])
-                    )
-                    : gapPair[0])
-                .chain(only(mappedRegions.intervals[$ - 1]))
-                .map!(mappedInterval => cast(Unqual!(typeof(mappedInterval))) mappedInterval)
-                .array
-            );
-        if (mappedRegions.intervals.length > 0)
-            mappedRegions = ReferenceRegion(mappedRegions
-                .intervals
-                // Remove small contigs
-                .filter!(mappedInterval => mappedInterval.size >= options.minContigSize)
-                .map!(mappedInterval => cast(Unqual!(typeof(mappedInterval))) mappedInterval)
-                .array
-            );
+
+        removeSmallGaps();
+        removeSmallContigs();
 
         writeMask(
             options.trueAssemblyDb,
@@ -136,6 +118,43 @@ private struct Translocator
             mappedRegions.intervals,
             options.workdir,
         );
+    }
+
+    protected void removeSmallGaps()
+    {
+        scope mappedIntervals = mappedRegions.releaseIntervals();
+
+        size_t accIdx;
+        foreach (i, currentInterval; mappedIntervals)
+        {
+            auto accInterval = &mappedIntervals[accIdx];
+
+            if (
+                accInterval.contigId == currentInterval.contigId &&
+                accInterval.end + options.minGapSize >= currentInterval.begin
+            )
+                // extend accInterval
+                accInterval.end = currentInterval.end;
+            else if (accIdx + 1 < mappedIntervals.length)
+                // start next accInterval
+                mappedIntervals[++accIdx] = currentInterval;
+        }
+
+        mappedIntervals = mappedIntervals[0 .. accIdx + 1];
+
+        mappedRegions = ReferenceRegion(mappedIntervals);
+    }
+
+
+    protected void removeSmallContigs()
+    {
+        scope mappedIntervals = mappedRegions.releaseIntervals();
+
+        mappedIntervals = filterInPlace!(
+            mappedInterval => mappedInterval.size >= options.minContigSize
+        )(mappedIntervals);
+
+        mappedRegions = ReferenceRegion(mappedIntervals);
     }
 
     protected void writeOutputAssembly()

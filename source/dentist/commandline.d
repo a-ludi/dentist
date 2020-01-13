@@ -1296,7 +1296,7 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!"
             minimum size for translocated gaps (default: %d)
         "(defaultValue!minGapSize))
-        coord_t minGapSize = 25;
+        coord_t minGapSize = 100;
     }
 
     static enum defaultMinSpanningReads = 3;
@@ -1383,6 +1383,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.translocateGaps,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -1401,7 +1402,10 @@ struct OptionsFor(DentistCommand _command)
             if (properAlignmentAllowance > 0)
                 return;
 
-            properAlignmentAllowance = tracePointDistance;
+            static if (command == TestingCommand.translocateGaps)
+                properAlignmentAllowance = 1_000;
+            else
+                properAlignmentAllowance = tracePointDistance;
         }
     }
 
