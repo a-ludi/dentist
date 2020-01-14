@@ -1358,7 +1358,8 @@ private struct ResultAnalyzer
         auto newReferenceLine = cast(SeqChar[]) gapSummary.alignment.referenceLine.dup;
         auto newQueryLine = cast(SeqChar[]) gapSummary.alignment.queryLine.dup;
         auto refPos = ReferencePoint(gapInterval.contigId, gapInterval.begin);
-        auto nextRefPos = refPos;
+        alias prevRefPos() = () => ReferencePoint(refPos.contigId, refPos.value - 1);
+        alias nextRefPos() = () => ReferencePoint(refPos.contigId, refPos.value + 1);
         coord_t numDustOps;
         coord_t numDustMatches;
         coord_t numNoneDustOps;
@@ -1366,9 +1367,10 @@ private struct ResultAnalyzer
 
         foreach (i, refChar, editOp, queryChar; gapSummary.alignment)
         {
-            nextRefPos.value = refPos.value + 1;
-
-            if (refPos in gapDust || (refChar == SeqChar.indel && nextRefPos in gapDust))
+            if (
+                refPos in gapDust ||
+                (refChar == SeqChar.indel && (prevRefPos() in gapDust || nextRefPos() in gapDust))
+            )
             {
                 if (editOp == EditOp.match)
                     ++numDustMatches;
