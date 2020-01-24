@@ -13,10 +13,12 @@ module dentist.modules;
 
 import std.meta : AliasSeq;
 static import dentist.commandline;
+static import dentist.commands.buildPartialAssembly;
 static import dentist.commands.checkResults;
 static import dentist.commands.collectPileUps;
 static import dentist.commands.collectPileUps.filter;
 static import dentist.commands.collectPileUps.pileups;
+static import dentist.commands.filterMask;
 static import dentist.commands.findClosableGaps;
 static import dentist.commands.generateDazzlerOptions;
 static import dentist.commands.maskRepetitiveRegions;
@@ -60,10 +62,12 @@ static import dentist.util.tempfile;
 
 alias modules = AliasSeq!(
     dentist.commandline,
+    dentist.commands.buildPartialAssembly,
     dentist.commands.checkResults,
     dentist.commands.collectPileUps,
     dentist.commands.collectPileUps.filter,
     dentist.commands.collectPileUps.pileups,
+    dentist.commands.filterMask,
     dentist.commands.findClosableGaps,
     dentist.commands.generateDazzlerOptions,
     dentist.commands.maskRepetitiveRegions,

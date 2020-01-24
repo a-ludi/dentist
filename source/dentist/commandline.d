@@ -414,6 +414,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         TestingCommand.translocateGaps,
+        TestingCommand.buildPartialAssembly,
         TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
     ))
@@ -435,6 +436,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -538,6 +540,16 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.filterMask,
+    ))
+    {
+        @Argument("<in:mask>")
+        @Help("filter Dazzler mask <mask>")
+        @Validate!((value, options) => validateInputMask(options.refDb, value))
+        string inMask;
+    }
+
+    static if (command.among(
         DentistCommand.showMask,
     ))
     {
@@ -549,6 +561,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         TestingCommand.findClosableGaps,
+        TestingCommand.buildPartialAssembly,
         TestingCommand.checkResults,
     ))
     {
@@ -633,6 +646,16 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.filterMask,
+    ))
+    {
+        @Argument("<out:filtered-mask>")
+        @Help("write filtered Dazzler mask to <filtered-mask>")
+        @Validate!((value, options) => validateOutputMask(options.refDb, value))
+        string outMask;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {
@@ -679,7 +702,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.buildPartialAssembly,
     ))
     {
         @Argument("<out:test-assembly>", Multiplicity.optional)
@@ -1064,7 +1087,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.buildPartialAssembly,
         DentistCommand.output,
     ))
     {
@@ -1266,14 +1289,14 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.filterMask,
     ))
     {
-        @Option("min-contig-size")
+        @Option("min-interval-size")
         @Help(format!"
-            minimum size for translocated contigs (default: %d)
-        "(defaultValue!minContigSize))
-        coord_t minContigSize = 1000;
+            minimum size for mask intervals (default: %d)
+        "(defaultValue!minIntervalSize))
+        coord_t minIntervalSize;
     }
 
     static if (command.among(
@@ -1289,14 +1312,14 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.filterMask,
     ))
     {
         @Option("min-gap-size")
         @Help(format!"
-            minimum size for translocated gaps (default: %d)
+            minimum size for gaps between mask intervals (default: %d)
         "(defaultValue!minGapSize))
-        coord_t minGapSize = 100;
+        coord_t minGapSize;
     }
 
     static enum defaultMinSpanningReads = 3;
@@ -1888,6 +1911,14 @@ template commandSummary(DentistCommand command)
     else static if (command == TestingCommand.translocateGaps)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
+        }".wrap;
+    else static if (command == TestingCommand.filterMask)
+        enum commandSummary = q"{
+            Filter a Dazzler mask.
+        }".wrap;
+    else static if (command == TestingCommand.buildPartialAssembly)
+        enum commandSummary = q"{
+            Build a partial assembly from a mask.
         }".wrap;
     else static if (command == TestingCommand.findClosableGaps)
         enum commandSummary = q"{
