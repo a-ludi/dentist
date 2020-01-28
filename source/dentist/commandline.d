@@ -543,8 +543,8 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.filterMask,
     ))
     {
-        @Argument("<in:mask>")
-        @Help("filter Dazzler mask <mask>")
+        @Argument("<in:input-mask>")
+        @Help("filter Dazzler mask <input-mask>")
         @Validate!((value, options) => validateInputMask(options.refDb, value))
         string inMask;
     }
