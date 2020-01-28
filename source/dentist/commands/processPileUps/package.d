@@ -194,7 +194,7 @@ protected class PileUpProcessor
             (!options.onlyFlags.spanning && pileUp.isGap)
         )
         {
-            logJsonInfo(
+            logJsonWarn(
                 "event", "pileUpSkipped",
                 "info", "skipping pile up due to --only",
                 "pileUpId", this.pileUpId,
@@ -260,7 +260,7 @@ protected class PileUpProcessor
     {
         if (pileUp.length < options.minReadsPerPileUp)
         {
-            logJsonInfo(
+            logJsonWarn(
                 "event", "pileUpSkipped",
                 "info", "skipping pile up due to `minReadsPerPileUp`",
                 "reason", "minReadsPerPileUp",
