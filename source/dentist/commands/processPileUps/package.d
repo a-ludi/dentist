@@ -195,6 +195,7 @@ protected class PileUpProcessor
         )
         {
             logJsonInfo(
+                "event", "pileUpSkipped",
                 "info", "skipping pile up due to --only",
                 "pileUpId", this.pileUpId,
                 "pileUp", pileUp.pileUpToSimpleJson(),
@@ -233,6 +234,7 @@ protected class PileUpProcessor
         catch(DentistException e)
         {
             logJsonWarn(
+                "event", "pileUpSkipped",
                 "info", "skipping pile up due to errors",
                 "reason", "error",
                 "error", e.message.to!string,
@@ -244,6 +246,7 @@ protected class PileUpProcessor
         catch(Exception e)
         {
             logJsonWarn(
+                "event", "pileUpSkipped",
                 "info", "skipping pile up due to errors",
                 "reason", "error",
                 "error", e.message.to!string,
@@ -258,6 +261,7 @@ protected class PileUpProcessor
         if (pileUp.length < options.minReadsPerPileUp)
         {
             logJsonInfo(
+                "event", "pileUpSkipped",
                 "info", "skipping pile up due to `minReadsPerPileUp`",
                 "reason", "minReadsPerPileUp",
                 "pileUpId", pileUpId,
