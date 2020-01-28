@@ -42,6 +42,7 @@ import dentist.dazzler :
 import dentist.util.algorithm :
     filterInPlace,
     first,
+    last,
     orderLexicographically,
     sliceBy,
     uniqInPlace;
@@ -1064,10 +1065,8 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return mappedRegionsMask
-            .intervals
-            .sliceBy!"a.contigId == b.contigId"
-            .map!(trueScaffoldSlice => trueScaffoldSlice[$ - 1].end - trueScaffoldSlice[0].begin)
+        return testScaffolds
+            .map!"a.size"
             .sum;
     }
 
@@ -1148,6 +1147,18 @@ private struct ResultAnalyzer
         return gapSummaries
             .filter!(gapSummary => gapSummary.state == GapState.partiallyClosed)
             .walkLength;
+    }
+
+    auto testScaffolds()
+    {
+        return mappedRegionsMask
+            .intervals
+            .sliceBy!"a.contigId == b.contigId"
+            .map!(scaffoldContigs => ReferenceInterval(
+                first(scaffoldContigs).contigId,
+                first(scaffoldContigs).begin,
+                last(scaffoldContigs).end,
+            ));
     }
 
     void writeGapDetailsJson()
@@ -1434,9 +1445,8 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return trueAssemblyScaffoldStructure
-            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
-            .map!(contigPart => contigPart.peek!ContigSegment.length)
+        return testScaffolds
+            .map!"a.size"
             .array
             .N!50(getNumBpsExpected);
     }
