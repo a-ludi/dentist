@@ -2172,6 +2172,27 @@ auto isAntiParallel(in PileUp pileUp) pure nothrow
         .isAntiParallel;
 }
 
+AlignmentChain.Contig[] contigs(in PileUp pileUp) nothrow
+{
+    AlignmentChain.Contig[] contigs;
+    contigs.reserve(2);
+
+    foreach (readAlignment; pileUp)
+    {
+        if (contigs.length == 2)
+            break;
+        else if (contigs.length == 0)
+            foreach (ac; readAlignment[])
+                contigs ~= ac.contigA;
+        else
+            foreach (ac; readAlignment[])
+                if (contigs[0] != ac.contigA)
+                    contigs ~= ac.contigA;
+    }
+
+    return contigs;
+}
+
 /// Returns a list of pointers to all involved alignment chains.
 AlignmentChain*[] getAlignmentRefs(PileUp pileUp) pure nothrow
 {

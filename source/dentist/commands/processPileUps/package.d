@@ -20,6 +20,7 @@ import dentist.common :
 import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
+    contigs,
     getAlignmentRefs,
     getType,
     isExtension,
@@ -161,7 +162,8 @@ class PileUpsProcessor
 protected class PileUpProcessor
 {
     const(Options) options;
-    const(ReferenceRegion) repeatMask;
+    const(ReferenceRegion) originalRepeatMask;
+    ReferenceRegion repeatMask;
 
     protected size_t pileUpId;
     protected PileUp pileUp;
@@ -178,7 +180,7 @@ protected class PileUpProcessor
     this(in Options options, in ReferenceRegion repeatMask)
     {
         this.options = options;
-        this.repeatMask = repeatMask;
+        this.originalRepeatMask = repeatMask;
     }
 
     void run(size_t pileUpId, PileUp pileUp, Insertion* resultInsertion)
@@ -222,6 +224,7 @@ protected class PileUpProcessor
             if (shouldSkipSmallPileUp())
                 return;
 
+            adjustRepeatMask();
             crop();
             selectReferenceRead();
             computeConsensus();
@@ -274,12 +277,34 @@ protected class PileUpProcessor
         return false;
     }
 
+    protected void adjustRepeatMask()
+    {
+        auto pileUpContigs = pileUp.contigs();
+        auto pileUpContigsRegion = ReferenceRegion(
+            pileUpContigs
+                .map!(contig => ReferenceInterval(contig.id, 0, contig.length))
+                .array
+        );
+        auto reducedRepeatMask = originalRepeatMask & pileUpContigsRegion;
+
+        foreach (pileUpContigInterval; pileUpContigsRegion.intervals)
+        {
+            auto numMaskedBps = (reducedRepeatMask & pileUpContigInterval).size;
+            auto numContigBps = pileUpContigInterval.size;
+            auto shouldIgnoreMask = numContigBps - numMaskedBps <= options.maskCoverAllowance;
+
+            if (shouldIgnoreMask)
+                reducedRepeatMask -= pileUpContigInterval;
+        }
+
+        repeatMask = reducedRepeatMask;
+    }
+
     protected void crop()
     {
         auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
             options.readsDb,
             options.tracePointDistance,
-            options.maskCoverAllowance,
             options.workdir,
         ));
 
