@@ -43,6 +43,7 @@ import dentist.common.scaffold :
     getDefaultJoin,
     isParallel;
 import dentist.util.log;
+import dentist.util.math : absdiff;
 import dentist.dazzler :
     dbEmpty,
     dbSubset,
@@ -433,8 +434,10 @@ protected class PileUpProcessor
 
             alias isProperInsertionOverlap = ac =>
                 alignmentSeed == AlignmentLocationSeed.front
-                    ? ac.first.contigA.begin == 0 && ac.last.contigB.end == ac.contigB.length
-                    : ac.last.contigA.end == ac.contigA.length && ac.first.contigB.begin == 0;
+                    ? ac.first.contigA.begin <= options.properAlignmentAllowance &&
+                      absdiff(ac.last.contigB.end, ac.contigB.length) <= options.properAlignmentAllowance
+                    : absdiff(ac.last.contigA.end, ac.contigA.length) <= options.properAlignmentAllowance &&
+                      ac.first.contigB.begin <= options.properAlignmentAllowance;
 
             auto flankAlignments = postConsensusAlignment
                 .filter!(ac => !ac.flags.disabled)
