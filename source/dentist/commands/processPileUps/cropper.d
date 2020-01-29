@@ -10,6 +10,7 @@ module dentist.commands.processPileUps.cropper;
 
 import dentist.common :
     ReadInterval,
+    ReferenceInterval,
     ReferenceRegion,
     ReferencePoint,
     to;
@@ -58,6 +59,7 @@ struct CropOptions
 {
     string readsDb;
     trace_point_t tracePointDistance;
+    coord_t maskCoverAllowance;
     string workdir;
 }
 
@@ -161,7 +163,12 @@ private struct PileUpCropper
     {
         auto alignmentsByContig = pileUp.splitAlignmentsByContigA();
         auto commonTracePoints = alignmentsByContig
-            .map!(acs => getCommonTracePoint(acs, repeatMask, options.tracePointDistance));
+            .map!(acs => getCommonTracePoint(
+                acs,
+                repeatMask,
+                options.tracePointDistance,
+                options.maskCoverAllowance,
+            ));
         auto contigAIds = alignmentsByContig.map!"a[0].contigA.id";
 
         auto cropPos = zip(contigAIds, commonTracePoints)
@@ -250,14 +257,17 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
     return array(alignmentsByContig);
 }
 
-/// Returns a common trace points wrt. contigA that is not in mask.
+/// Returns a common trace points wrt. contigA that is not in mask. The mask
+/// is ignored if it covers contigA except for `maskCoverAllowance`
+/// base pairs.
 private long getCommonTracePoint(
     in SeededAlignment[] alignments,
     in ReferenceRegion mask,
-    in size_t tracePointDistance
+    in size_t tracePointDistance,
+    in coord_t maskCoverAllowance,
 )
 {
-    static long getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion allowedTracePointRegion) pure
+    static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion allowedTracePointRegion) pure
     {
         auto commonTracePoints = tracePointCandidates.filter!(c => c in allowedTracePointRegion);
 
@@ -265,11 +275,16 @@ private long getCommonTracePoint(
     }
 
     auto contigA = alignments[0].contigA;
+    auto contigAInterval = ReferenceInterval(contigA.id, 0, contigA.length);
     auto locationSeed = alignments[0].seed;
     auto commonAlignmentRegion = alignments
         .map!(to!(ReferenceRegion, "contigA"))
         .fold!"a & b";
-    auto allowedTracePointRegion = commonAlignmentRegion - mask;
+    auto numMaskedBps = (mask & contigAInterval).size;
+    auto shouldIgnoreMask = contigA.length - numMaskedBps <= maskCoverAllowance;
+    auto allowedTracePointRegion = shouldIgnoreMask
+        ? commonAlignmentRegion
+        : commonAlignmentRegion - mask;
 
     assert(alignments.all!(a => a.contigA == contigA && a.seed == locationSeed));
     debug logJsonDebug(
@@ -289,8 +304,8 @@ private long getCommonTracePoint(
         .map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
 
     return locationSeed == AlignmentLocationSeed.front
-        ? getCommonTracePoint(tracePointCandidates.retro, allowedTracePointRegion)
-        : getCommonTracePoint(tracePointCandidates, allowedTracePointRegion);
+        ? _getCommonTracePoint(tracePointCandidates.retro, allowedTracePointRegion)
+        : _getCommonTracePoint(tracePointCandidates, allowedTracePointRegion);
 }
 
 private ReadInterval getCroppingSlice(

@@ -279,6 +279,7 @@ protected class PileUpProcessor
         auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
             options.readsDb,
             options.tracePointDistance,
+            options.maskCoverAllowance,
             options.workdir,
         ));
 
