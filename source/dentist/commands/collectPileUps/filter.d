@@ -160,6 +160,13 @@ class ContainedAlignmentChainsFilter : AlignmentChainFilter
     }
 }
 
+AlignmentChain[] filterContainedAlignmentChains(AlignmentChain[] alignmentChains)
+{
+    auto filter = new ContainedAlignmentChainsFilter();
+
+    return filter(alignmentChains);
+}
+
 alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
 
 alias orderByReadAndErrorRate = orderLexicographically!(

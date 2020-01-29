@@ -9,6 +9,7 @@
 module dentist.commands.processPileUps;
 
 import dentist.commandline : OptionsFor;
+import dentist.commands.collectPileUps.filter : filterContainedAlignmentChains;
 import dentist.commands.processPileUps.cropper : CropOptions, cropPileUp;
 import dentist.common :
     dentistEnforce,
@@ -399,14 +400,26 @@ protected class PileUpProcessor
             options.tracePointDistance,
         );
 
+        postConsensusAlignment = filterContainedAlignmentChains(postConsensusAlignment);
+
         foreach (ref ac; postConsensusAlignment)
         {
+            alias leftComplementMismatch = () =>
+                ac.contigA.id == referenceRead[0].contigA.id &&
+                ac.flags.complement != referenceRead[0].flags.complement;
+            alias rightComplementMismatch = () =>
+                croppingPositions.length > 1 &&
+                ac.contigA.id == referenceRead[1].contigA.id &&
+                ac.flags.complement != referenceRead[1].flags.complement;
+
             // Insert correct `contigId`s
             ac.contigA.id = croppingPositions[ac.contigA.id - 1]
                 .contigId
                 .to!id_t;
             ac.disableIf(
                 !ac.isProper(options.properAlignmentAllowance) ||
+                leftComplementMismatch() ||
+                rightComplementMismatch() ||
                 ac.averageErrorRate >= options.maxInsertionsError
             );
         }
