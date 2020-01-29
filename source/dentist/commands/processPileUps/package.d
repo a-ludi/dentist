@@ -419,14 +419,13 @@ protected class PileUpProcessor
             ac.disableIf(
                 !ac.isProper(options.properAlignmentAllowance) ||
                 leftComplementMismatch() ||
-                rightComplementMismatch() ||
-                ac.averageErrorRate >= options.maxInsertionsError
+                rightComplementMismatch()
             );
         }
 
         dentistEnforce(
             postConsensusAlignment.canFind!"!a.flags.disabled",
-            "consensus does not align to flanking contig(s)",
+            "consensus does not align properly to flanking contig(s)",
             ["consensusDb": consensusDb].toJson,
         );
     }
@@ -461,6 +460,15 @@ protected class PileUpProcessor
                 !flankAlignments.empty,
                 format!"consensus does not align to flanking contig %d"(croppingPos.contigId),
                 ["consensusDb": consensusDb].toJson,
+            );
+            dentistEnforce(
+                flankAlignments.front.averageErrorRate <= options.maxInsertionsError,
+                format!"consensus quality is too low on flanking contig %d"(croppingPos.contigId),
+                [
+                    "consensusDb": consensusDb.toJson,
+                    "averageErrorRate": flankAlignments.front.averageErrorRate.toJson,
+                    "maxErrorRate": options.maxInsertionsError.toJson,
+                ].toJson,
             );
 
             auto flankAlignment = SeededAlignment(flankAlignments.front, alignmentSeed);
