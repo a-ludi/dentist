@@ -23,6 +23,7 @@ import dentist.common.alignments :
     isValid,
     makeJoin,
     PileUp,
+    pileUpToSimpleJson,
     ReadAlignment,
     SeededAlignment;
 import dentist.common.binio : writePileUpsDb;
@@ -1603,9 +1604,37 @@ size_t findCorrectGapJoin(
     auto sndLargestPileUp = pileUpsLengths[1];
 
     if (sndLargestPileUp.value * bestPileUpMargin < largestPileUp.value)
+    {
         return largestPileUp.index;
+    }
     else
+    {
+        foreach (gapJoin; incidentGapJoins)
+            if (gapJoin.payload.types.inputGap)
+                logJsonWarn(
+                    "event", "badlySupportedScaffoldGap",
+                    "info", "scaffold gap does not have strong support",
+                    "reason", "scaffoldingConflict",
+                    "pileUp", gapJoin
+                        .payload
+                        .readAlignments
+                        .pileUpToSimpleJson(),
+                );
+
+        logJsonWarn(
+            "event", "pileUpSkipped",
+            "info", "skipping conflicting gap pile ups",
+            "reason", "scaffoldingConflict",
+            "pileUps", incidentGapJoins
+                .map!(gapJoin => gapJoin
+                    .payload
+                    .readAlignments
+                    .pileUpToSimpleJson())
+                .array,
+        );
+
         return size_t.max;
+    }
 }
 
 Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffold, size_t minSpanningReads)
@@ -1617,7 +1646,19 @@ Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffo
             join.isGap &&
             join.payload.readAlignments.length < minSpanningReads
         )
+        {
+            logJsonWarn(
+                "event", "pileUpSkipped",
+                "info", "skipping gap pile ups due to `minSpanningReads`",
+                "reason", "minSpanningReads",
+                "pileUp", join
+                    .payload
+                    .readAlignments
+                    .pileUpToSimpleJson(),
+            );
+
             join.payload.remove!(ScaffoldPayload.Type.pileUp)();
+        }
 
         return join;
     }
