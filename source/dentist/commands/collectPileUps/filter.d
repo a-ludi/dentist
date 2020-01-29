@@ -23,6 +23,7 @@ import dentist.util.log;
 import dentist.util.algorithm :
     cmpLexicographically,
     orderLexicographically;
+import dentist.util.algorithm : sliceUntil;
 import dentist.util.math :
     findMaximallyConnectedComponents,
     NaturalNumberSet;
@@ -35,6 +36,7 @@ import std.algorithm :
     joiner,
     map,
     sort,
+    SwapStrategy,
     uniq;
 import std.array :
     appender,
@@ -123,13 +125,48 @@ class RedundantAlignmentChainsFilter : ReadFilter
     }
 }
 
+alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
+
+/// Discard contained alignments.
+class ContainedAlignmentChainsFilter : AlignmentChainFilter
+{
+    this() { }
+
+    override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
+    {
+        alignmentChains.sort!("a < b", SwapStrategy.stable);
+        alias intervalOf(string contig) = toInterval!(ReferenceInterval, contig);
+
+        foreach (i, ac1; alignmentChains)
+        {
+            if (ac1.flags.disabled)
+                continue;
+
+            auto intervalA1 = intervalOf!"contigA"(ac1);
+            auto intervalB1 = intervalOf!"contigB"(ac1);
+            auto containedAlignments = alignmentChains[i + 1 .. $]
+                .sliceUntil!(ac2 => !intervalA1.contains(intervalOf!"contigA"(ac2)));
+
+            foreach (ref containedAlignment; containedAlignments)
+                if (
+                    containedAlignment.flags.complement == ac1.flags.complement &&
+                    intervalB1.contains(intervalOf!"contigB"(containedAlignment))
+                )
+                    // contained in A and B → get rid of this
+                    containedAlignment.flags.disabled = true;
+        }
+
+        return alignmentChains;
+    }
+}
+
+alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
+
 alias orderByReadAndErrorRate = orderLexicographically!(
     AlignmentChain,
     ac => ac.contigB.id,
     ac => ac.averageErrorRate,
 );
-
-alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
 
 /// Discard read if part of it aligns to multiple loci in the reference.
 class AmbiguousAlignmentChainsFilter : AlignmentChainFilter

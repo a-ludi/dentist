@@ -407,6 +407,27 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(!TI(0, 10, 20).intersects(TI(1, 25, 30)));
         }
 
+        /// Returns true iff this interval contains other.
+        bool contains(in TaggedInterval other) const pure nothrow
+        {
+            return (this & other) == other;
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TI = R.TaggedInterval;
+
+            assert(!TI(0, 10, 20).contains(TI(0, 0, 5)));
+            assert(!TI(0, 10, 20).contains(TI(0, 5, 15)));
+            assert(TI(0, 10, 20).contains(TI(0, 12, 18)));
+            assert(!TI(0, 10, 20).contains(TI(0, 15, 25)));
+            assert(TI(0, 10, 20).contains(TI(0, 10, 20)));
+            assert(!TI(0, 10, 20).contains(TI(0, 25, 30)));
+            assert(!TI(0, 10, 20).contains(TI(1, 25, 30)));
+        }
+
         /// Returns true iff `this` is a subset of `other`, ie. fully included _in_.
         bool opBinary(string op)(in TaggedInterval other) const pure nothrow if (op == "in")
         {
