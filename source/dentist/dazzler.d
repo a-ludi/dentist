@@ -338,7 +338,11 @@ AlignmentChain[] getAlignments(
     auto alignmentChains = lasdumpReader.array;
     alignmentChains.sort!("a < b", SwapStrategy.stable);
 
-    if (tracePointDistance > 0)
+    if (
+        tracePointDistance > 0 &&
+        alignmentChains.length > 0 &&
+        alignmentChains[0].tracePointDistance == 0
+    )
         foreach (ref alignmentChain; alignmentChains)
             alignmentChain.tracePointDistance = tracePointDistance;
 
@@ -605,6 +609,7 @@ private enum LasDumpLineFormat : LasDumpLineFormatTuple
     maxChainPartsCountPerPile = LasDumpLineFormatTuple('%', 'P', "% P %d"),
     maxTracePointsCountPerPile = LasDumpLineFormatTuple('%', 'T', "% T %d"),
     maxTracePointCount = LasDumpLineFormatTuple('@', 'T', "@ T %d"),
+    tracePointDistance = LasDumpLineFormatTuple('X', '\0', "X %d"),
     chainPart = LasDumpLineFormatTuple('P', '\0', "P %d %d %c %c"),
     lengths = LasDumpLineFormatTuple('L', '\0', "L %d %d"),
     coordinates = LasDumpLineFormatTuple('C', '\0', "C %d %d %d %d"),
@@ -640,6 +645,7 @@ private:
     dchar currentLineType;
     dchar currentLineSubType;
     size_t maxTracePointCount;
+    trace_point_t tracePointDistance;
     debug dchar[] allowedLineTypes;
 
 public:
@@ -654,6 +660,7 @@ public:
                 maxChainPartsCountPerPile.indicator,
                 maxTracePointsCountPerPile.indicator,
                 maxTracePointCount.indicator,
+                tracePointDistance.indicator,
                 chainPart.indicator,
             ];
         }
@@ -738,6 +745,10 @@ private:
                 case maxTracePointCount.indicator:
                     _enforce(currentLineSubType == maxTracePointCount.subIndicator, "expected `@ T` line");
                     readMaxTracePointCount();
+                    debug disallowCurrentLineType();
+                    break;
+                case tracePointDistance.indicator:
+                    readTracePointDistance();
                     debug disallowCurrentLineType();
                     break;
                 case chainPart.indicator:
@@ -848,6 +859,13 @@ private:
         tracePointsAcc.reserve(maxTracePointCount);
     }
 
+    void readTracePointDistance()
+    {
+        enum tracePointDistanceFormat = LasDumpLineFormat.tracePointDistance.format;
+
+        currentDumpLine[].formattedRead!tracePointDistanceFormat(tracePointDistance);
+    }
+
     Flag!"wasDumpPartConsumed" readChainPart()
     {
         enum chainPartFormat = LasDumpLineFormat.chainPart.format;
@@ -874,6 +892,7 @@ private:
             currentAC.contigA.id = contigAID;
             currentAC.contigB.id = contigBID;
             currentAC.flags = flags;
+            currentAC.tracePointDistance = tracePointDistance;
 
             return Yes.wasDumpPartConsumed;
         }
