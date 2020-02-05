@@ -117,7 +117,7 @@ void execute(Options)(in Options options)
 }
 
 
-enum AGPComponentType : char
+enum AGPComponentType : string
 {
     /// Active Finishing
     activeFinishing = 'A',
@@ -453,7 +453,7 @@ class AssemblyWriter
             "scaffoldId", startNode.contigId,
         );
 
-        currentScaffold = scaffoldHeader(startNode)[1 .. $];
+        currentScaffold = scaffoldHeader(startNode)[1 .. $ - 1];
         currentScaffoldPartId = 1;
         currentScaffoldCoord = 1;
         writeHeader(startNode);
@@ -541,16 +541,16 @@ class AssemblyWriter
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
-                to!string(currentScaffold),
+                currentScaffold,
                 to!string(currentScaffoldCoord),
                 to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
                 to!string(currentScaffoldPartId),
-                to!string(AGPComponentType.wgsContig),
+                cast(string) AGPComponentType.wgsContig,
                 to!string(insertionInfo.contigId),
                 to!string(insertionInfo.cropping.begin),
                 to!string(insertionInfo.cropping.end),
-                to!string(insertionInfo.complement ? '+' : '-'),
-                to!string(AGPLinkageEvidence.na),
+                insertionInfo.complement ? "+" : "-",
+                cast(string) AGPLinkageEvidence.na,
             ).joiner("\t"));
 
         logJsonDebug(
@@ -578,16 +578,16 @@ class AssemblyWriter
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
-                to!string(currentScaffold),
+                currentScaffold,
                 to!string(currentScaffoldCoord),
                 to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
                 to!string(currentScaffoldPartId),
-                to!string(AGPComponentType.gapWithSpecifiedSize),
+                cast(string) AGPComponentType.gapWithSpecifiedSize,
                 to!string(insertion.payload.contigLength),
                 to!string("scaffold"),
                 to!string("yes"),
                 to!string("na"),
-                to!string(AGPLinkageEvidence.unspecified),
+                cast(string) AGPLinkageEvidence.unspecified,
             ).joiner("\t"));
 
         logJsonDebug(
@@ -613,16 +613,16 @@ class AssemblyWriter
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
 
         agpFile.writeln(only(
-            to!string(currentScaffold),
+            currentScaffold,
             to!string(currentScaffoldCoord),
             to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
             to!string(currentScaffoldPartId),
-            to!string(AGPComponentType.otherSequence),
+            cast(string) AGPComponentType.otherSequence,
             format!"insertions-%d"(currentScaffoldPartId),
             to!string(insertionInfo.cropping.begin),
             to!string(insertionInfo.cropping.end),
             to!string(insertionInfo.complement ? '+' : '-'),
-            to!string(AGPLinkageEvidence.cloneContig),
+            cast(string) AGPLinkageEvidence.cloneContig,
         ).joiner("\t"));
 
         logJsonDebug(
