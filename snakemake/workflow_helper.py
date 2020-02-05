@@ -101,10 +101,27 @@ def alignment_file(db_a, db_b=None, block_a=None, block_b=None):
 
 
 def make_flags(flags):
+    try:
+        from shlex import quote
+    except ImportError:
+        from pipes import quote
+
     if str(flags) == flags:
         return flags
     else:
-        return " ".join(flags)
+        return " ".join(quote(flag)  for flag in flags)
+
+
+def append_flags(flags, *new_flags):
+    try:
+        from shlex import quote
+    except ImportError:
+        from pipes import quote
+
+    if len(flags) == 0:
+        return make_flags(new_flags)
+    else:
+        return flags + " " + make_flags(new_flags)
 
 
 def prepare_flags(flags):
@@ -291,6 +308,9 @@ from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
 dbsplit_flags = make_flags(config["dbsplit_flags"])
 dalign_flags = make_flags(config["dalign_flags"])
+
+if "TMPDIR" in environ:
+    dalign_flags = append_flags(dalign_flags, "-P{}".format(environ["TMPDIR"]))
 
 
 localrules:
