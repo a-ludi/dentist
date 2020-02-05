@@ -801,6 +801,17 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        enum agpVersion = "2.1";
+
+        @Option("agp")
+        @Help(format!"write AGP v%s file that describes the output assembly"(agpVersion))
+        string agpFile;
+    }
+
+    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {

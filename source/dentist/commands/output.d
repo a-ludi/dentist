@@ -117,6 +117,58 @@ void execute(Options)(in Options options)
 }
 
 
+enum AGPComponentType : char
+{
+    /// Active Finishing
+    activeFinishing = 'A',
+    /// Draft HTG (often phase1 and phase2 are called Draft, whether or not they have the draft keyword).
+    draftHTG = 'D',
+    /// Finished HTG (phase3)
+    finishedHTG = 'F',
+    /// Whole Genome Finishing
+    wholeGenomeFinishing = 'G',
+    /// Other sequence (typically means no HTG keyword)
+    otherSequence = 'O',
+    /// Pre Draft
+    preDraft = 'P',
+    /// WGS contig
+    wgsContig = 'W',
+    /// gap with specified size
+    gapWithSpecifiedSize = 'N',
+    /// gap of unknown size, defaulting to 100 bases.
+    gapOfUnknownSize = 'U',
+}
+
+
+enum AGPLinkageEvidence : string
+{
+    /// used when no linkage is being asserted (column 8b is ‘no’)
+    na = "na",
+    /// paired sequences from the two ends of a DNA fragment, mate-pairs and molecular-barcoding.
+    pairedEnds = "paired-ends",
+    /// alignment to a reference genome within the same genus.
+    alignGenus = "align_genus",
+    /// alignment to a reference genome within another genus.
+    alignXgenus = "align_xgenus",
+    /// alignment to a transcript from the same species.
+    alignTrnscpt = "align_trnscpt",
+    /// sequence on both sides of the gap is derived from the same clone, but the gap is not spanned by paired-ends. The adjacent sequence contigs have unknown order and orientation.
+    withinClone = "within_clone",
+    /// linkage is provided by a clone contig in the tiling path (TPF). For example, a gap where there is a known clone, but there is not yet sequence for that clone.
+    cloneContig = "clone_contig",
+    /// linkage asserted using a non-sequence based map such as RH, linkage, fingerprint or optical.
+    map = "map",
+    /// PCR using primers on both sides of the gap.
+    pcr = "pcr",
+    /// ligation of segments of DNA that were brought into proximity in chromatin (Hi-C and related technologies).
+    proximityLigation = "proximity_ligation",
+    /// strobe sequencing.
+    strobe = "strobe",
+    /// used only for gaps of type contamination and when converting old AGPs that lack a field for linkage evidence into the new format.
+    unspecified = "unspecified",
+}
+
+
 class AssemblyWriter
 {
     alias FastaWriter = typeof(wrapLines(stdout.lockingTextWriter, 0));
@@ -130,6 +182,10 @@ class AssemblyWriter
     ContigNode[] scaffoldStartNodes;
     File resultFile;
     FastaWriter writer;
+    File agpFile;
+    string currentScaffold;
+    id_t currentScaffoldPartId;
+    coord_t currentScaffoldCoord;
 
     this(in ref Options options)
     {
@@ -138,6 +194,8 @@ class AssemblyWriter
             ? stdout
             : File(options.resultFile, "w");
         this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
+        if (options.agpFile)
+            this.agpFile = File(options.agpFile, "w");
     }
 
     void run()
@@ -148,6 +206,8 @@ class AssemblyWriter
         buildAssemblyGraph();
         scaffoldStartNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
         logStatistics();
+        if (agpFile.isOpen)
+            writeAGPHeader();
 
         foreach (startNode; scaffoldStartNodes)
             writeNewScaffold(startNode);
@@ -283,6 +343,16 @@ class AssemblyWriter
         );
     }
 
+    void writeAGPHeader()
+    {
+        import dentist.swinfo;
+
+        agpFile.writefln!"##agp-version\t%s"(options.agpVersion);
+        agpFile.writefln!"# TOOL: %s %s"(executableName, version_);
+        agpFile.writefln!"# INPUT_ASSEMBLY: %s"(options.refDb);
+        agpFile.writefln!"# object\tobject_beg\tobject_end\tpart_number\tcomponent_type\tcomponent_id/gap_length\tcomponent_beg/gap_type\tcomponent_end/linkage\torientation\tlinkage_evidence"();
+    }
+
     void logSparseInsertionWalks()
     {
         auto oldLogLevel = getLogLevel();
@@ -383,6 +453,9 @@ class AssemblyWriter
             "scaffoldId", startNode.contigId,
         );
 
+        currentScaffold = scaffoldHeader(startNode)[1 .. $];
+        currentScaffoldPartId = 1;
+        currentScaffoldCoord = 1;
         writeHeader(startNode);
         foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
         {
@@ -395,6 +468,8 @@ class AssemblyWriter
             insertionBegin = currentInsertion.target(insertionBegin);
             if (currentInsertion.isAntiParallel)
                 globalComplement = !globalComplement;
+            ++currentScaffoldPartId;
+            currentScaffoldCoord += currentInsertion.payload.contigLength - 1;
         }
         "\n".copy(writer);
     }
@@ -428,9 +503,14 @@ class AssemblyWriter
         }
     }
 
+    protected string scaffoldHeader(in ContigNode begin)
+    {
+        return format!">scaffold-%d\n"(begin.contigId);
+    }
+
     protected void writeHeader(in ContigNode begin)
     {
-        format!">scaffold-%d\n"(begin.contigId).copy(writer);
+        scaffoldHeader(begin).copy(writer);
     }
 
     protected void writeInsertion(
@@ -459,6 +539,20 @@ class AssemblyWriter
         auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
         auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
 
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                to!string(currentScaffold),
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                to!string(AGPComponentType.wgsContig),
+                to!string(insertionInfo.contigId),
+                to!string(insertionInfo.cropping.begin),
+                to!string(insertionInfo.cropping.end),
+                to!string(insertionInfo.complement ? '+' : '-'),
+                to!string(AGPLinkageEvidence.na),
+            ).joiner("\t"));
+
         logJsonDebug(
             "info", "writing contig insertion",
             "contigId", insertionInfo.contigId,
@@ -482,6 +576,20 @@ class AssemblyWriter
     {
         auto insertionInfo = getInfoForGap(insertion);
 
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                to!string(currentScaffold),
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                to!string(AGPComponentType.gapWithSpecifiedSize),
+                to!string(insertion.payload.contigLength),
+                to!string("scaffold"),
+                to!string("yes"),
+                to!string("na"),
+                to!string(AGPLinkageEvidence.unspecified),
+            ).joiner("\t"));
+
         logJsonDebug(
             "info", "writing gap",
             "gapLength", insertionInfo.length,
@@ -503,6 +611,19 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
+
+        agpFile.writeln(only(
+            to!string(currentScaffold),
+            to!string(currentScaffoldCoord),
+            to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+            to!string(currentScaffoldPartId),
+            to!string(AGPComponentType.otherSequence),
+            format!"insertions-%d"(currentScaffoldPartId),
+            to!string(insertionInfo.cropping.begin),
+            to!string(insertionInfo.cropping.end),
+            to!string(insertionInfo.complement ? '+' : '-'),
+            to!string(AGPLinkageEvidence.cloneContig),
+        ).joiner("\t"));
 
         logJsonDebug(
             "info", "writing new sequence insertion",
