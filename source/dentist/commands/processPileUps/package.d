@@ -70,7 +70,7 @@ import std.array : array;
 import std.conv : to;
 import std.format : format;
 import std.parallelism : parallel, taskPool;
-import std.range : enumerate, evenChunks, only, zip;
+import std.range : enumerate, evenChunks, chain, only, zip;
 import std.range.primitives : empty, front, popFront;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
@@ -478,7 +478,12 @@ protected class PileUpProcessor
             dentistEnforce(
                 flankAlignments.empty,
                 format!"consensus ambiguously aligns to flanking contig %d"(croppingPos.contigId),
-                ["consensusDb": consensusDb].toJson,
+                [
+                    "consensusDb": consensusDb.toJson,
+                    "alignments": chain([flankAlignment.alignment], flankAlignments)
+                        .array
+                        .toJson,
+                ].toJson,
             );
         }
 
