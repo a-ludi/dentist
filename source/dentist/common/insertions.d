@@ -128,7 +128,12 @@ auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bo
         dentistEnforce(0, "too many splice sites");
     }
 
-    assert(globalComplement != (begin < insertion.target(begin)));
+    assert(
+        // walk contig in correct orientation
+        globalComplement != (begin < insertion.target(begin)) ||
+        // the contig is circular
+        begin.contigId == insertion.target(begin).contigId
+    );
 
     return tuple!(
         "contigId",

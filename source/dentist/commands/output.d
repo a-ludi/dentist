@@ -42,6 +42,7 @@ import dentist.common.scaffold :
     getUnkownJoin,
     initScaffold,
     isAntiParallel,
+    isCyclic,
     isDefault,
     isExtension,
     isFrontExtension,
@@ -453,10 +454,10 @@ class AssemblyWriter
             "scaffoldId", startNode.contigId,
         );
 
-        currentScaffold = scaffoldHeader(startNode)[1 .. $ - 1];
+        currentScaffold = scaffoldHeader(startNode, isCyclic!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache));
         currentScaffoldPartId = 1;
         currentScaffoldCoord = 1;
-        writeHeader(startNode);
+        writeHeader();
         foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
         {
             writeInsertion(
@@ -503,14 +504,17 @@ class AssemblyWriter
         }
     }
 
-    protected string scaffoldHeader(in ContigNode begin)
+    protected string scaffoldHeader(in ContigNode begin, in Flag!"isCyclic" isCyclic)
     {
-        return format!">scaffold-%d\n"(begin.contigId);
+        if (isCyclic)
+            return format!"circular-scaffold-%d"(begin.contigId);
+        else
+            return format!"scaffold-%d"(begin.contigId);
     }
 
-    protected void writeHeader(in ContigNode begin)
+    protected void writeHeader()
     {
-        scaffoldHeader(begin).copy(writer);
+        format!">%s\n"(currentScaffold).copy(writer);
     }
 
     protected void writeInsertion(

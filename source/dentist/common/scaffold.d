@@ -906,8 +906,13 @@ struct LinearWalk(T)
     private size_t currentNodeIdx;
     private Join!T currentJoin;
     private bool isEmpty = false;
-    private Flag!"isCyclic" isCyclic = No.isCyclic;
+    private Flag!"isCyclic" _isCyclic = No.isCyclic;
     private NaturalNumberSet visitedNodes;
+
+    @property Flag!"isCyclic" isCyclic() const pure nothrow @safe
+    {
+        return _isCyclic;
+    }
 
     /// Start linear walk through a scaffold graph in startNode.
     this(
@@ -996,7 +1001,7 @@ struct LinearWalk(T)
 
     private void lastEdgeOfCycle()
     {
-        isCyclic = Yes.isCyclic;
+        _isCyclic = Yes.isCyclic;
         // Find the missing edge.
         currentJoin = scaffold
             .incidentEdges(currentNode)
@@ -1025,6 +1030,43 @@ struct LinearWalk(T)
         this.visitedNodes.add(nodeIdx);
     }
 }
+
+/// Use `linearWalk` to determine if `startNode` is part of a cycle.
+///
+/// See_also: `linearWalk`
+Flag!"isCyclic" isCyclic(T)(
+    Scaffold!T scaffold,
+    ContigNode startNode,
+    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+)
+{
+    scope walk = LinearWalk!T(scaffold, startNode, incidentEdgesCache);
+
+    return isCyclic!T(walk);
+}
+
+/// ditto
+Flag!"isCyclic" isCyclic(T)(
+    Scaffold!T scaffold,
+    ContigNode startNode,
+    Join!T firstJoin,
+    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+)
+{
+    scope walk = LinearWalk!T(scaffold, startNode, firstJoin, incidentEdgesCache);
+
+    return isCyclic!T(walk);
+}
+
+
+private Flag!"isCyclic" isCyclic(T)(ref LinearWalk!T walk)
+{
+    while (!walk.empty)
+        walk.popFront();
+
+    return walk.isCyclic;
+}
+
 
 /// Get a range of `ContigNode`s where full contig walks should start.
 auto scaffoldStarts(T)(
