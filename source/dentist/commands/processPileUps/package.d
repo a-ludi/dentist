@@ -226,11 +226,27 @@ protected class PileUpProcessor
             if (shouldSkipSmallPileUp())
                 return;
 
-            adjustRepeatMask();
-            crop();
-            selectReferenceRead();
-            computeConsensus();
-            alignConsensusToFlankingContigs();
+            if (shouldProcessSingularPileUp())
+            {
+                postConsensusAlignment = pileUp[0][].map!"a.alignment".array;
+
+                logJsonInfo(
+                    "event", "singularPileUp",
+                    "info", "using single read instead of pile up",
+                    "pileUpId", pileUpId,
+                    "pileUp", pileUp.pileUpToSimpleJson,
+                    "readId", pileUp[0][0].contigB.id,
+                );
+            }
+            else
+            {
+                adjustRepeatMask();
+                crop();
+                selectReferenceRead();
+                computeConsensus();
+                alignConsensusToFlankingContigs();
+            }
+
             getInsertionAlignment();
             getInsertionSequence();
 
@@ -261,9 +277,14 @@ protected class PileUpProcessor
         }
     }
 
+    protected bool shouldProcessSingularPileUp() const nothrow
+    {
+        return options.allowSingleReads && pileUp.length == 1;
+    }
+
     protected bool shouldSkipSmallPileUp() const nothrow
     {
-        if (pileUp.length < options.minReadsPerPileUp)
+        if (pileUp.length < options.minReadsPerPileUp && !shouldProcessSingularPileUp())
         {
             logJsonWarn(
                 "event", "pileUpSkipped",
@@ -513,8 +534,20 @@ protected class PileUpProcessor
 
     protected void getInsertionSequence()
     {
-        auto fastaSequence = getFastaSequence(consensusDb, 1, options.workdir);
-        insertionSequence = CompressedSequence.from(fastaSequence);
+        if (shouldProcessSingularPileUp())
+        {
+            auto fastaSequence = getFastaSequence(
+                options.readsDb,
+                pileUp[0][0].contigB.id,
+                options.workdir,
+            );
+            insertionSequence = CompressedSequence.from(fastaSequence);
+        }
+        else
+        {
+            auto fastaSequence = getFastaSequence(consensusDb, 1, options.workdir);
+            insertionSequence = CompressedSequence.from(fastaSequence);
+        }
     }
 
     protected Insertion makeInsertion()

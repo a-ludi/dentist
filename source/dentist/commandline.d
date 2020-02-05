@@ -815,6 +815,15 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.processPileUps,
     ))
     {
+        @Option("allow-single-reads")
+        @Help("allow using single reads instead of consensus sequence for gap closing")
+        OptionFlag allowSingleReads;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
         @Option("batch", "b")
         @MetaVar("<from>..<to>")
         @Help(q"{
