@@ -120,23 +120,23 @@ void execute(Options)(in Options options)
 enum AGPComponentType : string
 {
     /// Active Finishing
-    activeFinishing = 'A',
+    activeFinishing = "A",
     /// Draft HTG (often phase1 and phase2 are called Draft, whether or not they have the draft keyword).
-    draftHTG = 'D',
+    draftHTG = "D",
     /// Finished HTG (phase3)
-    finishedHTG = 'F',
+    finishedHTG = "F",
     /// Whole Genome Finishing
-    wholeGenomeFinishing = 'G',
+    wholeGenomeFinishing = "G",
     /// Other sequence (typically means no HTG keyword)
-    otherSequence = 'O',
+    otherSequence = "O",
     /// Pre Draft
-    preDraft = 'P',
+    preDraft = "P",
     /// WGS contig
-    wgsContig = 'W',
+    wgsContig = "W",
     /// gap with specified size
-    gapWithSpecifiedSize = 'N',
+    gapWithSpecifiedSize = "N",
     /// gap of unknown size, defaulting to 100 bases.
-    gapOfUnknownSize = 'U',
+    gapOfUnknownSize = "U",
 }
 
 
