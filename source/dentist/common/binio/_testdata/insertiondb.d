@@ -15,6 +15,7 @@ version (unittest)
     import dentist.common.alignments :
         AlignmentChain,
         AlignmentLocationSeed,
+        id_t,
         PileUp,
         SeededAlignment;
     import dentist.common.insertions :
@@ -30,6 +31,7 @@ version (unittest)
     enum numOverlaps = 22;
     enum numLocalAlignments = 22;
     enum numTracePoints = 171;
+    enum numReadIds = 66;
 
     Insertion[] getInsertionsTestData()
     {
@@ -98,6 +100,7 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [],
                     ),
                 ),
                 Insertion(
@@ -163,6 +166,9 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [
+                            id_t(1),
+                        ],
                     ),
                 ),
                 Insertion(
@@ -220,6 +226,10 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.front,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
                         ],
                     ),
                 ),
@@ -287,6 +297,11 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                        ],
                     ),
                 ),
                 Insertion(
@@ -349,6 +364,12 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                        ],
                     ),
                 ),
                 Insertion(
@@ -388,6 +409,13 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.back,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
                         ],
                     ),
                 ),
@@ -433,6 +461,14 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.front,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
                         ],
                     ),
                 ),
@@ -494,6 +530,15 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.front,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
+                            id_t(7),
                         ],
                     ),
                 ),
@@ -561,6 +606,16 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
+                            id_t(7),
+                            id_t(8),
+                        ],
                     ),
                 ),
                 Insertion(
@@ -621,6 +676,17 @@ version (unittest)
                                 AlignmentLocationSeed.front,
                             ),
                         ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
+                            id_t(7),
+                            id_t(8),
+                            id_t(9),
+                        ],
                     ),
                 ),
                 Insertion(
@@ -678,6 +744,18 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.front,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
+                            id_t(7),
+                            id_t(8),
+                            id_t(9),
+                            id_t(10),
                         ],
                     ),
                 ),
@@ -741,6 +819,19 @@ version (unittest)
                                 ),
                                 AlignmentLocationSeed.front,
                             ),
+                        ],
+                        [
+                            id_t(1),
+                            id_t(2),
+                            id_t(3),
+                            id_t(4),
+                            id_t(5),
+                            id_t(6),
+                            id_t(7),
+                            id_t(8),
+                            id_t(9),
+                            id_t(10),
+                            id_t(11),
                         ],
                     ),
                 ),

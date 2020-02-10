@@ -42,6 +42,7 @@ struct InsertionInfo
     CompressedSequence sequence;
     size_t contigLength;
     SeededAlignment[] overlaps;
+    id_t[] readIds;
 }
 
 /// This is used to collect all sub-sequences of the output.

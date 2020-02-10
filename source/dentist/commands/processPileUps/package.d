@@ -557,6 +557,7 @@ protected class PileUpProcessor
             insertionSequence,
             0,
             insertionAlignment[],
+            pileUp.map!"a[0].contigB.id".array,
         );
 
         assert(insertion.isParallel == insertionAlignment.isParallel);
@@ -613,6 +614,14 @@ debug private void printInsertions(in Insertion[] insertions)
         writefln!"                AlignmentLocationSeed.%s,"(overlap.seed.to!string);
         writefln!"            ),";
 
+        }
+
+        writefln!"        ],";
+        writefln!"        [";
+
+        foreach (readId; insertion.payload.readIds)
+        {
+        writefln!"            %d"(readId);
         }
 
         writefln!"        ],";
