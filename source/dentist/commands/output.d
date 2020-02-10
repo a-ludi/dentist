@@ -624,7 +624,7 @@ class AssemblyWriter
                 to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
                 to!string(currentScaffoldPartId),
                 cast(string) AGPComponentType.otherSequence,
-                format!"insertions-%d"(currentScaffoldPartId),
+                format!"reads-%(%d-%)"(insertion.payload.readIds),
                 to!string(insertionInfo.cropping.begin),
                 to!string(insertionInfo.cropping.end),
                 to!string(insertionInfo.complement ? '+' : '-'),
