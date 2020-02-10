@@ -195,7 +195,7 @@ class AssemblyWriter
             ? stdout
             : File(options.resultFile, "w");
         this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
-        if (options.agpFile)
+        if (options.agpFile !is null)
             this.agpFile = File(options.agpFile, "w");
     }
 
@@ -348,6 +348,7 @@ class AssemblyWriter
     {
         import dentist.swinfo;
 
+        assert(agpFile.isOpen);
         agpFile.writefln!"##agp-version\t%s"(options.agpVersion);
         agpFile.writefln!"# TOOL: %s %s"(executableName, version_);
         agpFile.writefln!"# INPUT_ASSEMBLY: %s"(options.refDb);
@@ -616,18 +617,19 @@ class AssemblyWriter
     {
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
 
-        agpFile.writeln(only(
-            currentScaffold,
-            to!string(currentScaffoldCoord),
-            to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
-            to!string(currentScaffoldPartId),
-            cast(string) AGPComponentType.otherSequence,
-            format!"insertions-%d"(currentScaffoldPartId),
-            to!string(insertionInfo.cropping.begin),
-            to!string(insertionInfo.cropping.end),
-            to!string(insertionInfo.complement ? '+' : '-'),
-            cast(string) AGPLinkageEvidence.cloneContig,
-        ).joiner("\t"));
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                currentScaffold,
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                cast(string) AGPComponentType.otherSequence,
+                format!"insertions-%d"(currentScaffoldPartId),
+                to!string(insertionInfo.cropping.begin),
+                to!string(insertionInfo.cropping.end),
+                to!string(insertionInfo.complement ? '+' : '-'),
+                cast(string) AGPLinkageEvidence.cloneContig,
+            ).joiner("\t"));
 
         logJsonDebug(
             "info", "writing new sequence insertion",
