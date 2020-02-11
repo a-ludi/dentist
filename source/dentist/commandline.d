@@ -72,7 +72,11 @@ import std.algorithm :
     filter,
     find,
     map,
-    startsWith;
+    max,
+    sort,
+    startsWith,
+    sum,
+    swap;
 import std.array :
     array,
     split;
@@ -825,30 +829,45 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("batch", "b")
-        @MetaVar("<from>..<to>")
+        @MetaVar("<idx-spec>[,<idx-spec>...]")
         @Help(q"{
-            process only a subset of the pile ups in the given range (excluding <to>).
-            <from> and <to> are zero-based indices into the pile up DB or <to>
-            may be `$` to indicate the end of the pile up DB.
+            process only a subset of the pile ups. <pile-up-ids> is a
+            comma-separated list of <idx-spec>. Each
+            <id-specifications> is either a single integer <idx> or a range
+            <from>..<to>. <idx>, <from> and <to> are zero-based indices into
+            the pile up DB. The range is right-open, i.e. index <to> is
+            excluded. <to> may be a dollar-sign (`$`) to indicate the end of
+            the pile up DB.
         }")
         void parsePileUpBatch(string batchString) pure
         {
-            try
+            foreach (idxSpec; batchString.split(","))
+                try
+                    pileUpBatches ~= parsePileUpIdxSpec(idxSpec);
+                catch (Exception e)
+                    throw new CLIException("ill-formatted batch range");
+        }
+
+        static id_t[2] parsePileUpIdxSpec(string idxSpec) pure
+        {
+            id_t[2] batch;
+
+            if (!idxSpec.canFind('.'))
             {
-                if (batchString.endsWith("$"))
-                {
-                    batchString.formattedRead!"%d..$"(pileUpBatch[0]);
-                    pileUpBatch[1] = id_t.max;
-                }
-                else
-                {
-                    batchString.formattedRead!"%d..%d"(pileUpBatch[0], pileUpBatch[1]);
-                }
+                idxSpec.formattedRead!"%d"(batch[0]);
+                batch[1] = batch[0] + 1;
             }
-            catch (Exception e)
+            if (idxSpec.endsWith("$"))
             {
-                throw new CLIException("ill-formatted batch range");
+                idxSpec.formattedRead!"%d..$"(batch[0]);
+                batch[1] = id_t.max;
             }
+            else
+            {
+                idxSpec.formattedRead!"%d..%d"(batch[0], batch[1]);
+            }
+
+            return batch;
         }
 
         @property id_t pileUpLength() inout
@@ -865,10 +884,18 @@ struct OptionsFor(DentistCommand _command)
 
 
         @Option()
-        @Validate!validateBatchRange
-        id_t[2] pileUpBatch;
+        @Validate!validatePileUpBatches
+        id_t[2][] pileUpBatches;
 
-        static void validateBatchRange(id_t[2] pileUpBatch, OptionsFor!command options)
+        static void validatePileUpBatches(id_t[2][] pileUpBatches, OptionsFor!command options)
+        {
+            foreach (pileUpBatch; pileUpBatches)
+                validatePileUpBatchRange(pileUpBatch, options);
+
+            validatePileUpBatchesDontIntersect(pileUpBatches, options);
+        }
+
+        static void validatePileUpBatchRange(id_t[2] pileUpBatch, OptionsFor!command options)
         {
             auto from = pileUpBatch[0];
             auto to = pileUpBatch[1];
@@ -881,18 +908,54 @@ struct OptionsFor(DentistCommand _command)
             );
         }
 
-        @PostValidate()
-        void hookEnsurePresenceOfBatchRange()
+        static void validatePileUpBatchesDontIntersect(id_t[2][] pileUpBatches, OptionsFor!command options)
         {
-            if (pileUpBatch == pileUpBatch.init || pileUpBatch[1] == id_t.max)
+            static bool intersect(id_t[2] batch1, id_t[2] batch2)
             {
-                pileUpBatch[1] = pileUpLength;
+                if (batch1[0] > batch2[0])
+                    swap(batch1, batch2);
+
+                return batch1[1] > batch2[0];
             }
+
+            foreach (i, batch1; pileUpBatches)
+                foreach (j, batch2; pileUpBatches[i + 1 .. $])
+                    enforce!CLIException(
+                        !intersect(batch1, batch2),
+                        format!"invalid --batch: <idx-spec>'s at indices %d and %d intersect"(i, j),
+                    );
         }
 
-        @property id_t pileUpBatchSize() const pure nothrow
+        @PostValidate()
+        void hookEnsurePresenceOfBatchRanges()
         {
-            return pileUpBatch[1] - pileUpBatch[0];
+            foreach (ref pileUpBatch; pileUpBatches)
+                if (pileUpBatch == pileUpBatch.init || pileUpBatch[1] == id_t.max)
+                    pileUpBatch[1] = pileUpLength;
+        }
+
+        @PostValidate()
+        void hookOptimizeBatchRanges()
+        {
+            pileUpBatches.sort!"a[0] < b[0] || (a[0] == b[0] && a[1] < b[1])";
+
+            size_t accIdx;
+            foreach (ref pileUpBatch; pileUpBatches[1 .. $])
+            {
+                if (pileUpBatch[0] <= pileUpBatches[accIdx][1])
+                    pileUpBatches[accIdx][1] = max(pileUpBatch[1], pileUpBatches[accIdx][1]);
+                else
+                    pileUpBatches[++accIdx] = pileUpBatch;
+            }
+
+            pileUpBatches.length = accIdx + 1;
+        }
+
+        @property id_t numPileUps() const pure nothrow
+        {
+            return pileUpBatches
+                .map!(pileUpBatch => pileUpBatch[1] - pileUpBatch[0])
+                .sum;
         }
     }
 
@@ -1908,7 +1971,6 @@ struct OptionsFor(DentistCommand _command)
 
         return tuple!("lowerBound", "upperBound")(lowerBound, upperBound);
     }
-
 }
 
 private bool hasValidOptionNames(Options)() pure nothrow

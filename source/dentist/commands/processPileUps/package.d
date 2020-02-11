@@ -66,11 +66,11 @@ import std.algorithm :
     merge,
     sort,
     uniq;
-import std.array : array;
+import std.array : array, minimallyInitializedArray;
 import std.conv : to;
 import std.format : format;
 import std.parallelism : parallel, taskPool;
-import std.range : enumerate, evenChunks, chain, only, zip;
+import std.range : enumerate, evenChunks, chain, iota, only, zip;
 import std.range.primitives : empty, front, popFront;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
@@ -98,7 +98,8 @@ class PileUpsProcessor
     this(in ref Options options)
     {
         this.options = options;
-        this.insertions.length = options.pileUpBatchSize;
+        this.pileUps.reserve(options.numPileUps);
+        this.insertions = minimallyInitializedArray!(Insertion[])(options.numPileUps);
     }
 
     void run()
@@ -128,7 +129,9 @@ class PileUpsProcessor
         mixin(traceExecution);
 
         auto pileUpDb = PileUpDb.parse(options.pileUpsFile);
-        pileUps = pileUpDb[options.pileUpBatch[0] .. options.pileUpBatch[1]];
+
+        foreach (pileUpBatch; options.pileUpBatches)
+            pileUps ~= pileUpDb[pileUpBatch[0] .. pileUpBatch[1]];
     }
 
     protected void readRepeatMask()
@@ -167,7 +170,8 @@ protected class PileUpProcessor
     const(ReferenceRegion) originalRepeatMask;
     ReferenceRegion repeatMask;
 
-    protected size_t pileUpId;
+    protected const id_t[] pileUpIdMapping;
+    protected id_t pileUpId;
     protected PileUp pileUp;
     protected Insertion* resultInsertion;
     protected string croppedDb;
@@ -183,13 +187,18 @@ protected class PileUpProcessor
     {
         this.options = options;
         this.originalRepeatMask = repeatMask;
+        this.pileUpIdMapping = options
+            .pileUpBatches
+            .map!(batch => iota(batch[0], batch[1]))
+            .joiner
+            .array;
     }
 
-    void run(size_t pileUpId, PileUp pileUp, Insertion* resultInsertion)
+    void run(size_t pileUpIdx, PileUp pileUp, Insertion* resultInsertion)
     {
         mixin(traceExecution);
 
-        this.pileUpId = options.pileUpBatch[0] + pileUpId;
+        this.pileUpId = pileUpIdMapping[pileUpIdx];
         this.pileUp = pileUp;
         this.resultInsertion = resultInsertion;
 
