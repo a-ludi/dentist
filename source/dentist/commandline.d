@@ -1290,7 +1290,6 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.findClosableGaps,
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
     ))
     {
         @Option("min-anchor-length")
@@ -1757,7 +1756,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (
-        is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().readsErrorRate)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     ) {
@@ -1772,7 +1770,6 @@ struct OptionsFor(DentistCommand _command)
             return [
                 DalignerOptions.identity,
                 DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     pileUpAlignmentOptionsAverageCorrelationRate,
                 ),
