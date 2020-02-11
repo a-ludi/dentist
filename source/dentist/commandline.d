@@ -1275,15 +1275,15 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.processPileUps,
     ))
     {
-        @Option("max-insertions-error")
+        @Option("max-insertion-error")
         @Help(format!"
-            insertion and existing contigs must match with less than <double> errors (default: %s)
-        "(defaultValue!maxInsertionsError))
+            insertion and existing contigs must match with less error than <double> (default: %s)
+        "(defaultValue!maxInsertionError))
         @Validate!(value => enforce!CLIException(
             0.0 < value && value <= 0.3,
-            "maximum insertions error rate must be in (0, 0.3]"
+            "maximum insertion error rate must be in (0, 0.3]"
         ))
-        double maxInsertionsError = 1e-2;
+        double maxInsertionError = 1e-2;
     }
 
     static if (command.among(
@@ -1781,7 +1781,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (
-        is(typeof(OptionsFor!command().maxInsertionsError)) &&
+        is(typeof(OptionsFor!command().maxInsertionError)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
         is(typeof(OptionsFor!command().tracePointDistance)) &&
         is(typeof(OptionsFor!command().workdir))
@@ -1791,7 +1791,7 @@ struct OptionsFor(DentistCommand _command)
         @Validate!validateAverageCorrelationRate
         @property auto postConsensusAlignmentOptionsAverageCorrelationRate() const
         {
-            return 1 - maxInsertionsError;
+            return 1 - maxInsertionError;
         }
 
         @property string[] postConsensusAlignmentOptions() const
