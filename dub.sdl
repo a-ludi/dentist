@@ -16,7 +16,9 @@ buildRequirements "allowWarnings"
 
 preBuildCommands  "./update-swinfo.sh" "./update-modules.sh"
 
-configuration "default"
+configuration "default" {
+    buildRequirements "requireBoundsCheck" "requireContracts"
+}
 
 configuration "testing" {
     versions      "DentistTesting"
