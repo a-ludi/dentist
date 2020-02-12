@@ -169,19 +169,6 @@ enum ReturnCode
 /// Start `dentist` with the given set of arguments.
 ReturnCode run(in string[] args)
 {
-    try
-    {
-        assertExternalToolsAvailable();
-    }
-    catch (Exception e)
-    {
-        stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
-            ? e.to!string
-            : e.msg));
-
-        return ReturnCode.commandlineError;
-    }
-
     if (args.length == 1)
     {
         printBaseHelp();
@@ -2116,6 +2103,7 @@ private
 
         try
         {
+            assertExternalToolsAvailable();
             options = processOptions(parseArgs!Options(args[1 .. $]));
         }
         catch (ArgParseHelp e)
