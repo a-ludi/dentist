@@ -54,6 +54,7 @@ import dentist.dazzler :
     getTracePointDistance,
     lasEmpty,
     LasFilterAlignmentsOptions;
+import dentist.util.process : isExecutable;
 import dentist.swinfo :
     copyright,
     executableName,
@@ -272,26 +273,15 @@ void assertExternalToolsAvailable()
 {
     static assert(externalDependencies.length > 0);
 
-    enum whichBinary = "/bin/which";
-    auto result = execute(
-        [whichBinary, "--skip-alias", "--skip-functions"] ~
-        externalDependencies
-            .map!(extDep => extDep.executable)
-            .array
-    );
-
-    ExternalDependency[] missingExternalTools;
-    missingExternalTools.reserve(result.status);
-
-    foreach (i, line; enumerate(lineSplitter(result.output)))
-        if (line.startsWith(whichBinary))
-            missingExternalTools ~= externalDependencies[i];
+    auto missingExternalDependencies = externalDependencies
+        .filter!(extDep => !isExecutable(extDep.executable))
+        .array;
 
     enforce!CLIException(
-        missingExternalTools.length == 0,
+        missingExternalDependencies.length == 0,
         format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
-            missingExternalTools
-        )
+            missingExternalDependencies,
+        ),
     );
 }
 

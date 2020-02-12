@@ -24,6 +24,7 @@ import std.process :
     wait;
 import std.range.primitives;
 import std.traits : isSomeString;
+import std.typecons : Flag, No, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -190,4 +191,66 @@ static final class LinesPipe(CommandInfo)
             return false;
         }
     }
+}
+
+/**
+    Returns true iff `name` can be executed via the process function in
+    `std.process`. By default, `PATH` will be searched if `name` does not
+    contain directory separators.
+
+    Params:
+        name       = Path to file or name of executable
+        searchPath = Determines wether or not the path should be searched.
+*/
+version (Posix) bool isExecutable(scope string name, Flag!"searchPath" searchPath = Yes.searchPath)
+{
+    // Implementation is analogous to logic in `std.process.spawnProcessImpl`.
+    import std.algorithm : any;
+    import std.path : isDirSeparator;
+
+    if (!searchPath || any!isDirSeparator(name))
+        return isExecutableFile(name);
+    else
+        return searchPathFor(name) !is null;
+}
+
+version (Posix) unittest
+{
+    assert(isExecutable("/bin/sh", No.searchPath));
+    assert(isExecutable("/bin/sh", Yes.searchPath));
+    assert(isExecutable("sh"));
+    assert(!isExecutable("does-not-exist-anywhere"));
+}
+
+
+version (Posix) private bool isExecutableFile(scope string path) nothrow
+{
+    // Implementation is analogous to private function `std.process.isExecutable`.
+    import core.sys.posix.unistd : access, X_OK;
+    import std.string : toStringz;
+
+    return (access(path.toStringz(), X_OK) == 0);
+}
+
+
+version (Posix) private string searchPathFor(scope string executable)
+{
+    // Implementation is analogous to private function `std.process.searchPathFor`.
+    import std.algorithm.iteration : splitter;
+    import std.conv : to;
+    import std.path : buildPath;
+    static import core.stdc.stdlib;
+
+    auto pathz = core.stdc.stdlib.getenv("PATH");
+    if (pathz == null)  return null;
+
+    foreach (dir; splitter(to!string(pathz), ':'))
+    {
+        auto execPath = buildPath(dir, executable);
+
+        if (isExecutableFile(execPath))
+            return execPath;
+    }
+
+    return null;
 }
