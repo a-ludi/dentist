@@ -24,7 +24,9 @@ rule ALL:
 
 
 rule self_alignment_block:
-    input: await_db_files(reference)
+    input:
+        dentist_config_file,
+        await_db_files(reference)
     output:
         temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}')),
         temp(alignment_file(reference, block_b='{block_ref}', block_a='{block_reads}'))
@@ -71,6 +73,7 @@ checkpoint reads2db:
 
 rule ref_vs_reads_alignment_block:
     input:
+        dentist_config_file,
         await_db_files(reference),
         lambda _: mask_files(reference, self_mask),
         await_db_files(reads)
