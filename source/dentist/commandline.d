@@ -99,6 +99,7 @@ import std.format :
     formattedRead;
 import std.math :
     ceil,
+    exp,
     floor,
     log_e = log;
 import std.meta :
@@ -1147,6 +1148,15 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("debug-repeat-masks")
+        @Help("(only for reads-mask) write mask components into additional masks `<repeat-mask>-<component-type>`")
+        OptionFlag debugRepeatMasks;
+    }
+
+    static if (command.among(
         TestingCommand.buildPartialAssembly,
         DentistCommand.output,
     ))
@@ -1281,6 +1291,58 @@ struct OptionsFor(DentistCommand _command)
                 maxCoverageReads = upperBound(readCoverage);
 
             coverageBoundsReads = [0, maxCoverageReads];
+        }
+    }
+
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("max-improper-coverage-reads")
+        @MetaVar("<uint>")
+        @Help("
+            this is used to derive a repeat mask from the ref vs. reads alignment;
+            if the coverage of improper alignments is larger than <uint> it will be
+            considered repetitive; a default value is derived from --read-coverage;
+            both options are mutually exclusive
+        ")
+        id_t maxImproperCoverageReads;
+
+        @Option()
+        id_t[2] improperCoverageBoundsReads;
+
+        @PostValidate(Priority.medium)
+        void setImproperCoverageBoundsReads()
+        {
+            if (!hasReadsDb)
+                return;
+
+            enforce!CLIException(
+                maxImproperCoverageReads != maxImproperCoverageReads.init ||
+                readCoverage != readCoverage.init,
+                "must provide either --read-coverage or --max-improper-coverage-reads",
+            );
+            enforce!CLIException(
+                (maxImproperCoverageReads != maxImproperCoverageReads.init) ^
+                (readCoverage != readCoverage.init),
+                "must not provide both --read-coverage and --max-improper-coverage-reads",
+            );
+
+            id_t upperBound(double x)
+            {
+                enum a = 0.5;
+                enum b = 0.1875;
+                enum c = 8.0;
+
+                // This is a smooth version of `max(4, a*x)`
+                return to!id_t(a*x + exp(b*(c - x)));
+            }
+
+            if (readCoverage != readCoverage.init)
+                maxImproperCoverageReads = upperBound(readCoverage);
+
+            improperCoverageBoundsReads = [0, maxImproperCoverageReads];
         }
     }
 

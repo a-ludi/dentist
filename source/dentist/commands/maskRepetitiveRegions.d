@@ -20,6 +20,7 @@ import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     getAlignments,
     writeMask;
+import dentist.util.algorithm : filterInPlace;
 import dentist.util.log;
 import std.algorithm :
     joiner,
@@ -63,6 +64,7 @@ class RepeatMaskAssessor
     protected AlignmentType alignmentType;
     protected AlignmentChain[] alignment;
     protected ReferenceRegion repetitiveRegions;
+    protected ReferenceRegion repetitiveRegionsImproper;
 
     this(in ref Options options)
     {
@@ -131,18 +133,56 @@ class RepeatMaskAssessor
                 : toJson(null),
             "numRepetitiveRegions", repetitiveRegions.intervals.length,
         );
+
+        if (alignmentType == AlignmentType.reads)
+        {
+            auto improperRepeatAssessor = new BadAlignmentCoverageAssessor(
+                options.improperCoverageBoundsReads[0],
+                options.improperCoverageBoundsReads[1]
+            );
+
+            alignment.filterInPlace!(ac => !ac.isProper);
+
+            repetitiveRegionsImproper = repeatAssessor(alignment);
+
+            logJsonDiagnostic(
+                "alignmentType", alignmentType.to!string,
+                "repetitiveRegionsImproper", shouldLog(LogLevel.debug_)
+                    ? repetitiveRegionsImproper.intervals.toJson
+                    : toJson(null),
+                "numRepetitiveRegionsImproper", repetitiveRegionsImproper.intervals.length,
+            );
+        }
     }
 
     protected void writeRepeatMask()
     {
         mixin(traceExecution);
 
+        auto mergedMask = repetitiveRegions | repetitiveRegionsImproper;
+
         writeMask(
             options.refDb,
             options.repeatMask,
-            repetitiveRegions.intervals,
+            mergedMask.intervals,
             options.workdir,
         );
+
+        if (alignmentType == AlignmentType.reads && options.debugRepeatMasks)
+        {
+            writeMask(
+                options.refDb,
+                options.repeatMask ~ "-all",
+                repetitiveRegions.intervals,
+                options.workdir,
+            );
+            writeMask(
+                options.refDb,
+                options.repeatMask ~ "-improper",
+                repetitiveRegionsImproper.intervals,
+                options.workdir,
+            );
+        }
     }
 }
 
