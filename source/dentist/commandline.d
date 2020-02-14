@@ -1528,6 +1528,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         TestingCommand.translocateGaps,
+        DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -1683,6 +1684,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,

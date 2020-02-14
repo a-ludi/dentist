@@ -141,7 +141,7 @@ class RepeatMaskAssessor
                 options.improperCoverageBoundsReads[1]
             );
 
-            alignment.filterInPlace!(ac => !ac.isProper);
+            alignment.filterInPlace!(ac => !ac.isProper(options.properAlignmentAllowance));
 
             repetitiveRegionsImproper = repeatAssessor(alignment);
 
