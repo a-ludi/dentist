@@ -143,7 +143,7 @@ class RepeatMaskAssessor
 
             alignment.filterInPlace!(ac => !ac.isProper(options.properAlignmentAllowance));
 
-            repetitiveRegionsImproper = repeatAssessor(alignment);
+            repetitiveRegionsImproper = improperRepeatAssessor(alignment);
 
             logJsonDiagnostic(
                 "alignmentType", alignmentType.to!string,
