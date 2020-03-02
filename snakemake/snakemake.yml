@@ -45,6 +45,9 @@ dalign_flags:
     - -M25
     - -T{threads}
 
+datander_flags:
+    - -T{threads}
+
 # Trim short contigs/reads from the input because they may be detrimental
 dbsplit_flags:
     - -x1000 # trim contigs/reads with less than this number of bps

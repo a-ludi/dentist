@@ -295,10 +295,12 @@ reads = fasta_to_workdb(reads_fasta, reads_db_type)
 dentist_config_file = join(workdir_, workflow_["config"])
 dentist_merge_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
+tandem_alignment = alignment_file("TAN", reference)
 ref_vs_reads_alignment = alignment_file(reference, reads)
 self_mask = workflow_["self_mask"]
+tandem_mask = "tan"
 reads_mask = workflow_["reads_mask"]
-masks = [self_mask, reads_mask]
+masks = [self_mask, tandem_mask, reads_mask]
 pile_ups = join(workdir_, workflow_["pile_ups"])
 insertions_batch = join(workdir_, workflow_["insertions_batch"])
 insertions = join(workdir_, workflow_["insertions"])
@@ -308,9 +310,11 @@ from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
 dbsplit_flags = make_flags(config["dbsplit_flags"])
 dalign_flags = make_flags(config["dalign_flags"])
+datander_flags = make_flags(config["datander_flags"])
 
 if "TMPDIR" in environ:
     dalign_flags = append_flags(dalign_flags, "-P{}".format(environ["TMPDIR"]))
+    datander_flags = append_flags(datander_flags, "-P{}".format(environ["TMPDIR"]))
 
 
 localrules:

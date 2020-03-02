@@ -3578,6 +3578,36 @@ enum DalignerOptions : string
     masks = "-m",
 }
 
+
+/// Options for `datander`.
+enum DatanderOptions : string
+{
+    verbose = "-v",
+    /// Search code looks for a pair of diagonal bands of width 2^^w
+    /// (default 26 = 64) that contain a collection of exact matching k-mers
+    /// (default 12) between the two reads, such that the total number of
+    /// bases covered by the k-mer hits is h (default 35).
+    kMerSize = "-k",
+    /// ditto
+    bandWidth = "-w",
+    /// ditto
+    hitBaseCoverage = "-h",
+    tempDir = "-P",
+    /// Searching for local alignments involving at least -l base pairs
+    /// (default 1000) or more, that have an average correlation rate of
+    /// -e (default 70%).
+    minAlignmentLength = "-l",
+    /// ditto
+    averageCorrelationRate = "-e",
+    /// The local alignments found will be output in a sparse encoding where
+    /// a trace point on the alignment is recorded every -s base pairs of
+    /// the a-read (default 100bp).
+    tracePointDistance = "-s",
+    /// The program runs with 4 threads by default, but this may be set to
+    /// any power of 2 with the -T option.
+    numThreads = "-T",
+}
+
 /// Options for `damapper`.
 enum DamapperOptions : string
 {

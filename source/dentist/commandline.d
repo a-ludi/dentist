@@ -48,6 +48,7 @@ import dentist.dazzler :
     DaccordOptions,
     DalignerOptions,
     DamapperOptions,
+    DatanderOptions,
     getHiddenDbFiles,
     getMaskFiles,
     getNumContigs,
@@ -1830,6 +1831,16 @@ struct OptionsFor(DentistCommand _command)
                 DalignerOptions.identity,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
+        }
+
+        @property string[] tandemAlignmentOptions() const
+        {
+            return [
+                format!(DatanderOptions.minAlignmentLength ~ "%d")(minAnchorLength),
+                format!(DatanderOptions.averageCorrelationRate ~ "%f")(
                     selfAlignmentOptionsAverageCorrelationRate,
                 ),
             ];

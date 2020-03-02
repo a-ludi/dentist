@@ -61,6 +61,33 @@ rule mask_self:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {self_alignment} {self_mask} 2> {log}"
 
 
+rule tandem_alignment:
+    input:
+        dentist_config_file,
+        await_db_files(reference)
+    output:
+        tandem_alignment
+    params:
+        aligncmd = lambda _: generate_options_for("tandem", dentist_config_file),
+        reference_stub = db_stub(rel_to_workdir(reference)),
+        datander_flags = prepare_flags(datander_flags)
+    shell:
+        "cd {workdir_} && {params.aligncmd} {params.datander_flags} {params.reference_stub}"
+
+
+rule mask_tandem:
+    input:
+        dentist_config_file,
+        await_db_files(reference),
+        tandem_alignment
+    output:
+        *mask_files(reference, tandem_mask)
+    params:
+        reference_stub = db_stub(reference),
+    shell:
+        "TANmask -n{tandem_mask} {params.reference_stub} {tandem_alignment}"
+
+
 _fast2dam_checkpoint[reads] = "reads2db"
 checkpoint reads2db:
     input: reads_fasta
@@ -85,7 +112,7 @@ rule ref_vs_reads_alignment_block:
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
     shell:
-        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} -m{self_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}"
+        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} -m{self_mask} -m{tandem_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}"
 
 
 rule ref_vs_reads_alignment:
@@ -119,6 +146,7 @@ checkpoint collect:
         await_db_files(reads),
         ref_vs_reads_alignment,
         *mask_files(reference, self_mask),
+        *mask_files(reference, tandem_mask),
         *mask_files(reference, reads_mask)
     output:
         protected(pile_ups)
