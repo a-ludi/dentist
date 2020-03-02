@@ -35,8 +35,15 @@ rule self_alignment_block:
         reference_stub = db_stub(rel_to_workdir(reference)),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
+    log: log_file("self-alignment.{block_ref}.{block_reads}")
     shell:
-        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}"
+        """
+            {{
+                cd {workdir_}
+                {params.aligncmd} {params.dalign_flags} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
+                LAcheck -v {params.reference_stub} {output}
+            }} &> {log}
+        """
 
 
 rule self_alignment:
@@ -46,7 +53,7 @@ rule self_alignment:
     output:
         protected(self_alignment)
     shell:
-        "LAmerge {output} {input[block_alignments]}"
+        "LAmerge {output} {input[block_alignments]} && LAcheck -v {reference} {output}"
 
 
 rule mask_self:
@@ -71,8 +78,15 @@ rule tandem_alignment:
         aligncmd = lambda _: generate_options_for("tandem", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         datander_flags = prepare_flags(datander_flags)
+    log: log_file("tandem-alignment")
     shell:
-        "cd {workdir_} && {params.aligncmd} {params.datander_flags} {params.reference_stub}"
+        """
+            {{
+                cd {workdir_}
+                {params.aligncmd} {params.datander_flags} {params.reference_stub}
+                LAcheck -v {params.reference_stub} {output}
+            }} &> {log}
+        """
 
 
 rule mask_tandem:
@@ -111,8 +125,15 @@ rule ref_vs_reads_alignment_block:
         reads_stub = db_stub(rel_to_workdir(reads)),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
+    log: log_file("ref-vs-reads-alignment.{block_reads}")
     shell:
-        "cd {workdir_} && {params.aligncmd} {params.dalign_flags} -m{self_mask} -m{tandem_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}"
+        """
+            {{
+                cd {workdir_}
+                {params.aligncmd} {params.dalign_flags} -m{self_mask} -m{tandem_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
+                LAcheck -v {params.reference_stub} {params.reads_stub} {output}
+            }} &> {log}
+        """
 
 
 rule ref_vs_reads_alignment:
