@@ -41,7 +41,12 @@ rule self_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.dalign_flags} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
-                LAcheck -v {params.reference_stub} {output}
+                if (( ${{SKIP_LACHECK:-0}} == 0 ))
+                then
+                    LAcheck -v {params.reference_stub} {output} || grep -qF Duplicate {log}
+                else
+                    echo "Skipping LAcheck due to user request"
+                fi
             }} &> {log}
         """
 
@@ -53,7 +58,15 @@ rule self_alignment:
     output:
         protected(self_alignment)
     shell:
-        "LAmerge {output} {input[block_alignments]} && LAcheck -v {reference} {output}"
+        """
+            LAmerge {output} {input[block_alignments]}
+            if (( ${{SKIP_LACHECK:-0}} == 0 ))
+            then
+                LAcheck -v {reference} {output} || grep -qF Duplicate {log}
+            else
+                echo "Skipping LAcheck due to user request"
+            fi
+        """
 
 
 rule mask_self:
@@ -84,7 +97,12 @@ rule tandem_alignment:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.datander_flags} {params.reference_stub}
-                LAcheck -v {params.reference_stub} {output}
+                if (( ${{SKIP_LACHECK:-0}} == 0 ))
+                then
+                    LAcheck -v {params.reference_stub} {output} || grep -qF Duplicate {log}
+                else
+                    echo "Skipping LAcheck due to user request"
+                fi
             }} &> {log}
         """
 
@@ -131,7 +149,12 @@ rule ref_vs_reads_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.dalign_flags} -m{self_mask} -m{tandem_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
-                LAcheck -v {params.reference_stub} {params.reads_stub} {output}
+                if (( ${{SKIP_LACHECK:-0}} == 0 ))
+                then
+                    LAcheck -v {params.reference_stub} {params.reads_stub} {output} || grep -qF Duplicate {log}
+                else
+                    echo "Skipping LAcheck due to user request"
+                fi
             }} &> {log}
         """
 
