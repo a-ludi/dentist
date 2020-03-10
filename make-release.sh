@@ -102,6 +102,20 @@ function parse_args()
 }
 
 
+function prepare_dist()
+{
+    [[ ! -e "$DIST_DIR" ]] || bail_out "could not create dist directory: file already exists: $DIST_DIR"
+
+    mkdir "$DIST_DIR"
+    cp dentist "$DIST_DIR"
+
+    mkdir "$DIST_DIR/snakemake"
+    cp snakemake/cluster.yml "$DIST_DIR/snakemake/cluster.example.yml"
+    cp snakemake/snakemake.yml "$DIST_DIR/snakemake/snakemake.example.yml"
+    cp snakemake/{profile-slurm.yml,Snakefile,workflow_helper.py} "$DIST_DIR/snakemake"
+}
+
+
 function main()
 {
     DENTIST=dentist
@@ -115,8 +129,10 @@ function main()
     DENTIST_VERSION="${DENTIST_VERSION#dentist }"
     ARCH="$(uname -m)"
     TARBALL="dentist.$DENTIST_VERSION.$ARCH.tar.gz"
+    DIST_DIR="dentist.$DENTIST_VERSION.$ARCH"
 
-    tar -czf "$TARBALL" dentist
+    prepare_dist
+    tar -czf "$TARBALL" "$DIST_DIR"
 
     log "created $TARBALL"
 }
