@@ -5,7 +5,12 @@ dentist
 
 > Close assembly gaps using long-reads with focus on correctness.
 
-Today, many genome sequencing project have been conducted using second-generation sequencers which produce short reads. Such assemblies have many gaps. `dentist` closes these gaps using a (small) set of long reads. Furthermore, it can be used to scaffold contigs freely using a set of long reads. This can be used to fix known scaffolding errors or to further scaffold output of a long-read assembly pipeline.
+Today, many genome sequencing project have been conducted using
+second-generation sequencers which produce short reads. Such assemblies have
+many gaps. `dentist` closes these gaps using a (small) set of long reads.
+Furthermore, it can be used to scaffold contigs freely using a set of long
+reads. This can be used to fix known scaffolding errors or to further scaffold
+output of a long-read assembly pipeline.
 
 
 Table of Contents
@@ -42,6 +47,7 @@ The following software packages are required to run `dentist`:
 - [The Dazzler Data Base][DAZZ_DB]
 - [`daligner`][daligner]
 - [`damapper`][damapper]
+- [`TANmask`][damasker]
 - [`daccord`][daccord]
 
 Please see their own documentation for installtion instructions. Note, the
@@ -53,27 +59,36 @@ moment.
 [DAZZ_DB]: https://github.com/thegenemyers/DAZZ_DB
 [daligner]: https://github.com/thegenemyers/DALIGNER
 [damapper]: https://github.com/thegenemyers/DAMAPPER
+[damasker]: https://github.com/thegenemyers/DAMASKER
 [daccord]: https://gitlab.com/german.tischler/daccord
 
 Usage
 -----
 
-Suppose we have the genome assembly `reference.fasta` that is to be updated and a set of reads `reads.fasta` with 25× coverage.
+Suppose we have the genome assembly `reference.fasta` that is to be updated
+and a set of reads `reads.fasta` with 25× coverage.
 
 
-### Quick setup with `snakemake`
+### Quick execution with `snakemake`
 
-Install [snakemake][snakemake] version >=5.4.0 and copy these files next to your data:
+Install [snakemake][snakemake] version >=5.10.0 and copy these files into your
+working directory:
 
-    - `./snakemake/Snakefile`
-    - `./snakemake/snakemake.yml`
+- `./snakemake/Snakefile`
+- `./snakemake/workflow_helper.py`
+- `./snakemake/snakemake.example.yml` → `./snakemake/snakemake.yml`
 
-Next execute `snakemake`. For small genomes of a few 100 Mbp this should run
-on a regular workstation. Larger data sets may require a cluster in which case
-you can use Snakemake's [cloud][snakemake-cloud] or
-[cluster][snakemake-cluster] facilities. The cluster config `cluster.yml` and
-Snakemake profile `profile-slurm.yml` under `./snakemake` provide a starting
-point for a cluster setup.
+Next edit `snakemake.yml` to fit your needs and test your configuration with
+
+    snakemake --configfile=snakemake.yml extend_dentist_config
+
+If no errors occurred the whole workflow can be executed using
+
+    snakemake --configfile=snakemake.yml
+
+For small genomes of a few 100 Mbp this should run on a regular workstation.
+Larger data sets may require a cluster in which case you can use Snakemake's
+[cloud][snakemake-cloud] or [cluster][snakemake-cluster] facilities.
 
 
 [snakemake]: https://snakemake.readthedocs.io/en/stable/index.html
@@ -81,66 +96,40 @@ point for a cluster setup.
 [snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executable.html#cluster-execution
 
 
+#### Executing on a Cluster
+
+To make execution on a cluster easy DENTIST comes with examples files to make
+Snakemake use SLURM via DRMAA. Please read the [documentation of
+Snakemake][snakemake-cluster] if this does not suit your needs. Another good
+starting point is [the Snakemake-Profiles project][smp-project].
+
+Start by copying these files to your working directory:
+    
+- `./snakemake/profile-slurm.yml` → `~/.config/snakemake/<profile>/config.yaml`
+- `./snakemake/cluster.example.yml` → `./snakemake/cluster.yml`
+
+Next [adjust the profile][snakemake-profiles] according to your cluster. This should enable
+Snakemake to submit and track jobs on your cluster. You may use the
+configuration values specified in `cluster.yml` to configure job names and
+resource allocation for each step of the pipeline. Now, submit the workflow
+to your cluster by
+
+    snakemake --configfile=snakemake.yml --profile=<profile>
+
+Note, parameters specified in the profile provide default values and can be
+overridden by specififying different value on the CLI.
+
+
+[smp-project]: https://github.com/snakemake-profiles/doc
+[snakemake-profiles]: https://snakemake.readthedocs.io/en/stable/executing/cli.html#profiles
+
+
 ### Manual execution
 
-Create a directory structure like this:
-
-```
-project/
-|-- workdir/
-|-- reference.fasta
-`-- reads.fasta
-```
-
-A typical sequence of commands to run `dentist` is:
-
-```sh
-# Create DB files for fast access to sequences
-fasta2DAM workdir/reference.dam input/reference.fasta
-fasta2DB workdir/reads.db input/reads.fasta
-
-# Clip sequences shorter than 1 kpb from both DBs because they may produce
-# sub-optimal alignments. If smaller sequences are still desired, adjust the -x
-# option accordingly.
-DBsplit -x1000 workdir/reference.dam
-DBsplit -x1000 workdir/reads.db
-
-cd workdir
-
-# List suggestions for subsequent commands
-dentist generate-dazzler-options
-
-# Align the reference to itself
-# NOTE: this may require parallelization on a cluster (see `HPC.daligner`).
-daligner -I -l500 -e0.980100 reference.dam reference.dam
-
-# Generate a repeat mask from the self-alignment
-dentist mask reference.dam reference.reference.las dentist-self
-
-# Align the reference to itself
-# NOTE: this may require parallelization on a cluster (see `HPC.damapper`).
-damapper -C -N -n.7 -e0.841500 -mdentist-self reference.dam reads.db
-
-# Generate a repeat mask from the reads-alignment
-# NOTE: adjust the read coverage to your data!
-dentist mask -C25 reference.dam reads.db reference.reads.las dentist-reads
-
-# Collect a set of candidates for gap filling (pileups)
-dentist collect -m dentist-reads -m dentist-self \
-                reference.dam reads.db reference.reads.las pileups.db
-
-# Generate high-quality sequences from set of candidates.
-# NOTE: this may require parallelization on a cluster. Use the `show-pile-ups`
-#       sub-command to get the number of pileups and process them in batches
-#       using the `--batch` option of the `process` sub-command. Subsequently, 
-#       merge the results using the `merge-insertions` sub-command.
-dentist process -m dentist-reads -m dentist-self \
-                reference.dam reads.db reference.reads.las pileups.db \
-                insertions.db
-
-# Generate a gap-closed assembly.
-dentist output reference.db insertions.db ../gap-closed.fasta
-```
+Please inspect the Snakemake workflow to get all the details. It might be
+useful to execute Snakemake with the `-p` switch which causes Snakemake to
+print the shell commands. If you plan to write your own workflow management
+for DENTIST please feel free to contact the maintainer!
 
 
 Maintainer
