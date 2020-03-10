@@ -107,7 +107,7 @@ function prepare_dist()
     [[ ! -e "$DIST_DIR" ]] || bail_out "could not create dist directory: file already exists: $DIST_DIR"
 
     mkdir "$DIST_DIR"
-    cp dentist "$DIST_DIR"
+    cp dentist README.md CHANGELOG.md LICENSE "$DIST_DIR"
 
     mkdir "$DIST_DIR/snakemake"
     cp snakemake/cluster.yml "$DIST_DIR/snakemake/cluster.example.yml"
