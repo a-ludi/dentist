@@ -65,13 +65,15 @@ static enum ExternalDependency[] fromSymbol(alias symbol) = [Filter!(
 ExternalDependency[] getExternalDependencies(Modules...)()
 {
     import std.array : array;
-    import std.algorithm : joiner;
+    import std.algorithm : joiner, multiSort;
     import std.meta : staticMap;
     import std.traits : getSymbolsByUDA;
 
     alias _getSymbolsByUDA(alias Module) = getSymbolsByUDA!(Module, ExternalDependency);
     alias byExecutableLt = (a, b) => a.executable < b.executable;
     alias byExecutableEq = (a, b) => a.executable == b.executable;
+    alias byUrlLt = (a, b) => a.url < b.url;
+    alias byPackageLt = (a, b) => a.package_ < b.package_;
 
     return [staticMap!(
         fromSymbol,
@@ -79,7 +81,15 @@ ExternalDependency[] getExternalDependencies(Modules...)()
             _getSymbolsByUDA,
             Modules,
         ),
-    )].joiner.array.sort!byExecutableLt.release.uniq!byExecutableEq.array;
+    )]
+        .joiner
+        .array
+        .sort!byExecutableLt
+        .release
+        .uniq!byExecutableEq
+        .array
+        .multiSort!(byPackageLt, byUrlLt, byExecutableLt)
+        .release;
 }
 
 unittest

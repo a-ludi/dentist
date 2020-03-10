@@ -617,7 +617,7 @@ private struct ResultAnalyzer
             .array;
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fm-index", "DENTIST", "README.testing")
     @ExternalDependency("cut", "POSIX")
     @ExternalDependency("grep", "POSIX")
@@ -656,7 +656,7 @@ private struct ResultAnalyzer
         return sequenceListFile;
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("cut", "POSIX")
     @ExternalDependency("grep", "POSIX")
     @ExternalDependency("rev", "POSIX")
@@ -709,8 +709,8 @@ private struct ResultAnalyzer
         return sequenceListFile;
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
-    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("cut", "POSIX")
     @ExternalDependency("fold", "POSIX")
     @ExternalDependency("grep", "POSIX")

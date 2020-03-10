@@ -190,6 +190,12 @@ ReturnCode run(in string[] args)
         printBaseHelp();
 
         return ReturnCode.ok;
+    case "-d":
+        goto case;
+    case "--dependencies":
+        printExternalDependencies();
+
+        return ReturnCode.ok;
     case "--usage":
         stderr.write(usageString!BaseOptions(executableName));
 
@@ -256,6 +262,15 @@ unittest
     assert(run([executableName, "foobar"]) == ReturnCode.commandlineError);
     assert(run([executableName, "--foo"]) == ReturnCode.commandlineError);
     assert(run([executableName]) == ReturnCode.commandlineError);
+}
+
+void printExternalDependencies()
+{
+    import std.stdio : writefln;
+
+    static assert(externalDependencies.length > 0);
+
+    writefln!"%-(%s\n%)"(externalDependencies);
 }
 
 void assertExternalToolsAvailable()
@@ -2141,6 +2156,10 @@ unittest
 /// This describes the basic, ie. non-command-specific, options of `dentist`.
 struct BaseOptions
 {
+    @Option("dependencies", "d")
+    @Help("Print a list of external binaries that must be available on PATH.")
+    OptionFlag listDependencies;
+
     mixin HelpOption;
 
     @Option("version")

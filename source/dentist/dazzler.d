@@ -3739,7 +3739,7 @@ private
         dalign([refDam, readsDam], dalignerOpts, workdir);
     }
 
-    @ExternalDependency("daligner", null, "https://github.com/thegenemyers/DALIGNER")
+    @ExternalDependency("daligner", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     void dalign(in string[] dbList, in string[] dalignerOpts, in string workdir)
     {
         assert(dbList.length >= 1);
@@ -3762,7 +3762,7 @@ private
         damapper([refDam, readsDam], damapperOpts, workdir);
     }
 
-    @ExternalDependency("damapper", null, "https://github.com/thegenemyers/DAMAPPER")
+    @ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
     void damapper(in string[] dbList, in string[] damapperOpts, in string workdir)
     {
         const(string[]) dbListRelativeToWorkDir = dbList.map!(
@@ -3806,7 +3806,7 @@ private
     }
 
     @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
-    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3837,9 +3837,9 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
-    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
-    @ExternalDependency("fasta2DB", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3859,7 +3859,7 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
@@ -3915,13 +3915,13 @@ private
         return;
     }
 
-    @ExternalDependency("fasta2DAM", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     void fasta2dam(in string inFile, in string outFile, in string workdir = null)
     {
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
-    @ExternalDependency("DBsplit", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBsplit", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir = null)
     {
         executeCommand(chain(only("DBsplit"), dbsplitOptions,
@@ -3934,7 +3934,7 @@ private
         return ladump(lasFile, dbA, dbB, [], ladumpOpts, workdir);
     }
 
-    @ExternalDependency("LAdump", null, "https://github.com/thegenemyers/DALIGNER")
+    @ExternalDependency("LAdump", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     auto ladump(in string lasFile, in string dbA, in string dbB, in id_t[] readIds,
             in string[] ladumpOpts, in string workdir)
     {
@@ -3950,7 +3950,7 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir = null)
     {
         return executePipe(chain(
@@ -3960,7 +3960,7 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
             in string[] dbdumpOptions, in string workdir = null)
         if (
@@ -3989,7 +3989,7 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("DBdump", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(
         in string dbFile,
         id_t firstRecord,
@@ -4018,13 +4018,13 @@ private
         ), workdir);
     }
 
-    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string contigId)
     {
         return executeCommand(only("DBshow", dbFile, contigId));
     }
 
-    @ExternalDependency("DBshow", null, "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string[] dbshowOptions)
     {
         return executeCommand(chain(only("DBshow"), dbshowOptions, only(dbFile)));
