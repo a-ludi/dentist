@@ -112,7 +112,7 @@ function prepare_dist()
     mkdir "$DIST_DIR/snakemake"
     cp snakemake/cluster.yml "$DIST_DIR/snakemake/cluster.example.yml"
     cp snakemake/snakemake.yml "$DIST_DIR/snakemake/snakemake.example.yml"
-    cp snakemake/{profile-slurm.yml,Snakefile,workflow_helper.py} "$DIST_DIR/snakemake"
+    cp snakemake/{profile-slurm.yml,Snakefile} "$DIST_DIR/snakemake"
 }
 
 
