@@ -30,7 +30,8 @@ import dentist.util.math : add;
 import std.algorithm :
     among,
     canFind,
-    filter;
+    filter,
+    swap;
 import std.array : array;
 import std.typecons : tuple;
 import vibe.data.json : toJson = serializeToJson;
@@ -71,16 +72,35 @@ bool hasSequence(in Insertion insertion)
     return insertion.payload.sequence.length > 0;
 }
 
-coord_t getCroppingPosition(string contig)(in SeededAlignment overlap)
-    if (contig.among("contigA", "contigB"))
+coord_t getCroppingPosition(string contig)(in SeededAlignment overlap) if (contig == "contigA")
 {
     final switch (overlap.seed)
     {
         case AlignmentLocationSeed.front:
-            return mixin("overlap.first." ~ contig ~ ".begin");
+            return overlap.first.contigA.begin;
         case AlignmentLocationSeed.back:
-            return mixin("overlap.last." ~ contig ~ ".end");
+            return overlap.last.contigA.end;
     }
+}
+
+coord_t getCroppingPosition(string contig)(in SeededAlignment overlap) if (contig == "contigB")
+{
+    coord_t coord;
+
+    final switch (overlap.seed)
+    {
+        case AlignmentLocationSeed.front:
+            coord = overlap.first.contigB.begin;
+            break;
+        case AlignmentLocationSeed.back:
+            coord = overlap.last.contigB.end;
+            break;
+    }
+
+    if (overlap.flags.complement)
+        return overlap.contigB.length - coord;
+    else
+        return coord;
 }
 
 auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bool globalComplement)
@@ -190,28 +210,11 @@ auto getInfoForNewSequenceInsertion(
         }
         break;
     case 2:
-        if (overlaps[0].seed > overlaps[1].seed)
-        {
-            slice.begin = getCroppingPosition!"contigB"(overlaps[0]);
-            slice.end = getCroppingPosition!"contigB"(overlaps[1]);
-        }
-        else
-        {
-            slice.begin = getCroppingPosition!"contigB"(overlaps[1]);
-            slice.end = getCroppingPosition!"contigB"(overlaps[0]);
-        }
+        slice.begin = getCroppingPosition!"contigB"(overlaps[0]);
+        slice.end = getCroppingPosition!"contigB"(overlaps[1]);
+
         if (slice.end < slice.begin)
-        {
-            logJsonWarn(
-                "info", "adjusting invalid interval",
-                "cropping", [
-                    "begin": slice.begin,
-                    "end": slice.end,
-                ].toJson,
-                "sequence", insertion.payload.sequence.to!string,
-            );
-            slice.end = slice.begin;
-        }
+            swap(slice.begin, slice.end);
         break;
     default:
         assert(0);
