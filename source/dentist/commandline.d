@@ -445,7 +445,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:reference>")
         @Help("reference assembly in .dam format")
-        @Validate!(validateDB!".dam")
+        @Validate!(validateDB)
         string refDb;
     }
 
