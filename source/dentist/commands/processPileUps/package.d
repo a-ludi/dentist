@@ -70,7 +70,7 @@ import std.array : array, minimallyInitializedArray;
 import std.conv : to;
 import std.format : format;
 import std.parallelism : parallel, taskPool;
-import std.range : enumerate, evenChunks, chain, iota, only, zip;
+import std.range : drop, enumerate, evenChunks, chain, iota, only, zip;
 import std.range.primitives : empty, front, popFront;
 import std.typecons : Yes;
 import vibe.data.json : toJson = serializeToJson;
@@ -177,6 +177,7 @@ protected class PileUpProcessor
     protected string croppedDb;
     protected ReferencePoint[] croppingPositions;
     protected size_t referenceReadIdx;
+    protected id_t referenceReadTry;
     protected string consensusDb;
     protected AlignmentChain[] postConsensusAlignment;
     protected ReadAlignment insertionAlignment;
@@ -251,8 +252,31 @@ protected class PileUpProcessor
             {
                 adjustRepeatMask();
                 crop();
-                selectReferenceRead();
-                computeConsensus();
+                while (selectReferenceRead(referenceReadTry++))
+                {
+                    try
+                    {
+                        computeConsensus();
+                        break;
+                    }
+                    catch (Exception e)
+                    {
+                        logJsonDiagnostic(
+                            "event", "consensusFailed",
+                            "info", "computing reference-based consensus failed",
+                            "reason", "error",
+                            "error", e.message.to!string,
+                            "pileUpId", pileUpId,
+                            "pileUp", pileUp.pileUpToSimpleJson,
+                        );
+                    }
+                }
+
+                dentistEnforce(
+                    referenceReadIdx < size_t.max,
+                    "no valid reference read found",
+                );
+
                 alignConsensusToFlankingContigs();
             }
 
@@ -344,12 +368,17 @@ protected class PileUpProcessor
         croppingPositions = croppingResult.referencePositions;
     }
 
-    protected void selectReferenceRead()
+    protected bool selectReferenceRead(in id_t referenceReadTry)
     {
-        referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingPositions);
+        referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingPositions, referenceReadTry);
+
+        if (referenceReadIdx == size_t.max)
+            return false;
 
         logJsonDiagnostic("referenceReadIdx", referenceReadIdx);
         assert(referenceRead.length == croppingPositions.length);
+
+        return true;
     }
 
     protected @property inout(ReadAlignment) referenceRead() inout
@@ -360,16 +389,23 @@ protected class PileUpProcessor
     protected size_t bestReadAlignmentIndex(
         in PileUp pileUp,
         in ReferencePoint[] referencePositions,
+        in id_t skip,
     ) const pure
     {
         // NOTE pileUp is not modified but the read alignments need to be assignable.
-        return (cast(PileUp) pileUp)
+        auto candidates = (cast(PileUp) pileUp)
             .enumerate
             .filter!(enumReadAlignment =>
                 enumReadAlignment.value.length == referencePositions.length &&
                 enumReadAlignment.value[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
-            .maxElement!(enumReadAlignment => enumReadAlignment.value.meanScore)
-            .index;
+            .array
+            .sort!"a.value.meanScore > b.value.meanScore"
+            .release;
+
+        if (skip >= candidates.length)
+            return size_t.max;
+
+        return candidates[skip].index;
     }
 
     protected void computeConsensus()
