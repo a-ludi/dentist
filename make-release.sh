@@ -132,7 +132,7 @@ function main()
     DIST_DIR="dentist.$DENTIST_VERSION.$ARCH"
 
     prepare_dist
-    tar -czf "$TARBALL" "$DIST_DIR"
+    tar --remove-files -czf "$TARBALL" "$DIST_DIR"
 
     log "created $TARBALL"
 }
