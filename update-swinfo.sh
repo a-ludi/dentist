@@ -28,7 +28,7 @@ function get_updated_swinfo()
     INFO_JSON="$(dub describe | jq -c '.packages[0]')"
 
     EXECUTABLE_NAME="$(jq '.targetName' <<<"$INFO_JSON")"
-    GIT_VERSION="$(git describe --dirty)"
+    GIT_VERSION="$(git describe)"
     GIT_BRANCH="$(git branch --show-current)"
     GIT_COMMIT="$(git rev-parse HEAD)"
     DESCRIPTION="$(jq '.description' <<<"$INFO_JSON")"
@@ -41,6 +41,7 @@ function get_updated_swinfo()
 
     if is_git_dirty
     then
+        GIT_VERSION="$GIT_VERSION-dirty"
         GIT_COMMIT="$GIT_COMMIT+dirty"
     fi
 
