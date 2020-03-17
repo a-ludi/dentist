@@ -26,6 +26,18 @@ Table of Contents
 Install
 --------
 
+### Use Pre-Built Binaries
+
+Download the latest pre-built binaries from the [releases section][release]
+and extract the contents. The tarball contains a `dentist` binary as well as
+the snakemake workflow, example config files and this README. In short, everything you to run DENTIST.
+
+
+[release]: https://github.com/a-ludi/dentist/releases
+
+
+### Build from Source
+
 Be sure to install the D package manager [DUB][DUB]. Install using either
 
 ```sh
