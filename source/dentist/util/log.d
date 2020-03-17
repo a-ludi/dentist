@@ -18,13 +18,14 @@ import core.thread;
 
 private
 {
-    LogLevel minLevel = LogLevel.info;
+    __gshared LogLevel minLevel = LogLevel.info;
 }
 
 /// Sets the minimum log level to be printed.
 void setLogLevel(LogLevel level) nothrow
 {
-    minLevel = level;
+    synchronized
+        minLevel = level;
 }
 
 LogLevel getLogLevel()
@@ -110,8 +111,8 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
 ///
 unittest
 {
-    import std.regex : ctRegex, matchFirst;
     import std.stdio : File, stderr;
+    import vibe.data.json : Json, parseJsonString;
 
     auto origStderr = stderr;
     stderr = File.tmpfile();
@@ -124,11 +125,12 @@ unittest
     logJsonError("error", "mysterious observation", "secret", 42);
 
     stderr.rewind();
-    auto expected = ctRegex!(
-            `\{"secret":42,"error":"mysterious observation","thread":[0-9]+,"timestamp":[0-9]+\}` ~ '\n');
-    auto observed = stderr.readln;
+    auto observed = parseJsonString(stderr.readln);
 
-    assert(matchFirst(observed, expected), "got unexpected output `" ~ observed ~ "`");
+    assert(observed["thread"].type == Json.Type.int_);
+    assert(observed["timestamp"].type == Json.Type.int_);
+    assert(observed["error"] == "mysterious observation");
+    assert(observed["secret"] == 42);
 }
 
 /**
@@ -167,32 +169,6 @@ void log(T...)(LogLevel level, string fmt, lazy T args) nothrow
 {
     if (level < minLevel)
         return;
-    string pref;
-    final switch (level)
-    {
-    case LogLevel.debug_:
-        pref = "TRACE";
-        break;
-    case LogLevel.diagnostic:
-        pref = "DEBUG";
-        break;
-    case LogLevel.info:
-        pref = "INFO";
-        break;
-    case LogLevel.warn:
-        pref = "WARN";
-        break;
-    case LogLevel.error:
-        pref = "ERROR";
-        break;
-    case LogLevel.fatal:
-        pref = "FATAL";
-        break;
-    case LogLevel.none:
-        assert(false);
-    }
-    auto threadid = () @trusted{ return cast(ulong) cast(void*) Thread.getThis(); }();
-    threadid ^= threadid >> 32;
 
     try
     {
@@ -237,6 +213,40 @@ enum LogLevel
     none
 }
 
+struct ExecutionTracer(LogLevel logLevel = LogLevel.diagnostic)
+{
+    import std.datetime.stopwatch : StopWatch;
+    import std.typecons : Yes;
+
+    string functionName;
+    StopWatch timer;
+
+    this(int dummy, string fnName = __FUNCTION__)
+    {
+        this.functionName = fnName;
+
+        logJson(
+            logLevel,
+            `state`, `enter`,
+            `function`, this.functionName,
+        );
+
+        this.timer = StopWatch(Yes.autoStart);
+    }
+
+    ~this()
+    {
+        timer.stop();
+
+        logJson(
+            logLevel,
+            `state`, `exit`,
+            `function`, functionName,
+            `timeElapsed`, timer.peek().total!`hnsecs`,
+        );
+    }
+}
+
 string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
 {
     import std.conv : to;
@@ -244,50 +254,19 @@ string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
     import std.traits : moduleName;
 
     return q"{
-        import std.datetime.stopwatch : $prefix__StopWatch = StopWatch;
+        static import $thisModule;
 
-        $prefix__StopWatch $prefix__enter() {
-            import $thisModule : LogLevel;
-            import std.traits : fullyQualifiedName;
-            import std.typecons : Yes;
-
-            logJson(
-                $logLevel,
-                `state`, `enter`,
-                `function`, $function,
-            );
-
-            return $prefix__StopWatch(Yes.autoStart);
-        }
-
-        void $prefix__exit($prefix__StopWatch timer) {
-            import $thisModule : LogLevel;
-            import std.traits : fullyQualifiedName;
-
-            timer.stop();
-            logJson(
-                $logLevel,
-                `state`, `exit`,
-                `function`, $function,
-                `timeElapsed`, timer.peek().total!`hnsecs`,
-            );
-        }
-
-        auto $prefix__timer = $prefix__enter();
-
-        scope (exit)
-            $prefix__exit($prefix__timer);
+        scope __executionTracer = $thisModule.ExecutionTracer!($logLevel)(0);
     }"
         .replace("$thisModule", moduleName!LogLevel)
-        .replace("$function", "fullyQualifiedName!(__traits(parent, $prefix__enter))")
-        .replace("$logLevel", "LogLevel." ~ logLevel.to!string)
-        .replace("$prefix", `__traceExecution`);
+        .replace("$logLevel", "LogLevel." ~ logLevel.to!string);
 }
 
 unittest
 {
     import std.regex : ctRegex, matchFirst;
     import std.stdio : File, stderr;
+    import vibe.data.json : Json, parseJsonString;
 
     auto origStderr = stderr;
     stderr = File.tmpfile();
@@ -310,13 +289,17 @@ unittest
     doSomething();
     stderr.rewind();
 
-    auto expected1 = ctRegex!
-            `\{"state":"enter","function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
-    auto expected2 = ctRegex!
-            `\{"state":"exit","timeElapsed":[0-9]{2,},"function":"dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething","thread":[0-9]+,"timestamp":[0-9]+\}`;
-    auto observed1 = stderr.readln;
-    auto observed2 = stderr.readln;
+    enum functionFQN = ctRegex!`dentist\.util\.log\.__unittest_L[0-9]+_C[0-9]+\.doSomething`;
+    auto observed1 = parseJsonString(stderr.readln);
+    auto observed2 = parseJsonString(stderr.readln);
 
-    assert(matchFirst(observed1, expected1), "got unexpected output `" ~ observed1 ~ "`");
-    assert(matchFirst(observed2, expected2), "got unexpected output `" ~ observed2 ~ "`");
+    assert(observed1["thread"].type == Json.Type.int_);
+    assert(observed1["timestamp"].type == Json.Type.int_);
+    assert(observed1["state"] == "enter");
+    assert(matchFirst(observed1["function"].to!string, functionFQN));
+
+    assert(observed2["thread"].type == Json.Type.int_);
+    assert(observed2["timestamp"].type == Json.Type.int_);
+    assert(observed2["state"] == "exit");
+    assert(matchFirst(observed2["function"].to!string, functionFQN));
 }

@@ -11,7 +11,14 @@ module dentist.common.binio.insertiondb;
 
 import core.exception : AssertError;
 import dentist.common : ReferencePoint;
-import dentist.common.alignments : AlignmentChain;
+import dentist.common.alignments :
+    AlignmentChain,
+    AlignmentLocationSeed,
+    coord_t,
+    diff_t,
+    id_t,
+    SeededAlignment,
+    trace_point_t;
 import dentist.common.binio._base :
     ArrayStorage,
     CompressedBaseQuad,
@@ -23,8 +30,7 @@ import dentist.common.binio._base :
     readRecords;
 import dentist.common.insertions :
     Insertion,
-    InsertionInfo,
-    SpliceSite;
+    InsertionInfo;
 import dentist.common.scaffold :
     ContigNode,
     ContigPart;
@@ -45,11 +51,14 @@ import std.stdio : File;
 import std.traits : isArray;
 import std.typecons : tuple, Tuple;
 
-version (unittest) import dentist.common.binio._testdata :
+version (unittest) import dentist.common.binio._testdata.insertiondb :
     getInsertionsTestData,
-    numCompressedBaseQuads,
     numInsertions,
-    numSpliceSites;
+    numCompressedBaseQuads,
+    numOverlaps,
+    numLocalAlignments,
+    numReadIds,
+    numTracePoints;
 
 
 class InsertionDbException : Exception
@@ -63,10 +72,15 @@ class InsertionDbException : Exception
 
 struct InsertionDb
 {
+    private alias LocalAlignment = AlignmentChain.LocalAlignment;
+    private alias TracePoint = LocalAlignment.TracePoint;
     private alias DbSlices = Tuple!(
         ArrayStorage!(StorageType!Insertion), "insertions",
         ArrayStorage!(StorageType!CompressedBaseQuad), "compressedBaseQuads",
-        ArrayStorage!(StorageType!SpliceSite), "spliceSites",
+        ArrayStorage!(StorageType!SeededAlignment), "overlaps",
+        ArrayStorage!(StorageType!LocalAlignment), "localAlignments",
+        ArrayStorage!(StorageType!TracePoint), "tracePoints",
+        ArrayStorage!(StorageType!id_t), "readIds",
     );
 
     private File file;
@@ -83,9 +97,24 @@ struct InsertionDb
         return index.compressedBaseQuads;
     }
 
-    @property auto spliceSites() const pure nothrow
+    @property auto overlaps() const pure nothrow
     {
-        return index.spliceSites;
+        return index.overlaps;
+    }
+
+    @property auto localAlignments() const pure nothrow
+    {
+        return index.localAlignments;
+    }
+
+    @property auto tracePoints() const pure nothrow
+    {
+        return index.tracePoints;
+    }
+
+    @property auto readIds() const pure nothrow
+    {
+        return index.readIds;
     }
 
     static InsertionDb parse(in string dbFile)
@@ -174,19 +203,26 @@ struct InsertionDb
         // Step 2: allocate minimally initialized memory for all blocks
         auto insertions = minimallyInitializedArray!(Insertion[])(slices.insertions.length);
         auto compressedBaseQuads = minimallyInitializedArray!(CompressedBaseQuad[])(slices.compressedBaseQuads.length);
-        auto spliceSites = minimallyInitializedArray!(SpliceSite[])(slices.spliceSites.length);
+        auto overlaps = minimallyInitializedArray!(SeededAlignment[])(slices.overlaps.length);
+        auto localAlignments = minimallyInitializedArray!(LocalAlignment[])(slices.localAlignments.length);
+        auto tracePoints = minimallyInitializedArray!(TracePoint[])(slices.tracePoints.length);
+        auto readIds = minimallyInitializedArray!(id_t[])(slices.readIds.length);
 
         // Step 3: parse each record for each block assigning already
         //         allocated array slices to the array fields
-        parse(insertions, compressedBaseQuads, spliceSites);
+        parse(insertions, compressedBaseQuads, overlaps, readIds);
         parse(compressedBaseQuads);
-        parse(spliceSites);
+        parse(overlaps, localAlignments);
+        parse(localAlignments, tracePoints);
+        parse(tracePoints);
+        parse(readIds);
 
         return insertions;
     }
 
     private DbSlices getSlices(size_t from, size_t to)
     {
+
         auto insertions = index.insertions[from .. to];
         auto firstInsertion = file.readRecordAt!(StorageType!Insertion)(insertions[0]);
         auto lastInsertion = file.readRecordAt!(StorageType!Insertion)(insertions[$ - 1]);
@@ -196,28 +232,52 @@ struct InsertionDb
             lastInsertion.sequence[$],
         );
 
-        auto spliceSites = ArrayStorage!(StorageType!SpliceSite).fromPtrs(
-            firstInsertion.spliceSites[0],
-            lastInsertion.spliceSites[$],
+        auto readIds = ArrayStorage!(StorageType!id_t).fromPtrs(
+            firstInsertion.readIds[0],
+            lastInsertion.readIds[$],
+        );
+
+        auto overlaps = ArrayStorage!(StorageType!SeededAlignment).fromPtrs(
+            firstInsertion.overlaps[0],
+            lastInsertion.overlaps[$],
+        );
+        auto firstSeededAlignment = file.readRecordAt!(StorageType!SeededAlignment)(overlaps[0]);
+        auto lastSeededAlignment = file.readRecordAt!(StorageType!SeededAlignment)(overlaps[$ - 1]);
+
+        auto localAlignments = ArrayStorage!(StorageType!LocalAlignment).fromPtrs(
+            firstSeededAlignment.localAlignments[0],
+            lastSeededAlignment.localAlignments[$],
+        );
+        auto firstLocalAlignment = file.readRecordAt!(StorageType!LocalAlignment)(localAlignments[0]);
+        auto lastLocalAlignment = file.readRecordAt!(StorageType!LocalAlignment)(localAlignments[$ - 1]);
+
+        auto tracePoints = ArrayStorage!(StorageType!TracePoint).fromPtrs(
+            firstLocalAlignment.tracePoints[0],
+            lastLocalAlignment.tracePoints[$],
         );
 
         return DbSlices(
             insertions,
             compressedBaseQuads,
-            spliceSites,
+            overlaps,
+            localAlignments,
+            tracePoints,
+            readIds,
         );
     }
 
     private void parse(
         ref Insertion[] insertions,
         CompressedBaseQuad[] compressedBaseQuads,
-        SpliceSite[] spliceSites,
+        SeededAlignment[] overlaps,
+        id_t[] readIds,
     )
     {
         file.seek(slices.insertions.ptr);
 
         size_t[2] compressedBaseQuadsSlice;
-        size_t[2] spliceSitesSlice;
+        size_t[2] overlapsSlice;
+        size_t[2] readIdsSlice;
 
         foreach (ref insertion; insertions)
         {
@@ -226,8 +286,11 @@ struct InsertionDb
             compressedBaseQuadsSlice[0] = compressedBaseQuadsSlice[1];
             compressedBaseQuadsSlice[1] += insertionStorage.sequence.length;
 
-            spliceSitesSlice[0] = spliceSitesSlice[1];
-            spliceSitesSlice[1] += insertionStorage.spliceSites.length;
+            overlapsSlice[0] = overlapsSlice[1];
+            overlapsSlice[1] += insertionStorage.overlaps.length;
+
+            readIdsSlice[0] = readIdsSlice[1];
+            readIdsSlice[1] += insertionStorage.readIds.length;
 
             insertion = Insertion(
                 insertionStorage.start,
@@ -241,19 +304,11 @@ struct InsertionDb
                         insertionStorage.sequenceLength,
                     ),
                     insertionStorage.contigLength,
-                    spliceSites[spliceSitesSlice[0] .. spliceSitesSlice[1]],
+                    overlaps[overlapsSlice[0] .. overlapsSlice[1]],
+                    readIds[readIdsSlice[0] .. readIdsSlice[1]],
                 ),
             );
         }
-    }
-
-    private void parse(
-        ref SpliceSite[] spliceSites,
-    )
-    {
-        static assert(SpliceSite.sizeof == StorageType!SpliceSite.sizeof);
-        file.seek(slices.spliceSites.ptr);
-        spliceSites = file.readRecords(spliceSites);
     }
 
     private void parse(
@@ -263,6 +318,94 @@ struct InsertionDb
         static assert(CompressedBaseQuad.sizeof == StorageType!CompressedBaseQuad.sizeof);
         file.seek(slices.compressedBaseQuads.ptr);
         compressedBaseQuads = file.readRecords(compressedBaseQuads);
+    }
+
+    private void parse(
+        ref id_t[] readIds,
+    )
+    {
+        static assert(id_t.sizeof == StorageType!id_t.sizeof);
+        file.seek(slices.readIds.ptr);
+        readIds = file.readRecords(readIds);
+    }
+
+    private void parse(
+        ref SeededAlignment[] overlaps,
+        AlignmentChain.LocalAlignment[] localAlignments
+    )
+    {
+        // Parse `SeededAlignment`s
+        alias Contig = AlignmentChain.Contig;
+        file.seek(slices.overlaps.ptr);
+
+        size_t[2] localAlignmentsSlice;
+        foreach (ref overlap; overlaps)
+        {
+            auto overlapStorage = file.readRecord!(StorageType!SeededAlignment);
+
+            localAlignmentsSlice[0] = localAlignmentsSlice[1];
+            localAlignmentsSlice[1] += overlapStorage.localAlignments.length;
+
+            overlap = SeededAlignment(
+                AlignmentChain(
+                    overlapStorage.id,
+                    Contig(
+                        overlapStorage.contigAId,
+                        overlapStorage.contigALength,
+                    ),
+                    Contig(
+                        overlapStorage.contigBId,
+                        overlapStorage.contigBLength,
+                    ),
+                    overlapStorage.flags,
+                    localAlignments[localAlignmentsSlice[0] .. localAlignmentsSlice[1]],
+                    overlapStorage.tracePointDistance,
+                ),
+                overlapStorage.seed,
+            );
+        }
+    }
+
+    private void parse(
+        ref AlignmentChain.LocalAlignment[] localAlignments,
+        AlignmentChain.LocalAlignment.TracePoint[] tracePoints
+    )
+    {
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias Locus = LocalAlignment.Locus;
+        file.seek(slices.localAlignments.ptr);
+
+        size_t[2] localAlignmentsSlice;
+        foreach (ref localAlignment; localAlignments)
+        {
+            auto localAlignmentStorage = file.readRecord!(StorageType!LocalAlignment);
+
+            localAlignmentsSlice[0] = localAlignmentsSlice[1];
+            localAlignmentsSlice[1] += localAlignmentStorage.tracePoints.length;
+
+            localAlignment = LocalAlignment(
+                Locus(
+                    localAlignmentStorage.contigABegin,
+                    localAlignmentStorage.contigAEnd,
+                ),
+                Locus(
+                    localAlignmentStorage.contigBBegin,
+                    localAlignmentStorage.contigBEnd,
+                ),
+                localAlignmentStorage.numDiffs,
+                tracePoints[localAlignmentsSlice[0] .. localAlignmentsSlice[1]],
+            );
+        }
+    }
+
+    private void parse(ref AlignmentChain.LocalAlignment.TracePoint[] tracePoints)
+    {
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias TracePoint = LocalAlignment.TracePoint;
+
+        static assert(TracePoint.sizeof == StorageType!TracePoint.sizeof);
+        file.seek(slices.tracePoints.ptr);
+        tracePoints = file.readRecords(tracePoints);
     }
 
     static void write(R)(in string dbFile, R insertions)
@@ -279,6 +422,10 @@ unittest
 {
     import dentist.util.tempfile : mkstemp;
     import std.file : remove;
+    import std.algorithm : equal;
+
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias TracePoint = LocalAlignment.TracePoint;
 
     auto insertions = getInsertionsTestData();
 
@@ -286,7 +433,10 @@ unittest
         InsertionDbIndex.sizeof +
         StorageType!Insertion.sizeof * numInsertions +
         StorageType!CompressedBaseQuad.sizeof * numCompressedBaseQuads +
-        StorageType!SpliceSite.sizeof * numSpliceSites;
+        StorageType!SeededAlignment.sizeof * numOverlaps +
+        StorageType!LocalAlignment.sizeof * numLocalAlignments +
+        StorageType!TracePoint.sizeof * numTracePoints +
+        StorageType!id_t.sizeof * numReadIds;
 
     auto tmpDb = mkstemp("./.unittest-XXXXXX");
     scope (exit)
@@ -303,12 +453,20 @@ unittest
     tmpDb.file.rewind();
     auto insertionDb = InsertionDb(tmpDb.file);
 
-    assert(insertionDb[] == insertions);
+    alias insertionsEq = (Insertion a, Insertion b) =>
+        a.start == b.start &&
+        a.end == b.end &&
+        a.payload == b.payload;
+
+    assert(equal!insertionsEq(insertionDb[], insertions));
 }
 
 private struct InsertionDbFileWriter(R)
         if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
 {
+    private alias LocalAlignment = AlignmentChain.LocalAlignment;
+    private alias TracePoint = LocalAlignment.TracePoint;
+
     File file;
     R insertions;
     InsertionDbIndex index;
@@ -320,15 +478,20 @@ private struct InsertionDbFileWriter(R)
         file.rawWrite([index]);
         writeBlock!Insertion();
         writeBlock!CompressedBaseQuad();
-        writeBlock!SpliceSite();
+        writeBlock!SeededAlignment();
+        writeBlock!LocalAlignment();
+        writeBlock!TracePoint();
+        writeBlock!id_t();
     }
 
     void writeBlock(T : Insertion)()
     {
         auto compressedBaseQuads = index.compressedBaseQuads;
         compressedBaseQuads.length = 0;
-        auto spliceSites = index.spliceSites;
-        spliceSites.length = 0;
+        auto overlaps = index.overlaps;
+        overlaps.length = 0;
+        auto readIds = index.readIds;
+        readIds.length = 0;
 
         version (assert)
         {
@@ -339,7 +502,8 @@ private struct InsertionDbFileWriter(R)
         foreach (insertion; this.insertions.save)
         {
             compressedBaseQuads.length = insertion.payload.sequence.compressedLength;
-            spliceSites.length = insertion.payload.spliceSites.length;
+            overlaps.length = insertion.payload.overlaps.length;
+            readIds.length = insertion.payload.readIds.length;
             auto insertionStorage = InsertionStorage(
                 insertion.start,
                 insertion.end,
@@ -347,13 +511,15 @@ private struct InsertionDbFileWriter(R)
                 insertion.payload.sequence.length,
                 compressedBaseQuads,
                 insertion.payload.contigLength,
-                spliceSites,
+                overlaps,
+                readIds,
             );
 
             file.rawWrite([insertionStorage]);
 
             compressedBaseQuads.ptr = compressedBaseQuads[$];
-            spliceSites.ptr = spliceSites[$];
+            overlaps.ptr = overlaps[$];
+            readIds.ptr = readIds[$];
             version (assert)
             {
                 ++insertions.length;
@@ -383,23 +549,136 @@ private struct InsertionDbFileWriter(R)
         }
     }
 
-    void writeBlock(T : SpliceSite)()
+    void writeBlock(T : SeededAlignment)()
+    {
+        auto localAlignments = index.localAlignments;
+        localAlignments.length = 0;
+
+        version (assert)
+        {
+            auto overlaps = index.overlaps;
+            overlaps.length = 0;
+            assert(overlaps.ptr == file.tell());
+        }
+
+        foreach (insertion; this.insertions.save)
+        {
+            foreach (overlap; insertion.payload.overlaps)
+            {
+                localAlignments.length = overlap.localAlignments.length;
+
+                auto overlapStorage = SeededAlignmentStorage(
+                    overlap.id,
+                    overlap.contigA.id,
+                    overlap.contigA.length,
+                    overlap.contigB.id,
+                    overlap.contigB.length,
+                    overlap.flags,
+                    localAlignments,
+                    overlap.tracePointDistance,
+                    overlap.seed,
+                );
+
+                file.rawWrite([overlapStorage]);
+
+                localAlignments.ptr = localAlignments[$];
+                version (assert)
+                {
+                    ++overlaps.length;
+                    assert(overlaps[$] == file.tell());
+                }
+            }
+        }
+    }
+
+    void writeBlock(T : LocalAlignment)()
+    {
+        auto tracePoints = index.tracePoints;
+        tracePoints.length = 0;
+
+        version (assert)
+        {
+            auto localAlignments = index.localAlignments;
+            localAlignments.length = 0;
+            assert(localAlignments.ptr == file.tell());
+        }
+
+        foreach (insertion; this.insertions.save)
+        {
+            foreach (overlap; insertion.payload.overlaps)
+            {
+                foreach (localAlignment; overlap.localAlignments)
+                {
+                    tracePoints.length = localAlignment.tracePoints.length;
+
+                    auto localAlignmentStorage = LocalAlignmentStorage(
+                        localAlignment.contigA.begin,
+                        localAlignment.contigA.end,
+                        localAlignment.contigB.begin,
+                        localAlignment.contigB.end,
+                        localAlignment.numDiffs,
+                        tracePoints,
+                    );
+
+                    file.rawWrite([localAlignmentStorage]);
+
+                    tracePoints.ptr = tracePoints[$];
+                    version (assert)
+                    {
+                        ++localAlignments.length;
+                        assert(localAlignments[$] == file.tell());
+                    }
+                }
+            }
+        }
+    }
+
+    void writeBlock(T : TracePoint)()
     {
         version (assert)
         {
-            auto spliceSites = index.spliceSites;
-            spliceSites.length = 0;
-            assert(spliceSites.ptr == file.tell());
+            auto tracePoints = index.tracePoints;
+            tracePoints.length = 0;
+            assert(tracePoints.ptr == file.tell());
         }
+
         foreach (insertion; this.insertions.save)
         {
-            static assert(SpliceSite.sizeof == StorageType!SpliceSite.sizeof);
-            file.rawWrite(insertion.payload.spliceSites);
+            foreach (overlap; insertion.payload.overlaps)
+            {
+                foreach (localAlignment; overlap.localAlignments)
+                {
+                    static assert(TracePoint.sizeof == StorageType!TracePoint.sizeof);
+                    file.rawWrite(localAlignment.tracePoints);
+
+                    version (assert)
+                    {
+                        tracePoints.length += localAlignment.tracePoints.length;
+                        assert(tracePoints[$] == file.tell());
+                    }
+                }
+            }
+        }
+    }
+
+    void writeBlock(T : id_t)()
+    {
+        version (assert)
+        {
+            auto readIds = index.readIds;
+            readIds.length = 0;
+            assert(readIds.ptr == file.tell());
+        }
+
+        foreach (insertion; this.insertions.save)
+        {
+            static assert(id_t.sizeof == StorageType!id_t.sizeof);
+            file.rawWrite(insertion.payload.readIds);
 
             version (assert)
             {
-                spliceSites.length += insertion.payload.spliceSites.length;
-                assert(spliceSites[$] == file.tell());
+                readIds.length += insertion.payload.readIds.length;
+                assert(readIds[$] == file.tell());
             }
         }
     }
@@ -407,6 +686,9 @@ private struct InsertionDbFileWriter(R)
 
 private struct InsertionDbIndex
 {
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias TracePoint = LocalAlignment.TracePoint;
+
     mixin DbIndex;
 
     private static template NextType(T)
@@ -414,8 +696,14 @@ private struct InsertionDbIndex
         static if (is(T == Insertion))
             alias NextType = CompressedBaseQuad;
         else static if (is(T == CompressedBaseQuad))
-            alias NextType = SpliceSite;
-        else static if (is(T == SpliceSite))
+            alias NextType = SeededAlignment;
+        else static if (is(T == SeededAlignment))
+            alias NextType = LocalAlignment;
+        else static if (is(T == LocalAlignment))
+            alias NextType = TracePoint;
+        else static if (is(T == TracePoint))
+            alias NextType = id_t;
+        else static if (is(T == id_t))
             alias NextType = EOF;
     }
 
@@ -425,20 +713,32 @@ private struct InsertionDbIndex
             alias fieldPtr = insertionsPtr;
         else static if (is(T == CompressedBaseQuad))
             alias fieldPtr = compressedBaseQuadsPtr;
-        else static if (is(T == SpliceSite))
-            alias fieldPtr = spliceSitesPtr;
+        else static if (is(T == SeededAlignment))
+            alias fieldPtr = overlapsPtr;
+        else static if (is(T == LocalAlignment))
+            alias fieldPtr = localAlignmentsPtr;
+        else static if (is(T == TracePoint))
+            alias fieldPtr = tracePointsPtr;
+        else static if (is(T == id_t))
+            alias fieldPtr = readIdsPtr;
         else static if (is(T == EOF))
             alias fieldPtr = eofPtr;
     }
 
     size_t insertionsPtr;
     size_t compressedBaseQuadsPtr;
-    size_t spliceSitesPtr;
+    size_t overlapsPtr;
+    size_t localAlignmentsPtr;
+    size_t tracePointsPtr;
+    size_t readIdsPtr;
     size_t eofPtr;
 
     @property alias insertions = arrayStorage!Insertion;
     @property alias compressedBaseQuads = arrayStorage!CompressedBaseQuad;
-    @property alias spliceSites = arrayStorage!SpliceSite;
+    @property alias overlaps = arrayStorage!SeededAlignment;
+    @property alias localAlignments = arrayStorage!LocalAlignment;
+    @property alias tracePoints = arrayStorage!TracePoint;
+    @property alias readIds = arrayStorage!id_t;
 
     static InsertionDbIndex from(R)(R insertions) nothrow pure
             if (isInputRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
@@ -451,13 +751,29 @@ private struct InsertionDbIndex
         {
             index.endPtr!CompressedBaseQuad += StorageType!CompressedBaseQuad.sizeof *
                     insertion.payload.sequence.compressedLength;
-            index.endPtr!SpliceSite += StorageType!SpliceSite.sizeof *
-                    insertion.payload.spliceSites.length;
+            index.endPtr!SeededAlignment += StorageType!SeededAlignment.sizeof *
+                    insertion.payload.overlaps.length;
+
+            foreach (overlap; insertion.payload.overlaps)
+            {
+                index.endPtr!LocalAlignment += StorageType!LocalAlignment.sizeof *
+                        overlap.localAlignments.length;
+
+                foreach (localAlignment; overlap.localAlignments)
+                    index.endPtr!TracePoint += StorageType!TracePoint.sizeof *
+                            localAlignment.tracePoints.length;
+            }
+
+            index.endPtr!id_t += StorageType!id_t.sizeof *
+                    insertion.payload.readIds.length;
         }
 
         index.compressedBaseQuadsPtr += index.insertionsPtr;
-        index.spliceSitesPtr += index.compressedBaseQuadsPtr;
-        index.eofPtr += index.spliceSitesPtr;
+        index.overlapsPtr += index.compressedBaseQuadsPtr;
+        index.localAlignmentsPtr += index.overlapsPtr;
+        index.tracePointsPtr += index.localAlignmentsPtr;
+        index.readIdsPtr += index.tracePointsPtr;
+        index.eofPtr += index.readIdsPtr;
 
         return index;
     }
@@ -470,17 +786,29 @@ private struct InsertionDbIndex
         assert(dbIndex.compressedBaseQuadsPtr ==
                 dbIndex.insertionsPtr +
                 StorageType!Insertion.sizeof * numInsertions);
-        assert(dbIndex.spliceSitesPtr ==
+        assert(dbIndex.overlapsPtr ==
                 dbIndex.compressedBaseQuadsPtr +
                 StorageType!CompressedBaseQuad.sizeof * numCompressedBaseQuads);
+        assert(dbIndex.localAlignmentsPtr ==
+                dbIndex.overlapsPtr +
+                StorageType!SeededAlignment.sizeof * numOverlaps);
+        assert(dbIndex.tracePointsPtr ==
+                dbIndex.localAlignmentsPtr +
+                StorageType!LocalAlignment.sizeof * numLocalAlignments);
+        assert(dbIndex.readIdsPtr ==
+                dbIndex.tracePointsPtr +
+                StorageType!TracePoint.sizeof * numTracePoints);
         assert(dbIndex.eofPtr ==
-                dbIndex.spliceSitesPtr +
-                StorageType!SpliceSite.sizeof * numSpliceSites);
+                dbIndex.readIdsPtr +
+                StorageType!id_t.sizeof * numReadIds);
     }
 }
 
 unittest
 {
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias TracePoint = LocalAlignment.TracePoint;
+
     enum begin = 1;
     enum end = 2;
     enum modified = 3;
@@ -504,7 +832,7 @@ unittest
         InsertionDbIndex dbIndex;
 
         dbIndex.compressedBaseQuadsPtr = begin;
-        dbIndex.spliceSitesPtr = end;
+        dbIndex.overlapsPtr = end;
 
         assert(dbIndex.beginPtr!CompressedBaseQuad == begin);
         assert(dbIndex.endPtr!CompressedBaseQuad == end);
@@ -513,21 +841,66 @@ unittest
         dbIndex.endPtr!CompressedBaseQuad = modified;
 
         assert(dbIndex.compressedBaseQuadsPtr == modified);
-        assert(dbIndex.spliceSitesPtr == modified);
+        assert(dbIndex.overlapsPtr == modified);
     }
     {
         InsertionDbIndex dbIndex;
 
-        dbIndex.spliceSitesPtr = begin;
+        dbIndex.overlapsPtr = begin;
+        dbIndex.localAlignmentsPtr = end;
+
+        assert(dbIndex.beginPtr!SeededAlignment == begin);
+        assert(dbIndex.endPtr!SeededAlignment == end);
+
+        dbIndex.beginPtr!SeededAlignment = modified;
+        dbIndex.endPtr!SeededAlignment = modified;
+
+        assert(dbIndex.overlapsPtr == modified);
+        assert(dbIndex.localAlignmentsPtr == modified);
+    }
+    {
+        InsertionDbIndex dbIndex;
+
+        dbIndex.localAlignmentsPtr = begin;
+        dbIndex.tracePointsPtr = end;
+
+        assert(dbIndex.beginPtr!LocalAlignment == begin);
+        assert(dbIndex.endPtr!LocalAlignment == end);
+
+        dbIndex.beginPtr!LocalAlignment = modified;
+        dbIndex.endPtr!LocalAlignment = modified;
+
+        assert(dbIndex.localAlignmentsPtr == modified);
+        assert(dbIndex.tracePointsPtr == modified);
+    }
+    {
+        InsertionDbIndex dbIndex;
+
+        dbIndex.tracePointsPtr = begin;
+        dbIndex.readIdsPtr = end;
+
+        assert(dbIndex.beginPtr!TracePoint == begin);
+        assert(dbIndex.endPtr!TracePoint == end);
+
+        dbIndex.beginPtr!TracePoint = modified;
+        dbIndex.endPtr!TracePoint = modified;
+
+        assert(dbIndex.tracePointsPtr == modified);
+        assert(dbIndex.readIdsPtr == modified);
+    }
+    {
+        InsertionDbIndex dbIndex;
+
+        dbIndex.readIdsPtr = begin;
         dbIndex.eofPtr = end;
 
-        assert(dbIndex.beginPtr!SpliceSite == begin);
-        assert(dbIndex.endPtr!SpliceSite == end);
+        assert(dbIndex.beginPtr!id_t == begin);
+        assert(dbIndex.endPtr!id_t == end);
 
-        dbIndex.beginPtr!SpliceSite = modified;
-        dbIndex.endPtr!SpliceSite = modified;
+        dbIndex.beginPtr!id_t = modified;
+        dbIndex.endPtr!id_t = modified;
 
-        assert(dbIndex.spliceSitesPtr == modified);
+        assert(dbIndex.readIdsPtr == modified);
         assert(dbIndex.eofPtr == modified);
     }
 }
@@ -540,10 +913,22 @@ private template StorageType(T)
         alias StorageType = ArrayStorage!(StorageType!CompressedBaseQuad);
     else static if (is(T == CompressedBaseQuad))
         alias StorageType = CompressedBaseQuad;
-    else static if (is(T == SpliceSite))
-        alias StorageType = SpliceSite;
-    else static if (is(T == SpliceSite[]))
-        alias StorageType = ArrayStorage!(StorageType!SpliceSite);
+    else static if (is(T == SeededAlignment[]))
+        alias StorageType = ArrayStorage!(StorageType!SeededAlignment);
+    else static if (is(T == SeededAlignment))
+        alias StorageType = SeededAlignmentStorage;
+    else static if (is(T == AlignmentChain.LocalAlignment[]))
+        alias StorageType = ArrayStorage!(StorageType!(AlignmentChain.LocalAlignment));
+    else static if (is(T == AlignmentChain.LocalAlignment))
+        alias StorageType = LocalAlignmentStorage;
+    else static if (is(T == AlignmentChain.LocalAlignment.TracePoint[]))
+        alias StorageType = ArrayStorage!(StorageType!(AlignmentChain.LocalAlignment.TracePoint));
+    else static if (is(T == AlignmentChain.LocalAlignment.TracePoint))
+        alias StorageType = TracePointStorage;
+    else static if (is(T == id_t))
+        alias StorageType = id_t;
+    else static if (is(T == id_t[]))
+        alias StorageType = ArrayStorage!(StorageType!id_t);
 }
 
 private struct InsertionStorage
@@ -554,5 +939,39 @@ private struct InsertionStorage
     size_t sequenceLength;
     StorageType!(CompressedBaseQuad[]) sequence;
     size_t contigLength;
-    StorageType!(SpliceSite[]) spliceSites;
+    StorageType!(SeededAlignment[]) overlaps;
+    StorageType!(id_t[]) readIds;
+}
+
+private struct SeededAlignmentStorage
+{
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+
+    id_t id;
+    id_t contigAId;
+    coord_t contigALength;
+    id_t contigBId;
+    coord_t contigBLength;
+    AlignmentChain.Flags flags;
+    StorageType!(LocalAlignment[]) localAlignments;
+    trace_point_t tracePointDistance;
+    AlignmentLocationSeed seed;
+}
+
+private struct LocalAlignmentStorage
+{
+    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
+
+    coord_t contigABegin;
+    coord_t contigAEnd;
+    coord_t contigBBegin;
+    coord_t contigBEnd;
+    diff_t numDiffs;
+    StorageType!(TracePoint[]) tracePoints;
+}
+
+private struct TracePointStorage
+{
+    trace_point_t numDiffs;
+    trace_point_t numBasePairs;
 }

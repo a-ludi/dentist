@@ -8,11 +8,15 @@
 */
 module dentist.common.insertions;
 
-import dentist.common : ReferencePoint;
+import dentist.common :
+    dentistEnforce,
+    ReadInterval,
+    ReferenceInterval;
 import dentist.common.alignments :
-    AlignmentChain,
     AlignmentLocationSeed,
-    id_t;
+    coord_t,
+    id_t,
+    SeededAlignment;
 import dentist.common.binio : CompressedSequence;
 import dentist.common.scaffold :
     ContigNode,
@@ -21,28 +25,25 @@ import dentist.common.scaffold :
     isExtension,
     isGap,
     Scaffold;
+import dentist.util.log;
 import dentist.util.math : add;
 import std.algorithm :
+    among,
     canFind,
     filter,
     swap;
 import std.array : array;
-import std.typecons : Flag, tuple, Tuple;
+import std.typecons : tuple;
+import vibe.data.json : toJson = serializeToJson;
 
-/// Information about the point where the two sequences should be spliced.
-struct SpliceSite
-{
-    ReferencePoint croppingRefPosition;
-    AlignmentLocationSeed alignmentSeed;
-    AlignmentChain.Flags flags;
-}
 
 /// This characterizes an insertion.
 struct InsertionInfo
 {
     CompressedSequence sequence;
     size_t contigLength;
-    SpliceSite[] spliceSites;
+    SeededAlignment[] overlaps;
+    id_t[] readIds;
 }
 
 /// This is used to collect all sub-sequences of the output.
@@ -71,126 +72,101 @@ bool hasSequence(in Insertion insertion)
     return insertion.payload.sequence.length > 0;
 }
 
-Insertion concatenateSpliceSites(Insertion existingJoin, Insertion newJoin)
+coord_t getCroppingPosition(string contig)(in SeededAlignment overlap) if (contig == "contigA")
 {
-    if (existingJoin.payload.sequence.length == 0)
+    final switch (overlap.seed)
     {
-        existingJoin.payload.sequence = newJoin.payload.sequence;
+        case AlignmentLocationSeed.front:
+            return overlap.first.contigA.begin;
+        case AlignmentLocationSeed.back:
+            return overlap.last.contigA.end;
     }
-    existingJoin.payload.spliceSites ~= newJoin.payload.spliceSites;
-
-    return existingJoin;
 }
 
-/// Remove contig cropping where no new sequence is to be inserted.
-OutputScaffold fixContigCropping(OutputScaffold scaffold)
+coord_t getCroppingPosition(string contig)(in SeededAlignment overlap) if (contig == "contigB")
 {
-    alias replace = OutputScaffold.ConflictStrategy.replace;
-    auto contigJoins = scaffold.edges.filter!isDefault;
+    coord_t coord;
 
-    foreach (contigJoin; contigJoins)
+    final switch (overlap.seed)
     {
-        bool insertionUpdated;
-
-        foreach (contigNode; [contigJoin.start, contigJoin.end])
-        {
-            auto shouldInsertNewSequence = scaffold
-                .incidentEdges(contigNode)
-                .canFind!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension));
-
-            if (!shouldInsertNewSequence)
-            {
-                auto contigLength = contigJoin.payload.contigLength;
-                auto newSpliceSites = contigJoin
-                    .payload
-                    .spliceSites
-                    .filter!(spliceSite => contigNode.contigPart == ContigPart.begin
-                        ? !(spliceSite.croppingRefPosition.value < contigLength / 2)
-                        : !(spliceSite.croppingRefPosition.value >= contigLength / 2))
-                    .array;
-                if (newSpliceSites.length < contigJoin.payload.spliceSites.length)
-                {
-                    contigJoin.payload.spliceSites = newSpliceSites;
-                    insertionUpdated = true;
-                }
-            }
-        }
-
-        if (insertionUpdated)
-        {
-            scaffold.add!replace(contigJoin);
-        }
+        case AlignmentLocationSeed.front:
+            coord = overlap.first.contigB.begin;
+            break;
+        case AlignmentLocationSeed.back:
+            coord = overlap.last.contigB.end;
+            break;
     }
 
-    return scaffold;
+    if (overlap.flags.complement)
+        return overlap.contigB.length - coord;
+    else
+        return coord;
 }
 
 auto getInfoForExistingContig(in ContigNode begin, in Insertion insertion, in bool globalComplement)
 {
-    auto spliceSites = insertion.payload.spliceSites;
+    auto overlaps = insertion.payload.overlaps;
     auto contigId = cast(id_t) begin.contigId;
     auto contigLength = insertion.payload.contigLength;
-    size_t spliceStart;
-    size_t spliceEnd;
+    auto slice = ReferenceInterval(contigId, 0, contigLength);
 
     assert(contigLength > 0);
 
-    switch (spliceSites.length)
+    switch (overlaps.length)
     {
     case 0:
-        spliceStart = 0;
-        spliceEnd = contigLength;
+        // Keep whole contig
         break;
     case 1:
-        auto splicePosition = spliceSites[0].croppingRefPosition.value;
-        auto spliceSeed = spliceSites[0].alignmentSeed;
+        auto overlap = overlaps[0];
 
-        if (spliceSeed == AlignmentLocationSeed.front)
+        final switch (overlap.seed)
         {
-            spliceStart = splicePosition;
-            spliceEnd = contigLength;
-        }
-        else
-        {
-            spliceStart = 0;
-            spliceEnd = splicePosition;
+        case AlignmentLocationSeed.front:
+            slice.begin = getCroppingPosition!"contigA"(overlap);
+            break;
+        case AlignmentLocationSeed.back:
+            slice.end = getCroppingPosition!"contigA"(overlap);
+            break;
         }
         break;
     case 2:
-        assert(spliceSites[0].croppingRefPosition.contigId
-                == spliceSites[1].croppingRefPosition.contigId);
+        assert(overlaps[0].contigA.id == overlaps[1].contigA.id);
+        assert(overlaps[0].seed != overlaps[1].seed);
 
-        spliceStart = spliceSites[0].croppingRefPosition.value;
-        spliceEnd = spliceSites[1].croppingRefPosition.value;
-
-        assert(
-            spliceStart == spliceEnd ||
-            (spliceStart < spliceEnd)
-            ==
-            (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed)
-        );
-        if (spliceEnd < spliceStart)
-            swap(spliceStart, spliceEnd);
+        if (overlaps[0].seed < overlaps[1].seed)
+        {
+            slice.begin = getCroppingPosition!"contigA"(overlaps[0]);
+            slice.end = getCroppingPosition!"contigA"(overlaps[1]);
+        }
+        else
+        {
+            slice.begin = getCroppingPosition!"contigA"(overlaps[1]);
+            slice.end = getCroppingPosition!"contigA"(overlaps[0]);
+        }
         break;
     default:
-        assert(0, "too many spliceSites");
+        dentistEnforce(0, "too many splice sites");
     }
 
-    assert(globalComplement != (begin < insertion.target(begin)));
+    assert(
+        // walk contig in correct orientation
+        globalComplement != (begin < insertion.target(begin)) ||
+        // the contig is circular
+        begin.contigId == insertion.target(begin).contigId
+    );
 
     return tuple!(
         "contigId",
         "contigLength",
-        "spliceStart",
-        "spliceEnd",
+        "cropping",
         "length",
         "complement",
     )(
         contigId,
         contigLength,
-        spliceStart,
-        spliceEnd,
-        spliceEnd - spliceStart,
+        slice,
+        slice.size,
         globalComplement,
     );
 }
@@ -206,21 +182,53 @@ auto getInfoForNewSequenceInsertion(
     in bool globalComplement,
 )
 {
-    auto spliceSites = insertion.payload.spliceSites;
-    auto effectiveComplement = spliceSites[0].flags.complement ^ globalComplement;
+    auto overlaps = insertion.payload.overlaps;
+    auto firstOverlap = overlaps[0].contigA.id == begin.contigId ? overlaps[0] : overlaps[1];
+    auto effectiveComplement = firstOverlap.flags.complement ^ globalComplement;
 
     assert(
-        (insertion.isExtension && spliceSites.length == 1) ^
-        (insertion.isGap && spliceSites.length == 2)
+        (insertion.isExtension && overlaps.length == 1) ^
+        (insertion.isGap && overlaps.length == 2)
     );
+
+    auto slice = ReadInterval(
+        firstOverlap.contigB.id,
+        0,
+        firstOverlap.contigB.length,
+    );
+    switch (overlaps.length)
+    {
+    case 1:
+        final switch (firstOverlap.seed)
+        {
+        case AlignmentLocationSeed.front:
+            slice.end = getCroppingPosition!"contigB"(firstOverlap);
+            break;
+        case AlignmentLocationSeed.back:
+            slice.begin = getCroppingPosition!"contigB"(firstOverlap);
+            break;
+        }
+        break;
+    case 2:
+        slice.begin = getCroppingPosition!"contigB"(overlaps[0]);
+        slice.end = getCroppingPosition!"contigB"(overlaps[1]);
+
+        if (slice.end < slice.begin)
+            swap(slice.begin, slice.end);
+        break;
+    default:
+        assert(0);
+    }
 
     return tuple!(
         "sequence",
+        "cropping",
         "length",
         "complement",
     )(
         insertion.payload.sequence,
-        insertion.payload.sequence.length,
+        slice,
+        slice.size,
         effectiveComplement,
     );
 }

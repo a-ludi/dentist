@@ -11,19 +11,23 @@ module dentist.util.math;
 import dentist.util.algorithm : cmpLexicographically, sliceBy;
 import std.algorithm :
     all,
+    among,
     copy,
     countUntil,
     cumulativeFold,
     filter,
     map,
     max,
+    min,
+    maxElement,
     sort,
     sum,
     swap,
     uniq;
-import std.array : Appender, array;
+import std.array : appender, Appender, array;
 import std.conv : to;
 import std.exception : assertThrown;
+import std.format : format;
 import std.functional : binaryFun, unaryFun;
 import std.range :
     assumeSorted,
@@ -31,12 +35,22 @@ import std.range :
     ElementType,
     enumerate,
     isForwardRange,
+    isInputRange,
     isRandomAccessRange,
     retro,
     save,
-    walkLength;
-import std.traits : isCallable, isIntegral, isNumeric;
-import std.typecons : Flag, No, Yes;
+    slide,
+    StoppingPolicy,
+    walkLength,
+    zip;
+import std.traits :
+    isCallable,
+    isIntegral,
+    isNumeric;
+import std.typecons :
+    Flag,
+    No,
+    Yes;
 
 debug import std.stdio : writeln;
 
@@ -58,6 +72,38 @@ unittest
     {
         auto values = [1.0, 2.0, 3.0, 4.0];
         assert(values.mean == 2.5);
+    }
+}
+
+/// Calculate the weighted mean of values.
+double mean(Values, Weights)(Values values, Weights weights)
+    if (isInputRange!Values && isForwardRange!Weights)
+{
+    enum zeroWeight = cast(ElementType!Weights) 0;
+
+    auto weightedSum = zip(StoppingPolicy.requireSameLength, values, weights)
+        .map!(pair => (pair[0] * pair[1]).to!double)
+        .sum;
+    auto totalWeight = weights.sum;
+
+    return weightedSum / totalWeight;
+}
+
+unittest
+{
+    {
+        auto values = [2, 4, 6];
+        auto equalWeights = [1, 1, 1];
+        auto weights = [3, 4, 1];
+
+        assert(mean(values, equalWeights) == mean(values));
+        assert(mean(values, weights) == 3.5);
+    }
+    {
+        auto values = [1.0, 2.0, 3.0, 4.0];
+        auto weights = [4.0, 3.0, 2.0, 1.0];
+
+        assert(mean(values, weights) == 2.0);
     }
 }
 
@@ -106,7 +152,7 @@ unittest
 /// Calculate the Nxx (e.g. N50) of values.
 ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__traits(compiles, sort(values)))
 {
-    static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined for empty set");
+    static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined");
     assert(values.length > 0, "N" ~ xx.to!string ~ " is undefined for empty set");
     auto xxPercentile = xx/100.0 * totalSize;
     auto sortedValues = values.sort;
@@ -115,7 +161,7 @@ ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__trai
         .cumulativeFold!"a + b"(cast(ElementType!Range) 0)
         .countUntil!"a >= b"(xxPercentile);
 
-    if (targetIndex == values.length)
+    if (targetIndex.among(-1, values.length))
         return 0;
     else
         return sortedValues[$ - targetIndex - 1];
@@ -682,7 +728,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// Check if edge/node exists in this graph. Ignores the weight if weighted.
-    bool opBinaryRight(string op)(Node node) const pure nothrow if (op == "in")
+    bool opBinaryRight(string op)(in Node node) const pure nothrow if (op == "in")
     {
         auto sortedNodes = assumeSorted(nodes);
 
@@ -690,14 +736,14 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// ditto
-    bool has(Node node) const pure nothrow
+    bool has(in Node node) const pure nothrow
     {
         return node in this;
     }
 
     /// Check if edge exists in this graph. Only the `start` and `end` node
     /// will be compared.
-    bool opBinaryRight(string op)(Edge edge) const pure nothrow if (op == "in")
+    bool opBinaryRight(string op)(in Edge edge) const pure nothrow if (op == "in")
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
 
@@ -705,14 +751,14 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// ditto
-    bool has(Edge edge) const pure nothrow
+    bool has(in Edge edge) const pure nothrow
     {
         return edge in this;
     }
 
     /// Get the designated edge from this graph. Only the `start` and `end`
     /// node will be compared.
-    auto get(Edge edge)
+    auto ref get(in Edge edge)
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
         auto existingEdges = sortedEdges.equalRange(edge);
@@ -740,8 +786,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         assertThrown!MissingEdgeException(g1.get(g1.edge(1, 1)));
     }
 
-    /// Returns the ndex of node `n` in the list of nodes.
-    size_t indexOf(Node n) const
+    /// Returns the index of node `n` in the list of nodes.
+    size_t indexOf(in Node n) const
     {
         auto sortedNodes = assumeSorted(nodes);
         auto tristectedNodes = sortedNodes.trisect(n);
@@ -757,12 +803,38 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     ///
     unittest
     {
-
         auto g1 = Graph!(int, int)([1, 2]);
 
         assert(g1.indexOf(1) == 0);
         assert(g1.indexOf(2) == 1);
         assertThrown!MissingNodeException(g1.indexOf(3));
+    }
+
+    /// Returns the index of node `n` in the list of nodes.
+    size_t indexOf(in Edge edge) const
+    {
+        auto sortedEdges = assumeSorted!orderByNodes(edges);
+        auto trisectedEdges = sortedEdges.trisect(edge);
+
+        if (trisectedEdges[1].empty)
+        {
+            throw new MissingEdgeException();
+        }
+
+        return trisectedEdges[0].length;
+    }
+
+    ///
+    unittest
+    {
+        auto g1 = Graph!(int, int)([1, 2]);
+
+        auto e1 = g1.edge(1, 2, 1);
+
+        g1 ~= e1;
+
+        assert(g1.indexOf(g1.edge(1, 2)) == 0);
+        assertThrown!MissingEdgeException(g1.indexOf(g1.edge(1, 1)));
     }
 
     static if (isDirected)
@@ -1383,6 +1455,14 @@ void filterEdges(alias pred, G)(ref G graph) if (is(G : Graph!Params, Params...)
     graph._edges.shrinkTo(graph._edges.data.length - bufferRest.length);
 }
 
+void mapEdges(alias fun, G)(ref G graph) if (is(G : Graph!Params, Params...))
+{
+    foreach (ref edge; graph._edges.data)
+        edge = unaryFun!fun(edge);
+
+    graph._edges.data.sort();
+}
+
 class EmptySetException : Exception
 {
     this(string msg)
@@ -1415,6 +1495,19 @@ struct NaturalNumberSet
         }
     }
 
+    static NaturalNumberSet create(size_t[] initialElements...)
+    {
+        if (initialElements.length == 0)
+            return NaturalNumberSet();
+
+        auto set = NaturalNumberSet(initialElements.maxElement);
+
+        foreach (i; initialElements)
+            set.add(i);
+
+        return set;
+    }
+
     this(this)
     {
         parts = parts.dup;
@@ -1434,7 +1527,8 @@ struct NaturalNumberSet
     {
         if (parts.length == 0)
         {
-            parts.length = max(1, ceil(n, partSize) / partSize);
+            parts.length = max(1, ceildiv(n, partSize));
+            nMax = parts.length * partSize;
         }
 
         while (!inBounds(n))
@@ -1496,9 +1590,125 @@ struct NaturalNumberSet
         return (parts[partIdx(n)] & itemMask(n)) != emptyPart;
     }
 
+    bool opBinaryRight(string op)(in size_t n) const pure nothrow if (op == "in")
+    {
+        return this.has(n);
+    }
+
     bool empty() const pure nothrow
     {
         return parts.all!(part => part == emptyPart);
+    }
+
+    void clear() pure nothrow
+    {
+        foreach (ref part; parts)
+            part = emptyPart;
+    }
+
+    bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "==")
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+        {
+            if (this.parts[i] != other.parts[i])
+                return false;
+        }
+
+        static bool hasEmptyTail(ref in NaturalNumberSet set, in size_t tailStart)
+        {
+            foreach (i; tailStart .. set.parts.length)
+                if (set.parts[i] != emptyPart)
+                    return false;
+
+            return true;
+        }
+
+        if (this.parts.length > numCommonParts)
+            return hasEmptyTail(this, numCommonParts);
+        if (other.parts.length > numCommonParts)
+            return hasEmptyTail(other, numCommonParts);
+
+        return true;
+    }
+
+    bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "in")
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+            if ((this.parts[i] & other.parts[i]) != this.parts[i])
+                return false;
+
+        static bool hasEmptyTail(ref in NaturalNumberSet set, in size_t tailStart)
+        {
+            foreach (i; tailStart .. set.parts.length)
+                if (set.parts[i] != emptyPart)
+                    return false;
+
+            return true;
+        }
+
+        if (this.parts.length > numCommonParts)
+            return hasEmptyTail(this, numCommonParts);
+
+        return true;
+    }
+
+    NaturalNumberSet opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op.among("|", "^", "&"))
+    {
+        NaturalNumberSet result;
+        result.parts.length = max(this.parts.length, other.parts.length);
+        result.nMax = max(this.nMax, other.nMax);
+
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+            result.parts[i] = mixin("this.parts[i] " ~ op ~ " other.parts[i]");
+
+        static if (op.among("|", "^"))
+        {
+            if (this.parts.length > numCommonParts)
+                result.parts[numCommonParts .. $] = this.parts[numCommonParts .. $];
+            if (other.parts.length > numCommonParts)
+                result.parts[numCommonParts .. $] = other.parts[numCommonParts .. $];
+        }
+
+        return result;
+    }
+
+    bool intersects(in NaturalNumberSet other) const pure nothrow
+    {
+        auto numCommonParts = min(this.parts.length, other.parts.length);
+
+        foreach (i; 0 .. numCommonParts)
+        {
+            if ((this.parts[i] & other.parts[i]) != emptyPart)
+                return true;
+        }
+
+        return false;
+    }
+
+    @property size_t size() const pure nothrow
+    {
+        size_t numSetBits;
+
+        foreach (i, part; parts)
+        {
+            size_t j = 0;
+
+            while ((part >> j) != emptyPart && j < partSize)
+            {
+                while (((part >> j) & firstBit) != firstBit)
+                    ++j;
+                ++numSetBits;
+                ++j;
+            }
+        }
+
+        return numSetBits;
     }
 
     size_t minElement() const
@@ -1561,13 +1771,13 @@ struct NaturalNumberSet
     {
         static struct ElementsRange
         {
-            const NaturalNumberSet* set;
+            const(NaturalNumberSet)* set;
             bool _empty = false;
             size_t i = 0;
             size_t part;
             size_t j = 0;
 
-            this(const NaturalNumberSet* set) pure nothrow
+            this(const(NaturalNumberSet)* set) pure nothrow
             {
                 this.set = set;
                 this._empty = set.empty;
@@ -1580,6 +1790,11 @@ struct NaturalNumberSet
                         popFront();
                     }
                 }
+            }
+
+            @property ElementsRange save() const pure nothrow
+            {
+                return this;
             }
 
             void popFront() pure nothrow
@@ -1660,6 +1875,30 @@ struct NaturalNumberSet
 
         assert(equal(someNumbers, set.elements));
     }
+
+    /// The set may be modified while iterating:
+    unittest
+    {
+        import std.algorithm : equal;
+        import std.range : iota;
+
+        enum numElements = 64;
+        auto set = NaturalNumberSet(numElements, Yes.addAll);
+
+        foreach (i; set.elements)
+        {
+            if (i % 10 == 0)
+                set.remove(i + 1);
+        }
+
+        auto expectedNumbers = iota(numElements).filter!"a == 0 || !((a - 1) % 10 == 0)";
+        assert(equal(expectedNumbers, set.elements));
+    }
+
+    string toString() const pure
+    {
+        return format("[%(%d,%)]", this.elements);
+    }
 }
 
 unittest
@@ -1700,6 +1939,299 @@ unittest
             assert(!set.has(i));
         }
     }
+}
+
+/**
+    Find all maximal connected components of a graph-like structure. The
+    predicate `isConnected` will be evaluated `O(n^^2)` times in the
+    worst-case and `Ω(n)` in the best case. In expectation it will be
+    evaluated `θ(n*log(n))`.
+
+    Params:
+        isConnected =   binary predicate that evaluates to true iff two nodes,
+                        represented as indices, are connected
+        numNodes    =   total number of nodes in the graph
+
+    Returns:    range of maxmimally connected components represented as
+                `NaturalNumberSet`s
+*/
+auto findMaximallyConnectedComponents(alias isConnected)(in size_t numNodes)
+{
+    return MaximalConnectedComponents!(binaryFun!isConnected)(numNodes);
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : only;
+
+    alias modEqv(size_t m) = (a, b) => (a % m) == (b % m);
+    alias clusterByThreshold(size_t t) = (a, b) => (a < t) == (b < t);
+
+    assert(equal(
+        findMaximallyConnectedComponents!(modEqv!5)(15),
+        only(
+            NaturalNumberSet.create(0, 5, 10),
+            NaturalNumberSet.create(1, 6, 11),
+            NaturalNumberSet.create(2, 7, 12),
+            NaturalNumberSet.create(3, 8, 13),
+            NaturalNumberSet.create(4, 9, 14),
+        ),
+    ));
+    assert(equal(
+        findMaximallyConnectedComponents!(modEqv!3)(15),
+        only(
+            NaturalNumberSet.create(0, 3, 6, 9, 12),
+            NaturalNumberSet.create(1, 4, 7, 10, 13),
+            NaturalNumberSet.create(2, 5, 8, 11, 14),
+        ),
+    ));
+    assert(equal(
+        findMaximallyConnectedComponents!(clusterByThreshold!10)(15),
+        only(
+            NaturalNumberSet.create(0, 1, 2, 3, 4, 5, 6, 7, 8, 9),
+            NaturalNumberSet.create(10, 11, 12, 13, 14),
+        ),
+    ));
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : only;
+
+    auto connectivity = [
+        [false, false, false, true ],
+        [false, false, true , false],
+        [false, true , false, false],
+        [true , false, false, false],
+    ];
+    alias isConnected = (i, j) => connectivity[i][j];
+
+    assert(equal(
+        findMaximallyConnectedComponents!isConnected(4),
+        only(
+            NaturalNumberSet.create(0, 3),
+            NaturalNumberSet.create(1, 2),
+        ),
+    ));
+}
+
+private struct MaximalConnectedComponents(alias isConnected)
+{
+
+    const(size_t) numNodes;
+    NaturalNumberSet unvisited;
+    NaturalNumberSet currentComponent;
+
+    this(in size_t numNodes)
+    {
+        this.numNodes = numNodes;
+        this.unvisited = NaturalNumberSet(numNodes, Yes.addAll);
+        this.currentComponent = NaturalNumberSet(numNodes);
+
+        if (!empty)
+            popFront();
+    }
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty " ~ typeof(this).stringof);
+
+        currentComponent.clear();
+
+        if (unvisited.empty)
+            return;
+
+        auto seedNode = unvisited.minElement;
+
+        maximizeConnectedComponent(seedNode);
+    }
+
+    private void maximizeConnectedComponent(size_t node)
+    {
+        currentComponent.add(node);
+        unvisited.remove(node);
+
+        foreach (nextNode; unvisited.elements)
+            if (isConnected(node, nextNode))
+                maximizeConnectedComponent(nextNode);
+    }
+
+    @property NaturalNumberSet front()
+    {
+        assert(!empty, "Attempting to fetch the front an empty " ~ typeof(this).stringof);
+
+        return currentComponent;
+    }
+
+    @property bool empty() const pure nothrow
+    {
+        return unvisited.empty && currentComponent.empty;
+    }
+}
+
+/**
+    Find a cycle base of an undirected graph using the Paton's
+    algorithm.
+
+    The algorithm is described in
+
+    > K. Paton, An algorithm for finding a fundamental set of cycles
+    > for an undirected linear graph, Comm. ACM 12 (1969), pp. 514-518.
+
+    and the implementation is adapted from the [Java implementation][1] of
+    K. Paton originally licensed under [Apache License 2.0][2].
+
+    [1]: https://code.google.com/archive/p/niographs/
+    [2]: http://www.apache.org/licenses/LICENSE-2.0
+
+    Returns: range of cycles in the graph represented as arrays of node indices
+*/
+auto findCyclicSubgraphs(G)(
+    G graph,
+    G.IncidentEdgesCache incidentEdgesCache = G.IncidentEdgesCache.init,
+)
+    if (is(G : Graph!Params, Params...))
+{
+    auto node(in size_t idx)
+    {
+        return graph.nodes[idx];
+    }
+
+    version(assert) void assertValidCycle(in size_t[] cycle)
+    {
+        enum errorMsg = "not a cycle";
+
+        assert(
+            cycle.length > 0 && graph.edge(node(cycle[0]), node(cycle[$ - 1])) in graph,
+            errorMsg
+        );
+
+        foreach (pair; cycle.slide!(No.withPartial)(2))
+            assert(graph.edge(node(pair[0]), node(pair[1])) in graph, errorMsg);
+    }
+
+    auto numNodes = graph.nodes.length;
+
+    NaturalNumberSet[] used;
+    used.length = numNodes;
+
+    long[] parent;
+    parent.length = numNodes;
+    parent[] = -1;
+
+    size_t[] stack;
+    stack.reserve(numNodes);
+
+    auto cycles = appender!(size_t[][]);
+
+    if (incidentEdgesCache == G.IncidentEdgesCache.init)
+        incidentEdgesCache = graph.allIncidentEdges();
+
+    foreach (rootIdx, root; graph.nodes)
+    {
+        // Loop over the connected
+        // components of the graph.
+        if (parent[rootIdx] >= 0)
+            continue;
+
+        // Prepare to walk the spanning tree.
+        parent[rootIdx] = rootIdx;
+        used[rootIdx].reserveFor(numNodes);
+        used[rootIdx].add(rootIdx);
+        stack ~= rootIdx;
+
+        // Do the walk. It is a BFS with
+        // a LIFO instead of the usual
+        // FIFO. Thus it is easier to
+        // find the cycles in the tree.
+        while (stack.length > 0)
+        {
+            auto currentIdx = stack[$ - 1];
+            --stack.length;
+            auto current = node(currentIdx);
+            auto currentUsed = &used[currentIdx];
+
+            foreach (edge; incidentEdgesCache[currentIdx])
+            {
+                auto neighbour = edge.target(current);
+                auto neighbourIdx = graph.indexOf(neighbour);
+                auto neighbourUsed = &used[neighbourIdx];
+
+                if (neighbourUsed.empty)
+                {
+                    // found a new node
+                    parent[neighbourIdx] = currentIdx;
+                    neighbourUsed.reserveFor(numNodes);
+                    neighbourUsed.add(currentIdx);
+
+                    stack ~= neighbourIdx;
+                }
+                else if (neighbourIdx == currentIdx)
+                {
+                    // found a self loop
+                    auto cycle = [currentIdx];
+                    cycles ~= cycle;
+                    version(assert) assertValidCycle(cycle);
+                }
+                else if (!currentUsed.has(neighbourIdx))
+                {
+                    // found a cycle
+                    auto cycle = appender!(size_t[]);
+                    cycle ~= neighbourIdx;
+                    cycle ~= currentIdx;
+
+                    auto p = parent[currentIdx];
+                    for (; !neighbourUsed.has(p); p = parent[p])
+                        cycle ~= p;
+
+                    cycle ~= p;
+                    cycles ~= cycle.data;
+                    version(assert) assertValidCycle(cycle.data);
+                    neighbourUsed.add(currentIdx);
+                }
+            }
+        }
+    }
+
+    return cycles.data;
+}
+
+///
+unittest
+{
+    alias G = Graph!int;
+
+    //   __
+    //   \ \
+    //    `-0 -- 1 -- 2 -- 3
+    //      |       / |    |
+    //      |      /  |    |
+    //      4 -- 5 -- 6    7
+    auto g = G([0, 1, 2, 3, 4, 5, 6, 7], [
+        G.edge(0, 0),
+        G.edge(0, 1),
+        G.edge(0, 4),
+        G.edge(1, 2),
+        G.edge(2, 3),
+        G.edge(2, 5),
+        G.edge(2, 6),
+        G.edge(3, 7),
+        G.edge(4, 5),
+        G.edge(5, 6),
+    ]);
+    auto cycles = g.findCyclicSubgraphs();
+
+    import std.algorithm : equal;
+
+    assert(cycles.equal([
+        [0],
+        [2, 6, 5],
+        [1, 2, 5, 4, 0],
+    ]));
 }
 
 /**

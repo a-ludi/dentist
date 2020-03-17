@@ -131,6 +131,29 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         {
             mixin("alias " ~ tagAlias ~ " = tag;");
         }
+
+        /// Returns true iff `this` is in `interval`.
+        bool opBinary(string op)(in TaggedInterval interval) const pure nothrow if (op == "in")
+        {
+            return this.tag == interval.tag &&
+                   interval.begin <= this.value &&
+                   this.value < interval.end;
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TP = R.TaggedPoint;
+            alias TI = R.TaggedInterval;
+
+            enum interval = TI(0, 10, 20);
+
+            assert(TP(0, 10)  in interval);
+            assert(TP(1, 10) !in interval);
+            assert(TP(0,  0) !in interval);
+            assert(TP(0, 20) !in interval);
+        }
     }
 
     /**
@@ -182,6 +205,16 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(!TaggedInterval(1, 10, 20).empty);
             assert(!TaggedInterval(2, 20, 40).empty);
             assert(TaggedInterval(3, 60, 60).empty);
+        }
+
+        bool opBinary(string op)(auto ref const TaggedInterval other) const pure nothrow
+                if (op == "==")
+        {
+            return (this.empty && other.empty) || (
+                this.tag == other.tag &&
+                this.begin == other.begin &&
+                this.end == other.end
+            );
         }
 
         /**
@@ -374,6 +407,27 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(!TI(0, 10, 20).intersects(TI(1, 25, 30)));
         }
 
+        /// Returns true iff this interval contains other.
+        bool contains(in TaggedInterval other) const pure nothrow
+        {
+            return (this & other) == other;
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TI = R.TaggedInterval;
+
+            assert(!TI(0, 10, 20).contains(TI(0, 0, 5)));
+            assert(!TI(0, 10, 20).contains(TI(0, 5, 15)));
+            assert(TI(0, 10, 20).contains(TI(0, 12, 18)));
+            assert(!TI(0, 10, 20).contains(TI(0, 15, 25)));
+            assert(TI(0, 10, 20).contains(TI(0, 10, 20)));
+            assert(!TI(0, 10, 20).contains(TI(0, 25, 30)));
+            assert(!TI(0, 10, 20).contains(TI(1, 25, 30)));
+        }
+
         /// Returns true iff `this` is a subset of `other`, ie. fully included _in_.
         bool opBinary(string op)(in TaggedInterval other) const pure nothrow if (op == "in")
         {
@@ -557,6 +611,16 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region2.intervals == [TI(0, 5, 10), TI(0, 15, 20)]);
     }
 
+    /// Return a list of the tagged intervals in this region.
+    TaggedInterval[] releaseIntervals() pure nothrow
+    {
+        auto intervals = _intervals;
+
+        this._intervals = [];
+
+        return intervals;
+    }
+
     /// Returns the size of this region.
     Number size() pure const nothrow
     {
@@ -614,15 +678,18 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         TaggedInterval accInterval = _intervals[0];
         size_t insertIdx = 0;
 
+        alias intervalsTouch = (lhs, rhs) => lhs.tag == rhs.tag &&
+                                             (lhs.end == rhs.begin || lhs.begin == rhs.end);
+
         foreach (i, intervalB; _intervals[1 .. $])
         {
             if (intervalB.empty)
             {
                 continue;
             }
-            else if (accInterval.intersects(intervalB))
+            else if (accInterval.intersects(intervalB) || intervalsTouch(accInterval, intervalB))
             {
-                // If two intervals intersect their union is the same as the convex hull of both.
+                // If two intervals intersect or touch their union is the same as the convex hull of both.
                 accInterval = TaggedInterval.convexHull(accInterval, intervalB);
             }
             else
@@ -1083,8 +1150,9 @@ unittest
 }
 
 /**
-    Returns the minimum/supremum point of the intervals. Both values are
-    undefined for empty regions.
+    Returns the minimum/supremum point or convex hull of the intervals. Both
+    minimum and supremum are undefined for empty regions but the convex hull
+    is not.
 
     Throws: MismatchingTagsException if `tag`s differ.
     Throws: EmptyRegionException if region is empty.
@@ -1108,6 +1176,19 @@ auto sup(R)(R region) if (is(R : Region!Args, Args...))
     auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
 
     return convexHull.end;
+}
+
+/// ditto
+auto convexHull(R)(R region) if (is(R : Region!Args, Args...))
+{
+    alias TI = R.TaggedInterval;
+
+    if (region.empty)
+        return TI();
+
+    auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
+
+    return convexHull;
 }
 
 ///

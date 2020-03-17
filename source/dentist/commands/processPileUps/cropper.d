@@ -10,6 +10,7 @@ module dentist.commands.processPileUps.cropper;
 
 import dentist.common :
     ReadInterval,
+    ReferenceInterval,
     ReferenceRegion,
     ReferencePoint,
     to;
@@ -18,6 +19,7 @@ import dentist.common.alignments :
     AlignmentLocationSeed,
     coord_t,
     getType,
+    isExtension,
     PileUp,
     ReadAlignment,
     SeededAlignment,
@@ -35,12 +37,14 @@ import std.algorithm :
     filter,
     fold,
     map,
+    predSwitch,
     sort,
     sum,
     swap;
 import std.array : array, minimallyInitializedArray;
 import std.conv : to;
 import std.format : format;
+import std.path : buildPath;
 import std.range :
     chain,
     chunks,
@@ -81,9 +85,25 @@ private struct PileUpCropper
 
     void buildDb()
     {
+        enum extensionDbName = "pileup-%d.dam";
+        enum gapDbName = "pileup-%d-%d.dam";
+
         fetchCroppingRefPositions();
         auto croppedSequences = pileUpWithSequence().map!(t => getCroppedSequence(t.expand));
-        croppedDb = buildDamFile(croppedSequences, options.workdir);
+
+        if (croppingRefPositions.length == 1)
+            croppedDb = format!extensionDbName(croppingRefPositions[0].contigId);
+        else
+            croppedDb = format!gapDbName(
+                croppingRefPositions[0].contigId,
+                croppingRefPositions[1].contigId,
+            );
+        croppedDb = buildPath(options.workdir, croppedDb);
+
+        buildDamFile(
+            croppedDb,
+            croppedSequences,
+        );
     }
 
     private void fetchCroppingRefPositions()
@@ -231,15 +251,14 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
     return array(alignmentsByContig);
 }
 
-/// Returns a common trace points wrt. contigA that is not in mask and is on
-/// the relevant half of the contig.
+/// Returns a common trace points wrt. contigA that is not in mask.
 private long getCommonTracePoint(
     in SeededAlignment[] alignments,
     in ReferenceRegion mask,
-    in size_t tracePointDistance
+    in size_t tracePointDistance,
 )
 {
-    static long getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion allowedTracePointRegion) pure
+    static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion allowedTracePointRegion) pure
     {
         auto commonTracePoints = tracePointCandidates.filter!(c => c in allowedTracePointRegion);
 
@@ -271,8 +290,8 @@ private long getCommonTracePoint(
         .map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
 
     return locationSeed == AlignmentLocationSeed.front
-        ? getCommonTracePoint(tracePointCandidates.retro, allowedTracePointRegion)
-        : getCommonTracePoint(tracePointCandidates, allowedTracePointRegion);
+        ? _getCommonTracePoint(tracePointCandidates.retro, allowedTracePointRegion)
+        : _getCommonTracePoint(tracePointCandidates, allowedTracePointRegion);
 }
 
 private ReadInterval getCroppingSlice(

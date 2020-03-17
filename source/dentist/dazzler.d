@@ -12,12 +12,14 @@ import core.memory : GC;
 import dentist.common : ReferenceInterval, ReferenceRegion;
 import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
 import dentist.common.binio : CompressedSequence;
+import dentist.common.external : ExternalDependency;
 import dentist.util.algorithm : sliceUntil;
 import dentist.util.fasta : parseFastaRecord, reverseComplement;
 import dentist.util.log;
 import dentist.util.math : absdiff, floor, ceil, RoundingMode;
+import dentist.util.process : executePipe = pipeLines;
 import dentist.util.range : arrayChunks, takeExactly;
-import dentist.util.region : findTilings, min, sup;
+import dentist.util.region : convexHull, findTilings, min, sup;
 import dentist.util.string :
     EditOp,
     findAlignment,
@@ -52,17 +54,24 @@ import std.algorithm :
     SwapStrategy,
     uniq,
     until;
-import std.array : appender, Appender, array, uninitializedArray;
+import std.array :
+    appender,
+    Appender,
+    array,
+    split,
+    uninitializedArray;
 import std.conv : to;
 import std.exception : enforce;
 import std.file : exists, remove;
 import std.format : format, formattedRead;
+import std.math : isNaN;
 import std.meta : AliasSeq;
 import std.path :
     absolutePath,
     baseName,
     buildPath,
     dirName,
+    extension,
     relativePath,
     stripExtension,
     withExtension;
@@ -92,10 +101,12 @@ import std.stdio : File;
 import std.string : lineSplitter, outdent;
 import std.traits : isArray, isIntegral, isSomeString, ReturnType, Unqual;
 import std.typecons : Flag, No, tuple, Tuple, Yes;
+import std.uni : toUpper;
 import std.variant : Algebraic;
 import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writeln;
+
 
 /// File suffixes of hidden .db files.
 private enum hiddenDbFileSuffixes = [".bps", ".idx"];
@@ -141,60 +152,6 @@ class DazzlerCommandException : Exception
     }
 }
 
-/// Determines how data should be provided in the working directory.
-enum ProvideMethod
-{
-    copy,
-    symlink,
-}
-enum provideMethods = __traits(allMembers, ProvideMethod);
-
-/**
-    Provide dbFile in `workdir`.
-
-    Returns: Path of the dbFile in `workdir`.
-*/
-string provideDamFileInWorkdir(in string dbFile, ProvideMethod provideMethod, in string workdir)
-{
-    foreach (hiddenDbFile; getHiddenDbFiles(dbFile))
-    {
-        provideFileInWorkdir(hiddenDbFile, provideMethod, workdir);
-    }
-
-    return provideFileInWorkdir(dbFile, provideMethod, workdir);
-}
-
-/**
-    Provide lasFile in `workdir`.
-
-    Returns: Path of the lasFile in `workdir`.
-*/
-string provideLasFileInWorkdir(in string lasFile, ProvideMethod provideMethod, in string workdir)
-{
-    return provideFileInWorkdir(lasFile, provideMethod, workdir);
-}
-
-/// Provide file in `workdir`.
-string provideFileInWorkdir(in string file, ProvideMethod provideMethod, in string workdir)
-{
-    import std.file : copy, symlink;
-    import std.path : absolutePath;
-
-    auto fileInWorkdir = buildPath(workdir, file.baseName);
-
-    final switch (provideMethod)
-    {
-    case ProvideMethod.copy:
-        copy(file.absolutePath, fileInWorkdir);
-        break;
-    case ProvideMethod.symlink:
-        symlink(file.absolutePath, fileInWorkdir);
-        break;
-    }
-
-    return fileInWorkdir;
-}
-
 /// Returns true iff lasFile contains zero parts.
 bool lasEmpty(in string lasFile, in string dbA, in string workdir)
 {
@@ -218,7 +175,27 @@ bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir
     return numParts == 0;
 }
 
-/// Build a new .dam file by using the given subset of reads in inDbFile.
+/// Returns the number of records in dbFile.
+id_t numDbRecords(in string dbFile, in string workdir)
+{
+    auto dbdumpLines = dbdump(dbFile, [], workdir);
+    scope (exit) dbdumpLines.destroy();
+    auto recordNumberLine = dbdumpLines.find!(l => l.startsWith("+ R")).front;
+    id_t numRecords;
+
+    recordNumberLine.formattedRead!"+ R %d"(numRecords);
+    // Clean up child process
+
+    return numRecords;
+}
+
+/// Returns true iff dbFile is empty.
+bool dbEmpty(in string dbFile, in string workdir)
+{
+    return numDbRecords(dbFile, workdir) == 0;
+}
+
+/// Build outputDb file by using the given subset of reads in inDbFile.
 string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
@@ -226,16 +203,36 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
     enum outDbNameTemplate = "subset-XXXXXX";
 
     auto outDbTemplate = buildPath(options.workdir, outDbNameTemplate);
-    auto outDb = mkstemp(outDbTemplate, damFileExtension);
+    auto outDb = mkstemp(outDbTemplate, inDbFile.extension);
 
     outDb.file.close();
     remove(outDb.name);
-    buildSubsetDb(inDbFile, outDb.name, readIds, options.workdir);
-    dbsplit(outDb.name, options.dbsplitOptions, options.workdir);
 
-    return outDb.name;
+    return dbSubset(outDb.name, inDbFile, readIds, options);
 }
 
+/**
+    Build `outputDb` by using the given subset of reads in `inDbFile`. If no
+    `outputDb` is given a temporary file with the same extension as `inDbFile`
+    will be created.
+
+    Returns: DB file name
+*/
+string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options)
+        if (isSomeString!(typeof(options.workdir)) &&
+            isOptionsList!(typeof(options.dbsplitOptions)))
+{
+    auto _outputDb = outputDb.extension == inDbFile.extension
+        ? outputDb
+        : outputDb ~ inDbFile.extension;
+
+    buildSubsetDb(inDbFile, _outputDb, readIds, options.workdir);
+    dbsplit(_outputDb, options.dbsplitOptions, options.workdir);
+
+    return outputDb;
+}
+
+/// ditto
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
@@ -330,16 +327,22 @@ AlignmentChain[] getAlignments(
     if (tracePointDistance > 0)
         ladumpOptions ~= LAdumpOptions.tracePoints;
 
-    auto alignmentChains = readLasDump(ladump(
+    auto lasdumpReader = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         ladumpOptions,
         workdir,
-    )).array;
+    ));
+    scope (exit) lasdumpReader.closePipe();
+    auto alignmentChains = lasdumpReader.array;
     alignmentChains.sort!("a < b", SwapStrategy.stable);
 
-    if (tracePointDistance > 0)
+    if (
+        tracePointDistance > 0 &&
+        alignmentChains.length > 0 &&
+        alignmentChains[0].tracePointDistance == 0
+    )
         foreach (ref alignmentChain; alignmentChains)
             alignmentChain.tracePointDistance = tracePointDistance;
 
@@ -363,14 +366,16 @@ void attachTracePoints(
     // NOTE: dump only for matching A reads; better would be for matching
     //       B reads but that is not possible with `LAdump`.
     auto aReadIds = alignmentChains.map!"a.contigA.id".uniq.array;
-    auto acsWithTracePoints = readLasDump(ladump(
+    auto lasdumpReader = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         aReadIds,
         ladumpOptions,
         workdir,
-    )).array;
+    ));
+    scope (exit) lasdumpReader.closePipe();
+    auto acsWithTracePoints = lasdumpReader.array;
     acsWithTracePoints.sort!"a < b";
     assert(isSorted!"*a < *b"(alignmentChains), "alignmentChains must be sorted");
 
@@ -597,13 +602,14 @@ private struct LasDumpLineFormatTuple
     string format;
 }
 
-private enum LasDumpLineFormat
+private enum LasDumpLineFormat : LasDumpLineFormatTuple
 {
     totalChainPartsCount = LasDumpLineFormatTuple('+', 'P', "+ P %d"),
     totalTracePointsCount = LasDumpLineFormatTuple('+', 'T', "+ T %d"),
     maxChainPartsCountPerPile = LasDumpLineFormatTuple('%', 'P', "% P %d"),
     maxTracePointsCountPerPile = LasDumpLineFormatTuple('%', 'T', "% T %d"),
     maxTracePointCount = LasDumpLineFormatTuple('@', 'T', "@ T %d"),
+    tracePointDistance = LasDumpLineFormatTuple('X', '\0', "X %d"),
     chainPart = LasDumpLineFormatTuple('P', '\0', "P %d %d %c %c"),
     lengths = LasDumpLineFormatTuple('L', '\0', "L %d %d"),
     coordinates = LasDumpLineFormatTuple('C', '\0', "C %d %d %d %d"),
@@ -612,7 +618,7 @@ private enum LasDumpLineFormat
     tracePoint = LasDumpLineFormatTuple(' ', '\0', " %d %d"),
 }
 
-private enum ChainPartType
+private enum ChainPartType : char
 {
     start = '>',
     continuation = '-',
@@ -639,6 +645,7 @@ private:
     dchar currentLineType;
     dchar currentLineSubType;
     size_t maxTracePointCount;
+    trace_point_t tracePointDistance;
     debug dchar[] allowedLineTypes;
 
 public:
@@ -653,6 +660,7 @@ public:
                 maxChainPartsCountPerPile.indicator,
                 maxTracePointsCountPerPile.indicator,
                 maxTracePointCount.indicator,
+                tracePointDistance.indicator,
                 chainPart.indicator,
             ];
         }
@@ -683,16 +691,21 @@ public:
         return currentAC;
     }
 
+    static if (__traits(hasMember, lasDump, "destroy"))
+        alias closePipe = setEmpty;
+
+    void setEmpty() pure nothrow
+    {
+        static if (__traits(hasMember, lasDump, "destroy"))
+            lasDump.destroy();
+        _empty = true;
+    }
+
 private:
 
     static auto getDumpLines(S lasDump)
     {
         return lasDump.enumerate(1).filter!"!a[1].empty";
-    }
-
-    void setEmpty() pure nothrow
-    {
-        _empty = true;
     }
 
     void readNextAlignmentChain()
@@ -704,18 +717,38 @@ private:
 
         while (true)
         {
-            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c`"(currentLineType));
+            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c` (allowed: `%(%c%)`)"(currentLineType, allowedLineTypes));
 
             with (LasDumpLineFormat)
             {
                 switch (currentLineType)
                 {
-                case totalChainPartsCount.indicator: goto case;
+                case totalChainPartsCount.indicator:
+                    static assert(totalTracePointsCount.indicator == totalChainPartsCount.indicator);
+
+                    switch (currentLineSubType)
+                    {
+                    case totalChainPartsCount.subIndicator:
+                        if (readTotalChainPartsCount() == 0)
+                            // do not try to read empty dump
+                            return setEmpty();
+                        break;
+                    case totalTracePointsCount.subIndicator:
+                        break; // ignore
+                    default:
+                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
+                    }
+                    break;
                 case maxChainPartsCountPerPile.indicator:
+                    static assert(maxTracePointsCountPerPile.indicator == maxChainPartsCountPerPile.indicator);
                     break; // ignore
                 case maxTracePointCount.indicator:
                     _enforce(currentLineSubType == maxTracePointCount.subIndicator, "expected `@ T` line");
                     readMaxTracePointCount();
+                    debug disallowCurrentLineType();
+                    break;
+                case tracePointDistance.indicator:
+                    readTracePointDistance();
                     debug disallowCurrentLineType();
                     break;
                 case chainPart.indicator:
@@ -807,6 +840,16 @@ private:
         }
     }
 
+    id_t readTotalChainPartsCount()
+    {
+        enum totalChainPartsCountFormat = LasDumpLineFormat.totalChainPartsCount.format;
+
+        id_t totalChainPartsCount;
+        currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
+
+        return totalChainPartsCount;
+    }
+
     void readMaxTracePointCount()
     {
         enum maxTracePointCountFormat = LasDumpLineFormat.maxTracePointCount.format;
@@ -814,6 +857,13 @@ private:
         currentDumpLine[].formattedRead!maxTracePointCountFormat(maxTracePointCount);
 
         tracePointsAcc.reserve(maxTracePointCount);
+    }
+
+    void readTracePointDistance()
+    {
+        enum tracePointDistanceFormat = LasDumpLineFormat.tracePointDistance.format;
+
+        currentDumpLine[].formattedRead!tracePointDistanceFormat(tracePointDistance);
     }
 
     Flag!"wasDumpPartConsumed" readChainPart()
@@ -842,6 +892,7 @@ private:
             currentAC.contigA.id = contigAID;
             currentAC.contigB.id = contigBID;
             currentAC.flags = flags;
+            currentAC.tracePointDistance = tracePointDistance;
 
             return Yes.wasDumpPartConsumed;
         }
@@ -889,6 +940,9 @@ private:
     {
         finishCurrentLAs();
         currentAC.id = currentACID++;
+
+        // ensure alignment chain is valid by triggering invariant of AlignmentChain
+        cast(void) currentAC.first;
     }
 
     void readLengths()
@@ -981,29 +1035,29 @@ unittest
         "% T 12",
         "@ T 4",
         "P 1 2 n >",
-        "L 8 9",
+        "L 13 15",
         "C 3 4 5 6",
         "D 7",
         "P 1 2 n -",
-        "L 8 9",
+        "L 13 15",
         "C 12 13 14 15",
         "D 16",
         "P 19 20 c +",
-        "L 26 27",
+        "L 31 33",
         "C 21 22 23 24",
         "D 25",
         "P 19 20 c -",
-        "L 26 27",
+        "L 31 33",
         "C 30 31 32 33",
         "D 34",
         "T 1",
         "   0 1",
         "P 37 38 n .",
-        "L 35 36",
+        "L 40 42",
         "C 39 40 41 42",
         "D 43",
         "P 46 47 c .",
-        "L 53 54",
+        "L 58 60",
         "C 48 49 50 51",
         "D 52",
         "T 3",
@@ -1011,7 +1065,7 @@ unittest
         "   3 101",
         "   4 104",
         "P 46 47 n .",
-        "L 53 54",
+        "L 58 60",
         "C 57 58 59 60",
         "D 61",
         "T 3",
@@ -1052,8 +1106,8 @@ unittest
         auto expectedResult = [
             AlignmentChain(
                 0,
-                Contig(1, 8),
-                Contig(2, 9),
+                Contig(1, 13),
+                Contig(2, 15),
                 emptyFlags,
                 [
                     LocalAlignment(
@@ -1070,8 +1124,8 @@ unittest
             ),
             AlignmentChain(
                 1,
-                Contig(19, 26),
-                Contig(20, 27),
+                Contig(19, 31),
+                Contig(20, 33),
                 Flags(complement),
                 [
                     LocalAlignment(
@@ -1091,8 +1145,8 @@ unittest
             ),
             AlignmentChain(
                 2,
-                Contig(37, 35),
-                Contig(38, 36),
+                Contig(37, 40),
+                Contig(38, 42),
                 emptyFlags,
                 [
                     LocalAlignment(
@@ -1104,8 +1158,8 @@ unittest
             ),
             AlignmentChain(
                 3,
-                Contig(46, 53),
-                Contig(47, 54),
+                Contig(46, 58),
+                Contig(47, 60),
                 Flags(complement),
                 [
                     LocalAlignment(
@@ -1122,8 +1176,8 @@ unittest
             ),
             AlignmentChain(
                 4,
-                Contig(46, 53),
-                Contig(47, 54),
+                Contig(46, 58),
+                Contig(47, 60),
                 emptyFlags,
                 [
                     LocalAlignment(
@@ -1426,23 +1480,35 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
                 );
             }
 
+            assert(localAlignments.length > 0, "localAlignments must not be empty");
+            auto coveredInterval = ReferenceInterval(
+                0,
+                localAlignments[0].contigA.begin,
+                localAlignments[$ - 1].contigA.end,
+            );
             auto combinations = findTilings!toInterval(
                 localAlignments.map!((ref la) => &la).array,
                 longestInputsLength(memoryLimit),
             );
+            assert(combinations.length > 0, "no viable tilings found");
 
             alias Combination = typeof(combinations[0]);
             auto combinationScore(in Combination combination)
             {
                 long coveredBasePairs = combination.region.size;
-                long score = combination.region.size
+                long score =
+                     + combination.region.size
                      - combination.totalOverlap
                      - combination.elements.map!"a.numDiffs".sum;
 
                 return score;
             }
 
-            return combinations.maxElement!combinationScore.elements.map!"*a".array;
+            return combinations
+                .filter!(combination => convexHull(combination.region) == coveredInterval)
+                .maxElement!combinationScore
+                .elements
+                .map!"*a".array;
         }
 
         size_t skipTracePointsToASeqPos(in LocalAlignment localAlignment)
@@ -1812,15 +1878,520 @@ unittest
 }
 
 /**
+    Get the designated records of `dbFile`.
+
+    Throws: DazzlerCommandException if recordNumber is not in dbFile
+*/
+auto getDbRecords(in string dbFile, in DBdumpOptions[] dbdumpOptions = [], in string workdir = null)
+{
+    enum size_t[] allRecords = [];
+
+    return getDbRecords(dbFile, allRecords, dbdumpOptions, workdir);
+}
+
+/// ditto
+auto getDbRecords(Range)(
+    in string dbFile,
+    Range recordNumbers,
+    in DBdumpOptions[] dbdumpOptions = [],
+    in string workdir = null,
+)
+        if (isForwardRange!Range && is(ElementType!Range : size_t))
+{
+    return readDbDump(dbdump(dbFile, recordNumbers, cast(string[]) dbdumpOptions, workdir));
+}
+
+
+private struct DbDumpLineFormatTuple
+{
+    char indicator;
+    char subIndicator;
+    string format;
+}
+
+private enum DbDumpLineFormat : DbDumpLineFormatTuple
+{
+    totalReadNumberCount = DbDumpLineFormatTuple('+', 'R', "+ R %d"),
+    totalMCount = DbDumpLineFormatTuple('+', 'M', "+ M %d"),
+    totalHeaderCount = DbDumpLineFormatTuple('+', 'H', "+ H %d"),
+    maxHeaderLength = DbDumpLineFormatTuple('@', 'H', "@ H %d"),
+    totalSequenceCount = DbDumpLineFormatTuple('+', 'S', "+ S %d"),
+    maxSequenceLength = DbDumpLineFormatTuple('@', 'S', "@ S %d"),
+    readNumber = DbDumpLineFormatTuple('R', '\0', "R %d"),
+    header = DbDumpLineFormatTuple('H', '\0', "H %d %s"),
+    pbLocation = DbDumpLineFormatTuple('L', '\0', "L %d %d %d"),
+    pbQuality = DbDumpLineFormatTuple('Q', '\0', "Q %f"),
+    sequence = DbDumpLineFormatTuple('S', '\0', "S %d %s"),
+    arrowSNR = DbDumpLineFormatTuple('N', '\0', "S %d %d %d %d"),
+    arrowPulseWidth = DbDumpLineFormatTuple('A', '\0', "A %d %s"),
+    intrinsicQualityVector = DbDumpLineFormatTuple('I', '\0', "I %d %s"),
+    quivaDeletionValues = DbDumpLineFormatTuple('d', '\0', "d %d %s"),
+    quivaDeletionString = DbDumpLineFormatTuple('c', '\0', "c %d %s"),
+    quivaInsertionValues = DbDumpLineFormatTuple('i', '\0', "i %d %s"),
+    quivaMergeValues = DbDumpLineFormatTuple('m', '\0', "m %d %s"),
+    quivaSubstitutionValues = DbDumpLineFormatTuple('s', '\0', "s %d %s"),
+    repeatProfileVector = DbDumpLineFormatTuple('P', '\0', "P %d %s"),
+    maskTrack = DbDumpLineFormatTuple('T', '\0', "T%d %d %(%d %d%)"),
+}
+
+struct DbRecord
+{
+    static struct PacBioReadInfo
+    {
+        id_t well;
+        coord_t pulseStart;
+        alias begin = pulseStart;
+        coord_t pulseEnd;
+        alias end = pulseEnd;
+        float readQuality;
+
+
+        @property coord_t pulseLength() const pure nothrow @safe
+        {
+            return pulseEnd - pulseStart;
+        }
+
+        alias length = pulseLength;
+    }
+
+    id_t readNumber;
+    alias contigId = readNumber;
+    string header;
+    PacBioReadInfo pacBioReadInfo;
+    alias location = pacBioReadInfo;
+    string sequence;
+}
+
+private struct DbDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
+{
+    static alias dstring = immutable(dchar)[];
+    static alias DbDump = ReturnType!getDumpLines;
+
+private:
+    DbDump dbDump;
+    bool _empty;
+    id_t numReads;
+    DbRecord currentRecord;
+    dstring currentDumpLine;
+    size_t currentDumpLineNumber;
+    dchar currentLineType;
+    dchar currentLineSubType;
+    debug dchar[] allowedLineTypes;
+
+public:
+    coord_t totalSequence;
+
+    this(S dbDump)
+    {
+        this.dbDump = getDumpLines(dbDump);
+        debug with (DbDumpLineFormat)
+        {
+            this.allowedLineTypes = [
+                totalReadNumberCount.indicator,
+                totalMCount.indicator,
+                totalHeaderCount.indicator,
+                maxHeaderLength.indicator,
+                totalSequenceCount.indicator,
+                maxSequenceLength.indicator,
+            ];
+        }
+        this.popFront();
+    }
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty DbDumpReader");
+
+        if (dbDump.empty)
+        {
+            return setEmpty();
+        }
+
+        readNextDbRecord();
+    }
+
+    @property bool empty() const pure nothrow
+    {
+        return _empty;
+    }
+
+    @property DbRecord front() pure nothrow
+    {
+        assert(!empty, "Attempting to fetch the front of an empty DbDumpReader");
+
+        return currentRecord;
+    }
+
+    @property size_t length() pure nothrow
+    {
+        return numReads;
+    }
+
+    static if (__traits(hasMember, dbDump, "destroy"))
+        alias closePipe = setEmpty;
+
+    void setEmpty() pure nothrow
+    {
+        static if (__traits(hasMember, dbDump, "destroy"))
+            dbDump.destroy();
+        _empty = true;
+    }
+
+private:
+
+    static auto getDumpLines(S dbDump)
+    {
+        return dbDump.enumerate(1).filter!"!a[1].empty";
+    }
+
+    void readNextDbRecord()
+    {
+        currentRecord = DbRecord.init;
+        peekDumpLine();
+
+        while (true)
+        {
+            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c` (allowed: `%(%c%)`)"(currentLineType, allowedLineTypes));
+
+            with (DbDumpLineFormat)
+            {
+                switch (currentLineType)
+                {
+                case totalReadNumberCount.indicator:
+                    static assert(totalMCount.indicator == totalReadNumberCount.indicator);
+                    static assert(totalHeaderCount.indicator == totalReadNumberCount.indicator);
+                    static assert(totalSequenceCount.indicator == totalReadNumberCount.indicator);
+
+                    switch (currentLineSubType)
+                    {
+                    case totalReadNumberCount.subIndicator:
+                        read!totalReadNumberCount();
+
+                        debug allowedLineTypes ~= [
+                            readNumber.indicator,
+                            header.indicator,
+                            pbLocation.indicator,
+                            pbQuality.indicator,
+                            sequence.indicator,
+                        ];
+
+                        // do not try to read empty dump
+                        if (numReads == 0)
+                            return setEmpty();
+                        break;
+                    case totalMCount.subIndicator:
+                        assert(readTotal!(totalMCount, size_t) == 0, "unexpected totalMCount != 0");
+                        break;
+                    case totalHeaderCount.subIndicator:
+                        break; // ignore
+                    case totalSequenceCount.subIndicator:
+                        read!totalSequenceCount();
+                        break;
+                    default:
+                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
+                    }
+                    break;
+                case maxHeaderLength.indicator:
+                    static assert(maxSequenceLength.indicator == maxHeaderLength.indicator);
+                    break; // ignore both
+                static foreach (lineTypeFormat; [readNumber, header, pbLocation, pbQuality, sequence])
+                {
+                    case lineTypeFormat.indicator:
+                        static if (lineTypeFormat == pbLocation)
+                        {
+                            auto pbReadInfo = currentRecord.pacBioReadInfo;
+                            auto wasLineTypeDone = pbReadInfo.well != pbReadInfo.well.init ||
+                                                   pbReadInfo.pulseStart != pbReadInfo.pulseStart.init ||
+                                                   pbReadInfo.pulseEnd != pbReadInfo.pulseEnd.init;
+                        }
+                        else static if (lineTypeFormat == pbQuality)
+                        {
+                            auto pbReadInfo = currentRecord.pacBioReadInfo;
+                            auto wasLineTypeDone = !isNaN(pbReadInfo.readQuality);
+                        }
+                        else
+                        {
+                            auto wasLineTypeDone = mixin(
+                                "currentRecord." ~ lineTypeFormat.to!string ~ " != " ~
+                                "currentRecord." ~ lineTypeFormat.to!string ~ ".init"
+                            );
+                        }
+
+                        if (wasLineTypeDone)
+                        {
+                            debug allowedLineTypes = [
+                                readNumber.indicator,
+                                header.indicator,
+                                pbLocation.indicator,
+                                pbQuality.indicator,
+                                sequence.indicator,
+                            ];
+                            return; // DB record completed; stay on current dump line
+                        }
+
+                        read!lineTypeFormat();
+                        goto break_;
+                }
+                default:
+                    error(format!"unknown line type `%c`"(currentLineType));
+                }
+
+                break_: // pseudo-break for use with static foreach
+            }
+
+            if (popDumpLine() == Yes.empty)
+                return; // EOF reached
+        }
+    }
+
+    void peekDumpLine()
+    {
+        auto currentLine = dbDump.front;
+
+        currentDumpLineNumber = currentLine[0];
+        currentDumpLine = currentLine[1].array;
+        currentLineType = currentDumpLine[0];
+        currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
+    }
+
+    Flag!"empty" popDumpLine()
+    {
+        if (dbDump.empty)
+        {
+            return Yes.empty;
+        }
+
+        dbDump.popFront();
+        ++currentDumpLineNumber;
+
+        if (dbDump.empty)
+        {
+            return Yes.empty;
+        }
+        else
+        {
+            peekDumpLine();
+
+            return No.empty;
+        }
+    }
+
+    Int readTotal(DbDumpLineFormat lineTypeFormat, Int)()
+    {
+        Int total;
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(total);
+
+        return total;
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.totalReadNumberCount)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(numReads);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.totalSequenceCount)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(totalSequence);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.header)
+    {
+        coord_t headerLength;
+
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            headerLength,
+            currentRecord.header,
+        );
+
+        assert(currentRecord.header.length == headerLength, "mismatched header length");
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.readNumber)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(currentRecord.readNumber);
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.pbLocation)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            currentRecord.pacBioReadInfo.well,
+            currentRecord.pacBioReadInfo.pulseStart,
+            currentRecord.pacBioReadInfo.pulseEnd,
+        );
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.pbQuality)
+    {
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            currentRecord.pacBioReadInfo.readQuality,
+        );
+    }
+
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.sequence)
+    {
+        coord_t sequenceLength;
+
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            sequenceLength,
+            currentRecord.sequence,
+        );
+
+        assert(currentRecord.sequence.length == sequenceLength, "mismatched sequence length");
+    }
+
+    debug void disallowCurrentLineType() {
+        allowedLineTypes = allowedLineTypes
+            .filter!(type => type != currentLineType)
+            .array;
+    }
+
+    void error(in string reason)
+    {
+        _enforce(false, reason);
+    }
+
+    void _enforce(bool condition, lazy string reason)
+    {
+        enforce!DazzlerCommandException(condition, format!"ill-formatted DBdump output: %s (line %d)"(reason, currentDumpLineNumber));
+    }
+}
+
+private auto readDbDump(S)(S lasDump)
+{
+    return DbDumpReader!S(lasDump);
+}
+
+unittest
+{
+    enum testDbDump = q"EOF
+        + R 5
+        + M 0
+        + H 15
+        @ H 3
+        + S 281
+        @ S 63
+        R 1
+        H 3 Sim
+        L 1 0 62
+        Q 0.851
+        S 62 ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc
+        R 2
+        H 3 Sim
+        L 2 0 63
+        Q 0.852
+        S 63 cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat
+        R 3
+        H 3 Sim
+        L 3 0 62
+        Q 0.853
+        S 62 aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa
+        R 4
+        H 3 Sim
+        L 4 0 62
+        Q 0.854
+        S 62 ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca
+        R 5
+        H 3 Sim
+        L 5 0 32
+        Q 0.855
+        S 32 gtgtctgctgttttttttcttttagtggacat
+EOF".outdent;
+
+    import std.algorithm : equal;
+    import std.string : lineSplitter;
+
+    auto dbDump = readDbDump(testDbDump.lineSplitter);
+    auto expectedResult = [
+        DbRecord(
+            1,
+            "Sim",
+            DbRecord.PacBioReadInfo(
+                1,
+                0,
+                62,
+                0.851,
+            ),
+            "ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc",
+        ),
+        DbRecord(
+            2,
+            "Sim",
+            DbRecord.PacBioReadInfo(
+                2,
+                0,
+                63,
+                0.852,
+            ),
+            "cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat",
+        ),
+        DbRecord(
+            3,
+            "Sim",
+            DbRecord.PacBioReadInfo(
+                3,
+                0,
+                62,
+                0.853,
+            ),
+            "aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa",
+        ),
+        DbRecord(
+            4,
+            "Sim",
+            DbRecord.PacBioReadInfo(
+                4,
+                0,
+                62,
+                0.854,
+            ),
+            "ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca",
+        ),
+        DbRecord(
+            5,
+            "Sim",
+            DbRecord.PacBioReadInfo(
+                5,
+                0,
+                32,
+                0.855,
+            ),
+            "gtgtctgctgttttttttcttttagtggacat",
+        ),
+    ];
+
+    assert(dbDump.length == expectedResult.length);
+    assert(dbDump.equal(expectedResult));
+}
+
+/**
     Get the FASTA sequences of the designated records.
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir)
+auto getFastaSequences(in string dbFile, in string workdir = null)
+{
+    enum size_t[] allRecords = [];
+
+    return getFastaSequences(dbFile, allRecords, workdir);
+}
+
+/// ditto
+auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir = null)
         if (isForwardRange!Range && is(ElementType!Range : size_t))
 {
     string[] dbdumpOptions = [DBdumpOptions.sequenceString];
     auto numRecords = recordNumbers.save.walkLength;
+
+    if (numRecords == 0)
+        numRecords = getNumContigs(dbFile, workdir);
+
     auto sequences = readSequences(dbdump(dbFile, recordNumbers, dbdumpOptions, workdir));
     size_t numFoundSequences;
 
@@ -1852,7 +2423,7 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string w
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in id_t cacheSize = 1024)
+string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir = null, in id_t cacheSize = 1024)
 {
     // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
     // requirements of this function
@@ -1882,13 +2453,15 @@ auto getFastaSequence(in string dbFile, id_t recordNumber, in string workdir, in
     {
         enum string[] dbdumpOptions = [DBdumpOptions.sequenceString];
         _cache[_dbIdx].length = cacheSize;
-        auto bufferRest = readSequences(dbdump(
+        auto dbdumpLines = dbdump(
             dbFile,
             recordNumber,
             min(recordNumber + cacheSize - 1, _numRecords[_dbIdx]),
             dbdumpOptions,
             workdir,
-        )).copy(_cache[_dbIdx]);
+        );
+        scope (exit) dbdumpLines.destroy();
+        auto bufferRest = readSequences(dbdumpLines).copy(_cache[_dbIdx]);
         _cache[_dbIdx] = _cache[_dbIdx][0 .. $ - bufferRest.length];
         _firstRecord[_dbIdx] = recordNumber;
         enforce!DazzlerCommandException(_cache[_dbIdx].length > 0, "cannot read sequence: empty dump");
@@ -1943,11 +2516,11 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
         DBdumpOptions.sequenceString,
     ];
 
-    return readDbDump(dbdump(dbFile, recordNumbers, dbdumpOptions,
+    return readDbDumpForFastaEntries(dbdump(dbFile, recordNumbers, dbdumpOptions,
             options.workdir), recordNumbers, options.fastaLineWidth);
 }
 
-private auto readDbDump(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
+private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
         if (isInputRange!S && isSomeString!(ElementType!S)
             && isInputRange!Range && is(ElementType!Range : size_t))
 {
@@ -2049,7 +2622,7 @@ EOF".outdent;
 
     {
         size_t[] recordIds = [];
-        auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
+        auto fastaEntries = readDbDumpForFastaEntries(testDbDump.lineSplitter, recordIds, 50).array;
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/2/0_9 RQ=0.975\ncacattgtg",
@@ -2060,7 +2633,7 @@ EOF".outdent;
     }
     {
         size_t[] recordIds = [1, 3];
-        auto fastaEntries = readDbDump(testDbDump.lineSplitter, recordIds, 50).array;
+        auto fastaEntries = readDbDumpForFastaEntries(testDbDump.lineSplitter, recordIds, 50).array;
         assert(fastaEntries == [
             ">Sim/1/0_14 RQ=0.975\nggcccaggcagccc",
             ">Sim/3/0_11 RQ=0.975\ngagtgcagtgg",
@@ -2068,21 +2641,35 @@ EOF".outdent;
     }
 }
 
-/// Build a .dam file with the given set of FASTA records.
-string buildDamFile(Range)(Range fastaRecords, in string workdir, in string[] dbsplitOptions = [])
+/**
+    Build `outputDb` with the given set of FASTA records. If no `outputDb`
+    is given a temporary `.dam` file will be created.
+
+    Returns: DB file name
+*/
+string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [])
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     enum tempDbNameTemplate = "auxiliary-XXXXXX";
 
-    auto tempDbTemplate = buildPath(workdir, tempDbNameTemplate);
+    auto tempDbTemplate = buildPath(tmpdir, tempDbNameTemplate);
     auto tempDb = mkstemp(tempDbTemplate, damFileExtension);
 
     tempDb.file.close();
     remove(tempDb.name);
-    fasta2dam(tempDb.name, fastaRecords, workdir);
-    dbsplit(tempDb.name, dbsplitOptions, workdir);
 
-    return tempDb.name;
+    return buildDamFile(tempDb.name, fastaRecords, dbsplitOptions);
+}
+
+/// ditto
+string buildDamFile(Range)(string outputDb, Range fastaRecords, in string[] dbsplitOptions = [])
+        if (isInputRange!Range && isSomeString!(ElementType!Range))
+{
+    assert(outputDb.endsWith(damFileExtension), "outputDb must end with " ~ damFileExtension);
+    fasta2dam(outputDb, fastaRecords);
+    dbsplit(outputDb, dbsplitOptions);
+
+    return outputDb;
 }
 
 unittest
@@ -2099,19 +2686,68 @@ unittest
     scope (exit)
         rmdirRecurse(tmpDir);
 
-    string dbName = buildDamFile(fastaRecords[], tmpDir);
-
-    assert(dbName.isFile);
-    foreach (hiddenDbFile; getHiddenDbFiles(dbName))
     {
-        assert(hiddenDbFile.isFile);
+        string dbName = buildDamFile(fastaRecords[], tmpDir);
+
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
     }
+    {
+        string wantedDbName = buildPath(tmpDir, "unit-test.dam");
+        string dbName = buildDamFile(wantedDbName, fastaRecords[]);
+
+        assert(dbName == wantedDbName);
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
+    }
+}
+
+/**
+    Align DB(s) to each other using `daligner`.
+
+    Returns: path to las-file.
+*/
+string getDalignment(in string dbFile, in string[] dalignerOptions, in string workdir)
+{
+    dalign(dbFile, dalignerOptions, workdir);
+    auto lasFile = getLasFile(dbFile, workdir);
+
+    return lasFile;
+}
+
+/// ditto
+string getDalignment(in string referenceDb, in string queryDb, in string[] dalignerOptions, in string workdir)
+{
+    dalign(referenceDb, queryDb, dalignerOptions, workdir);
+    auto lasFile = getLasFile(referenceDb, queryDb, workdir);
+
+    return lasFile;
+}
+
+/**
+    Map dbFile.
+
+    Returns: path to las-file.
+*/
+string getDamapping(
+    in string refDb,
+    in string queryDb,
+    in string[] damapperOptions,
+    in string workdir,
+)
+{
+    damapper(refDb, queryDb, damapperOptions, workdir);
+    auto lasFile = getLasFile(refDb, queryDb, workdir);
+
+    return lasFile;
 }
 
 /**
     Self-dalign dbFile and build consensus using daccord.
 
-    Returns: list of consensus DBs.
+    Returns: filename of consensus DB.
 */
 string getConsensus(Options)(in string dbFile, in size_t readId, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
@@ -2307,14 +2943,16 @@ id_t getNumBlocks(in string damFile)
     enum blockNumFormat = "blocks = %d";
     enum blockNumFormatStart = blockNumFormat[0 .. 6];
     id_t numBlocks;
-    auto matchingLine = File(damFile.stripBlock).byLine.filter!(
-            line => line.startsWith(blockNumFormatStart)).front;
+    auto matchingLines = File(damFile.stripBlock).byLine.filter!(
+            line => line.startsWith(blockNumFormatStart));
 
-    if (!matchingLine)
+    if (matchingLines.empty)
     {
         auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
+
+    auto matchingLine = matchingLines.front;
 
     if (formattedRead!blockNumFormat(matchingLine, numBlocks) != 1)
     {
@@ -2325,13 +2963,51 @@ id_t getNumBlocks(in string damFile)
     return numBlocks;
 }
 
+coord_t getContigCutoff(in string dbFile)
+{
+    // see also in dazzler's DB.h:394
+    //     #define DB_PARAMS "size = %10lld cutoff = %9d all = %1d\n"
+    enum paramsFormat = "size = %d cutoff = %d all = %d";
+    enum paramsFormatStart = paramsFormat[0 .. 6];
+    coord_t contigCutoff;
+    size_t dummy;
+    auto matchingLines = File(dbFile.stripBlock).byLine.filter!(
+            line => line.startsWith(paramsFormatStart));
+
+    if (matchingLines.empty)
+    {
+        enum msg = "could not read the contig cutoff in `%s`; " ~
+                   "try using DBsplit to fix";
+        auto errorMessage = format!msg(dbFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    auto matchingLine = matchingLines.front;
+
+    if (matchingLine.formattedRead!paramsFormat(dummy, contigCutoff, dummy) != 3)
+    {
+        auto errorMessage = format!"could not read the contig cutoff in `%s`"(dbFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    return contigCutoff;
+}
+
 id_t getNumContigs(in string damFile, in string workdir)
+{
+    return getNumContigs(damFile, No.untrimmedDb, workdir);
+}
+
+id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb, in string workdir = null)
 {
     enum contigNumFormat = "+ R %d";
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
-    auto matchingLine = dbdump(damFile, empty, [], workdir)
+    string[] options = untrimmedDb ? [DBdumpOptions.untrimmedDatabase] : [];
+    auto dbdumpLines = dbdump(damFile, empty, options, workdir);
+    scope (exit) dbdumpLines.destroy();
+    auto matchingLine = dbdumpLines
         .filter!(line => line.startsWith(contigNumFormatStart))
         .front;
 
@@ -2404,7 +3080,8 @@ struct GapSegment
 
 private struct ScaffoldStructureReader
 {
-    static enum scaffoldInfoLineFormat = "%s:: Contig %d[%d,%d]";
+    static enum scaffoldInfoLineSeparator = " :: ";
+    static enum scaffoldInfoLineFormat = "Contig %d[%d,%d]";
     alias RawScaffoldInfo = typeof("".lineSplitter);
 
     private RawScaffoldInfo rawScaffoldInfo;
@@ -2442,13 +3119,17 @@ private struct ScaffoldStructureReader
             lastContigPart.scaffoldId,
         );
 
-        rawScaffoldInfo.front.formattedRead!scaffoldInfoLineFormat(
-            nextContigPart.header,
+        auto currentLine = rawScaffoldInfo.front;
+        auto parts = rawScaffoldInfo.front.split(scaffoldInfoLineSeparator);
+
+        assert(parts.length == 2, "illegally formatted line from `DBshow -n`");
+        nextContigPart.header = parts[0];
+        parts[1].formattedRead!scaffoldInfoLineFormat(
             nextContigPart.contigId,
             nextContigPart.begin,
             nextContigPart.end,
         );
-        auto hasHeaderChanged = lastContigPart.header != nextContigPart.header[0 .. $ - 1];
+        auto hasHeaderChanged = lastContigPart.header != nextContigPart.header;
 
         if (hasHeaderChanged)
             ++nextContigPart.scaffoldId;
@@ -2456,9 +3137,6 @@ private struct ScaffoldStructureReader
         if (currentPart.peek!GapSegment !is null
                 || lastContigPart.scaffoldId != nextContigPart.scaffoldId)
         {
-            assert(nextContigPart.header[$ - 1] == ' ');
-            // Remove the trailing space
-            nextContigPart.header = nextContigPart.header[0 .. $ - 1];
             lastContigPart = nextContigPart;
             currentPart = nextContigPart;
             rawScaffoldInfo.popFront();
@@ -2574,10 +3252,12 @@ EOS";
 /**
     Get the hidden files comprising the designated mask.
 */
-auto getMaskFiles(in string dbFile, in string maskDestination)
+auto getMaskFiles(in string dbFile, in string maskName)
 {
-    auto destinationDir = maskDestination.dirName;
-    auto maskName = maskDestination.baseName;
+    enforce!DazzlerCommandException(!maskName.canFind("/"), "mask name must not contain slashes `/`");
+    enforce!DazzlerCommandException(!maskName.canFind("."), "mask name must not contain dots `.`");
+
+    auto destinationDir = dbFile.dirName;
     auto dbName = dbFile.baseName.stripExtension;
     auto maskHeader = format!"%s/.%s.%s.anno"(destinationDir, dbName, maskName);
     auto maskData = format!"%s/.%s.%s.data"(destinationDir, dbName, maskName);
@@ -2610,11 +3290,11 @@ private
     Throws: MaskReaderException
     See_Also: `writeMask`, `getMaskFiles`
 */
-Region[] readMask(Region)(in string dbFile, in string maskDestination, in string workdir)
+Region[] readMask(Region)(in string dbFile, in string maskName, in string workdir)
 {
     alias _enforce = enforce!MaskReaderException;
 
-    auto maskFileNames = getMaskFiles(dbFile, maskDestination);
+    auto maskFileNames = getMaskFiles(dbFile, maskName);
     auto maskHeader = readMaskHeader(maskFileNames.header);
     auto maskData = getBinaryFile!MaskDataEntry(maskFileNames.data);
 
@@ -2622,14 +3302,27 @@ Region[] readMask(Region)(in string dbFile, in string maskDestination, in string
     alias RegionContigId = typeof(maskRegions.data[0].tag);
     alias RegionBegin = typeof(maskRegions.data[0].begin);
     alias RegionEnd = typeof(maskRegions.data[0].end);
-    auto numReads = getNumContigs(dbFile, workdir).to!int;
+    auto numReads = getNumContigs(dbFile, No.untrimmedDb, workdir).to!int;
+    id_t[] trimmedDbTranslateTable;
 
     size_t currentContig = 1;
 
+    if (dbFile.endsWith(damFileExtension) && maskHeader.numReads > numReads)
+    {
+        logJsonWarn(
+            "info", "reading mask for untrimmed DB",
+            "dbFile", dbFile,
+            "maskName", maskName,
+        );
+        numReads = getNumContigs(dbFile, Yes.untrimmedDb, workdir).to!int;
+        trimmedDbTranslateTable = getTrimmedDbTranslateTable(dbFile);
+    }
+
     if (maskHeader.numReads != numReads)
         logJsonWarn(
-            "info",
-            "mask does not match DB: number of reads does not match",
+            "info", "mask does not match DB: number of reads does not match",
+            "dbFile", dbFile,
+            "maskName", maskName,
         );
     _enforce(maskHeader.size == 0, "corrupted mask: expected 0");
     _enforce(maskHeader.dataPointers.length == maskHeader.numReads + 1,
@@ -2654,7 +3347,11 @@ Region[] readMask(Region)(in string dbFile, in string maskDestination, in string
             newRegion.begin = interval[0].to!RegionBegin;
             newRegion.end = interval[1].to!RegionEnd;
 
-            maskRegions ~= newRegion;
+            if (trimmedDbTranslateTable.length > 0)
+                newRegion.tag = trimmedDbTranslateTable[newRegion.tag - 1].to!RegionContigId;
+
+            if (newRegion.tag < id_t.max)
+                maskRegions ~= newRegion;
         }
 
         ++currentContig;
@@ -2683,6 +3380,10 @@ private T[] getBinaryFile(T)(in string fileName)
 {
     auto file = File(fileName, "rb");
     auto bufferLength = file.size / T.sizeof;
+
+    if (bufferLength == 0)
+        return [];
+
     auto dataBuffer = file.rawRead(uninitializedArray!(T[])(bufferLength));
 
     enforce!MaskReaderException(dataBuffer.length == bufferLength,
@@ -2692,6 +3393,28 @@ private T[] getBinaryFile(T)(in string fileName)
     return dataBuffer;
 }
 
+private id_t[] getTrimmedDbTranslateTable(in string dbFile)
+{
+    assert(dbFile.endsWith(damFileExtension), "only implemented for DAM files");
+
+    auto cutoff = getContigCutoff(dbFile);
+    auto untrimmedSize = getNumContigs(dbFile, Yes.untrimmedDb);
+    auto dbRecords = getDbRecords(dbFile, [
+        DBdumpOptions.readNumber,
+        DBdumpOptions.originalHeader,
+        DBdumpOptions.untrimmedDatabase,
+    ]);
+
+    auto trimmedDbTranslateTable = uninitializedArray!(id_t[])(untrimmedSize);
+    trimmedDbTranslateTable[] = id_t.max;
+    id_t untrimmedReadNumber;
+    foreach (dbRecord; dbRecords)
+        if (dbRecord.location.length >= cutoff)
+            trimmedDbTranslateTable[dbRecord.contigId - 1] = (++untrimmedReadNumber);
+
+    return trimmedDbTranslateTable;
+}
+
 /**
     Write the list of regions to a Dazzler mask for `dbFile`.
 
@@ -2699,7 +3422,7 @@ private T[] getBinaryFile(T)(in string fileName)
 */
 void writeMask(Region)(
     in string dbFile,
-    in string maskDestination,
+    in string maskName,
     in Region[] regions,
     in string workdir,
 )
@@ -2710,18 +3433,7 @@ void writeMask(Region)(
         MaskDataEntry, "end",
     );
 
-    if (regions.length == 0)
-    {
-        logJsonDiagnostic(
-            "notice", "skipping empty mask",
-            "dbFile", dbFile,
-            "maskDestination", maskDestination,
-        );
-
-        return;
-    }
-
-    auto maskFileNames = getMaskFiles(dbFile, maskDestination);
+    auto maskFileNames = getMaskFiles(dbFile, maskName);
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
 
@@ -2734,7 +3446,7 @@ void writeMask(Region)(
         .array;
     maskRegions.sort();
 
-    auto numReads = getNumContigs(dbFile, workdir).to!MaskHeaderEntry;
+    auto numReads = getNumContigs(dbFile, No.untrimmedDb, workdir).to!MaskHeaderEntry;
     MaskHeaderEntry size = 0; // Mark the DAZZ_TRACK as a mask (see DAZZ_DB/DB.c:1183)
     MaskHeaderEntry currentContig = 1;
     MaskDataPointer dataPointer = 0;
@@ -2866,6 +3578,36 @@ enum DalignerOptions : string
     masks = "-m",
 }
 
+
+/// Options for `datander`.
+enum DatanderOptions : string
+{
+    verbose = "-v",
+    /// Search code looks for a pair of diagonal bands of width 2^^w
+    /// (default 26 = 64) that contain a collection of exact matching k-mers
+    /// (default 12) between the two reads, such that the total number of
+    /// bases covered by the k-mer hits is h (default 35).
+    kMerSize = "-k",
+    /// ditto
+    bandWidth = "-w",
+    /// ditto
+    hitBaseCoverage = "-h",
+    tempDir = "-P",
+    /// Searching for local alignments involving at least -l base pairs
+    /// (default 1000) or more, that have an average correlation rate of
+    /// -e (default 70%).
+    minAlignmentLength = "-l",
+    /// ditto
+    averageCorrelationRate = "-e",
+    /// The local alignments found will be output in a sparse encoding where
+    /// a trace point on the alignment is recorded every -s base pairs of
+    /// the a-read (default 100bp).
+    tracePointDistance = "-s",
+    /// The program runs with 4 threads by default, but this may be set to
+    /// any power of 2 with the -T option.
+    numThreads = "-T",
+}
+
 /// Options for `damapper`.
 enum DamapperOptions : string
 {
@@ -2922,7 +3664,7 @@ enum DamapperOptions : string
 }
 
 /// Options for `DBdump`.
-enum DBdumpOptions
+enum DBdumpOptions : string
 {
     readNumber = "-r",
     originalHeader = "-h",
@@ -2937,7 +3679,7 @@ enum DBdumpOptions
 }
 
 /// Options for `DBshow`.
-enum DBshowOptions
+enum DBshowOptions : string
 {
     untrimmedDatabase = "-u",
     showQuiva = "-q",
@@ -2951,7 +3693,7 @@ enum DBshowOptions
 }
 
 /// Options for `fasta2DAM` and `fasta2DB`.
-enum Fasta2DazzlerOptions
+enum Fasta2DazzlerOptions : string
 {
     verbose = "-v",
     /// Import files listed 1/line in given file.
@@ -2961,7 +3703,7 @@ enum Fasta2DazzlerOptions
 }
 
 /// Options for `LAdump`.
-enum LAdumpOptions
+enum LAdumpOptions : string
 {
     coordinates = "-c",
     numDiffs = "-d",
@@ -2971,14 +3713,14 @@ enum LAdumpOptions
 }
 
 /// Options for `computeintrinsicqv`.
-enum ComputeIntrinsicQVOptions
+enum ComputeIntrinsicQVOptions : string
 {
     /// Read depth aka. read coverage. (mandatory)
     readDepth = "-d",
 }
 
 /// Options for `lasfilteralignments`.
-enum LasFilterAlignmentsOptions
+enum LasFilterAlignmentsOptions : string
 {
     /// Error threshold for proper alignment termination (default: 0.35)
     errorThresold = "-e",
@@ -2997,11 +3739,16 @@ private
         dalign([refDam, readsDam], dalignerOpts, workdir);
     }
 
+    @ExternalDependency("daligner", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     void dalign(in string[] dbList, in string[] dalignerOpts, in string workdir)
     {
         assert(dbList.length >= 1);
         auto isSelfAlignment = dbList.length == 1;
-        auto additionalOptions = only(isSelfAlignment ? DalignerOptions.identity : null);
+        auto needIdentityOption = !dalignerOpts.canFind(DalignerOptions.identity);
+        auto additionalOptions = only(isSelfAlignment && needIdentityOption
+            ? DalignerOptions.identity
+            : null
+        );
         auto inputFiles = isSelfAlignment ? [dbList[0], dbList[0]] : dbList;
         const(string[]) inputFilesRelativeToWorkDir = inputFiles.map!(
                 f => f.relativeToWorkdir(workdir)).array;
@@ -3015,6 +3762,7 @@ private
         damapper([refDam, readsDam], damapperOpts, workdir);
     }
 
+    @ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
     void damapper(in string[] dbList, in string[] damapperOpts, in string workdir)
     {
         const(string[]) dbListRelativeToWorkDir = dbList.map!(
@@ -3024,6 +3772,7 @@ private
                 damapperOpts, dbListRelativeToWorkDir), workdir);
     }
 
+    @ExternalDependency("computeintrinsicqv", "daccord", "https://gitlab.com/german.tischler/daccord")
     void computeIntrinsicQV(in string dbFile, in string lasFile, in size_t readDepth,
                              in string workdir)
     {
@@ -3037,6 +3786,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("lasfilteralignments", "daccord", "https://gitlab.com/german.tischler/daccord")
     string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options,
                              in string workdir)
     {
@@ -3055,6 +3805,8 @@ private
         return filteredLasFile;
     }
 
+    @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3073,6 +3825,7 @@ private
         return daccordedDb;
     }
 
+    @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
     void silentDaccord(in string dbFile, in string lasFile, in string[] daccordOpts,
             in string workdir)
     {
@@ -3084,6 +3837,9 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir)
     {
         alias esc = escapeShellCommand;
@@ -3091,18 +3847,20 @@ private
             .map!(to!size_t)
             .map!(to!string)
             .map!esc;
+        auto fastaToDbCommand = "fasta2" ~ inDbFile.extension[1 .. $].toUpper;
 
         executeShell(chain(
             only("DBshow"),
             only(esc(inDbFile.relativeToWorkdir(workdir))),
             escapedReadIds,
             only("|"),
-            only("fasta2DAM", Fasta2DazzlerOptions.fromStdin),
+            only(fastaToDbCommand, Fasta2DazzlerOptions.fromStdin),
             only(esc(outDbFile.relativeToWorkdir(workdir))),
         ), workdir);
     }
 
-    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir)
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : each, joiner;
@@ -3157,12 +3915,14 @@ private
         return;
     }
 
-    void fasta2dam(in string inFile, in string outFile, in string workdir)
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    void fasta2dam(in string inFile, in string outFile, in string workdir = null)
     {
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
-    void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir)
+    @ExternalDependency("DBsplit", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir = null)
     {
         executeCommand(chain(only("DBsplit"), dbsplitOptions,
                 only(dbFile.stripBlock.relativeToWorkdir(workdir))), workdir);
@@ -3174,6 +3934,7 @@ private
         return ladump(lasFile, dbA, dbB, [], ladumpOpts, workdir);
     }
 
+    @ExternalDependency("LAdump", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     auto ladump(in string lasFile, in string dbA, in string dbB, in id_t[] readIds,
             in string[] ladumpOpts, in string workdir)
     {
@@ -3189,10 +3950,37 @@ private
         ), workdir);
     }
 
-    auto dbdump(Range)(in string dbFile, Range recordNumbers,
-            in string[] dbdumpOptions, in string workdir)
-            if (isForwardRange!Range && is(ElementType!Range : size_t))
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir = null)
     {
+        return executePipe(chain(
+            only("DBdump"),
+            dbdumpOptions,
+            only(dbFile.relativeToWorkdir(workdir)),
+        ), workdir);
+    }
+
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    auto dbdump(Range)(in string dbFile, Range recordNumbers,
+            in string[] dbdumpOptions, in string workdir = null)
+        if (
+            isForwardRange!Range &&
+            (
+                (is(Range.length) && Range.length == 0) ||
+                is(ElementType!Range : size_t)
+            )
+        )
+    {
+        version (assert)
+        {
+            auto numRecords = numDbRecords(dbFile, workdir);
+
+            assert(
+                recordNumbers.save.all!(n => 0 < n && n <= numRecords),
+                "illegal records for `DBdump`",
+            );
+        }
+
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
@@ -3201,6 +3989,7 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(
         in string dbFile,
         id_t firstRecord,
@@ -3209,6 +3998,16 @@ private
         in string workdir,
     )
     {
+        version (assert)
+        {
+            auto numRecords = numDbRecords(dbFile, workdir);
+
+            assert(
+                0 < firstRecord && firstRecord <= lastRecord && lastRecord <= numRecords,
+                "illegal record range for `DBdump`",
+            );
+        }
+
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
@@ -3219,142 +4018,19 @@ private
         ), workdir);
     }
 
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string contigId)
     {
         return executeCommand(only("DBshow", dbFile, contigId));
     }
 
+    @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     string dbshow(in string dbFile, in string[] dbshowOptions)
     {
         return executeCommand(chain(only("DBshow"), dbshowOptions, only(dbFile)));
     }
 
-    auto executePipe(Range)(Range command, in string workdir = null)
-            if (isInputRange!Range && isSomeString!(ElementType!Range))
-    {
-        static final class LinesPipe
-        {
-            static enum lineTerminator = "\n";
-
-            private const string[] command;
-            private const string workdir;
-            private ProcessPipes process;
-            private string currentLine;
-
-            this(in string[] command, in string workdir)
-            {
-                this.command = command;
-                this.workdir = workdir;
-            }
-
-            ~this()
-            {
-                if (!(process.pid is null))
-                    releaseProcess();
-            }
-
-            void releaseProcess()
-            {
-                if (!process.stdout.isOpen)
-                    return;
-
-                process.stdout.close();
-
-                version (Posix)
-                {
-                    import core.sys.posix.signal : SIGKILL;
-
-                    process.pid.kill(SIGKILL);
-                }
-                else
-                {
-                    static assert(0, "Only intended for use on POSIX compliant OS.");
-                }
-                process.pid.wait();
-            }
-
-            private void ensureInitialized()
-            {
-                if (!(process.pid is null))
-                    return;
-
-                logJsonDiagnostic(
-                    "action", "execute",
-                    "type", "pipe",
-                    "command", command.toJson,
-                    "state", "pre",
-                );
-                process = pipeProcess(command, Redirect.stdout, null, Config.none, workdir);
-
-                if (!empty)
-                    popFront();
-            }
-
-            void popFront()
-            {
-                ensureInitialized();
-                assert(!empty, "Attempting to popFront an empty LinesPipe");
-                currentLine = process.stdout.readln();
-
-                if (currentLine.empty)
-                {
-                    currentLine = null;
-                    releaseProcess();
-                }
-
-                if (currentLine.endsWith(lineTerminator))
-                    currentLine = currentLine[0 .. $ - lineTerminator.length];
-            }
-
-            @property string front()
-            {
-                ensureInitialized();
-                assert(!empty, "Attempting to fetch the front of an empty LinesPipe");
-
-                return currentLine;
-            }
-
-            @property bool empty()
-            {
-                ensureInitialized();
-
-                if (!process.stdout.isOpen || process.stdout.eof)
-                {
-                    releaseProcess();
-
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-        }
-
-        auto sanitizedCommand = command.filter!"a != null".array;
-
-        return new LinesPipe(sanitizedCommand, workdir);
-    }
-
-    unittest
-    {
-        import std.algorithm : equal;
-        import std.range : take;
-
-        auto cheers = executePipe(only("yes", "Cheers!"), ".");
-        assert(cheers.take(5).equal([
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-            "Cheers!",
-        ]));
-
-        auto helloWorld = executePipe(only("echo", "Hello World!"), ".");
-        assert(helloWorld.equal(["Hello World!"]));
-    }
-
-    string executeCommand(Range)(in Range command, in string workdir = null)
+    string executeCommand(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.process : Config, execute;
@@ -3365,7 +4041,7 @@ private
         return output;
     }
 
-    void executeShell(Range)(in Range command, in string workdir = null)
+    void executeShell(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : joiner;
@@ -3376,7 +4052,7 @@ private
                     Config.none, size_t.max, workdir));
     }
 
-    void executeScript(Range)(in Range command, in string workdir = null)
+    void executeScript(Range)(Range command, in string workdir = null)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.process : Config, executeShell;
@@ -3386,7 +4062,7 @@ private
                     Config.none, size_t.max, workdir));
     }
 
-    string executeWrapper(string type, alias execCall, Range)(in Range command)
+    string executeWrapper(string type, alias execCall, Range)(Range command)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.array : array;
@@ -3446,8 +4122,11 @@ private
         assert("foo_bar.db".stripBlock == "foo_bar.db");
     }
 
-    string relativeToWorkdir(in string fileName, in string workdir)
+    string relativeToWorkdir(in string fileName, in string workdir = null)
     {
-        return relativePath(absolutePath(fileName), absolutePath(workdir));
+        if (workdir is null)
+            return fileName;
+        else
+            return relativePath(absolutePath(fileName), absolutePath(workdir));
     }
 }

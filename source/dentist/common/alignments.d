@@ -23,6 +23,7 @@ import std.algorithm :
     any,
     canFind,
     chunkBy,
+    countUntil,
     cumulativeFold,
     equal,
     filter,
@@ -35,7 +36,8 @@ import std.algorithm :
     sort,
     sum,
     swap,
-    SwapStrategy;
+    SwapStrategy,
+    uniq;
 import std.array : appender, array, minimallyInitializedArray;
 import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
@@ -51,6 +53,8 @@ import std.range :
     iota,
     only,
     radial,
+    repeat,
+    retro,
     slide,
     takeNone,
     zip;
@@ -58,7 +62,7 @@ import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
 import std.traits : isArray, TemplateArgsOf, TemplateOf;
-import vibe.data.json : toJson = serializeToJson;
+import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writefln, writeln;
 
@@ -81,10 +85,12 @@ struct AlignmentChain
     }
 
     static alias Flags = BitFlags!Flag;
-    static alias TranslatedTracePoint = Tuple!(
-        coord_t, "contigA",
-        coord_t, "contigB",
-    );
+
+    static struct TranslatedTracePoint
+    {
+        coord_t contigA;
+        coord_t contigB;
+    }
 
     static struct LocalAlignment
     {
@@ -112,7 +118,7 @@ struct AlignmentChain
 
         TranslatedTracePoint translateTracePoint(string contig = "contigA")(
             in coord_t contigPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure if (contig.among("contigA", "contigB"))
         {
@@ -131,9 +137,41 @@ struct AlignmentChain
             return TranslatedTracePoint(contigAPos, contigBPos);
         }
 
+        /// Crops this local alignment from startingSeed to contigPos.
+        void cropToTracePoint(string contig = "contigA")(
+            in AlignmentLocationSeed startingSeed,
+            in coord_t contigPos,
+            in trace_point_t tracePointDistance,
+            in RoundingMode roundingMode,
+        ) pure if (contig.among("contigA", "contigB"))
+        {
+            auto index = tracePointsUpTo!contig(contigPos, tracePointDistance, roundingMode);
+            auto newLocusBoundary = translateTracePoint!contig(
+                contigPos,
+                tracePointDistance,
+                roundingMode,
+            );
+
+            final switch (startingSeed)
+            {
+            case AlignmentLocationSeed.front:
+                contigA.end = newLocusBoundary.contigA;
+                contigB.end = newLocusBoundary.contigB;
+                tracePoints = tracePoints[0 .. index];
+                break;
+            case AlignmentLocationSeed.back:
+                contigA.begin = newLocusBoundary.contigA;
+                contigB.begin = newLocusBoundary.contigB;
+                tracePoints = tracePoints[index .. $];
+                break;
+            }
+
+            numDiffs = tracePoints.map!(tp => tp.numDiffs.to!diff_t).sum;
+        }
+
         auto tracePointsUpTo(string contig)(
             in coord_t contigAPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure nothrow if (contig == "contigA")
         {
@@ -195,7 +233,7 @@ struct AlignmentChain
 
         auto tracePointsUpTo(string contig)(
             in coord_t contigBPos,
-            trace_point_t tracePointDistance,
+            in trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure nothrow if (contig == "contigB")
         {
@@ -244,6 +282,15 @@ struct AlignmentChain
     LocalAlignment[] localAlignments;
     trace_point_t tracePointDistance;
 
+    static @property AlignmentChain disabledInstance()
+    {
+        AlignmentChain ac;
+
+        ac.flags |= Flag.disabled;
+
+        return ac;
+    }
+
     static foreach(flagName; __traits(allMembers, Flag))
     {
         mixin(format!(q"<
@@ -263,6 +310,9 @@ struct AlignmentChain
 
     invariant
     {
+        if (flags.disabled)
+            return;
+
         assert(localAlignments.length >= 1, "empty chain is forbidden");
         foreach (la; localAlignments)
         {
@@ -320,7 +370,7 @@ struct AlignmentChain
             }
     }
 
-    @property ref const(LocalAlignment) first() const pure nothrow
+    @property ref const(LocalAlignment) first() const pure nothrow @safe
     {
         return localAlignments[0];
     }
@@ -337,7 +387,7 @@ struct AlignmentChain
             }
     }
 
-    @property ref const(LocalAlignment) last() const pure nothrow
+    @property ref const(LocalAlignment) last() const pure nothrow @safe
     {
         return localAlignments[$ - 1];
     }
@@ -366,16 +416,21 @@ struct AlignmentChain
     }
 
     /// This alignment is called proper iff it starts and ends at a read boundary.
-    @property bool isProper() const pure nothrow
+    @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
-        return (
-            first.contigA.begin == 0 ||
-            first.contigB.begin == 0
-        )
-        &&
-        (
-            last.contigA.end == contigA.length ||
-            last.contigB.end == contigB.length
+        enum beginsWith(string contig) = "first."~contig~".begin <= allowance";
+        enum endsWith(string contig) = "last."~contig~".end + allowance >= "~contig~".length";
+
+        return (mixin(beginsWith!"contigA") || mixin(beginsWith!"contigB")) &&
+               (mixin(endsWith!"contigA") || mixin(endsWith!"contigB"));
+    }
+
+    /// Returns true iff this alignment covers `contig` completely.
+    @property bool completelyCovers(string contig)() const pure nothrow
+        if (contig.among("contigA", "contigB"))
+    {
+        return mixin(
+            "first." ~ contig ~ ".begin == 0 && last." ~ contig ~ ".end == " ~ contig ~ ".length"
         );
     }
 
@@ -556,6 +611,23 @@ struct AlignmentChain
             }
     }
 
+    @property double averageErrorRate() const pure
+    {
+        return totalDiffs.to!double / coveredBases!"contigA".to!double;
+    }
+
+    unittest
+    {
+        with (Complement) with (LocalAlignment)
+            {
+                auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
+                auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+
+                assert(ac.averageErrorRate == 3.0 / 7.0);
+            }
+    }
+
     int compareIds(ref const AlignmentChain other) const pure nothrow
     {
         return cmpLexicographically!(
@@ -692,19 +764,8 @@ struct AlignmentChain
         RoundingMode roundingMode,
     ) const pure if (contig.among("contigA", "contigB"))
     {
-        bool coversContigPos(in AlignmentChain.LocalAlignment localAlignment)
-        {
-            return mixin(`localAlignment.` ~ contig ~ `.begin <= contigPos
-                && contigPos <= localAlignment.` ~ contig ~ `.end`);
-        }
-
-        enum otherContig = contig == "contigA" ? "contigB" : "contigA";
-        auto coveringLocalAlignments = localAlignments.find!coversContigPos;
-        enforce!Exception(
-            coveringLocalAlignments.length > 0,
-            "cannot translate coordinate due to lack of alignment coverage",
-        );
-        auto coveringLocalAlignment = coveringLocalAlignments[0];
+        auto index = coveringLocalAlignmentIndex!contig(contigPos, roundingMode);
+        auto coveringLocalAlignment = localAlignments[index];
 
         return coveringLocalAlignment.translateTracePoint!contig(
             contigPos,
@@ -754,23 +815,339 @@ struct AlignmentChain
             tracePointDistance,
         );
 
-        assert(ac.translateTracePoint(579, RoundingMode.floor) == tuple(579, 0));
-        assert(ac.translateTracePoint(599, RoundingMode.floor) == tuple(579, 0));
-        assert(ac.translateTracePoint(600, RoundingMode.floor) == tuple(600, 23));
-        assert(ac.translateTracePoint(699, RoundingMode.floor) == tuple(600, 23));
+        assert(ac.translateTracePoint(579, RoundingMode.floor) == TranslatedTracePoint(579, 0));
+        assert(ac.translateTracePoint(599, RoundingMode.floor) == TranslatedTracePoint(579, 0));
+        assert(ac.translateTracePoint(600, RoundingMode.floor) == TranslatedTracePoint(600, 23));
+        assert(ac.translateTracePoint(699, RoundingMode.floor) == TranslatedTracePoint(600, 23));
+        assert(
+            ac.translateTracePoint(700, RoundingMode.ceil)
+            ==
+            ac.translateTracePoint(700, RoundingMode.floor)
+        );
         assert(
             ac.translateTracePoint(699, RoundingMode.ceil)
             ==
             ac.translateTracePoint(701, RoundingMode.floor)
         );
-        assert(ac.translateTracePoint(700, RoundingMode.floor) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(799, RoundingMode.floor) == tuple(700, 23 + 109));
-        assert(ac.translateTracePoint(800, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(899, RoundingMode.floor) == tuple(800, 23 + 109 + 109));
-        assert(ac.translateTracePoint(2583, RoundingMode.floor) == tuple(2500, 2070));
-        assert(ac.translateTracePoint(2584, RoundingMode.floor) == tuple(2584, 2158));
+        assert(ac.translateTracePoint(700, RoundingMode.floor) == TranslatedTracePoint(700, 23 + 109));
+        assert(ac.translateTracePoint(799, RoundingMode.floor) == TranslatedTracePoint(700, 23 + 109));
+        assert(ac.translateTracePoint(800, RoundingMode.floor) == TranslatedTracePoint(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(899, RoundingMode.floor) == TranslatedTracePoint(800, 23 + 109 + 109));
+        assert(ac.translateTracePoint(2583, RoundingMode.floor) == TranslatedTracePoint(2500, 2070));
+        assert(ac.translateTracePoint(2584, RoundingMode.floor) == TranslatedTracePoint(2584, 2158));
         assertThrown!Exception(ac.translateTracePoint(578, RoundingMode.floor));
         assertThrown!Exception(ac.translateTracePoint(2585, RoundingMode.floor));
+    }
+
+    /// Crops this alignment chain from startingSeed to contigPos.
+    void cropToTracePoint(string contig = "contigA")(
+        in AlignmentLocationSeed startingSeed,
+        in coord_t contigPos,
+        in RoundingMode roundingMode,
+    ) pure if (contig.among("contigA", "contigB"))
+    {
+        auto index = coveringLocalAlignmentIndex!contig(contigPos, roundingMode);
+
+        localAlignments[index].cropToTracePoint!contig(
+            startingSeed,
+            contigPos,
+            tracePointDistance,
+            roundingMode,
+        );
+        auto isEmptyCroppedLA = localAlignments[index].contigA.length == 0 ||
+                                localAlignments[index].contigB.length == 0;
+
+        final switch (startingSeed)
+        {
+        case AlignmentLocationSeed.front:
+            if (isEmptyCroppedLA)
+                --index;
+            localAlignments = localAlignments[0 .. index + 1];
+            break;
+        case AlignmentLocationSeed.back:
+            if (isEmptyCroppedLA)
+                ++index;
+            localAlignments = localAlignments[index .. $];
+            break;
+        }
+
+        if (localAlignments.length == 0)
+            flags.disabled = true;
+    }
+
+    unittest
+    {
+        enum front = AlignmentLocationSeed.front;
+        enum back = AlignmentLocationSeed.back;
+        alias Locus = LocalAlignment.Locus;
+        alias TracePoint = LocalAlignment.TracePoint;
+        enum tracePointDistance = 100;
+        alias getAC = () => AlignmentChain(
+            0,
+            Contig(1, 2584),
+            Contig(58024, 10570),
+            Flags(Flag.complement),
+            [LocalAlignment(
+                Locus(579, 2584),
+                Locus(0, 2158),
+                292,
+                [
+                    TracePoint( 2,  23),
+                    TracePoint(11, 109),
+                    TracePoint(13, 109),
+                    TracePoint(15, 107),
+                    TracePoint(18, 107),
+                    TracePoint(14, 103),
+                    TracePoint(16, 106),
+                    TracePoint(17, 106),
+                    TracePoint( 9, 106),
+                    TracePoint(14, 112),
+                    TracePoint(16, 105),
+                    TracePoint(16, 114),
+                    TracePoint(10, 103),
+                    TracePoint(14, 110),
+                    TracePoint(15, 110),
+                    TracePoint(15, 101),
+                    TracePoint(17, 108),
+                    TracePoint(17, 109),
+                    TracePoint(15, 111),
+                    TracePoint(17, 111),
+                    TracePoint(11,  88),
+                ],
+            )],
+            tracePointDistance,
+        );
+        enum originalAC = getAC();
+
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 579, RoundingMode.floor);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 599, RoundingMode.floor);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 600, RoundingMode.floor);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.first.contigA.begin == originalAC.first.contigA.begin);
+            assert(ac.first.contigA.end == 600);
+            assert(ac.first.contigB.begin == originalAC.first.contigB.begin);
+            assert(ac.first.contigB.end == 23);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(front, 699, RoundingMode.floor);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.first.contigA.begin == originalAC.first.contigA.begin);
+            assert(ac.first.contigA.end == 600);
+            assert(ac.first.contigB.begin == originalAC.first.contigB.begin);
+            assert(ac.first.contigB.end == 23);
+        }
+        {
+            auto ac1 = getAC();
+            ac1.cropToTracePoint(front, 699, RoundingMode.ceil);
+            auto ac2 = getAC();
+            ac2.cropToTracePoint(front, 701, RoundingMode.floor);
+
+            assert(ac1 == ac2);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2584, RoundingMode.ceil);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2501, RoundingMode.ceil);
+
+            assert(ac.flags.disabled);
+            assert(ac.localAlignments.length == 0);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2500, RoundingMode.ceil);
+            import std.stdio;
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.last.contigA.end == originalAC.last.contigA.end);
+            assert(ac.last.contigA.begin == 2500);
+            assert(ac.last.contigB.end == originalAC.last.contigB.end);
+            assert(ac.last.contigB.begin == 2070);
+        }
+        {
+            auto ac = getAC();
+            ac.cropToTracePoint(back, 2401, RoundingMode.ceil);
+
+            assert(!ac.flags.disabled);
+            assert(ac.localAlignments.length == 1);
+            assert(ac.last.contigA.end == originalAC.last.contigA.end);
+            assert(ac.last.contigA.begin == 2500);
+            assert(ac.last.contigB.end == originalAC.last.contigB.end);
+            assert(ac.last.contigB.begin == 2070);
+        }
+        {
+            auto ac1 = getAC();
+            ac1.cropToTracePoint(back, 2401, RoundingMode.ceil);
+            auto ac2 = getAC();
+            ac2.cropToTracePoint(back, 2500, RoundingMode.floor);
+
+            assert(ac1 == ac2);
+        }
+
+        assertThrown!Exception(getAC().cropToTracePoint(front, 578, RoundingMode.floor));
+        assertThrown!Exception(getAC().cropToTracePoint(front, 2585, RoundingMode.floor));
+    }
+
+    protected size_t coveringLocalAlignmentIndex(string contig = "contigA")(
+        in coord_t contigPos,
+        in RoundingMode roundingMode,
+    ) const pure if (contig.among("contigA", "contigB"))
+    {
+        bool coversContigPos(in AlignmentChain.LocalAlignment localAlignment)
+        {
+            return mixin(`localAlignment.` ~ contig ~ `.begin <= contigPos
+                && contigPos <= localAlignment.` ~ contig ~ `.end`);
+        }
+
+        auto index = localAlignments.countUntil!coversContigPos;
+        enforce!Exception(
+            index >= 0,
+            "cannot translate coordinate due to lack of alignment coverage",
+        );
+
+        return index;
+    }
+
+    /**
+        Generate a cartoon of this alignment relative to `contig`.
+
+        Params:
+            bpsPerChar =    Number of base pairs that one char represents.
+
+        Returns: a cartoon of this alignment
+    */
+    static string cartoon(string contig)(in coord_t bpsPerChar, in AlignmentChain[] alignmentChains...)
+    {
+        if (alignmentChains.length == 0)
+            return "";
+
+        alias getContig = ac => mixin("ac." ~ contig);
+        alias getCoords = la => mixin("la." ~ contig);
+        alias getComplementedCoords = la => LocalAlignment.Locus(
+
+        );
+
+        auto referenceContig = getContig(alignmentChains[0]);
+
+        enforce!Exception(
+            alignmentChains.all!(ac => getContig(ac) == referenceContig),
+            "all alignment chains must share the same reference contig",
+        );
+
+        InputRange!char cartoonLine(in AlignmentChain ac)
+        {
+            if (contig == "contigA" || !ac.flags.complement)
+                return inputRangeObject(chain(
+                    ' '.repeat(getCoords(ac.first).begin / bpsPerChar),
+                    ac
+                        .localAlignments
+                        .slide!(No.withPartial)(2)
+                        .map!(laPair => getCoords(laPair[1]).begin > getCoords(laPair[0]).end
+                            ? chain(
+                                '-'.repeat(ceildiv(getCoords(laPair[0]).length, bpsPerChar)),
+                                '='.repeat((getCoords(laPair[1]).begin - getCoords(laPair[0]).end) / bpsPerChar),
+                            )
+                            : chain(
+                                '-'.repeat(ceildiv(
+                                    getCoords(laPair[0]).length - (getCoords(laPair[0]).end - getCoords(laPair[1]).begin),
+                                    bpsPerChar,
+                                )),
+                                '='.repeat(0),
+                            ),
+                        )
+                        .joiner,
+                    '-'.repeat(ceildiv(getCoords(ac.last).length, bpsPerChar)),
+                ));
+            else
+                return inputRangeObject(chain(
+                    ' '.repeat((referenceContig.length - getCoords(ac.last).end) / bpsPerChar),
+                    ac
+                        .localAlignments
+                        .retro
+                        .slide!(No.withPartial)(2)
+                        .map!(laPair => getCoords(laPair[0]).begin > getCoords(laPair[1]).end
+                            ? chain(
+                                '-'.repeat(ceildiv(getCoords(laPair[0]).length, bpsPerChar)),
+                                '='.repeat((getCoords(laPair[0]).begin - getCoords(laPair[1]).end) / bpsPerChar),
+                            )
+                            : chain(
+                                '-'.repeat(ceildiv(
+                                    getCoords(laPair[0]).length - (getCoords(laPair[1]).end - getCoords(laPair[0]).begin),
+                                    bpsPerChar,
+                                )),
+                                '='.repeat(0),
+                            )
+                        )
+                        .joiner,
+                    '-'.repeat(ceildiv(getCoords(ac.first).length, bpsPerChar)),
+                ));
+        }
+
+        return chain(
+            '-'.repeat(ceildiv(referenceContig.length, bpsPerChar)),
+            only('\n'),
+            alignmentChains.map!cartoonLine.joiner(only('\n')),
+        ).to!string;
+    }
+
+    ///
+    unittest
+    {
+        with (AlignmentChain) with (LocalAlignment) with (Complement)
+        {
+            auto acs = [
+                AlignmentChain(
+                    0,
+                    Contig(1, 10),
+                    Contig(1, 10),
+                    emptyFlags,
+                    [
+                        LocalAlignment(Locus(0, 3), Locus(0, 3)),
+                        LocalAlignment(Locus(4, 5), Locus(4, 5)),
+                    ]),
+                AlignmentChain(
+                    1,
+                    Contig(1, 10),
+                    Contig(1, 10),
+                    Flags(Flag.complement),
+                    [
+                        LocalAlignment(Locus(5, 8), Locus(0, 3)),
+                        LocalAlignment(Locus(9, 10), Locus(4, 5)),
+                    ]),
+            ];
+
+            assert(cartoon!"contigA"(1, acs) == "----------\n" ~
+                                                "---=-\n" ~
+                                                "     ---=-");
+            assert(cartoon!"contigB"(1, acs) == "----------\n" ~
+                                                "---=-\n" ~
+                                                "     -=---");
+        }
     }
 }
 
@@ -1724,117 +2101,6 @@ J makeJoin(J)(ReadAlignment readAlignment)
     }
 }
 
-/// Generate join from read alignment.
-J to(J : Join!(ReadAlignment[]))(ReadAlignment readAlignment)
-{
-    auto join = makeJoin!J(readAlignment);
-    join.payload = [readAlignment];
-
-    return join;
-}
-
-///
-unittest
-{
-    with (AlignmentChain) with (LocalAlignment) with (Flag)
-            {
-                auto frontExtension = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        3,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(2, 3),
-                                Locus(5, 6),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(5, 6),
-                                Locus(9, 10),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-                auto backExtension = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        5,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-                auto gap = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        11,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        Flags(complement),
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                    SeededAlignment.from(AlignmentChain(
-                        12,
-                        Contig(2, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-
-                auto join1 = frontExtension.to!(Join!(ReadAlignment[]));
-                auto join2 = backExtension.to!(Join!(ReadAlignment[]));
-                auto join3 = gap.to!(Join!(ReadAlignment[]));
-
-                assert(join1.start == ContigNode(1, ContigPart.pre));
-                assert(join1.end == ContigNode(1, ContigPart.begin));
-                assert(join1.payload == [frontExtension]);
-
-                assert(join2.start == ContigNode(1, ContigPart.end));
-                assert(join2.end == ContigNode(1, ContigPart.post));
-                assert(join2.payload == [backExtension]);
-
-                assert(join3.start == ContigNode(1, ContigPart.end));
-                assert(join3.end == ContigNode(2, ContigPart.end));
-                assert(join3.payload == [gap]);
-            }
-}
-
 /**
     A pile of read alignments belonging to the same gap/contig end.
 
@@ -1871,11 +2137,11 @@ bool isValid(in PileUp pileUp) pure nothrow
 
 bool isExtension(in PileUp pileUp) pure nothrow
 {
-    if (pileUp[0].isFrontExtension)
+    if (pileUp.length > 0 && pileUp[0].isFrontExtension)
     {
         return pileUp.all!(readAlignment => readAlignment.isFrontExtension);
     }
-    else if (pileUp[0].isBackExtension)
+    else if (pileUp.length > 0 && pileUp[0].isBackExtension)
     {
         return pileUp.all!(readAlignment => readAlignment.isBackExtension);
     }
@@ -1904,6 +2170,27 @@ auto isAntiParallel(in PileUp pileUp) pure nothrow
         .filter!(readAlignment => readAlignment.isGap)
         .front
         .isAntiParallel;
+}
+
+AlignmentChain.Contig[] contigs(in PileUp pileUp) nothrow
+{
+    AlignmentChain.Contig[] contigs;
+    contigs.reserve(2);
+
+    foreach (readAlignment; pileUp)
+    {
+        if (contigs.length == 2)
+            break;
+        else if (contigs.length == 0)
+            foreach (ac; readAlignment[])
+                contigs ~= ac.contigA;
+        else
+            foreach (ac; readAlignment[])
+                if (contigs[0] != ac.contigA)
+                    contigs ~= ac.contigA;
+    }
+
+    return contigs;
 }
 
 /// Returns a list of pointers to all involved alignment chains.
@@ -1943,4 +2230,21 @@ unittest
     assert(pileUp[0][0].id == 1);
     assert(pileUp[0][1].id == 2);
     assert(pileUp[1][0].id == 3);
+}
+
+/// Converts the pileup into a simple JSON object for diagnostic purposes.
+Json pileUpToSimpleJson(in PileUp pileUp)
+{
+    return [
+        "type": pileUp.getType.to!string.toJson,
+        "length": pileUp.length.toJson,
+        "contigIds": pileUp
+            .map!(ra => ra[].map!"0 + a.contigA.id".array)
+            .joiner
+            .array
+            .sort
+            .uniq
+            .array
+            .toJson,
+    ].toJson;
 }

@@ -1,0 +1,4 @@
+jobs:                2048
+max-jobs-per-second: 100
+cluster-config:      "cluster.yml"
+drmaa:               " -J {cluster.jobname} --mem={cluster.memory} --mincpus={cluster.nCPUs} --partition={cluster.partition} --time={cluster.time}"

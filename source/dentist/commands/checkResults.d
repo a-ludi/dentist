@@ -12,77 +12,144 @@ import dentist.common : isTesting;
 
 static if (isTesting):
 
-import core.atomic : atomicOp;
-import dentist.commandline : TestingCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.common :
+    dentistEnforce,
     ReferenceInterval,
     ReferenceRegion,
-    to;
+    ReferencePoint;
 import dentist.common.alignments :
     AlignmentChain,
     coord_t,
+    diff_t,
     id_t;
+import dentist.common.commands : TestingCommand;
+import dentist.common.external : ExternalDependency;
 import dentist.dazzler :
+    buildDamFile,
     ContigSegment,
-    fingerprint,
+    DamapperOptions,
+    DBdumpOptions,
     GapSegment,
     getAlignments,
-    getExactAlignment,
+    getContigCutoff,
+    getDamapping,
+    getFastaSequence,
+    getDbRecords,
     getScaffoldStructure,
     readMask,
     ScaffoldSegment;
 import dentist.util.algorithm :
-    cmpLexicographically,
+    filterInPlace,
     first,
     last,
-    sliceBy;
+    orderLexicographically,
+    sliceBy,
+    uniqInPlace;
+import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
-    absdiff,
-    ceildiv,
-    longestIncreasingSubsequence,
     mean,
     median,
     N,
     NaturalNumberSet;
+import dentist.util.process : pipeLines;
 import dentist.util.range : tupleMap;
+import dentist.util.string :
+    findAlignment,
+    Strip;
 import std.algorithm :
     all,
     among,
-    chunkBy,
     copy,
     count,
+    countUntil,
+    cumulativeFold,
     filter,
     find,
-    fold,
+    group,
     joiner,
     map,
     max,
     maxElement,
     min,
-    remove,
+    minElement,
+    setDifference,
     sort,
+    startsWith,
     sum,
-    uniq;
-import std.array : appender, array;
-import std.format : format;
+    until;
+import std.array :
+    array,
+    minimallyInitializedArray,
+    split;
+import std.ascii :
+    newline,
+    toLower;
+import std.conv : to;
+import std.exception : enforce;
+import std.file :
+    exists,
+    getSize,
+    read,
+    write;
+import std.format :
+    format,
+    formattedRead;
 import std.math :
     ceil,
     log10;
-import std.parallelism : parallel;
+import std.parallelism :
+    parallel,
+    taskPool;
+import std.path :
+    baseName,
+    buildPath,
+    stripExtension;
+import std.process :
+    escapeShellFileName,
+    executeShell;
 import std.range :
     assumeSorted,
     chain,
+    chunks,
     enumerate,
+    evenChunks,
+    iota,
     only,
+    repeat,
+    retro,
+    slide,
     StoppingPolicy,
+    tee,
     zip;
 import std.range.primitives;
-import std.regex : ctRegex, replaceAll;
-import std.stdio : File, writeln;
-import std.string : join;
-import std.typecons : Tuple;
-import vibe.data.json : Json, toJson = serializeToJson, toJsonString = serializeToPrettyJson;
+import std.regex :
+    ctRegex,
+    replaceAll;
+import std.stdio :
+    File,
+    toFile,
+    writeln;
+import std.string :
+    join,
+    outdent,
+    splitLines,
+    tr;
+import std.traits : Unqual;
+import std.typecons :
+    Flag,
+    No,
+    tuple,
+    Tuple,
+    Yes;
+import vibe.data.json :
+    Json,
+    JSONException,
+    parseJson,
+    toJson = serializeToJson,
+    toJsonCompressed = serializeToJsonString,
+    toJsonString = serializeToPrettyJson;
 
 
 /// Options for the `collectPileUps` command.
@@ -92,7 +159,15 @@ alias Options = OptionsFor!(TestingCommand.checkResults);
 void execute(in Options options)
 {
     auto analyzer = ResultAnalyzer(options);
-    auto stats = analyzer.collect();
+    Stats stats;
+    try
+    {
+        stats = analyzer.collect();
+    }
+    catch (StopExecution)
+    {
+        return;
+    }
 
     if (options.useJson)
         writeln(stats.toJsonString());
@@ -100,23 +175,107 @@ void execute(in Options options)
         writeln(stats.toTabular());
 }
 
+class StopExecution : Exception
+{
+    this() {
+        super(null);
+    }
+}
+
+alias Complement = Flag!"complement";
+
+struct ContigMapping
+{
+    ReferenceInterval reference;
+    coord_t referenceContigLength;
+    id_t queryContigId;
+    Complement complement;
+
+    T opCast(T)() const pure nothrow if (is(bool : T))
+    {
+        return cast(T) queryContigId != 0;
+    }
+}
+
+static alias queryOrder = orderLexicographically!(const(ContigMapping),
+    mapping => mapping.queryContigId,
+);
+static alias queryEquiv = (const(ContigMapping) a, const(ContigMapping) b) =>
+        a.queryContigId == b.queryContigId;
+
+
 private struct ResultAnalyzer
 {
-    alias ExactAlignment = typeof(getExactAlignment("", "", resultAlignment[0], ""));
-    alias Fingerprint = typeof(fingerprint(&resultAlignment[0]));
     static enum identityLevels = Stats.identityLevels;
+
+    static struct InsertionMapping
+    {
+        ReferenceInterval trueAssembly;
+        ReferencePoint resultBegin;
+        ReferencePoint resultEnd;
+        id_t leftRefContig;
+        id_t rightRefContig;
+        Complement complement;
+    }
+
+    static enum GapState : ubyte
+    {
+        /// Unsure what happened; probably due to an assembly error.
+        unkown,
+        /// Flanking contigs could be found but not in the expected configuration.
+        broken,
+        /// Flanking contigs could be found and no sequence was inserted.
+        unclosed,
+        /// Flanking contigs could be found and sequence was inserted but a gap remains.
+        partiallyClosed,
+        /// Flanking contigs could be found and contiguous sequence was inserted.
+        closed,
+        /// This is not a gap – ignore it.
+        ignored,
+    }
+
+    static struct GapSummary
+    {
+        id_t lhsContigId;
+        GapState state;
+        coord_t gapLength;
+        StretcherAlignment alignment;
+        coord_t numDustOps;
+        coord_t numDustMatches;
+        coord_t numNoneDustOps;
+        coord_t numNoneDustMatches;
+
+
+        @property double dustPercentIdentity() const pure nothrow
+        {
+            return cast(double) numDustMatches / numDustOps;
+        }
+
+        @property double noneDustPercentIdentity() const pure nothrow
+        {
+            return cast(double) numNoneDustMatches / numNoneDustOps;
+        }
+
+        @property id_t rhsContigId() const pure nothrow
+        {
+            return lhsContigId + 1;
+        }
+
+        ContigMapping lhsContigMapping;
+        ContigMapping rhsContigMapping;
+    }
 
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
     protected const(ScaffoldSegment)[] resultScaffoldStructure;
+    protected coord_t[] resultContigLengths;
     protected coord_t referenceOffset;
-    protected AlignmentChain[] resultAlignment;
-    protected ExactAlignment[Fingerprint] exactResultAlignments;
+    protected ReferenceRegion dustMask;
     protected ReferenceRegion mappedRegionsMask;
     protected ReferenceRegion referenceGaps;
-    protected ReferenceRegion reconstructedRegions;
-    protected ReferenceRegion[] reconstructedGaps;
-    protected size_t[][identityLevels.length] correctContigsPerIdentityLevel;
+    protected ContigMapping[] contigAlignments;
+    protected NaturalNumberSet duplicateContigIds;
+    protected GapSummary[] gapSummaries;
     protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
 
     Stats collect()
@@ -125,33 +284,26 @@ private struct ResultAnalyzer
 
         init();
 
-        if (options.alignmentTabular !is null)
-            writeAlignmentTabular(
-                File(options.alignmentTabular, "w"),
-                resultAlignment,
-            );
-
         Stats stats;
 
         stats.numBpsExpected = getNumBpsExpected();
         stats.numBpsKnown = getNumBpsKnown();
         stats.numBpsResult = getNumBpsResult();
+        stats.numBpsInGaps = getNumBpsInGaps();
+        stats.averageInsertionError = getAverageInsertionError();
         stats.numTranslocatedGaps = getNumTranslocatedGaps();
-        stats.numBpsCorrect = getNumBpsCorrect();
         stats.numContigsExpected = getNumContigsExpected();
-        stats.numCorrectContigs = getNumCorrectContigs();
+        stats.numMappedContigs = getNumMappedContigs();
         stats.numCorrectGaps = getNumCorrectGaps();
         stats.numClosedGaps = getNumClosedGaps();
-        stats.numPartlyClosedGaps = getNumPartlyClosedGaps();
-        stats.numUnaddressedGaps = getNumUnaddressedGaps();
-        stats.numBpsInClosedGaps = getNumBpsInClosedGaps();
-        stats.numBpsInGaps = getNumBpsInGaps();
+        stats.numPartiallyClosedGaps = getNumPartiallyClosedGaps();
         stats.maximumN50 = getMaximumN50();
         stats.inputN50 = getInputN50();
         stats.resultN50 = getResultN50();
         stats.gapMedian = getGapMedian();
         stats.closedGapMedian = getClosedGapMedian();
-        stats.maxClosedGap = getMaxClosedGap();
+        stats.minClosedGap = getExtremumClosedGap!minElement();
+        stats.maxClosedGap = getExtremumClosedGap!maxElement();
         if (options.bucketSize > 0)
         {
             stats.correctGapLengthHistograms = getCorrectGapLengthHistograms();
@@ -164,230 +316,718 @@ private struct ResultAnalyzer
 
     void init()
     {
+        mixin(traceExecution);
+
         trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
         resultScaffoldStructure = getScaffoldStructure(options.resultDb).array;
-        if (options.onlyContigId == 0)
-            resultAlignment = cleanUpAlignments(getAlignments(
-                options.trueAssemblyDb,
-                options.resultDb,
-                options.resultsAlignmentFile,
-                options.workdir,
-                options.tracePointDistance,
-            ));
-        else
-            resultAlignment = cleanUpAlignments(getAlignments(
-                options.trueAssemblyDb,
-                options.resultDb,
-                options.resultsAlignmentFile,
-                options.workdir,
-                options.tracePointDistance,
-            ).filter!(ac => ac.contigA.id == options.onlyContigId).array);
+        resultContigLengths = resultScaffoldStructure
+            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
+            .map!(contigPart => cast(coord_t) contigPart.peek!ContigSegment.length)
+            .array;
+
+        auto contigCutoff = getContigCutoff(options.refDb);
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
             options.workdir,
-        ));
+        ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
-        debug logJsonDebug("referenceOffset", referenceOffset);
-        referenceGaps = getReferenceGaps();
-        reconstructedRegions = getReconstructedRegions();
-        reconstructedGaps = getReconstructedGaps();
-        debug logJsonDebug(
-            "referenceGaps", referenceGaps.toJson,
-            "reconstructedRegions", reconstructedRegions.toJson,
-            "reconstructedGaps", reconstructedGaps.toJson,
+
+        if (options.dustMask !is null)
+            dustMask = ReferenceRegion(readMask!ReferenceInterval(
+                options.trueAssemblyDb,
+                options.dustMask,
+                options.workdir,
+            ).array);
+
+        auto contigAlignmentsCache = ContigAlignmentsCache(
+            options.contigAlignmentsCache,
+            options.resultDb,
+            options.refDb,
         );
-        calculateExactResultAlignments();
-        correctContigsPerIdentityLevel = getCorrectRegions(mappedRegionsMask.intervals);
-        if (options.gapDetailsTabular !is null)
-            correctGapsPerIdentityLevel = getCorrectRegions(
-                referenceGaps
-                    .intervals
-                    .array,
-                File(options.gapDetailsTabular, "w"),
-            );
-        else
-            correctGapsPerIdentityLevel = getCorrectRegions(
-                referenceGaps
-                    .intervals
-                    .array,
-            );
-    }
 
-    AlignmentChain[] cleanUpAlignments(AlignmentChain[] localAlignments)
-    {
-        mixin(traceExecution);
+        contigAlignments = contigAlignmentsCache.isValid
+            ? contigAlignmentsCache.read()
+            : findReferenceContigs();
+        referenceGaps = getReferenceGaps();
 
-        static struct AlignmentEvent
-        {
-            size_t contigId;
-            size_t position;
-            int diff;
-            AlignmentChain* alignmentChain;
-
-            int opCmp(in AlignmentEvent other) const pure nothrow
-            {
-                return cmpLexicographically!(
-                    const(AlignmentEvent),
-                    e => e.contigId,
-                    e => e.position,
-                    e => -e.diff,
-                )(this, other);
-            }
-        }
-
-        // 1. Prepare alignmentEvents
-        auto alignmentEvents = localAlignments
-            .map!((ref alignment) => only(
-                AlignmentEvent(alignment.contigA.id, alignment.first.contigA.begin, 1, &alignment),
-                AlignmentEvent(alignment.contigA.id, alignment.last.contigA.end, -1, &alignment),
-            ))
-            .joiner;
-        auto contigBoundaryEvents = localAlignments
-            .map!"a.contigA"
-            .uniq
-            .map!(contig => only(
-                AlignmentEvent(contig.id, 0, 0, null),
-                AlignmentEvent(contig.id, contig.length, 0, null),
-            ))
-            .joiner;
-        auto changeEvents = chain(alignmentEvents, contigBoundaryEvents).array;
-        changeEvents.sort();
-
-        if (changeEvents.length == 0)
-            return localAlignments;
-
-        // 2. Find overlapping alignments
-        int currentCoverage;
-        auto overlappingAlignments = appender!(AlignmentChain*[]);
-        auto goodAlignments = appender!(AlignmentChain*[]);
-        foreach (changeEvent; changeEvents)
-        {
-            currentCoverage += changeEvent.diff;
-
-            if (currentCoverage == 0 && overlappingAlignments.data.length > 0)
-            {
-                // Collected local group of overlapping alignments
-
-                auto locallyCleanedUpAlignments = overlappingAlignments.data.length == 1
-                    ? overlappingAlignments.data
-                    : locallyCleanUpAlignments(overlappingAlignments.data);
-                logJsonDebug(
-                    "overlappingAlignments", overlappingAlignments.data.map!"*a".array.toJson,
-                    "locallyCleanedUpAlignments", locallyCleanedUpAlignments.map!"*a".array.toJson,
-                );
-                goodAlignments ~= locallyCleanedUpAlignments;
-
-                overlappingAlignments.clear();
-            }
-            else if (currentCoverage >= 1 && changeEvent.diff > 0)
-            {
-                // Found overlapping alignments
-                assert(changeEvent.alignmentChain !is null);
-                overlappingAlignments ~= changeEvent.alignmentChain;
-            }
-        }
+        if (contigAlignmentsCache.canWrite)
+            contigAlignmentsCache.write(contigAlignments, duplicateContigIds);
 
         logJsonDiagnostic(
-            "numRawLocalAlignments", localAlignments.length,
-            "numCleanedLocalAlignments", goodAlignments.data.length,
+            "referenceOffset", referenceOffset,
+            "numContigAlignments", contigAlignments.length.toJson,
+            "contigAlignments", shouldLog(LogLevel.debug_)
+                ? contigAlignments.toJson
+                : toJson(null),
+            "numReferenceGaps", referenceGaps.intervals.length,
+            "referenceGaps", shouldLog(LogLevel.debug_)
+                ? referenceGaps.toJson
+                : toJson(null),
         );
 
-        return goodAlignments.data.map!"*a".array;
+        if (options.cacheOnly)
+        {
+            dentistEnforce(contigAlignmentsCache.isValid, "invalid cache with --cache-only");
+
+            throw new StopExecution();
+        }
+
+        gapSummaries = analyzeGaps();
+        correctGapsPerIdentityLevel = makeIdentityLevelStats();
+
+        if (options.gapDetailsJson !is null)
+            writeGapDetailsJson();
     }
 
-    AlignmentChain*[] locallyCleanUpAlignments(AlignmentChain*[] overlappingAlignments)
+    ContigMapping[] findReferenceContigs()
     {
-        ReferenceInterval interval(in AlignmentChain* ac) pure
-        {
-            return ReferenceInterval(
-                ac.contigA.id,
-                ac.first.contigA.begin,
-                ac.last.contigA.end,
-            );
-        }
-
-        alias containedWithin = (lhs, rhs) => interval(lhs) in interval(rhs);
-        alias overlapEachOther = (lhs, rhs) =>
-                interval(lhs).intersects(interval(rhs));
-
-        // 1. Remove LAs completely included in others
-        foreach (ac; overlappingAlignments)
-            foreach (other; overlappingAlignments)
-                ac.disableIf(!other.flags.disabled && containedWithin(ac, other));
-
-        // 2. Find combination of alignments, s.t.
-        //     - they are not disabled
-        //     - they do not overlap
-        //     - if more than one: cover maximum possible area
-        //     - if more than one: have best quality
-
-        static struct ViableCombination
-        {
-            ReferenceRegion region;
-            AlignmentChain*[] acs;
-        }
-
-        auto viableCombinationsAcc = appender!(ViableCombination[]);
-
-        void findNonOverlappingCombinations(AlignmentChain*[] candidates, ReferenceRegion region, AlignmentChain*[] included)
-        {
-            size_t numExpansions;
-            foreach (i, candidate; candidates)
-            {
-                auto candidateInterval = interval(candidate);
-                auto newRegion = region | candidateInterval;
-
-                if (newRegion.size == region.size + candidateInterval.size)
-                {
-                    findNonOverlappingCombinations(
-                        candidates.remove(i),
-                        newRegion,
-                        included ~ [candidate],
-                    );
-                    ++numExpansions;
-                }
-            }
-
-            if (numExpansions == 0)
-                viableCombinationsAcc ~= ViableCombination(
-                    region,
-                    included,
-                );
-        }
-
-        findNonOverlappingCombinations(
-            overlappingAlignments.filter!"!a.flags.disabled".array,
-            ReferenceRegion(),
-            [],
+        duplicateContigIds = NaturalNumberSet.create(
+            findPerfectAlignments(options.refDb)
+                .map!(selfAlignment => cast(size_t) selfAlignment.queryContigId)
+                .array
+        );
+        logJsonDiagnostic(
+            "numDuplicateContigIds", duplicateContigIds.size,
+            "duplicateContigIds", shouldLog(LogLevel.debug_)
+                ? duplicateContigIds.elements.array.toJson
+                : toJson(null),
         );
 
-        assert(viableCombinationsAcc.data.length > 0);
+        auto perfectContigAlignments = findPerfectAlignments(
+            options.resultDb,
+            options.refDb,
+        )
+            // Ignore contigs that have exact copies in `refDb`
+            .filter!(contigAlignment => contigAlignment.queryContigId !in duplicateContigIds)
+            .array;
 
-        return viableCombinationsAcc
-            .data
-            .maxElement!(vc => vc.region.size - vc.acs.map!"a.totalDiffs".sum.to!double)
-            .acs;
+        debug logJsonDebug("perfectContigAlignments", perfectContigAlignments.toJson);
+
+        auto bufferRest = perfectContigAlignments
+            .sort!queryOrder
+            .group!queryEquiv
+            .filter!(group => group[1] == 1)
+            .map!(group => group[0])
+            .copy(perfectContigAlignments);
+        perfectContigAlignments.length -= bufferRest.length;
+
+        return perfectContigAlignments
+            .sort!queryOrder
+            .release;
     }
 
-    void calculateExactResultAlignments()
+    ContigMapping[] findPerfectAlignments(in string refDb, in string queryDb = null)
     {
         mixin(traceExecution);
 
-        foreach (alignmentChain; parallel(resultAlignment))
+        id_t[] getContigIds(string dbFile)
         {
-            auto acFingerprint = fingerprint(&alignmentChain);
-            auto exactAlignment = getExactAlignment(
-                options.trueAssemblyDb,
-                options.resultDb,
-                alignmentChain,
-                options.workdir,
-                10*2^^30,
+            auto dbRecords = getDbRecords(dbFile, [DBdumpOptions.readNumber]);
+            scope (exit) dbRecords.closePipe();
+            auto contigIds = dbRecords.map!"a.readNumber".array;
+
+            return contigIds;
+        }
+
+        auto isSelfAlignment = queryDb is null;
+        auto referenceContigIds = getContigIds(refDb);
+        auto refSequenceList = makeIndexedSequenceList(refDb);
+
+        logJsonDiagnostic("indexSize", getSize(refSequenceList ~ ".fm9"));
+
+        auto queryContigIds = isSelfAlignment
+            ? referenceContigIds
+            : getContigIds(queryDb);
+        auto querySequenceList = makeCroppedSequenceList(
+            isSelfAlignment ? refDb : queryDb,
+            isSelfAlignment ? options.cropAmbiguous : options.cropAlignment,
+        );
+
+        assert(querySequenceList.exists);
+
+        auto queryChunks = iota(queryContigIds.length.to!id_t)
+            .evenChunks(min(queryContigIds.length, taskPool.size + 1))
+            .map!(queryChunk => tuple!(
+                "queryChunk",
+                "queryDb",
+                "querySequenceList",
+                "refDb",
+                "refSequenceList",
+                "isSelfAlignment",
+                "referenceContigIds",
+                "queryContigIds",
+            )(
+                queryChunk,
+                queryDb,
+                querySequenceList,
+                refDb,
+                refSequenceList,
+                isSelfAlignment,
+                referenceContigIds,
+                queryContigIds,
+            ));
+
+        auto perfectAlignments = taskPool
+             .amap!findPerfectAlignmentsChunk(queryChunks, 1)
+             .joiner
+             .array;
+
+        if (options.recoverImperfectContigs && !isSelfAlignment)
+        {
+            auto mappedContigIds = perfectAlignments
+                .map!"a.queryContigId"
+                .array
+                .sort
+                .release
+                .uniqInPlace;
+            auto unmappedContigIds = setDifference(
+                setDifference(queryContigIds, mappedContigIds),
+                duplicateContigIds.elements,
+            ).array;
+            auto recoveredAlignments = recoverSlightlyImperfectAlignments(unmappedContigIds);
+
+            perfectAlignments = perfectAlignments ~ recoveredAlignments;
+        }
+
+        return perfectAlignments;
+    }
+
+    static ContigMapping[] findPerfectAlignmentsChunk(ChunkInfo)(ChunkInfo info)
+    {
+        enum findCommandTemplate = `set -o pipefail; sed -n '%d,%d p' %s | fm-index -r %s`;
+        enum resultFieldSeparator = '\t';
+        alias FmIndexResult = Tuple!(
+            id_t, "refId",
+            coord_t, "refLength",
+            id_t, "queryId",
+            coord_t, "begin",
+            coord_t, "end",
+            Complement, "complement",
+        );
+
+        auto queryChunk = info.queryChunk;
+        auto querySequenceList = info.querySequenceList;
+        auto refSequenceList = info.refSequenceList;
+        auto isSelfAlignment = info.isSelfAlignment;
+        auto referenceContigIds = info.referenceContigIds;
+        auto queryContigIds = info.queryContigIds;
+
+        return pipeLines(format!findCommandTemplate(
+            queryChunk.front + 1,
+            queryChunk.back + 1,
+            querySequenceList,
+            refSequenceList,
+        ))
+            .map!(resultLine => resultLine.split(resultFieldSeparator))
+            .map!(resultFields => FmIndexResult(
+                resultFields[1].to!id_t,
+                resultFields[2].to!coord_t,
+                resultFields[3].to!id_t + queryChunk.front,
+                resultFields[4].to!coord_t,
+                resultFields[5].to!coord_t,
+                cast(Complement) (resultFields[6] == "yes"),
+            ))
+            .filter!(findResult => !isSelfAlignment || findResult.refId != findResult.queryId)
+            .map!(findResult => ContigMapping(
+                ReferenceInterval(
+                    referenceContigIds[findResult.refId],
+                    findResult.begin,
+                    findResult.end,
+                ),
+                findResult.refLength,
+                queryContigIds[findResult.queryId],
+                findResult.complement,
+            ))
+            .tee!(contigMapping => assert(
+                contigMapping.reference.begin < contigMapping.reference.end &&
+                contigMapping.reference.end <= contigMapping.referenceContigLength,
+                "non-sense alignment"
+            ))
+            .array;
+    }
+
+    ContigMapping[] recoverSlightlyImperfectAlignments(id_t[] unmappedContigIds)
+    {
+        mixin(traceExecution);
+
+        auto queryChunks = unmappedContigIds
+            .evenChunks(min(unmappedContigIds.length, taskPool.size + 1))
+            .map!(queryChunk => tuple!(
+                "queryChunk",
+                "options",
+            )(
+                queryChunk,
+                options,
+            ));
+
+        return taskPool
+             .amap!recoverSlightlyImperfectAlignments(queryChunks, 1)
+             .joiner
+             .array;
+    }
+
+    static ContigMapping[] recoverSlightlyImperfectAlignments(ChunkInfo)(ChunkInfo info)
+    {
+        id_t[] queryChunk = info.queryChunk;
+        Options options = info.options;
+
+        auto croppedContigDb = makeCroppedSubsetDb(
+            options.refDb,
+            options.cropAlignment,
+            queryChunk,
+            options.workdir,
+        );
+        auto croppedContigMappingFile = getDamapping(
+            options.resultDb,
+            croppedContigDb,
+            options.recoverImperfectContigsAlignmentOptions,
+            options.workdir,
+        );
+        auto croppedContigAlignments = getAlignments(
+            options.resultDb,
+            croppedContigDb,
+            croppedContigMappingFile,
+            options.workdir,
+        );
+
+        foreach (ref ac; croppedContigAlignments)
+            ac.contigB.id = queryChunk[ac.contigB.id - 1];
+
+        alias wholeContigMaps = (ac) => ac.first.contigB.begin == 0 &&
+                                        ac.last.contigB.end == ac.contigB.length;
+        croppedContigAlignments.filterInPlace!wholeContigMaps;
+        croppedContigAlignments.sort!"a.contigB.id < b.contigB.id";
+
+        return croppedContigAlignments
+            .sliceBy!"a.contigB.id == b.contigB.id"
+            .map!(recoveredAlignments => recoveredAlignments.length == 1
+                ? ContigMapping(
+                    ReferenceInterval(
+                        recoveredAlignments[0].contigA.id,
+                        recoveredAlignments[0].first.contigA.begin,
+                        recoveredAlignments[0].last.contigA.end,
+                    ),
+                    recoveredAlignments[0].contigA.length,
+                    recoveredAlignments[0].contigB.id,
+                    recoveredAlignments[0].complement,
+                )
+                : ContigMapping())
+            .filter!"a"
+            .array;
+    }
+
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fm-index", "DENTIST", "README.testing")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("grep", "POSIX")
+    string makeIndexedSequenceList(in string dbFile)
+    {
+        mixin(traceExecution);
+
+        enum commandTemplate = `DBdump -s %s | grep -E '^S' | cut -d' ' -f3 > %2$s && fm-index %s < /dev/null`;
+
+        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir);
+
+        if (!exists(sequenceListFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(dbFile),
+                escapeShellFileName(sequenceListFile),
             );
 
-            synchronized
-                exactResultAlignments[acFingerprint] = exactAlignment;
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            auto commandResult = executeShell(command);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make indexed sequence list `%s`: %s"(sequenceListFile, commandResult.output),
+            );
         }
+
+        assert(exists(sequenceListFile ~ ".fm9"), "missing FM-index");
+
+        return sequenceListFile;
+    }
+
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("grep", "POSIX")
+    @ExternalDependency("rev", "POSIX")
+    string makeCroppedSequenceList(in string dbFile, in coord_t crop)
+    {
+        mixin(traceExecution);
+
+        enum commandTemplate = `
+            set -o pipefail;
+            DBdump -s %1$s |
+            grep -E '^S' |
+            cut -d' ' -f3 |
+            cut -c%3$d- |
+            rev |
+            cut -c%3$d- |
+            rev
+            > %2$s`.outdent.tr("\n", "", "d");
+
+        auto minCutoff = 2 * crop;
+        dentistEnforce(
+            minCutoff < getContigCutoff(dbFile),
+            format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, dbFile),
+        );
+
+        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir, crop);
+
+        if (!exists(sequenceListFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(dbFile),
+                escapeShellFileName(sequenceListFile),
+                crop + 1,
+            );
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            auto commandResult = executeShell(command);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make cropped sequence list `%s`: %s"(sequenceListFile, commandResult.output),
+            );
+        }
+
+        return sequenceListFile;
+    }
+
+    @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("cut", "POSIX")
+    @ExternalDependency("fold", "POSIX")
+    @ExternalDependency("grep", "POSIX")
+    @ExternalDependency("paste", "POSIX")
+    @ExternalDependency("rev", "POSIX")
+    static string makeCroppedSubsetDb(in string inDbFile, in coord_t crop, id_t[] contigIds, string workdir)
+    {
+        mixin(traceExecution);
+
+        enum commandTemplate = `
+            set -o pipefail;
+            DBdump -s %1$s %4$(%d %) |
+            grep -E '^S' |
+            cut -d' ' -f3 |
+            cut -c%3$d- |
+            rev |
+            cut -c%3$d- |
+            rev |
+            paste -d '\n' <(
+                DBdump -r %1$s %4$(%d %) |
+                sed -nE 's/^R />contig-/p'
+            ) - |
+            fold |
+            fasta2DAM -i %2$s`.outdent.tr("\n", "", "d");
+
+        auto minCutoff = 2 * crop;
+        dentistEnforce(
+            minCutoff < getContigCutoff(inDbFile),
+            format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, inDbFile),
+        );
+
+        import std.digest.crc : CRC32;
+        import std.digest : hexDigest;
+
+        auto outDbFile = buildPath(workdir, format!"cropped-subset-%s.dam"(hexDigest!CRC32(contigIds)));
+
+        if (!exists(outDbFile))
+        {
+            auto command = format!commandTemplate(
+                escapeShellFileName(inDbFile),
+                escapeShellFileName(outDbFile),
+                crop + 1,
+                contigIds,
+            );
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "shell",
+                "command", command,
+                "state", "pre",
+            );
+
+            import std.process : Config;
+            enum bash = "/bin/bash";
+
+            auto commandResult = executeShell(command, null, Config.none, size_t.max, null, bash);
+
+            dentistEnforce(
+                commandResult.status == 0,
+                format!"failed to make cropped subset DB `%s`: %s"(outDbFile, commandResult.output),
+            );
+        }
+
+        return outDbFile;
+    }
+
+    static string getSequenceListFile(in string dbFile, in string workdir, coord_t crop = 0)
+    {
+        enum baseExtension = ".seq";
+        auto seqExtension = crop == 0
+            ? baseExtension
+            : "-crop-" ~ crop.to!string ~ baseExtension;
+
+        return buildPath(workdir, stripExtension(baseName(dbFile)) ~ seqExtension);
+    }
+
+    GapSummary[] analyzeGaps()
+    {
+        mixin(traceExecution);
+
+        auto contigAlignments = this.contigAlignments.assumeSorted!queryOrder;
+        const batchBegin = options.referenceContigBatch[0];
+        auto gapSummaries = new GapSummary[options.referenceContigBatchSize];
+
+        static ContigMapping needleForContig(in id_t contigId)
+        {
+            typeof(return) needleAlignment;
+
+            needleAlignment.queryContigId = contigId;
+
+            return needleAlignment;
+        }
+
+        foreach (i, ref gapSummary; parallel(gapSummaries))
+        {
+            id_t lhsContigId = cast(id_t) (batchBegin + i + 1);
+            id_t rhsContigId = lhsContigId + 1;
+
+            gapSummary.lhsContigId = lhsContigId;
+
+            if (!isGap(lhsContigId, rhsContigId))
+            {
+                gapSummary.state = GapState.ignored;
+                continue;
+            }
+
+            gapSummary.gapLength = inputGapSize(lhsContigId);
+
+            auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
+            auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
+
+            if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
+            {
+                logJsonDiagnostic(
+                    "info", "unkown gap",
+                    "lhs", [
+                        "contigId": lhsContigId.toJson,
+                        "numContigAlignments": lhsContigAlignments.length.toJson,
+                    ].toJson,
+                    "rhs", [
+                        "contigId": rhsContigId.toJson,
+                        "numContigAlignments": rhsContigAlignments.length.toJson,
+                    ].toJson,
+                );
+                // One contig alignment either does not exist or is ambiguous:
+                // the gap state is unkown
+                gapSummary.state = GapState.unkown;
+                continue;
+            }
+
+            gapSummary.lhsContigMapping = lhsContigAlignments[0];
+            gapSummary.rhsContigMapping = rhsContigAlignments[0];
+
+            gapSummary.state = getGapState(gapSummary.lhsContigMapping, gapSummary.rhsContigMapping);
+
+            if (gapSummary.state == GapState.broken)
+                logJsonDiagnostic(
+                    "info", "broken gap",
+                    "lhs", gapSummary.lhsContigMapping.toJson,
+                    "lhsMappedInterval", mappedIntervalOf(gapSummary.lhsContigMapping).toJson,
+                    "rhs", gapSummary.rhsContigMapping.toJson,
+                    "rhsMappedInterval", mappedIntervalOf(gapSummary.rhsContigMapping).toJson,
+                );
+
+            if (gapSummary.state.among(GapState.partiallyClosed, GapState.closed))
+                gapSummary.alignment = computeInsertionAlignment(getInsertionMapping(
+                    gapSummary.lhsContigMapping,
+                    gapSummary.rhsContigMapping,
+                ));
+
+            if (options.dustMask !is null && gapSummary.state == GapState.closed)
+                addDustAnalysis(gapSummary);
+        }
+
+        return gapSummaries;
+    }
+
+    private GapState getGapState(in ContigMapping lhs, in ContigMapping rhs) const
+    {
+        if (!isGap(lhs, rhs))
+            return GapState.ignored;
+        else if (isGapClosed(lhs, rhs))
+            return GapState.closed;
+        else if (isGapPartiallyClosed(lhs, rhs))
+            return GapState.partiallyClosed;
+        else if (isGapUnclosed(lhs, rhs))
+            return GapState.unclosed;
+        else
+            return GapState.broken;
+    }
+
+    private bool isGap(in ContigMapping lhs, in ContigMapping rhs) const
+    {
+        return isGap(lhs.queryContigId, rhs.queryContigId);
+    }
+
+    private bool isGap(in id_t lhsContigId, in id_t rhsContigId) const
+    {
+        auto lhsTrueContigId = mappedIntervalOf(lhsContigId).contigId;
+        alias rhsTrueContigId = () => mappedIntervalOf(rhsContigId).contigId;
+
+        return lhsTrueContigId > 0 && lhsTrueContigId == rhsTrueContigId();
+    }
+
+    private bool isGapClosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
+    {
+        if (!noSwap && lhs.complement)
+            return isGapClosed(rhs, lhs, Yes.noSwap);
+
+        return lhs.reference.contigId == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
+               lhs.reference.end <= rhs.reference.begin;
+    }
+
+    private bool isGapPartiallyClosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
+    {
+        if (!noSwap && lhs.complement)
+            return isGapPartiallyClosed(rhs, lhs, Yes.noSwap);
+
+        return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
+               (
+                   lhs.reference.end + options.cropAlignment < lhs.referenceContigLength ||
+                   options.cropAlignment < rhs.reference.begin
+               ) &&
+               resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
+    }
+
+    private bool isGapUnclosed(
+        in ContigMapping lhs,
+        in ContigMapping rhs,
+        Flag!"noSwap" noSwap = No.noSwap,
+    ) const
+    {
+        if (!noSwap && lhs.complement)
+            return isGapUnclosed(rhs, lhs, Yes.noSwap);
+
+        return lhs.reference.contigId + 1 == rhs.reference.contigId &&
+               lhs.complement == rhs.complement &&
+               lhs.reference.end + options.cropAlignment == lhs.referenceContigLength &&
+               options.cropAlignment == rhs.reference.begin &&
+               resultGapSize(cast(id_t) lhs.reference.contigId) > 0;
+    }
+
+    InsertionMapping getInsertionMapping(in ContigMapping lhs, in ContigMapping rhs)
+    {
+        auto trueAssemblyInterval = ReferenceInterval(
+            mappedIntervalOf(lhs).contigId,
+            mappedIntervalOf(lhs).end - options.cropAlignment,
+            mappedIntervalOf(rhs).begin + options.cropAlignment,
+        );
+
+        alias resultBegin = (contigMapping) => ReferencePoint(
+            contigMapping.reference.contigId,
+            contigMapping.reference.end,
+        );
+        alias resultEnd = (contigMapping) => ReferencePoint(
+            contigMapping.reference.contigId,
+            contigMapping.reference.begin,
+        );
+
+        return InsertionMapping(
+            trueAssemblyInterval,
+            resultBegin(lhs.complement ? rhs : lhs),
+            resultEnd(lhs.complement ? lhs : rhs),
+            lhs.queryContigId,
+            rhs.queryContigId,
+            lhs.complement,
+        );
+    }
+
+    ReferenceInterval mappedIntervalOf(in ContigMapping mapping) const
+    {
+        return mappedIntervalOf(mapping.queryContigId);
+    }
+
+    ReferenceInterval mappedIntervalOf(in id_t contigId) const
+    {
+        if (contigId > mappedRegionsMask.intervals.length)
+            return ReferenceInterval();
+
+        return mappedRegionsMask.intervals[contigId - 1];
+    }
+
+    coord_t resultGapSize(in id_t contigId) const
+    {
+        auto findGap = resultScaffoldStructure
+            .filter!(gapPart => gapPart.peek!GapSegment !is null)
+            .map!(gapPart => gapPart.get!GapSegment)
+            .find!(gapPart => gapPart.beginGlobalContigId == contigId);
+
+        if (findGap.empty)
+            return 0;
+        else
+            return cast(coord_t) findGap.front.length;
+    }
+
+    coord_t inputGapSize(in id_t contigId) const
+    {
+        auto lhsMappedContig = mappedRegionsMask.intervals[contigId - 1];
+        auto rhsMappedContig = mappedRegionsMask.intervals[contigId];
+
+        assert(lhsMappedContig.contigId == rhsMappedContig.contigId);
+        assert(rhsMappedContig.begin >= lhsMappedContig.end);
+
+        return cast(coord_t) (rhsMappedContig.begin - lhsMappedContig.end);
+    }
+
+    size_t[][identityLevels.length] makeIdentityLevelStats()
+    {
+        typeof(return) correctGapsPerIdentityLevel;
+        auto lengthsBuffer = minimallyInitializedArray!(size_t[])(
+            getNumClosedGaps() * identityLevels.length,
+        );
+
+        foreach (identityLevel, minIdentity; identityLevels)
+        {
+            auto bufferRest = gapSummaries
+                .filter!(gapSummary => gapSummary.state == GapState.closed)
+                .filter!(gapSummary => minIdentity <= gapSummary.alignment.percentIdentity)
+                .map!(gapSummary => gapSummary.gapLength)
+                .copy(lengthsBuffer);
+
+            correctGapsPerIdentityLevel[identityLevel] = lengthsBuffer;
+            correctGapsPerIdentityLevel[identityLevel].length -= bufferRest.length;
+            lengthsBuffer = bufferRest;
+        }
+
+        return correctGapsPerIdentityLevel;
     }
 
     ReferenceRegion getReferenceGaps()
@@ -411,74 +1051,6 @@ private struct ResultAnalyzer
         );
     }
 
-    ReferenceRegion getReconstructedRegions()
-    {
-        mixin(traceExecution);
-
-        return ReferenceRegion(resultAlignment
-            .map!(ac => ac
-                .localAlignments
-                .map!(la => ReferenceInterval(
-                    ac.contigA.id,
-                    la.contigA.begin,
-                    la.contigA.end,
-                )))
-            .joiner
-            .array);
-    }
-
-    ReferenceRegion[] getReconstructedGaps()
-    {
-        mixin(traceExecution);
-
-        return referenceGaps
-            .intervals
-            .map!(gap => reconstructedRegions & gap)
-            .array;
-    }
-
-    void writeAlignmentTabular(File tabularFile, AlignmentChain[] alignmentChains)
-    {
-        coord_t contigBId;
-        coord_t contigBOffset;
-        foreach (alignmentChain; alignmentChains)
-        {
-            if (contigBId != alignmentChain.contigB.id)
-            {
-                contigBId = alignmentChain.contigB.id;
-                contigBOffset = getResultContigBegin(contigBId);
-            }
-
-            alias percentSimilarity = (la) => 1.0 - cast(double) la.numDiffs /
-                                                    cast(double) (la.contigA.end - la.contigA.begin);
-
-            foreach (i, localAlignment; alignmentChain.localAlignments)
-            {
-                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
-                    alignmentChain.contigA.id,
-                    alignmentChain.contigB.id,
-                    localAlignment.contigA.begin,
-                    alignmentChain.flags.complement
-                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.end)
-                        : contigBOffset + localAlignment.contigB.begin,
-                    0.0,
-                    alignmentChain.flags.complement ? -1 : 1,
-                );
-                tabularFile.writefln!"%12d %12d %12d %12d %12f %d"(
-                    alignmentChain.contigA.id,
-                    alignmentChain.contigB.id,
-                    localAlignment.contigA.end,
-                    alignmentChain.flags.complement
-                        ? alignmentChain.contigB.length - (contigBOffset + localAlignment.contigB.begin)
-                        : contigBOffset + localAlignment.contigB.end,
-                    percentSimilarity(localAlignment),
-                    alignmentChain.flags.complement ? -1 : 1,
-                );
-            }
-            tabularFile.writeln();
-        }
-    }
-
     coord_t getResultContigBegin(id_t contigId)
     {
         return cast(coord_t) (resultScaffoldStructure
@@ -493,10 +1065,8 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        return mappedRegionsMask
-            .intervals
-            .sliceBy!"a.contigId == b.contigId"
-            .map!(trueScaffoldSlice => trueScaffoldSlice[$ - 1].end - trueScaffoldSlice[0].begin)
+        return testScaffolds
+            .map!"a.size"
             .sum;
     }
 
@@ -517,34 +1087,26 @@ private struct ResultAnalyzer
             .sum;
     }
 
-    size_t getNumBpsCorrect()
+    size_t getNumBpsInGaps()
     {
         mixin(traceExecution);
 
-        return resultAlignment
-            .map!(ac => ac
-                .localAlignments
-                .map!(la => la.contigA.end - la.contigA.begin - la.numDiffs))
-            .joiner
-            .sum;
+        return getGapInfos!"gapLength".sum;
+    }
+
+    double getAverageInsertionError()
+    {
+        mixin(traceExecution);
+
+        return mean(
+            getGapInfos!"alignment.percentIdentity"(),
+            getGapInfos!"gapLength"(),
+        );
     }
 
     size_t getNumTranslocatedGaps()
     {
         mixin(traceExecution);
-
-        version (assert)
-        {
-            foreach (pair; zip(referenceGaps.intervals, reconstructedGaps))
-                assert(
-                    isGapClosed(pair) ^ isGapPartlyClosed(pair) ^ isGapUnaddressed(pair),
-                    format!"%s-%s-%s"(
-                        isGapClosed(pair),
-                        isGapPartlyClosed(pair),
-                        isGapUnaddressed(pair),
-                    ),
-                );
-        }
 
         return referenceGaps.intervals.length;
     }
@@ -556,9 +1118,12 @@ private struct ResultAnalyzer
         return mappedRegionsMask.intervals.length;
     }
 
-    size_t getNumCorrectContigs()
+    size_t getNumMappedContigs()
     {
-        return correctContigsPerIdentityLevel[0].length;
+        return contigAlignments
+            .group!queryEquiv
+            .filter!(group => group[1] == 1)
+            .walkLength;
     }
 
     size_t getNumCorrectGaps()
@@ -566,115 +1131,299 @@ private struct ResultAnalyzer
         return correctGapsPerIdentityLevel[0].length;
     }
 
-    size_t[][identityLevels.length] getCorrectRegions(in ReferenceInterval[] intervals, File detailsTabular = File())
+    size_t getNumClosedGaps()
     {
-        if (detailsTabular.isOpen)
-            detailsTabular.writefln!"%10s %10s %10s %10s %10s %s"(
-                "contigId",
-                "begin",
-                "end",
-                "numDiffs",
-                "percentIdentity",
-                "sequenceAlignment",
-            );
+        mixin(traceExecution);
 
-        auto sortedResultAlignment = resultAlignment.assumeSorted!"a.contigA.id < b.contigA.id";
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == GapState.closed)
+            .walkLength;
+    }
 
-        size_t[][identityLevels.length] identicalLengthsPerLevel;
-        foreach (identicalLengths; identicalLengthsPerLevel)
-            identicalLengths.reserve(intervals.length);
+    size_t getNumPartiallyClosedGaps()
+    {
+        mixin(traceExecution);
 
-        foreach (interval; parallel(intervals))
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == GapState.partiallyClosed)
+            .walkLength;
+    }
+
+    auto testScaffolds()
+    {
+        return mappedRegionsMask
+            .intervals
+            .sliceBy!"a.contigId == b.contigId"
+            .map!(scaffoldContigs => ReferenceInterval(
+                first(scaffoldContigs).contigId,
+                first(scaffoldContigs).begin,
+                last(scaffoldContigs).end,
+            ));
+    }
+
+    void writeGapDetailsJson()
+    {
+        mixin(traceExecution);
+
+        assert(options.gapDetailsJson !is null);
+
+        auto gapDetailsFile = File(options.gapDetailsJson, "w");
+
+        foreach (gapSummary; gapSummaries)
         {
-            auto overlappingAlignments = sortedResultAlignment
-                .equalRange(getDummyAC(interval));
+            if (gapSummary.state != GapState.ignored)
+                gapDetailsFile.writeln([
+                    "leftContig": gapSummary.lhsContigId.toJson,
+                    "rightContig": gapSummary.rhsContigId.toJson,
+                    "state": gapSummary.state.to!string.toJson,
+                    "gapLength": gapSummary.gapLength.toJson,
+                    "details": gapSummary.state.among(GapState.closed, GapState.partiallyClosed)
+                        ? (alignment => [
+                            "referenceLength": alignment.referenceLength.toJson,
+                            "queryLength": alignment.queryLength.toJson,
+                            "complement": alignment.complement.toJson,
+                            "percentIdentity": alignment.percentIdentity.toJson,
+                            "dustPercentIdentity": gapSummary.dustPercentIdentity.toJson,
+                            "noneDustPercentIdentity": gapSummary.noneDustPercentIdentity.toJson,
+                            "alignment": [
+                                cast(string) alignment.referenceLine,
+                                cast(string) alignment.editOps,
+                                cast(string) alignment.queryLine,
+                            ].toJson,
+                        ].toJson)(gapSummary.alignment)
+                        : toJson(null),
+                    "sequence": gapSummary.state.among(GapState.closed, GapState.unclosed, GapState.partiallyClosed)
+                        ? getInsertionSequence(gapSummary).toJson
+                        : toJson(null),
+                ].toJsonCompressed);
+        }
+    }
 
-            auto overlappedRegion = overlappingAlignments
-                .map!(to!(ReferenceRegion, "contigA"))
-                .fold!"a | b"(ReferenceRegion());
-            size_t numDiffs = (ReferenceRegion(interval) - overlappedRegion).size;
-            auto alignmentString = appender!string;
+    string getInsertionSequence(GapSummary gapSummary)
+    {
+        if (options.gapDetailsContext == 0)
+            return null;
 
-            foreach (overlappingAlignment; overlappingAlignments)
-            {
-                auto alignmentBegin = overlappingAlignment.first.contigA.begin;
-                auto alignmentEnd = overlappingAlignment.last.contigA.end;
-                if (interval.end <= alignmentBegin || alignmentEnd <= interval.begin)
-                    continue; // Ignore non-overlaps
-                auto overlapBegin = interval.begin > alignmentBegin
-                    ? interval.begin - alignmentBegin
-                    : 0;
-                auto overlapEnd = interval.end < alignmentEnd
-                    ? interval.end - alignmentBegin
-                    : alignmentEnd - alignmentBegin;
+        auto insertionMapping = getInsertionMapping(
+            gapSummary.lhsContigMapping,
+            gapSummary.rhsContigMapping,
+        );
+        auto gapId = getGapId(insertionMapping);
 
-                if (overlappingAlignment.flags.complement)
-                {
-                    // Inversions are not allowed
-                    numDiffs += overlapEnd - overlapBegin;
-                }
-                else
-                {
-                    auto exactAlignment = getOverlapAlignment(overlappingAlignment);
-                    auto overlappingExactAlignment = exactAlignment[overlapBegin..min(overlapEnd, $)];
+        auto subseqBegin = insertionMapping.resultBegin;
+        subseqBegin.value = subseqBegin.value >= options.gapDetailsContext
+            ? subseqBegin.value - options.gapDetailsContext
+            : 0;
 
-                    numDiffs += overlappingExactAlignment.score;
+        auto rhsContigLength = resultContigLengths[insertionMapping.resultEnd.contigId - 1];
+        auto subseqEnd = insertionMapping.resultEnd;
+        subseqEnd.value = subseqEnd.value + options.gapDetailsContext < rhsContigLength
+            ? subseqEnd.value + options.gapDetailsContext
+            : rhsContigLength;
 
-                    if (detailsTabular.isOpen)
-                        alignmentString ~= overlappingExactAlignment
-                            .toString()
-                            .replaceAll(ctRegex!(r"\n", "g"), "\\n");
-                }
-                if (detailsTabular.isOpen)
-                    alignmentString ~= "\\n\\n";
-            }
+        return resultSubseqString(
+            subseqBegin,
+            subseqEnd,
+            gapId,
+        );
+    }
 
-            if (detailsTabular.isOpen)
-                synchronized detailsTabular.writefln!"%10d %10d %10d %10d %.8f %s"(
-                    interval.contigId,
-                    interval.begin,
-                    interval.end,
-                    numDiffs,
-                    1.0 - (numDiffs.to!double / interval.size.to!double),
-                    alignmentString.data,
-                );
+    StretcherAlignment computeInsertionAlignment(in InsertionMapping insertionMapping)
+    {
+        mixin(traceExecution);
 
-            foreach (i, identityLevel; identityLevels)
-                if (numDiffs <= (1.0 - identityLevel) * interval.size)
-                    synchronized identicalLengthsPerLevel[i] ~= interval.size;
+        auto gapId = getGapId(insertionMapping);
+        auto trueSequenceFile = trueAssemblySubseqFasta(insertionMapping.trueAssembly, gapId);
+        auto insertedSequenceFile = resultSubseqFasta(
+            insertionMapping.resultBegin,
+            insertionMapping.resultEnd,
+            gapId,
+        );
+        auto alignment = stretcher(
+            trueSequenceFile,
+            insertedSequenceFile,
+            insertionMapping.complement,
+        );
+
+        if (options.cropAlignment > 0)
+            alignment.cropReference(options.cropAlignment);
+
+        return alignment;
+    }
+
+    static string getGapId(in InsertionMapping insertionMapping)
+    {
+        return format!"%d-%d@%d-%d"(
+            insertionMapping.resultBegin.contigId,
+            insertionMapping.resultEnd.contigId,
+            insertionMapping.leftRefContig,
+            insertionMapping.rightRefContig,
+        );
+    }
+
+    enum subseqFastaFileFormat = "%s/insertion-%s.%s.fasta";
+    enum subseqFastaHeaderFormat = ">%s-%s [contig-%d@%d, contig-%d@%d)";
+
+    string trueAssemblySubseqFasta(in ReferenceInterval interval, in string gapId)
+    {
+        enum origin = "true";
+        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaHeader = format!subseqFastaHeaderFormat(
+            origin,
+            gapId,
+            interval.contigId,
+            interval.begin,
+            interval.contigId,
+            interval.end,
+        );
+        auto subSequence = options.trueAssemblyDb.getFastaSequence(
+            cast(id_t) interval.contigId,
+            options.workdir,
+        )[interval.begin .. interval.end];
+
+        chain(
+            fastaHeader,
+            newline,
+            subSequence,
+            newline,
+        ).map!(to!(immutable(char))).toFile(fastaFile);
+
+        return fastaFile;
+    }
+
+    string resultSubseqFasta(in ReferencePoint begin, in ReferencePoint end, in string gapId)
+    {
+        enum origin = "inserted";
+        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaHeader = format!subseqFastaHeaderFormat(
+            origin,
+            gapId,
+            begin.contigId,
+            begin.value,
+            end.contigId,
+            end.value,
+        );
+
+        chain(
+            fastaHeader,
+            newline,
+            resultSubseqString(begin, end, gapId),
+            newline,
+        ).map!(to!(immutable(char))).toFile(fastaFile);
+
+        return fastaFile;
+    }
+
+    string resultSubseqString(in ReferencePoint begin, in ReferencePoint end, in string gapId)
+    {
+        auto dbFile = options.resultDb;
+        string subSequence;
+
+        if (begin.contigId == end.contigId)
+        {
+            subSequence = options.resultDb.getFastaSequence(
+                cast(id_t) begin.contigId,
+                options.workdir,
+            )[begin.value .. end.value];
+        }
+        else
+        {
+            auto leftFlank = options.resultDb.getFastaSequence(
+                cast(id_t) begin.contigId,
+                options.workdir,
+            )[begin.value .. $];
+            auto rightFlank = options.resultDb.getFastaSequence(
+                cast(id_t) end.contigId,
+                options.workdir,
+            )[0 .. end.value];
+            auto gapSize = resultGapSize(cast(id_t) begin.contigId);
+
+            enum char unkownBase = 'n';
+            subSequence = chain(
+                leftFlank,
+                unkownBase.repeat(gapSize),
+                rightFlank,
+            ).map!(to!(immutable(char))).array;
         }
 
-        return identicalLengthsPerLevel;
+        return subSequence;
     }
 
-    auto getOverlapAlignment(in AlignmentChain alignmentChain)
+    void addDustAnalysis(ref GapSummary gapSummary)
     {
-        auto acFingerprint = fingerprint(&alignmentChain);
+        import std.ascii : toUpper;
 
-        return exactResultAlignments[acFingerprint];
-    }
-
-    static AlignmentChain getDummyAC(in ReferenceInterval refInterval)
-    {
-        return AlignmentChain(
-            0,
-            AlignmentChain.Contig(
-                cast(id_t) refInterval.contigId,
-                cast(coord_t) refInterval.end,
-            ),
-            AlignmentChain.Contig(0, 1),
-            AlignmentChain.emptyFlags,
-            [AlignmentChain.LocalAlignment(
-                AlignmentChain.LocalAlignment.Locus(
-                    cast(coord_t) refInterval.begin,
-                    cast(coord_t) refInterval.end,
-                ),
-                AlignmentChain.LocalAlignment.Locus(
-                    cast(coord_t) 0,
-                    cast(coord_t) 1,
-                ),
-            )],
+        auto lhsMappedContig = mappedIntervalOf(gapSummary.lhsContigId);
+        auto rhsMappedContig = mappedIntervalOf(gapSummary.rhsContigId);
+        auto gapInterval = ReferenceInterval(
+            lhsMappedContig.contigId,
+            lhsMappedContig.end,
+            rhsMappedContig.begin,
         );
+        auto gapDust = dustMask & gapInterval;
+
+        alias EditOp = StretcherAlignment.EditOp;
+        alias SeqChar = StretcherAlignment.SeqChar;
+        alias isBase = StretcherAlignment.isBase;
+
+        auto newReferenceLine = cast(SeqChar[]) gapSummary.alignment.referenceLine.dup;
+        auto newQueryLine = cast(SeqChar[]) gapSummary.alignment.queryLine.dup;
+        auto refPos = ReferencePoint(gapInterval.contigId, gapInterval.begin);
+        alias prevRefPos() = () => ReferencePoint(refPos.contigId, refPos.value - 1);
+        alias nextRefPos() = () => ReferencePoint(refPos.contigId, refPos.value + 1);
+        coord_t numDustOps;
+        coord_t numDustMatches;
+        coord_t numNoneDustOps;
+        coord_t numNoneDustMatches;
+
+        foreach (i, refChar, editOp, queryChar; gapSummary.alignment)
+        {
+            if (
+                refPos in gapDust ||
+                (refChar == SeqChar.indel && (prevRefPos() in gapDust || nextRefPos() in gapDust))
+            )
+            {
+                if (editOp == EditOp.match)
+                    ++numDustMatches;
+                ++numDustOps;
+                newReferenceLine[i] = cast(SeqChar) toUpper(refChar);
+                newQueryLine[i] = cast(SeqChar) toUpper(queryChar);
+            }
+            else
+            {
+                if (editOp == EditOp.match)
+                    ++numNoneDustMatches;
+                ++numNoneDustOps;
+            }
+
+            if (editOp.among(EditOp.match, EditOp.mismatch) || isBase(refChar))
+                ++refPos.value;
+        }
+
+        logJsonDebug(
+            "gapInterval", gapInterval.toJson,
+            "gapDust", gapDust.intervals.toJson,
+            "alignment", [
+                cast(string) gapSummary.alignment.referenceLine,
+                cast(string) gapSummary.alignment.editOps,
+                cast(string) gapSummary.alignment.queryLine,
+            ].toJson,
+            "newAlignment", [
+                cast(string) newReferenceLine,
+                cast(string) gapSummary.alignment.editOps,
+                cast(string) newQueryLine,
+            ].toJson,
+        );
+
+        // highlight mask in alignment
+        gapSummary.alignment.referenceLine = cast(const) newReferenceLine;
+        gapSummary.alignment.queryLine = cast(const) newQueryLine;
+
+        // add masked %id
+        gapSummary.numDustOps = numDustOps;
+        gapSummary.numDustMatches = numDustMatches;
+        gapSummary.numNoneDustOps = numNoneDustOps;
+        gapSummary.numNoneDustMatches = numNoneDustMatches;
     }
 
     bool isInnerGap(in ReferenceInterval gap)
@@ -692,99 +1441,12 @@ private struct ResultAnalyzer
             .length;
     }
 
-    size_t getNumClosedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("closedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapClosed(pair));
-    }
-
-    size_t getNumPartlyClosedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("partlyClosedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapPartlyClosed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapPartlyClosed(pair));
-    }
-
-    size_t getNumUnaddressedGaps()
-    {
-        mixin(traceExecution);
-
-        assert(referenceGaps.intervals.length == reconstructedGaps.length);
-        logJsonDebug("unaddressedGaps", zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapUnaddressed(pair))
-            .map!"a[1].intervals"
-            .array
-            .toJson);
-
-        return zip(referenceGaps.intervals, reconstructedGaps).count!(pair => isGapUnaddressed(pair));
-    }
-
-    bool isGapClosed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return insertion.size == gap.size;
-    }
-
-    bool isGapPartlyClosed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return options.minInsertionLength <= insertion.size && insertion.size < gap.size;
-    }
-
-    bool isGapUnaddressed(Pair)(Pair gapAndInsertion)
-    {
-        auto gap = gapAndInsertion[0];
-        auto insertion = gapAndInsertion[1];
-
-        return insertion.size < min(options.minInsertionLength, gap.size);
-    }
-
-    size_t getNumBpsInClosedGaps()
-    {
-        mixin(traceExecution);
-
-        return zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[1].size"
-            .sum;
-    }
-
-    size_t getNumBpsInGaps()
-    {
-        mixin(traceExecution);
-
-        return referenceGaps
-            .intervals
-            .map!(gap => gap.size)
-            .sum;
-    }
-
     size_t getMaximumN50()
     {
         mixin(traceExecution);
 
-        return trueAssemblyScaffoldStructure
-            .filter!(contigPart => contigPart.peek!ContigSegment !is null)
-            .map!(contigPart => contigPart.peek!ContigSegment.length)
+        return testScaffolds
+            .map!"a.size"
             .array
             .N!50(getNumBpsExpected);
     }
@@ -815,40 +1477,36 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        auto values = referenceGaps
-            .intervals
-            .map!(gap => gap.size)
-            .array;
+        auto gapSizes = getGapInfos!"gapLength".array;
 
-        if (values.length == 0)
+        if (gapSizes.length == 0)
             return size_t.max;
         else
-            return median(values);
+            return median(gapSizes);
     }
 
     size_t getClosedGapMedian()
     {
         mixin(traceExecution);
 
-        auto values = zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[0].size"
-            .array;
+        auto closedGapSizes = getGapInfos!"gapLength"(GapState.closed).array;
 
-        if (values.length == 0)
+        if (closedGapSizes.length == 0)
             return size_t.max;
         else
-            return median(values);
+            return median(closedGapSizes);
     }
 
-    ReferenceInterval getMaxClosedGap()
+    size_t getExtremumClosedGap(alias extremeElement)()
     {
         mixin(traceExecution);
 
-        return zip(referenceGaps.intervals, reconstructedGaps)
-            .filter!(pair => isGapClosed(pair))
-            .map!"a[0]"
-            .maxElement!"a.size"(ReferenceInterval(0, 0, 0));
+        auto closeGapLengths = getGapInfos!"gapLength"(GapState.closed);
+
+        if (closeGapLengths.empty)
+            return size_t.max;
+        else
+            return extremeElement(closeGapLengths);
     }
 
     Histogram!coord_t[identityLevels.length] getCorrectGapLengthHistograms()
@@ -876,10 +1534,7 @@ private struct ResultAnalyzer
 
         return histogram(
             options.bucketSize,
-            zip(referenceGaps.intervals, reconstructedGaps)
-                .filter!(pair => isGapClosed(pair))
-                .map!(pair => cast(coord_t) pair[0].size)
-                .array,
+            getGapInfos!"gapLength"(GapState.closed).array,
         );
     }
 
@@ -894,6 +1549,113 @@ private struct ResultAnalyzer
                 .map!(gap => cast(coord_t) gap.size)
                 .array,
         );
+    }
+
+    auto getGapInfos(string what)(in GapState wantedState) const
+    {
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state == wantedState)
+            .map!(gapSummary => mixin("gapSummary." ~ what))
+            .map!(info => cast(Unqual!(typeof(info))) info);
+    }
+
+    auto getGapInfos(string what)() const
+    {
+        return gapSummaries
+            .filter!(gapSummary => gapSummary.state != GapState.ignored)
+            .map!(gapSummary => mixin("gapSummary." ~ what))
+            .map!(info => cast(Unqual!(typeof(info))) info);
+    }
+}
+
+private struct ContigAlignmentsCache
+{
+    string contigAlignmentsCache;
+    string dbA;
+    string dbB;
+    Json _cachedAlignments = Json.undefined;
+
+    @property bool isValid()
+    {
+        return contigAlignmentsCache !is null &&
+               exists(contigAlignmentsCache) &&
+               cachedAlignments["dbA"] == dbA &&
+               cachedAlignments["dbB"] == dbB;
+    }
+
+    @property bool canWrite()
+    {
+        return contigAlignmentsCache !is null && !isValid;
+    }
+
+    @property Json cachedAlignments()
+    {
+        if (_cachedAlignments.type != Json.Type.object)
+        {
+            auto cachedContent = cast(string) contigAlignmentsCache.read();
+            try
+            {
+                _cachedAlignments = parseJson(
+                    cachedContent,
+                    null,
+                    contigAlignmentsCache,
+                );
+            }
+            catch (JSONException e)
+            {
+                _cachedAlignments = Json.emptyObject;
+            }
+        }
+
+        return _cachedAlignments;
+    }
+
+    void write(ContigMapping[] contigAlignments, NaturalNumberSet duplicateContigIds)
+    {
+        assert(!isValid, "refusing to overwrite a valid ContigAlignmentsCache");
+        assert(contigAlignmentsCache !is null, "cannot write ContigAlignmentsCache: no file given");
+        assert(canWrite);
+
+        logJsonDiagnostic(
+            "info", "caching contig alignments",
+            "contigAlignmentsCache", contigAlignmentsCache,
+        );
+
+        auto cache = File(contigAlignmentsCache, "w");
+
+        cache.writefln!`{"dbA":%s,"dbB":%s,"contigAlignments":%s,"duplicateContigIds":%s}`(
+            dbA.toJsonCompressed,
+            dbB.toJsonCompressed,
+            contigAlignments.toJsonCompressed,
+            duplicateContigIds.elements.array.toJsonCompressed,
+        );
+    }
+
+    ContigMapping[] read()
+    {
+        assert(isValid, "must not read invalid ContigAlignmentsCache");
+
+        logJsonDiagnostic(
+            "info", "reading contig alignments from cache",
+            "contigAlignmentsCache", contigAlignmentsCache,
+        );
+
+        ContigMapping[] contigAlignments;
+        contigAlignments.length = cachedAlignments["contigAlignments"].length;
+
+        foreach (size_t i, cachedAlignment; cachedAlignments["contigAlignments"])
+            contigAlignments[i] = ContigMapping(
+                ReferenceInterval(
+                    cast(size_t) cachedAlignment["reference"]["contigId"],
+                    cast(size_t) cachedAlignment["reference"]["begin"],
+                    cast(size_t) cachedAlignment["reference"]["end"],
+                ),
+                cast(coord_t) cachedAlignment["referenceContigLength"],
+                cast(id_t) cachedAlignment["queryContigId"],
+                cast(Complement) cachedAlignment["complement"].get!bool,
+            );
+
+        return contigAlignments;
     }
 }
 
@@ -942,27 +1704,33 @@ auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
 
 private struct Stats
 {
-    static enum identityLevels = [.999, .99, .95, .90];
+    static enum identityLevels = [
+        1.0,
+        0.999,
+        0.99,
+        0.95,
+        0.90,
+        0.70,
+    ];
 
     size_t numBpsExpected;
     size_t numBpsKnown;
     size_t numBpsResult;
-    size_t numBpsCorrect;
+    size_t numBpsInGaps;
+    double averageInsertionError;
     size_t numTranslocatedGaps;
     size_t numCorrectGaps;
     size_t numContigsExpected;
-    size_t numCorrectContigs;
+    size_t numMappedContigs;
     size_t numClosedGaps;
-    size_t numPartlyClosedGaps;
-    size_t numUnaddressedGaps;
-    size_t numBpsInClosedGaps;
-    size_t numBpsInGaps;
+    size_t numPartiallyClosedGaps;
     size_t maximumN50;
     size_t inputN50;
     size_t resultN50;
     size_t gapMedian;
     size_t closedGapMedian;
-    ReferenceInterval maxClosedGap;
+    size_t minClosedGap;
+    size_t maxClosedGap;
     Histogram!coord_t[identityLevels.length] correctGapLengthHistograms;
     Histogram!coord_t closedGapLengthHistogram;
     Histogram!coord_t gapLengthHistogram;
@@ -973,21 +1741,20 @@ private struct Stats
             "numBpsExpected": numBpsExpected.toJson,
             "numBpsKnown": numBpsKnown.toJson,
             "numBpsResult": numBpsResult.toJson,
-            "numBpsCorrect": numBpsCorrect.toJson,
+            "numBpsInGaps": numBpsInGaps.toJson,
+            "averageInsertionError": averageInsertionError.toJson,
             "numTranslocatedGaps": numTranslocatedGaps.toJson,
             "numCorrectGaps": numCorrectGaps.toJson,
             "numContigsExpected": numContigsExpected.toJson,
-            "numCorrectContigs": numCorrectContigs.toJson,
+            "numMappedContigs": numMappedContigs.toJson,
             "numClosedGaps": numClosedGaps.toJson,
-            "numPartlyClosedGaps": numPartlyClosedGaps.toJson,
-            "numUnaddressedGaps": numUnaddressedGaps.toJson,
-            "numBpsInClosedGaps": numBpsInClosedGaps.toJson,
-            "numBpsInGaps": numBpsInGaps.toJson,
+            "numPartiallyClosedGaps": numPartiallyClosedGaps.toJson,
             "maximumN50": maximumN50.toJson,
             "inputN50": inputN50.toJson,
             "resultN50": resultN50.toJson,
             "gapMedian": gapMedian.toJson,
             "closedGapMedian": closedGapMedian.toJson,
+            "minClosedGap": minClosedGap.toJson,
             "maxClosedGap": maxClosedGap.toJson,
             "gapLengthHistogram": histsToJson(
                 correctGapLengthHistograms[0],
@@ -1004,29 +1771,27 @@ private struct Stats
     {
         auto columnWidth = columnWidth();
         auto rows =[
-            format!"numContigsExpected:    %*d"(columnWidth, numContigsExpected),
-            format!"numCorrectContigs:     %*d"(columnWidth, numCorrectContigs),
+            format!"numContigsExpected:     %*d"(columnWidth, numContigsExpected),
+            format!"numMappedContigs:       %*d"(columnWidth, numMappedContigs),
 
-            format!"numTranslocatedGaps:   %*d"(columnWidth, numTranslocatedGaps),
-            format!"numClosedGaps:         %*d"(columnWidth, numClosedGaps),
-            format!"numPartlyClosedGaps:   %*d"(columnWidth, numPartlyClosedGaps),
-            format!"numUnaddressedGaps:    %*d"(columnWidth, numUnaddressedGaps),
-            format!"numCorrectGaps:        %*d"(columnWidth, numCorrectGaps),
+            format!"numTranslocatedGaps:    %*d"(columnWidth, numTranslocatedGaps),
+            format!"numClosedGaps:          %*d"(columnWidth, numClosedGaps),
+            format!"numPartiallyClosedGaps: %*d"(columnWidth, numPartiallyClosedGaps),
+            format!"numCorrectGaps:         %*d"(columnWidth, numCorrectGaps),
 
-            format!"numBpsExpected:        %*d"(columnWidth, numBpsExpected),
-            format!"numBpsKnown:           %*d"(columnWidth, numBpsKnown),
-            format!"numBpsResult:          %*d"(columnWidth, numBpsResult),
-            format!"numBpsCorrect:         %*d"(columnWidth, numBpsCorrect),
-            format!"numBpsInGaps:          %*d"(columnWidth, numBpsInGaps),
-            format!"numBpsInClosedGaps:    %*d"(columnWidth, numBpsInClosedGaps),
-            format!"numBpsInNonClosedGaps: %*d"(columnWidth, numBpsInGaps - numBpsInClosedGaps),
+            format!"numBpsExpected:         %*d"(columnWidth, numBpsExpected),
+            format!"numBpsKnown:            %*d"(columnWidth, numBpsKnown),
+            format!"numBpsResult:           %*d"(columnWidth, numBpsResult),
+            format!"numBpsInGaps:           %*d"(columnWidth, numBpsInGaps),
+            format!"averageInsertionError:  %*.3e"(columnWidth, averageInsertionError),
 
-            format!"maximumN50:            %*d"(columnWidth, maximumN50),
-            format!"inputN50:              %*d"(columnWidth, inputN50),
-            format!"resultN50:             %*d"(columnWidth, resultN50),
-            format!"gapMedian:             %*d"(columnWidth, gapMedian),
-            format!"closedGapMedian:       %*d"(columnWidth, closedGapMedian),
-            format!"maxClosedGap:          %*s"(columnWidth, toString(maxClosedGap)),
+            format!"maximumN50:             %*d"(columnWidth, maximumN50),
+            format!"inputN50:               %*d"(columnWidth, inputN50),
+            format!"resultN50:              %*d"(columnWidth, resultN50),
+            format!"gapMedian:              %*d"(columnWidth, gapMedian),
+            format!"closedGapMedian:        %*d"(columnWidth, closedGapMedian),
+            format!"minClosedGap:           %*s"(columnWidth, minClosedGap),
+            format!"maxClosedGap:           %*s"(columnWidth, maxClosedGap),
             gapLengthHistogram.length > 0
                 ? format!"gapLengthHistogram:\n    \n%s"(histsToString(
                     correctGapLengthHistograms[0],
@@ -1040,11 +1805,6 @@ private struct Stats
         ];
 
         return format!"%-(%s\n%)"(rows.filter!"a !is null");
-    }
-
-    const string toString(in ReferenceInterval interval)
-    {
-        return format!"[%d, %d) | len=%d"(interval.begin, interval.end, interval.size);
     }
 
     const string histsToString(Hists...)(in Hists hists)
@@ -1095,34 +1855,269 @@ private struct Stats
             numBpsExpected,
             numBpsKnown,
             numBpsResult,
+            numBpsInGaps,
             numTranslocatedGaps,
-            numBpsCorrect,
             numCorrectGaps,
             numContigsExpected,
-            numCorrectContigs,
+            numMappedContigs,
             numClosedGaps,
-            numPartlyClosedGaps,
-            numUnaddressedGaps,
-            numBpsInClosedGaps,
-            numBpsInGaps,
+            numPartiallyClosedGaps,
             maximumN50,
             inputN50,
             resultN50,
             gapMedian,
             closedGapMedian,
+            minClosedGap,
+            maxClosedGap,
         ));
-        auto strWidth = max(
-            0, // dummy
-            toString(maxClosedGap).length,
-        );
+        auto strWidth = only(
+            format!"%.3e"(averageInsertionError).length,
+        ).maxElement;
 
         return max(numWidth, strWidth);
     }
 
     static protected size_t numWidth(Int)(Int i) nothrow
     {
+        if (i == 0)
+            return 1;
+
         auto numWidth = cast(size_t) ceil(log10(i));
 
         return numWidth;
     }
+}
+
+
+struct StretcherAlignment
+{
+    static enum EditOp : char
+    {
+        match = '|',
+        mismatch = '.',
+        indel = '-',
+    }
+
+    static enum SeqChar : char
+    {
+        a = 'a',
+        c = 'c',
+        g = 'g',
+        t = 't',
+        A = 'A',
+        C = 'C',
+        G = 'G',
+        T = 'T',
+        unkownBase = 'n',
+        indel = '-',
+    }
+
+    static bool isBase(in SeqChar c)
+    {
+        return c.among(
+            SeqChar.a,
+            SeqChar.c,
+            SeqChar.g,
+            SeqChar.t,
+            SeqChar.A,
+            SeqChar.C,
+            SeqChar.G,
+            SeqChar.T,
+        ) != 0;
+    }
+
+    coord_t referenceLength;
+    coord_t queryLength;
+    Complement complement;
+    double percentIdentity;
+    const(SeqChar)[] referenceLine;
+    const(EditOp)[] editOps;
+    const(SeqChar)[] queryLine;
+
+    invariant
+    {
+        assert(
+            referenceLine.length == editOps.length && editOps.length == queryLine.length,
+            "alignment lines must have same length",
+        );
+    }
+
+    private void triggerInvariant() { }
+
+    StretcherAlignment cropReference(in coord_t crop) const
+    {
+        /// Count cropped base pairs and return the position in `alignmentSeq`.
+        alias cropIndex = alignmentSeq => alignmentSeq
+            .cumulativeFold!((numBPs, c) => numBPs + isBase(c))(0UL)
+            .countUntil(crop);
+
+        auto gapBegin = cropIndex(referenceLine) + 1;
+        auto gapEnd = referenceLine.length - cropIndex(referenceLine.retro) - 1;
+
+
+        StretcherAlignment croppedAlignment;
+
+        croppedAlignment.referenceLine = cast(const(const(SeqChar)[])) referenceLine[gapBegin .. gapEnd];
+        croppedAlignment.editOps = cast(const(const(EditOp)[])) editOps[gapBegin .. gapEnd];
+        croppedAlignment.queryLine = cast(const(const(SeqChar)[])) queryLine[gapBegin .. gapEnd];
+
+        alias countBPs = alignmentSeq => cast(coord_t) alignmentSeq.count!isBase;
+
+        croppedAlignment.referenceLength = countBPs(croppedAlignment.referenceLine);
+        croppedAlignment.queryLength = countBPs(croppedAlignment.queryLine);
+        croppedAlignment.percentIdentity = croppedAlignment.editOps.count(EditOp.match).to!double /
+                                           croppedAlignment.editOps.length.to!double;
+
+        return croppedAlignment;
+    }
+
+    unittest
+    {
+        enum alignment = StretcherAlignment(
+            50,
+            50,
+            No.complement,
+            45.0/51.0,
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatatttata-tcta",
+            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.|||-||||",
+            cast(const(SeqChar)[]) "tatcc-tcaggtgaggcataacaacaaaaatatatatataataataatcta",
+        );
+        enum crop = 10;
+        enum croppedAlignment = StretcherAlignment(
+            30,
+            30,
+            No.complement,
+            28.0/30.0,
+            cast(const(SeqChar)[]) "gtgaggactaacaacaaaaatatatatata",
+            cast(const(EditOp)[])  "||||||..||||||||||||||||||||||",
+            cast(const(SeqChar)[]) "gtgaggcataacaacaaaaatatatatata",
+        );
+
+        assert(alignment.cropReference(crop) == croppedAlignment);
+    }
+
+    @property size_t length() const pure nothrow
+    {
+        return editOps.length;
+    }
+
+    int opApply(scope int delegate(size_t, SeqChar, EditOp, SeqChar) dg)
+    {
+        int result = 0;
+
+        foreach (i; 0 .. this.length)
+        {
+            result = dg(i, referenceLine[i], editOps[i], queryLine[i]);
+
+            if (result)
+                break;
+        }
+
+        return result;
+    }
+}
+
+@ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
+StretcherAlignment stretcher(in string refFasta, in string queryFasta, Complement complement)
+{
+    coord_t refLength;
+    coord_t queryLength;
+
+    try
+    {
+        // Throws exception if FASTA file is empty
+        refLength = cast(coord_t) refFasta.getFastaLength();
+    }
+    // Treat empty FASTA file as length == 0
+    catch (Exception e) { }
+
+    try
+    {
+        // Throws exception if FASTA file is empty
+        queryLength = cast(coord_t) queryFasta.getFastaLength();
+    }
+    // Treat empty FASTA file as length == 0
+    catch (Exception e) { }
+
+    alias onlyNs = (fasta) => fasta.all!(base => base.among('n', 'N'));
+    auto alignment = StretcherAlignment(refLength, queryLength, complement);
+
+    if (
+        refLength == 0 ||
+        queryLength == 0 ||
+        onlyNs(queryFasta)
+    )
+        return alignment;
+
+    auto stretcherCmd = only(
+        "stretcher",
+        "--auto",
+        "--stdout",
+        "--aformat=pair",
+        "--awidth=" ~ uint.max.to!string,
+        complement ? "--sreverse2" : null,
+        refFasta,
+        queryFasta,
+    );
+
+    auto stretcherResult = stretcherCmd.pipeLines();
+
+    stretcherResult.stretcherReadPercentIdentity(alignment);
+    stretcherResult.stretcherReadAlignmentString(alignment);
+
+    version (assert)
+        alignment.triggerInvariant();
+
+    return alignment;
+}
+
+private void stretcherReadPercentIdentity(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+{
+    enum identityLineFormat = "# Identity: %d/%d";
+    enum identityLinePrefix = identityLineFormat.until(':', No.openRight);
+    auto findIdentityLine = stretcherResult.find!(line => line.startsWith(identityLinePrefix));
+
+    dentistEnforce(!findIdentityLine.empty, "Missing identity line in stretcher output");
+
+    coord_t numIdentical;
+    coord_t alignmentLength;
+
+    findIdentityLine.front.formattedRead!identityLineFormat(
+        numIdentical,
+        alignmentLength,
+    );
+
+    if (alignmentLength > 0)
+        alignment.percentIdentity = numIdentical.to!double / alignmentLength.to!double;
+    else
+        alignment.percentIdentity = double.nan;
+}
+
+private void stretcherReadAlignmentString(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
+{
+    enum commentChar = '#';
+
+    auto alignmentLines = stretcherResult
+        .filter!(line => line.length > 0 && line[0] != commentChar)
+        .array;
+
+    dentistEnforce(alignmentLines.length > 0, "Missing alignment in stretcher output");
+    dentistEnforce(alignmentLines.length == 3, "Missing alignment in stretcher output");
+
+    enum sequenceRegex = ctRegex!`^\s*(?P<prefix>(?:true|inserted)-[0-9@-]+\s+\d+\s+)(?P<seq>[ACTGN-]+).*$`;
+    alias captureSequence = (line) => line
+        .replaceAll(sequenceRegex, `$2`)
+        .map!toLower
+        .map!(c => c.to!(StretcherAlignment.SeqChar))
+        .array;
+    alias sequencePrefix = (line) => line
+        .replaceAll(sequenceRegex, `$1`);
+    alias captureAlignment = (seqLine, alignmentLine) =>
+        alignmentLine[sequencePrefix(seqLine).length .. $].tr(" ", "-")
+            .map!(c => c.to!(StretcherAlignment.EditOp))
+            .array;
+
+    alignment.referenceLine = captureSequence(alignmentLines[0]);
+    alignment.editOps = captureAlignment(alignmentLines[0], alignmentLines[1]);
+    alignment.queryLine = captureSequence(alignmentLines[2]);
 }

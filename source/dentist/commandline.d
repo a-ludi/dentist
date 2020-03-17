@@ -9,8 +9,11 @@
 module dentist.commandline;
 
 import darg :
+    ArgParseError,
     ArgParseHelp,
     Argument,
+    ArgumentsParser,
+    handleArg,
     Help,
     helpString,
     MetaVar,
@@ -27,62 +30,135 @@ import dentist.common.alignments :
     coord_t,
     id_t,
     trace_point_t;
+import dentist.common.commands :
+    DentistCommand,
+    dentistCommands,
+    TestingCommand;
+import dentist.common.configfile :
+    retroInitFromConfig,
+    fromBytes,
+    SizeUnit,
+    toBytes;
 import dentist.common.binio : PileUpDb;
+import dentist.common.external :
+    ExternalDependency,
+    externalDependencies;
 import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DaccordOptions,
     DalignerOptions,
     DamapperOptions,
+    DatanderOptions,
     getHiddenDbFiles,
     getMaskFiles,
+    getNumContigs,
     getTracePointDistance,
     lasEmpty,
-    LasFilterAlignmentsOptions,
-    provideDamFileInWorkdir,
-    provideLasFileInWorkdir,
-    ProvideMethod,
-    provideMethods;
+    LasFilterAlignmentsOptions;
+import dentist.util.process : isExecutable;
 import dentist.swinfo :
     copyright,
-    executableName,
     description,
+    executableName,
+    gitCommit,
     license,
     version_;
 import dentist.util.algorithm : staticPredSwitch;
 import dentist.util.log;
 import dentist.util.tempfile : mkdtemp;
+import dentist.util.string : dashCaseCT, toString;
 import std.algorithm :
     among,
+    canFind,
     each,
     endsWith,
     filter,
     find,
     map,
-    startsWith;
+    max,
+    sort,
+    startsWith,
+    sum,
+    swap;
+import std.array :
+    array,
+    split;
 import std.conv;
-import std.exception : enforce, ErrnoException;
-import std.file : exists, FileException, getcwd, isDir, tempDir, remove, rmdirRecurse;
-import std.format : format, formattedRead;
-import std.math : ceil, floor, log_e = log;
-import std.meta : AliasSeq, staticMap, staticSort;
-import std.parallelism : defaultPoolThreads, totalCPUs;
-import std.path : absolutePath, buildPath;
-import std.range : only, takeOne;
-import std.regex : ctRegex, matchFirst;
-import std.stdio : File, stderr;
-import std.string : join, tr, wrap;
+import std.exception :
+    basicExceptionCtors,
+    enforce,
+    ErrnoException;
+import std.file :
+    exists,
+    FileException,
+    getcwd,
+    isDir,
+    tempDir,
+    remove,
+    rmdirRecurse;
+import std.format :
+    format,
+    formattedRead;
+import std.math :
+    ceil,
+    exp,
+    floor,
+    log_e = log;
+import std.meta :
+    Alias,
+    AliasSeq,
+    allSatisfy,
+    staticMap,
+    staticSort;
+import std.parallelism :
+    defaultPoolThreads,
+    totalCPUs;
+import std.path :
+    absolutePath,
+    buildPath;
+import std.process :
+    Config,
+    execute;
+import std.range :
+    ElementType,
+    enumerate,
+    only,
+    takeOne;
+import std.regex :
+    ctRegex,
+    matchFirst;
+import std.stdio :
+    File,
+    stderr;
+import std.string :
+    join,
+    lineSplitter,
+    tr,
+    wrap;
 import std.traits :
     arity,
     EnumMembers,
     getSymbolsByUDA,
     getUDAs,
+    isArray,
+    isAssignable,
     isCallable,
+    isDynamicArray,
+    isFloatingPoint,
+    isIntegral,
+    isSomeString,
     isStaticArray,
+    isUnsigned,
     Parameters,
     ReturnType;
-import std.typecons : BitFlags;
-import transforms : camelCase, snakeCaseCT;
-import vibe.data.json : serializeToJsonString;
+import std.typecons :
+    BitFlags,
+    tuple,
+    Yes;
+import transforms : camelCase;
+import vibe.data.json :
+    serializeToJsonString,
+    toJson = serializeToJson;
 
 
 /// Possible returns codes of the command line execution.
@@ -92,43 +168,6 @@ enum ReturnCode
     commandlineError,
     runtimeError,
 }
-
-/// Possible returns codes of the command line execution.
-mixin("enum DentistCommand {" ~
-    testingOnly!"translocateGaps," ~
-    testingOnly!"findClosableGaps," ~
-    "generateDazzlerOptions," ~
-    "maskRepetitiveRegions," ~
-    "showMask," ~
-    "collectPileUps," ~
-    "showPileUps," ~
-    "processPileUps," ~
-    "showInsertions," ~
-    "mergeInsertions," ~
-    "output," ~
-    testingOnly!"translateCoords," ~
-    testingOnly!"checkResults," ~
-"}");
-
-struct TestingCommand
-{
-    @disable this();
-
-    static DentistCommand opDispatch(string command)() pure nothrow
-    {
-        static if (isTesting)
-            return mixin("DentistCommand." ~ command);
-        else
-            return cast(DentistCommand) size_t.max;
-    }
-}
-
-enum dashCase(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
-
-private enum dentistCommands = staticMap!(
-    dashCase,
-    __traits(allMembers, DentistCommand),
-);
 
 /// Start `dentist` with the given set of arguments.
 ReturnCode run(in string[] args)
@@ -150,6 +189,12 @@ ReturnCode run(in string[] args)
         goto case;
     case "--help":
         printBaseHelp();
+
+        return ReturnCode.ok;
+    case "-d":
+        goto case;
+    case "--dependencies":
+        printExternalDependencies();
 
         return ReturnCode.ok;
     case "--usage":
@@ -220,6 +265,31 @@ unittest
     assert(run([executableName]) == ReturnCode.commandlineError);
 }
 
+void printExternalDependencies()
+{
+    import std.stdio : writefln;
+
+    static assert(externalDependencies.length > 0);
+
+    writefln!"%-(%s\n%)"(externalDependencies);
+}
+
+void assertExternalToolsAvailable()
+{
+    static assert(externalDependencies.length > 0);
+
+    auto missingExternalDependencies = externalDependencies
+        .filter!(extDep => !isExecutable(extDep.executable))
+        .array;
+
+    enforce!CLIException(
+        missingExternalDependencies.length == 0,
+        format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
+            missingExternalDependencies,
+        ),
+    );
+}
+
 string parseCommandName(in string[] args)
 {
     enforce!CLIException(!args[1].startsWith("-"), format!"Missing <command> '%s'"(args[1]));
@@ -247,7 +317,7 @@ private void printBaseHelp()
 
 private void printVersion()
 {
-    stderr.writeln(format!"%s %s"(executableName, version_));
+    stderr.writeln(format!"%s %s (commit %s)"(executableName, version_, gitCommit));
     stderr.writeln();
     stderr.write(copyright);
     stderr.writeln();
@@ -279,8 +349,11 @@ class UsageRequested : Exception
 }
 
 /// Options for the different commands.
-struct OptionsFor(DentistCommand command)
+struct OptionsFor(DentistCommand _command)
 {
+    enum command = _command;
+    enum commandName = dentistCommands[_command];
+
     static enum needWorkdir = command.among(
         TestingCommand.translocateGaps,
         TestingCommand.findClosableGaps,
@@ -292,9 +365,55 @@ struct OptionsFor(DentistCommand command)
         TestingCommand.checkResults,
     );
 
+    @Option()
+    string executableVersion = version_;
+
+    static if (command == DentistCommand.maskRepetitiveRegions)
+    {
+        @ArgumentsParser
+        auto parseArguments(const(string)[] leftOver)
+        {
+            alias referenceSymbol = Alias!(__traits(getMember, this, "refDb"));
+            enum referenceUDA = getUDAs!(referenceSymbol, Argument)[0];
+
+            enforce!ArgParseError(leftOver.length >= numArguments.lowerBound, referenceUDA.multiplicityError(0));
+            enforce!ArgParseError(leftOver.length <= numArguments.upperBound, "Missing positional arguments.");
+
+            auto hasReadsDb = (leftOver.length == numArguments.upperBound);
+            handleArg!"refDb"(this, leftOver[0]);
+            leftOver = leftOver[1 .. $];
+
+            if (hasReadsDb)
+            {
+                handleArg!"readsDb"(this, leftOver[0]);
+                leftOver = leftOver[1 .. $];
+            }
+
+            handleArg!"dbAlignmentFile"(this, leftOver[0]);
+            leftOver = leftOver[1 .. $];
+
+            foreach (member; __traits(allMembers, typeof(this)))
+            {
+                alias symbol = Alias!(__traits(getMember, this, member));
+                alias argUDAs = getUDAs!(symbol, Argument);
+
+                static if (
+                    argUDAs.length > 0 &&
+                    !member.among("refDb", "readsDb", "dbAlignmentFile")
+                )
+                {
+                    handleArg!member(this, leftOver[0]);
+                    leftOver = leftOver[1 .. $];
+                }
+            }
+
+            return this;
+        }
+    }
 
     static if (command.among(
         TestingCommand.translocateGaps,
+        TestingCommand.buildPartialAssembly,
         TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
     ))
@@ -302,15 +421,7 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:true-assembly>")
         @Help("the 'true' assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string trueAssemblyFile;
-        @Option()
         string trueAssemblyDb;
-
-        @PostValidate()
-        void hookProvideTrueAssemblyFileInWorkDir()
-        {
-            trueAssemblyDb = provideDamFileInWorkdir(trueAssemblyFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -320,37 +431,23 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:short-read-assembly>")
         @Help("short-read assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string shortReadAssemblyFile;
-        @Option()
         string shortReadAssemblyDb;
-
-        @PostValidate()
-        void hookProvideShortReadAssemblyFileInWorkDir()
-        {
-            shortReadAssemblyDb = provideDamFileInWorkdir(shortReadAssemblyFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
+        TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
+        TestingCommand.checkResults,
     ))
     {
         @Argument("<in:reference>")
         @Help("reference assembly in .dam format")
-        @Validate!(validateDB!".dam")
-        string refFile;
-        @Option()
+        @Validate!(validateDB)
         string refDb;
-
-        @PostValidate()
-        void hookProvideRefFileInWorkDir()
-        {
-            refDb = provideDamFileInWorkdir(refFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
@@ -359,17 +456,25 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.processPileUps,
     ))
     {
-        @Argument("<in:reads>")
-        @Help("set of PacBio reads in .dam format")
-        @Validate!validateDB
-        string readsFile;
-        @Option()
+        static if (command == DentistCommand.maskRepetitiveRegions)
+            enum argReadsMultiplicity = Multiplicity.optional;
+        else
+            enum argReadsMultiplicity = 1;
+
+        @Argument("<in:reads>", argReadsMultiplicity)
+        @Help("set of PacBio reads in .db/.dam format")
+        @Validate!(validateReadsDb)
         string readsDb;
 
-        @PostValidate()
-        void hookProvideReadsFileInWorkDir()
+        static void validateReadsDb(string readsDb)
         {
-            readsDb = provideDamFileInWorkdir(readsFile, provideMethod, workdir);
+            if (argReadsMultiplicity == 1 || readsDb !is null)
+                validateDB(readsDb);
+        }
+
+        @property bool hasReadsDb() const pure nothrow
+        {
+            return readsDb !is null;
         }
     }
 
@@ -380,69 +485,35 @@ struct OptionsFor(DentistCommand command)
         @Argument("<in:result>")
         @Help("result assembly in .dam format")
         @Validate!(validateDB!".dam")
-        string resultFile;
-        @Option()
         string resultDb;
-
-        @PostValidate()
-        void hookProvideResultFileInWorkDir()
-        {
-            resultDb = provideDamFileInWorkdir(resultFile, provideMethod, workdir);
-        }
     }
 
     static if (command.among(
         TestingCommand.translocateGaps,
     ))
     {
-        @Argument("<in:short-vs-true-read-alignment>")
+        @Argument("<in:short-vs-true-alignment>")
         @Help(q"{
             locals alignments of the short-read assembly against the 'true'
             assembly in form of a .las file as produced by `daligner`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.shortReadAssemblyFile))
-        string shortReadAssemblyAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyDb, options.shortReadAssemblyDb))
         string shortReadAssemblyAlignmentFile;
-
-        @PostValidate()
-        void hookProvideShortReadAssemblyAlignmentInWorkDir()
-        {
-            shortReadAssemblyAlignmentFile = provideLasFileInWorkdir(
-                shortReadAssemblyAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
     ))
     {
-        @Argument("<in:self-alignment>")
-        @Help(q"{
-            local alignments of the reference against itself in form of a .las
-            file as produced by `daligner`
-        }")
-        @Validate!((value, options) => validateLasFile(value, options.refFile))
-        string selfAlignmentInputFile;
-        @Option()
-        string selfAlignmentFile;
-
-        @PostValidate()
-        void hookProvideSelfAlignmentInWorkDir()
-        {
-            selfAlignmentFile = provideLasFileInWorkdir(
-                selfAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
+        @Argument("<in:alignment>")
+        @Help("self-alignment of the reference assembly or reads vs. reference alignment")
+        @Validate!((value, options) => options.readsDb is null
+            ? validateLasFile(value, options.refDb)
+            : validateLasFile(value, options.refDb, options.readsDb))
+        string dbAlignmentFile;
     }
 
     static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -452,45 +523,8 @@ struct OptionsFor(DentistCommand command)
             alignments chains of the reads against the reference in form of a .las
             file as produced by `damapper`
         }")
-        @Validate!((value, options) => validateLasFile(value, options.refFile, options.readsFile))
-        string readsAlignmentInputFile;
-        @Option()
+        @Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb))
         string readsAlignmentFile;
-
-        @PostValidate()
-        void hookProvideReadsAlignmentInWorkDir()
-        {
-            readsAlignmentFile = provideLasFileInWorkdir(
-                readsAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Argument("<in:result-vs-true-alignment>")
-        @Help(q"{
-            alignments chains of the result assembly against the 'true'
-            assembly in form of a .las file as produced by `damapper`
-        }")
-        @Validate!((value, options) => validateLasFile(value, options.trueAssemblyFile, options.resultFile))
-        string resultsAlignmentInputFile;
-        @Option()
-        string resultsAlignmentFile;
-
-        @PostValidate()
-        void hookProvideResultsAlignmentInWorkDir()
-        {
-            resultsAlignmentFile = provideLasFileInWorkdir(
-                resultsAlignmentInputFile,
-                provideMethod,
-                workdir,
-            );
-        }
     }
 
     static if (command.among(
@@ -505,30 +539,34 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.showMask,
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
+        TestingCommand.filterMask,
     ))
     {
-        @Argument("<in:repeat-mask>")
-        @Help("read <repeat-mask> generated by the `maskRepetitiveRegions` command")
-        @Validate!((value, options) => validateInputMask(options.refFile, value))
-        string repeatMask;
+        @Argument("<in:input-mask>")
+        @Help("filter Dazzler mask <input-mask>")
+        @Validate!((value, options) => validateInputMask(options.refDb, value))
+        string inMask;
+    }
+
+    static if (command.among(
+        DentistCommand.showMask,
+    ))
+    {
+        @Argument("<in:repeat-mask>", Multiplicity.oneOrMore)
+        @Help("read Dazzler mask <repeat-mask>")
+        @Validate!((values, options) => validateInputMasks(options.refDb, values))
+        string[] masks;
     }
 
     static if (command.among(
         TestingCommand.findClosableGaps,
+        TestingCommand.buildPartialAssembly,
         TestingCommand.checkResults,
     ))
     {
         @Argument("<in:mapped-regions-mask>")
-        @Help(q"{
-            read regions that were kept aka. output contigs from the Dazzler
-            mask. Given a path-like string without extension: the `dirname`
-            designates the directory to write the mask to. The mask comprises
-            two hidden files `.[REFERENCE].[MASK].{anno,data}`.
-        }")
-        @Validate!((value, options) => validateInputMask(options.trueAssemblyFile, value))
+        @Help("read regions that were kept aka. output contigs from the Dazzler mask.")
+        @Validate!((value, options) => validateInputMask(options.trueAssemblyDb, value))
         string mappedRegionsMask;
     }
 
@@ -558,20 +596,20 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
     ))
     {
-        @Argument("<in:debug-graph>")
+        @Argument("<in:scaffolding>")
         @Help(q"{
-            read the assembly graph from <debug-graph> generate
-            (see `--debug-graph` of the `output` command)
+            read the assembly graph from <scaffolding> generate
+            (see `--scaffolding` of the `output` command)
         }")
         @Validate!validateFileExists
         string assemblyGraphFile;
     }
 
     static if (command.among(
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
     ))
     {
         @Argument("<coord-string>", Multiplicity.oneOrMore)
@@ -601,14 +639,19 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<out:mapped-regions-mask>")
-        @Help(q"{
-            write regions that were kept aka. output contigs into a Dazzler
-            mask. Given a path-like string without extension: the `dirname`
-            designates the directory to write the mask to. The mask comprises
-            two hidden files `.[REFERENCE].[MASK].{anno,data}`.
-        }")
-        @Validate!((value, options) => validateOutputMask(options.trueAssemblyFile, value))
+        @Help("write regions that were kept aka. output contigs into a Dazzler mask.")
+        @Validate!((value, options) => validateOutputMask(options.trueAssemblyDb, value))
         string mappedRegionsMask;
+    }
+
+    static if (command.among(
+        TestingCommand.filterMask,
+    ))
+    {
+        @Argument("<out:filtered-mask>")
+        @Help("write filtered Dazzler mask to <filtered-mask>")
+        @Validate!((value, options) => validateOutputMask(options.refDb, value))
+        string outMask;
     }
 
     static if (command.among(
@@ -626,13 +669,8 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Argument("<out:repeat-mask>")
-        @Help(q"{
-            write inferred repeat mask into a Dazzler mask. Given a path-like
-            string without extension: the `dirname` designates the directory to
-            write the mask to. The mask comprises two hidden files
-            `.[REFERENCE].[MASK].{anno,data}`.
-        }")
-        @Validate!((value, options) => validateOutputMask(options.refFile, value))
+        @Help("write inferred repeat mask into a Dazzler mask.")
+        @Validate!((value, options) => validateOutputMask(options.refDb, value))
         string repeatMask;
     }
 
@@ -650,51 +688,181 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.mergeInsertions,
     ))
     {
-        @Argument("<out:merged-insertions>")
-        @Help("write merged insertion information to <merged-insertions>")
+        @Argument("<out:insertions>")
+        @Help("write merged insertion information to <insertions>")
         @Validate!validateFileWritable
         string mergedInsertionsFile;
 
-        @Argument("<in:insertions>", Multiplicity.oneOrMore)
-        @Help("merge insertion information from <insertions>... generated by the `processPileUps` command")
+        @Argument("<in:partitioned-insertions>", Multiplicity.oneOrMore)
+        @Help("merge insertion information from <partitioned-insertions>... generated by the `processPileUps` command")
         @Validate!validateFilesExist
-        @Validate!"a.length >= 2"
+        @Validate!(value => value.length >= 2)
         string[] insertionsFiles;
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.buildPartialAssembly,
+    ))
+    {
+        @Argument("<out:test-assembly>", Multiplicity.optional)
+        @Help("write output assembly to <test-assembly> (default: stdout)")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string resultFile;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
-        @Argument("<out:assembly>", Multiplicity.optional)
-        @Help("write output assembly to <assembly> (default: stdout)")
+        @Argument("<out:result>", Multiplicity.optional)
+        @Help("write gap-closed assembly to <result> (default: stdout)")
         @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string assemblyFile;
+        string resultFile;
     }
 
     mixin HelpOption;
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("batch", "b")
+        @MetaVar("<from>..<to>")
+        @Help(q"{
+            process only a subset of the gaps in the given range (excluding <to>).
+            <from> and <to> are zero-based indices for the contigs of the
+            reference assembly or <to> may be `$` to indicate the end of the
+            reference.
+        }")
+        void parseReferenceContigBatch(string batchString) pure
+        {
+            try
+            {
+                if (batchString.endsWith("$"))
+                {
+                    batchString.formattedRead!"%d..$"(referenceContigBatch[0]);
+                    referenceContigBatch[1] = id_t.max;
+                }
+                else
+                {
+                    batchString.formattedRead!"%d..%d"(referenceContigBatch[0], referenceContigBatch[1]);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new CLIException("ill-formatted batch range");
+            }
+        }
+
+        @property id_t numReferenceContigs() inout
+        {
+            static id_t _numReferenceContigs;
+
+            if (_numReferenceContigs == 0)
+            {
+                _numReferenceContigs = getNumContigs(refDb, "/");
+            }
+
+            return _numReferenceContigs;
+        }
+
+
+        @Option()
+        @Validate!validateReferenceContigBatchRange
+        id_t[2] referenceContigBatch;
+
+        static void validateReferenceContigBatchRange(id_t[2] referenceContigBatch, OptionsFor!command options)
+        {
+            auto from = referenceContigBatch[0];
+            auto to = referenceContigBatch[1];
+
+            enforce!CLIException(
+                referenceContigBatch == referenceContigBatch.init ||
+                (0 <= from && from < to && (to == id_t.max || to <= options.numReferenceContigs)),
+                format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
+                        options.numReferenceContigs)
+            );
+        }
+
+        @PostValidate()
+        void hookEnsurePresenceOfBatchRange()
+        {
+            if (referenceContigBatch == referenceContigBatch.init || referenceContigBatch[1] == id_t.max)
+            {
+                referenceContigBatch[1] = numReferenceContigs;
+            }
+        }
+
+        @property id_t referenceContigBatchSize() const pure nothrow
+        {
+            return referenceContigBatch[1] - referenceContigBatch[0];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        enum agpVersion = "2.1";
+
+        @Option("agp")
+        @Help(format!"write AGP v%s file that describes the output assembly"(agpVersion))
+        string agpFile;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("allow-single-reads")
+        @Help("allow using single reads instead of consensus sequence for gap closing")
+        OptionFlag allowSingleReads;
+    }
 
     static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
         @Option("batch", "b")
-        @MetaVar("<from>..<to>")
+        @MetaVar("<idx-spec>[,<idx-spec>...]")
         @Help(q"{
-            process only a subset of the pile ups in the given range (excluding <to>);
-            <from> and <to> are zero-based indices into the pile up DB
+            process only a subset of the pile ups. <pile-up-ids> is a
+            comma-separated list of <idx-spec>. Each
+            <id-specifications> is either a single integer <idx> or a range
+            <from>..<to>. <idx>, <from> and <to> are zero-based indices into
+            the pile up DB. The range is right-open, i.e. index <to> is
+            excluded. <to> may be a dollar-sign (`$`) to indicate the end of
+            the pile up DB.
         }")
         void parsePileUpBatch(string batchString) pure
         {
-            try
+            foreach (idxSpec; batchString.split(","))
+                try
+                    pileUpBatches ~= parsePileUpIdxSpec(idxSpec);
+                catch (Exception e)
+                    throw new CLIException("ill-formatted batch range");
+        }
+
+        static id_t[2] parsePileUpIdxSpec(string idxSpec) pure
+        {
+            id_t[2] batch;
+
+            if (!idxSpec.canFind('.'))
             {
-                batchString.formattedRead!"%d..%d"(pileUpBatch[0], pileUpBatch[1]);
+                idxSpec.formattedRead!"%d"(batch[0]);
+                batch[1] = batch[0] + 1;
             }
-            catch (Exception e)
+            if (idxSpec.endsWith("$"))
             {
-                throw new CLIException("ill-formatted batch range");
+                idxSpec.formattedRead!"%d..$"(batch[0]);
+                batch[1] = id_t.max;
             }
+            else
+            {
+                idxSpec.formattedRead!"%d..%d"(batch[0], batch[1]);
+            }
+
+            return batch;
         }
 
         @property id_t pileUpLength() inout
@@ -711,107 +879,79 @@ struct OptionsFor(DentistCommand command)
 
 
         @Option()
-        @Validate!validateBatchRange
-        id_t[2] pileUpBatch;
+        @Validate!validatePileUpBatches
+        id_t[2][] pileUpBatches;
 
-        static void validateBatchRange(id_t[2] pileUpBatch, OptionsFor!command options)
+        static void validatePileUpBatches(id_t[2][] pileUpBatches, OptionsFor!command options)
+        {
+            foreach (pileUpBatch; pileUpBatches)
+                validatePileUpBatchRange(pileUpBatch, options);
+
+            validatePileUpBatchesDontIntersect(pileUpBatches, options);
+        }
+
+        static void validatePileUpBatchRange(id_t[2] pileUpBatch, OptionsFor!command options)
         {
             auto from = pileUpBatch[0];
             auto to = pileUpBatch[1];
 
             enforce!CLIException(
                 pileUpBatch == pileUpBatch.init ||
-                (0 <= from && from < to && to <= options.pileUpLength),
+                (0 <= from && from < to && (to == id_t.max || to <= options.pileUpLength)),
                 format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
                         options.pileUpLength)
             );
         }
 
+        static void validatePileUpBatchesDontIntersect(id_t[2][] pileUpBatches, OptionsFor!command options)
+        {
+            static bool intersect(id_t[2] batch1, id_t[2] batch2)
+            {
+                if (batch1[0] > batch2[0])
+                    swap(batch1, batch2);
+
+                return batch1[1] > batch2[0];
+            }
+
+            foreach (i, batch1; pileUpBatches)
+                foreach (j, batch2; pileUpBatches[i + 1 .. $])
+                    enforce!CLIException(
+                        !intersect(batch1, batch2),
+                        format!"invalid --batch: <idx-spec>'s at indices %d and %d intersect"(i, j),
+                    );
+        }
+
         @PostValidate()
-        void hookEnsurePresenceOfBatchRange()
+        void hookEnsurePresenceOfBatchRanges()
         {
-            if (pileUpBatch == pileUpBatch.init)
+            foreach (ref pileUpBatch; pileUpBatches)
+                if (pileUpBatch == pileUpBatch.init || pileUpBatch[1] == id_t.max)
+                    pileUpBatch[1] = pileUpLength;
+        }
+
+        @PostValidate()
+        void hookOptimizeBatchRanges()
+        {
+            pileUpBatches.sort!"a[0] < b[0] || (a[0] == b[0] && a[1] < b[1])";
+
+            size_t accIdx;
+            foreach (ref pileUpBatch; pileUpBatches[1 .. $])
             {
-                pileUpBatch[1] = pileUpLength;
+                if (pileUpBatch[0] <= pileUpBatches[accIdx][1])
+                    pileUpBatches[accIdx][1] = max(pileUpBatch[1], pileUpBatches[accIdx][1]);
+                else
+                    pileUpBatches[++accIdx] = pileUpBatch;
             }
+
+            pileUpBatches.length = accIdx + 1;
         }
 
-        @property id_t pileUpBatchSize() const pure nothrow
+        @property id_t numPileUps() const pure nothrow
         {
-            return pileUpBatch[1] - pileUpBatch[0];
+            return pileUpBatches
+                .map!(pileUpBatch => pileUpBatch[1] - pileUpBatch[0])
+                .sum;
         }
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("bucket-size", "b")
-        @Help(format!q"{
-            bucket size of the gap length histogram; use 0 to disable (default: %d)
-        }"(defaultValue!bucketSize))
-        coord_t bucketSize = 500;
-    }
-
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("daccord-threads")
-        @Help("use <uint> threads for `daccord` (defaults to floor(totalCpus / <threads>) )")
-        uint numDaccordThreads;
-
-        @PostValidate(Priority.low)
-        void hookInitDaccordThreads()
-        {
-            if (numDaccordThreads == 0)
-            {
-                numDaccordThreads = totalCPUs / numThreads;
-            }
-        }
-    }
-
-    static if (command.among(
-        DentistCommand.output,
-    ))
-    {
-        @Option("debug-scaffold")
-        @MetaVar("<file>")
-        @Help("write the assembly scaffold to <file>; use `show-insertions` to inspect the result")
-        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string assemblyGraphFile;
-    }
-
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("only-contig")
-        @Help("restrict analysis to contig <uint> (experimental)")
-        id_t onlyContigId;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("debug-alignment")
-        @MetaVar("<file>")
-        @Help("write the result alignment to a tabular file <file>")
-        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string alignmentTabular;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("debug-gap-details")
-        @MetaVar("<file>")
-        @Help("write the statistics for every single gap to a tabular file <file>")
-        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
-        string gapDetailsTabular;
     }
 
     static if (command.among(
@@ -819,26 +959,222 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("best-pile-up-margin")
-        @Help(q"{
-            given a set of possibly of conflicting pile ups, if the largest
-            has <double> times more reads than the second largest it is
-            considered unique
-        }")
+        @Help(format!q"{
+            given a set of of conflicting gap closing candidates, if the
+            largest has <double> times more reads than the second largest it
+            is considered unique. If a candidates would close gap in the
+            reference assembly marked by `n`s the number reads is multipled by
+            --existing-gap-bonus. (default: %s)
+        }"(defaultValue!bestPileUpMargin))
         @Validate!(value => enforce!CLIException(value > 1.0, "--best-pile-up-margin must be greater than 1.0"))
         double bestPileUpMargin = 3.0;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("bucket-size", "B")
+        @Help(format!q"{
+            bucket size of the gap length histogram; use 0 to disable (default: %d)
+        }"(defaultValue!bucketSize))
+        coord_t bucketSize = 500;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("cache-contig-alignments")
+        @Help(format!q"{
+            if given results of contig alignments will be cached as JSON (default: %s)
+        }"(defaultValue!contigAlignmentsCache))
+        string contigAlignmentsCache;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("cache-only")
+        @Help("stop execution after writing the contig alignments cache")
+        @Validate!((value, options) => enforce!CLIException(
+            !value || options.contigAlignmentsCache !is null,
+            "requires --cache-contig-alignments",
+        ))
+        OptionFlag cacheOnly;
+    }
+
+    static if (command == DentistCommand.validateConfig)
+    {
+        @Argument("<in:config>")
+        @Help(configHelpString)
+        @Validate!validateFileExists
+        string configFile;
+    }
+    else
+    {
+        @Option("config")
+        @MetaVar("<config-json>")
+        @Help(configHelpString)
+        @Validate!(value => (value is null).execUnless!(() => validateFileExists(value)))
+        string configFile;
+
+        @PreValidate(Priority.high)
+        void retroMergeConfig()
+        {
+            if (configFile is null)
+                return;
+
+            this.retroInitFromConfig(configFile);
+        }
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("crop-ambiguous")
+        @MetaVar("<num>")
+        @Help(format!q"{
+            crop <num> bp from both ends of each reference contig when searching for exact copies
+            in the reference itself in order to identify ambiguous contigs. If comparing different
+            gap closing tools use the same value for all tools. (default: %d)
+        }"(defaultValue!cropAmbiguous))
+        // This is the amount PBJelly may modify
+        coord_t cropAmbiguous = 100;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("crop-alignment")
+        @MetaVar("<num>")
+        @Help(format!q"{
+            crop <num> bp from both ends of each reference contig when searching for exact copies
+            in the output of the gap closer. Keep this as low as possible, ie. if the contigs are
+            not modified use zero. (default: %d)
+        }"(defaultValue!cropAlignment))
+        @Validate!((value, options) => enforce!CLIException(value <= options.cropAmbiguous,
+                                                            "must be <= --crop-ambiguous"))
+        coord_t cropAlignment = 0;
+    }
+
+    enum configHelpString = "
+        provide configuration values in a JSON file. See README.md for
+        usage and examples.
+    ";
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("auxiliary-threads", "aux-threads")
+        @MetaVar("num-threads")
+        @Help("
+            use <num-threads> threads for auxiliary tools like `daligner`,
+            `damapper` and `daccord`
+            (defaults to floor(totalCpus / <threads>) )
+        ")
+        uint numAuxiliaryThreads;
+
+        @PostValidate(Priority.low)
+        void hookInitDaccordThreads()
+        {
+            if (numAuxiliaryThreads == 0)
+            {
+                numAuxiliaryThreads = totalCPUs / numThreads;
+            }
+        }
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("dust", "d")
+        @MetaVar("<string>")
+        @Help("
+            Dazzler mask for low complexity regions. Uses " ~ defaultValue!dustMask ~ "
+            by default but only if present.
+        ")
+        @Validate!((value, options) => value == defaultValue!dustMask || validateInputMask(options.trueAssemblyDb, value))
+        string dustMask = "dust";
+
+        @PostValidate(Priority.medium)
+        void fixDefaultDustMask()
+        {
+            if (dustMask != defaultValue!dustMask)
+                return;
+
+            try
+            {
+                validateInputMask(trueAssemblyDb, dustMask);
+            }
+            catch(CLIException e)
+            {
+                dustMask = null;
+            }
+        }
     }
 
     static if (command.among(
         DentistCommand.output,
     ))
     {
-        @Option("extend-contigs")
-        @Help("if given extend contigs even if no spanning reads can be found")
-        OptionFlag shouldExtendContigs;
+        @Option("scaffolding")
+        @MetaVar("<insertions-db>")
+        @Help("write the assembly scaffold to <insertions-db>; use `show-insertions` to inspect the result")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string assemblyGraphFile;
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("gap-details")
+        @MetaVar("<json>")
+        @Help("write the summary for all gaps to a JSON file <json>")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string gapDetailsJson;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("gap-details-context")
+        @MetaVar("<num>")
+        @Help("add <num> base pairs of context to inserted sequence in gap details")
+        coord_t gapDetailsContext;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("debug-pile-ups")
+        @MetaVar("<db-stem>")
+        @Help("write pile ups of intermediate steps to `<db-stem>.<state>.db`")
+        @Validate!(value => (value is null).execUnless!(() => validateFileWritable(value)))
+        string intermediatePileUpsStem;
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("debug-repeat-masks")
+        @Help("(only for reads-mask) write mask components into additional masks `<repeat-mask>-<component-type>`")
+        OptionFlag debugRepeatMasks;
+    }
+
+    static if (command.among(
+        TestingCommand.buildPartialAssembly,
         DentistCommand.output,
     ))
     {
@@ -846,17 +1182,6 @@ struct OptionsFor(DentistCommand command)
         @Help(format!"line width for ouput FASTA (default: %d)"(defaultValue!fastaLineWidth))
         @Validate!(value => enforce!CLIException(value > 0, "fasta line width must be greater than zero"))
         size_t fastaLineWidth = 50;
-    }
-
-    static if (needWorkdir)
-    {
-        @Option("input-provide-method", "p")
-        @MetaVar(format!"{%-(%s,%)}"([provideMethods]))
-        @Help(format!q"{
-            use the given method to provide the input files in the working
-            directory (default: `%s`)
-        }"(defaultValue!provideMethod))
-        ProvideMethod provideMethod = ProvideMethod.symlink;
     }
 
     static if (command.among(
@@ -880,7 +1205,7 @@ struct OptionsFor(DentistCommand command)
         DentistCommand.showMask,
         DentistCommand.showPileUps,
         DentistCommand.showInsertions,
-        TestingCommand.translateCoords,
+        DentistCommand.translateCoords,
         TestingCommand.checkResults,
     ))
     {
@@ -897,22 +1222,43 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
     {
         @Option("mask", "m")
         @MetaVar("<string>...")
-        @Help("additional masks (see <in:repeat-mask>)")
+        @Help("
+            Dazzler masks for repetitive regions (at least one required;
+            generate with `mask-repetitive-regions` command)
+        ")
         void addMask(string mask) pure
         {
-            additionalMasks ~= mask;
+            repeatMasks ~= mask;
         }
 
         @Option()
-        @Validate!((values, options) => validateInputMasks(options.refFile, values))
-        string[] additionalMasks;
+        @Validate!((values, options) => validateInputMasks(options.refDb, values))
+        @Validate!(value => value.length > 0)
+        string[] repeatMasks;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        enum numBubblesEscapeNodes = 2;
+        enum nodePerContig = 2;
+        enum numIntermediateContigs = 3;
+
+        /// Consider cyclic subgraphs of up to the size when detecting
+        /// _bubbles_ aka. _skipping pile ups.
+        @Option()
+        ubyte maxBubbleSize = numBubblesEscapeNodes + nodePerContig * numIntermediateContigs;
+
+        /// Run the solver at most this number of times
+        @Option()
+        ubyte maxBubbleResolverIterations = 1 + numIntermediateContigs;
     }
 
     static if (command.among(
@@ -935,15 +1281,18 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsReads()
         {
+            if (!hasReadsDb)
+                return;
+
             enforce!CLIException(
                 maxCoverageReads != maxCoverageReads.init ||
                 readCoverage != readCoverage.init,
-                "must provide either --read-coverage or --acceptable-coverage-reads",
+                "must provide either --read-coverage or --max-coverage-reads",
             );
             enforce!CLIException(
                 (maxCoverageReads != maxCoverageReads.init) ^
                 (readCoverage != readCoverage.init),
-                "must not provide both --read-coverage and --acceptable-coverage-reads",
+                "must not provide both --read-coverage and --max-coverage-reads",
             );
 
             id_t upperBound(double x)
@@ -959,6 +1308,58 @@ struct OptionsFor(DentistCommand command)
                 maxCoverageReads = upperBound(readCoverage);
 
             coverageBoundsReads = [0, maxCoverageReads];
+        }
+    }
+
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("max-improper-coverage-reads")
+        @MetaVar("<uint>")
+        @Help("
+            this is used to derive a repeat mask from the ref vs. reads alignment;
+            if the coverage of improper alignments is larger than <uint> it will be
+            considered repetitive; a default value is derived from --read-coverage;
+            both options are mutually exclusive
+        ")
+        id_t maxImproperCoverageReads;
+
+        @Option()
+        id_t[2] improperCoverageBoundsReads;
+
+        @PostValidate(Priority.medium)
+        void setImproperCoverageBoundsReads()
+        {
+            if (!hasReadsDb)
+                return;
+
+            enforce!CLIException(
+                maxImproperCoverageReads != maxImproperCoverageReads.init ||
+                readCoverage != readCoverage.init,
+                "must provide either --read-coverage or --max-improper-coverage-reads",
+            );
+            enforce!CLIException(
+                (maxImproperCoverageReads != maxImproperCoverageReads.init) ^
+                (readCoverage != readCoverage.init),
+                "must not provide both --read-coverage and --max-improper-coverage-reads",
+            );
+
+            id_t upperBound(double x)
+            {
+                enum a = 0.5;
+                enum b = 0.1875;
+                enum c = 8.0;
+
+                // This is a smooth version of `max(4, a*x)`
+                return to!id_t(a*x + exp(b*(c - x)));
+            }
+
+            if (readCoverage != readCoverage.init)
+                maxImproperCoverageReads = upperBound(readCoverage);
+
+            improperCoverageBoundsReads = [0, maxImproperCoverageReads];
         }
     }
 
@@ -982,15 +1383,32 @@ struct OptionsFor(DentistCommand command)
         @PostValidate(Priority.medium)
         void setCoverageBoundsSelf()
         {
+            if (hasReadsDb)
+                return;
+
             coverageBoundsSelf = [0, maxCoverageSelf];
         }
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("max-insertion-error")
+        @Help(format!"
+            insertion and existing contigs must match with less error than <double> (default: %s)
+        "(defaultValue!maxInsertionError))
+        @Validate!(value => enforce!CLIException(
+            0.0 < value && value <= 0.3,
+            "maximum insertion error rate must be in (0, 0.3]"
+        ))
+        double maxInsertionError = 1e-2;
     }
 
     static if (command.among(
         TestingCommand.findClosableGaps,
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
     ))
     {
         @Option("min-anchor-length")
@@ -1009,20 +1427,18 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
-        TestingCommand.checkResults,
+        TestingCommand.filterMask,
     ))
     {
-        @Option("min-insertion-length")
-        @Help(format!q"{
-            an insertion must have at least this num ber base pairs to be
-            considered as (partial) insertion (default: %d)
-        }"(defaultValue!minInsertionLength))
-        @Validate!(value => enforce!CLIException(value > 0, "minimum insertion length must be greater than zero"))
-        size_t minInsertionLength = 50;
+        @Option("min-interval-size")
+        @Help(format!"
+            minimum size for mask intervals (default: %d)
+        "(defaultValue!minIntervalSize))
+        coord_t minIntervalSize;
     }
 
     static if (command.among(
-        DentistCommand.processPileUps,
+        DentistCommand.output,
     ))
     {
         @Option("min-extension-length")
@@ -1031,6 +1447,17 @@ struct OptionsFor(DentistCommand command)
         }"(defaultValue!minExtensionLength))
         @Validate!(value => enforce!CLIException(value > 0, "minimum extension length must be greater than zero"))
         size_t minExtensionLength = 100;
+    }
+
+    static if (command.among(
+        TestingCommand.filterMask,
+    ))
+    {
+        @Option("min-gap-size")
+        @Help(format!"
+            minimum size for gaps between mask intervals (default: %d)
+        "(defaultValue!minGapSize))
+        coord_t minGapSize;
     }
 
     static enum defaultMinSpanningReads = 3;
@@ -1054,9 +1481,118 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("min-spanning-reads", "s")
         @Help(format!q"{
-            require at least <uint> spanning reads to close a gap (default: %d)
+            require at least <ulong> spanning reads to close a gap (default: %d)
         }"(defaultValue!minSpanningReads))
         size_t minSpanningReads = defaultMinSpanningReads;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("no-merge-extension")
+        @Help("Do not merge extension reads into spanning pile ups.")
+        OptionFlag noMergeExtensions;
+
+        @property bool mergeExtensions() const pure nothrow
+        {
+            return !noMergeExtensions;
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("no-highlight-insertions", "H")
+        @Help("
+            turn off highlighting (upper case) of inserted sequences in the
+            FASTA output
+        ")
+        OptionFlag noHighlightInsertions;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+        DentistCommand.output,
+    ))
+    {
+        @Option("only")
+        @Help(format!"
+            only process/output insertions of the given type. Note, extending
+            insertions are experimental and may produce invalid results.
+            (default: spanning)
+        ")
+        OnlyFlag onlyFlag;
+
+        enum OnlyFlag
+        {
+            spanning = 1 << 0,
+            extending = 1 << 1,
+            both = spanning | extending,
+        }
+
+        alias OnlyFlags = BitFlags!(OnlyFlag, Yes.unsafe);
+
+        OnlyFlags onlyFlags;
+
+        @PostValidate()
+        void initOnlyFlags() pure nothrow
+        {
+            onlyFlags = OnlyFlags(onlyFlag);
+        }
+    }
+
+    static if (command.among(
+        TestingCommand.translocateGaps,
+        DentistCommand.maskRepetitiveRegions,
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("proper-alignment-allowance")
+        @MetaVar("num")
+        @Help("
+            An alignment is called proper if it is end-to-end with at most <num> bp allowance.
+            (default: --trace-point-spacing)
+        ")
+        coord_t properAlignmentAllowance;
+
+        @PostValidate(Priority.low)
+        void hookEnsurePresenceOfProperAlignmentAllowance()
+        {
+            if (properAlignmentAllowance > 0)
+                return;
+
+            static if (command == TestingCommand.translocateGaps)
+                properAlignmentAllowance = 1_000;
+            else
+                properAlignmentAllowance = tracePointDistance;
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("mask-cover-allowance")
+        @MetaVar("num")
+        @Help("
+            When selecting splice sites for insertions, the repeat mask of
+            repetitive contigs is ignored if there are at most <num> bp
+            unmasked bases.
+            (default: --proper-alignment-allowance)
+        ")
+        coord_t maskCoverAllowance;
+
+        @PostValidate(Priority.low)
+        void hookEnsurePresenceOfMaskCoverAllowance()
+        {
+            if (maskCoverAllowance > 0)
+                return;
+
+            maskCoverAllowance = properAlignmentAllowance;
+        }
     }
 
     static if (command.among(
@@ -1065,10 +1601,10 @@ struct OptionsFor(DentistCommand command)
     {
         @Option("read-coverage", "C")
         @Help(q"{
-            this is used to provide good default values for --acceptable-coverage-reads;
+            this is used to provide good default values for --max-coverage-reads;
             both options are mutually exclusive
         }")
-        id_t readCoverage;
+        double readCoverage;
     }
 
     static if (command.among(
@@ -1078,29 +1614,74 @@ struct OptionsFor(DentistCommand command)
     ))
     {
         @Option("reads-error")
-        @Help("estimated error rate in reads")
+        @Help(format!"
+            estimated error rate in reads (default: %s)
+        "(defaultValue!readsErrorRate))
         @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reads error rate must be in (0, 1)"
+            0.0 < value && value <= 0.3,
+            "reads error rate must be in (0, 0.3]"
         ))
         double readsErrorRate = .15;
     }
 
     static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("recover-imperfect-contigs", "R")
+        @Help("try to recover imperfect contigs")
+        OptionFlag recoverImperfectContigs;
+
+        @Option()
+        double maxImperfectContigError = 0.015;
+
+        @property string[] recoverImperfectContigsAlignmentOptions() const
+        {
+            return [
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DamapperOptions.kMerSize ~ "32",
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    1.0 - maxImperfectContigError,
+                ),
+            ];
+        }
+    }
+
+    static if (command.among(
         DentistCommand.generateDazzlerOptions,
         DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("reference-error")
-        @Help("estimated error rate in reference")
+        @Help(format!"
+            estimated error rate in reference (default: %s)
+        "(defaultValue!referenceErrorRate))
         @Validate!(value => enforce!CLIException(
-            0.0 < value && value < 1.0,
-            "reference error rate must be in (0, 1)"
+            0.0 < value && value <= 0.3,
+            "reference error rate must be in (0, 0.3]"
         ))
         double referenceErrorRate = .01;
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("existing-gap-bonus")
+        @Help(format!q"{
+            if a candidate would close an existing gap its size is multipled
+            by <double> before conflict resolution
+            (see --best-pile-up-margin). (default: %s)
+        }"(defaultValue!existingGapBonus))
+        @Validate!(value => enforce!CLIException(1.0 <= value, "--existing-gap-bonus must be at least 1.0"))
+        double existingGapBonus = 6.0;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         TestingCommand.checkResults,
     ))
@@ -1120,10 +1701,10 @@ struct OptionsFor(DentistCommand command)
     }
 
     static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
-        TestingCommand.checkResults,
     ))
     {
         @Option("trace-point-spacing", "s")
@@ -1140,18 +1721,56 @@ struct OptionsFor(DentistCommand command)
         }
     }
 
+    @Option("quiet", "q")
+    @Help("
+        reduce output as much as possible reporting only fatal errors. If
+        given this option overrides --verbose.
+    ")
+    OptionFlag quiet;
+
     @Option("verbose", "v")
-    @Help("increase output to help identify problems; use up to three times")
+    @Help("
+        increase output to help identify problems; use up to three times.
+        Warning: performance may be drastically reduced if using three times.
+    ")
     void increaseVerbosity() pure
     {
         ++verbosity;
     }
+
     @Option()
     @Validate!(value => enforce!CLIException(
         0 <= value && value <= 3,
         "verbosity must used 0-3 times"
     ))
     size_t verbosity = 0;
+
+    @PostValidate(Priority.high)
+    void hookInitLogLevel()
+    {
+        if (quiet)
+            verbosity = 0;
+
+        if (verbosity >= 3)
+            logJsonWarn("info", "high level of verbosity may drastically reduce performance");
+
+        switch (verbosity)
+        {
+        case 3:
+            setLogLevel(LogLevel.debug_);
+            break;
+        case 2:
+            setLogLevel(LogLevel.diagnostic);
+            break;
+        case 1:
+            setLogLevel(LogLevel.info);
+            break;
+        case 0:
+        default:
+            setLogLevel(LogLevel.error);
+            break;
+        }
+    }
 
     static if (needWorkdir)
     {
@@ -1163,7 +1782,7 @@ struct OptionsFor(DentistCommand command)
         enum workdirTemplate = format!"dentist-%s-XXXXXX"(command);
 
         /// This is a temporary directory to store all working data.
-        @Option("workdir", "w")
+        @Option("workdir", "P")
         @Help("use <string> as a working directory")
         @Validate!(value => enforce!CLIException(
             value is null || value.isDir,
@@ -1199,24 +1818,22 @@ struct OptionsFor(DentistCommand command)
         }
     }
 
-    @PostValidate()
-    void hookInitLogLevel()
-    {
-        switch (verbosity)
+    static if (is(typeof(OptionsFor!command().referenceErrorRate))) {
+        @Validate!validateAverageCorrelationRate
+        @property auto selfAlignmentOptionsAverageCorrelationRate() const
         {
-        case 3:
-            setLogLevel(LogLevel.debug_);
-            break;
-        case 2:
-            setLogLevel(LogLevel.diagnostic);
-            break;
-        case 1:
-            setLogLevel(LogLevel.info);
-            break;
-        case 0:
-        default:
-            setLogLevel(LogLevel.error);
-            break;
+            return (1 - referenceErrorRate)^^2;
+        }
+
+        @property string[] shortVsTrueAssemblyAlignmentOptions() const
+        {
+            return [
+                DamapperOptions.symmetric,
+                DamapperOptions.oneDirection,
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
         }
     }
 
@@ -1229,7 +1846,19 @@ struct OptionsFor(DentistCommand command)
             return [
                 DalignerOptions.identity,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate)^^2),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
+        }
+
+        @property string[] tandemAlignmentOptions() const
+        {
+            return [
+                format!(DatanderOptions.minAlignmentLength ~ "%d")(minAnchorLength),
+                format!(DatanderOptions.averageCorrelationRate ~ "%f")(
+                    selfAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
@@ -1238,40 +1867,108 @@ struct OptionsFor(DentistCommand command)
         is(typeof(OptionsFor!command().referenceErrorRate)) &&
         is(typeof(OptionsFor!command().readsErrorRate))
     ) {
+        @Validate!validateAverageCorrelationRate
+        @property auto refVsReadsAlignmentOptionsAverageCorrelationRate() const
+        {
+            return (1 - referenceErrorRate) * (1 - readsErrorRate);
+        }
+
         @property string[] refVsReadsAlignmentOptions() const
         {
             return [
                 DamapperOptions.symmetric,
                 DamapperOptions.oneDirection,
                 DamapperOptions.bestMatches ~ ".7",
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")((1 - referenceErrorRate) * (1 - readsErrorRate)),
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    refVsReadsAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
 
     static if (
-        is(typeof(OptionsFor!command().minAnchorLength)) &&
-        is(typeof(OptionsFor!command().readsErrorRate))
+        is(typeof(OptionsFor!command().readsErrorRate)) &&
+        is(typeof(OptionsFor!command().numAuxiliaryThreads))
     ) {
+        @Validate!validateAverageCorrelationRate
+        @property auto pileUpAlignmentOptionsAverageCorrelationRate() const
+        {
+            return (1 - readsErrorRate)^^2;
+        }
+
         @property string[] pileUpAlignmentOptions() const
         {
             return [
                 DalignerOptions.identity,
-                format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")((1 - readsErrorRate)^^2),
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    pileUpAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
         }
     }
 
-    static if (isTesting)
+    static if (
+        is(typeof(OptionsFor!command().maxInsertionError)) &&
+        is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
+        is(typeof(OptionsFor!command().tracePointDistance)) &&
+        is(typeof(OptionsFor!command().workdir))
+    ) {
+        enum flankingContigsRepeatMaskName = "rep";
+
+        @Validate!validateAverageCorrelationRate
+        @property auto postConsensusAlignmentOptionsAverageCorrelationRate() const
+        {
+            return 1 - maxInsertionError;
+        }
+
+        @property string[] postConsensusAlignmentOptions() const
+        {
+            return [
+                DalignerOptions.asymmetric,
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DalignerOptions.masks ~ flankingContigsRepeatMaskName,
+                format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
+                    postConsensusAlignmentOptionsAverageCorrelationRate,
+                ),
+            ];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
     {
-        @property string[] trueAssemblyVsResultAlignmentOptions() const
+        static struct AnchorSkippingPileUpsOptions
+        {
+            string[] damapperOptions;
+            string[] dbsplitOptions;
+            string workdir;
+        }
+
+        @property string[] intermediateContigsAlignmentOptions() const
         {
             return [
                 DamapperOptions.symmetric,
                 DamapperOptions.oneDirection,
-                DamapperOptions.averageCorrelationRate ~ ".7",
+                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                    refVsReadsAlignmentOptionsAverageCorrelationRate,
+                ),
             ];
+        }
+
+        @property auto anchorSkippingPileUpsOptions() const
+        {
+            return const(AnchorSkippingPileUpsOptions)(
+                // dalignerOptions
+                intermediateContigsAlignmentOptions,
+                // dbsplitOptions
+                [],
+                // workdir
+                workdir,
+            );
         }
     }
 
@@ -1294,7 +1991,7 @@ struct OptionsFor(DentistCommand command)
                 // daccordOptions
                 [
                     DaccordOptions.produceFullSequences,
-                    DaccordOptions.numberOfThreads ~ numDaccordThreads.to!string,
+                    DaccordOptions.numberOfThreads ~ numAuxiliaryThreads.to!string,
                 ],
                 // dalignerOptions
                 pileUpAlignmentOptions,
@@ -1310,13 +2007,61 @@ struct OptionsFor(DentistCommand command)
         }
     }
 
-    static auto defaultValue(alias property)() pure nothrow
+    static auto defaultValue(alias property)(in uint precision = 2) pure nothrow
     {
         OptionsFor!command defaultOptions;
 
-        return __traits(getMember, defaultOptions, property.stringof);
+        auto value = __traits(getMember, defaultOptions, property.stringof);
+
+        static if (isFloatingPoint!(typeof(value)))
+            return value.toString(precision);
+        else
+            return value;
+    }
+
+    static auto numArguments() pure nothrow
+    {
+        alias ThisOptions = OptionsFor!command;
+        size_t lowerBound;
+        size_t upperBound;
+
+        foreach (member; __traits(allMembers, ThisOptions))
+        {
+            alias symbol = Alias!(__traits(getMember, ThisOptions, member));
+            alias argUDAs = getUDAs!(symbol, Argument);
+
+            static if (argUDAs.length > 0)
+            {
+                lowerBound += argUDAs[0].lowerBound;
+                upperBound += argUDAs[0].upperBound;
+            }
+        }
+
+        return tuple!("lowerBound", "upperBound")(lowerBound, upperBound);
     }
 }
+
+private bool hasValidOptionNames(Options)() pure nothrow
+{
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Alias!(__traits(getMember, Options, member));
+        alias argUDAs = getUDAs!(symbol, Argument);
+
+        static if (argUDAs.length > 0)
+        {
+            enum argName = argUDAs[0].name;
+
+            static assert(argName[0] == '<', "argument `" ~ argName ~ "` must start with `<`");
+            static assert(argName[$ - 1] == '>', "argument `" ~ argName ~ "` must end with `>`");
+        }
+    }
+
+    return true;
+}
+
+static foreach (command; EnumMembers!DentistCommand)
+    static assert(hasValidOptionNames!(OptionsFor!command));
 
 unittest
 {
@@ -1329,9 +2074,22 @@ unittest
 /// A short summary for each command to be output underneath the usage.
 template commandSummary(DentistCommand command)
 {
-    static if (command == TestingCommand.translocateGaps)
+    static if (command == DentistCommand.validateConfig)
+        enum commandSummary = q"{
+            Validate config file. Exit with non-zero status if errors are
+            found.
+        }".wrap;
+    else static if (command == TestingCommand.translocateGaps)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
+        }".wrap;
+    else static if (command == TestingCommand.filterMask)
+        enum commandSummary = q"{
+            Filter a Dazzler mask.
+        }".wrap;
+    else static if (command == TestingCommand.buildPartialAssembly)
+        enum commandSummary = q"{
+            Build a partial assembly from a mask.
         }".wrap;
     else static if (command == TestingCommand.findClosableGaps)
         enum commandSummary = q"{
@@ -1375,7 +2133,7 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Write output.
         }".wrap;
-    else static if (command == TestingCommand.translateCoords)
+    else static if (command == DentistCommand.translateCoords)
         enum commandSummary = q"{
             Translate coordinates of result assembly to coordinates of
             input assembly.
@@ -1399,6 +2157,10 @@ unittest
 /// This describes the basic, ie. non-command-specific, options of `dentist`.
 struct BaseOptions
 {
+    @Option("dependencies", "d")
+    @Help("Print a list of external binaries that must be available on PATH.")
+    OptionFlag listDependencies;
+
     mixin HelpOption;
 
     @Option("version")
@@ -1421,11 +2183,8 @@ struct BaseOptions
 
 class CLIException : Exception
 {
-    pure nothrow @nogc @safe this(string msg, string file = __FILE__,
-            size_t line = __LINE__, Throwable nextInChain = null)
-    {
-        super(msg, file, line, nextInChain);
-    }
+    ///
+    mixin basicExceptionCtors;
 }
 
 private
@@ -1433,13 +2192,13 @@ private
     ReturnCode runCommand(DentistCommand command)(in string[] args)
     {
         alias Options = OptionsFor!command;
-        enum commandName = command.to!string.snakeCaseCT.tr("_", "-");
-        enum usage = usageString!Options(executableName ~ " " ~ commandName);
+        enum usage = usageString!Options(executableName ~ " " ~ Options.commandName);
 
         Options options;
 
         try
         {
+            assertExternalToolsAvailable();
             options = processOptions(parseArgs!Options(args[1 .. $]));
         }
         catch (ArgParseHelp e)
@@ -1510,6 +2269,10 @@ private
         high,
     }
 
+    struct PreValidate {
+        Priority priority;
+    }
+
     struct PostValidate {
         Priority priority;
     }
@@ -1555,24 +2318,64 @@ private
 
     Options processOptions(Options)(Options options)
     {
+        alias preValidateQueue = staticSort!(
+            cmpPriority!PreValidate,
+            getSymbolsByUDA!(Options, PreValidate),
+        );
+
+        static foreach (alias symbol; preValidateQueue)
+        {
+            mixin("options." ~ __traits(identifier, symbol) ~ "();");
+        }
+
         static foreach (alias symbol; getSymbolsByUDA!(Options, Validate))
         {{
-            alias validate = getUDAs!(symbol, Validate)[0].validate;
-            auto value = __traits(getMember, options, symbol.stringof);
-            alias Value = typeof(value);
-            alias Validator = typeof(validate);
+            alias validateUDAs = getUDAs!(symbol, Validate);
 
+            foreach (validateUDA; validateUDAs)
+            {
+                alias validate = validateUDA.validate;
+                auto value = __traits(getMember, options, __traits(identifier, symbol));
+                alias Value = typeof(value);
+                alias Validator = typeof(validate);
 
-            static if (is(typeof(validate(value))))
-                cast(void) validate(value);
-            else static if (is(typeof(validate(value, options))))
-                cast(void) validate(value, options);
-            else
-                static assert(0, format!q"{
-                    validator for %s.%s should have a signature of
-                    `void (T value);` or `void (T value, Options options);` -
-                    maybe the validator does not compile?
-                }"(Options.stringof, symbol.stringof).wrap(size_t.max));
+                try
+                {
+                    static if (is(typeof(validate(value))))
+                        cast(void) validate(value);
+                    else static if (is(typeof(validate(value, options))))
+                        cast(void) validate(value, options);
+                    else
+                        static assert(0, format!q"{
+                            validator for %s.%s should have a signature of
+                            `void (T value);` or `void (T value, Options options);` -
+                            maybe the validator does not compile?
+                        }"(Options.stringof, symbol.stringof).wrap(size_t.max));
+                }
+                catch (Exception cause)
+                {
+                    enum isOption = getUDAs!(symbol, Option).length > 0;
+                    enum isArgument = getUDAs!(symbol, Argument).length > 0;
+
+                    static if (isOption)
+                    {
+                        enum thing = "option";
+                        enum name = getUDAs!(symbol, Option)[0].toString();
+                    }
+                    else static if (isArgument)
+                    {
+                        enum thing = "argument";
+                        enum name = getUDAs!(symbol, Argument)[0].name;
+                    }
+                    else
+                    {
+                        enum thing = "property";
+                        enum name = __traits(identifier, symbol);
+                    }
+
+                    throw new CLIException("invalid " ~ thing ~ " " ~ name ~ ": " ~ cause.msg, cause);
+                }
+            }
         }}
 
         alias postValidateQueue = staticSort!(
@@ -1721,6 +2524,14 @@ private
         );
     }
 
+    void validateAverageCorrelationRate(V)(V value)
+    {
+        enforce!CLIException(
+            0.7 <= value && value < 1.0,
+            "-e option of daligner/damapper must be in [0.7, 1) - some error rate(s) are too high",
+        );
+    }
+
     void validateCoverageBounds(DestType, string option)(in string coverageBoundsString)
     {
         auto coverageBounds = parseRange!DestType(coverageBoundsString);
@@ -1749,18 +2560,15 @@ private
         enforce!CLIException(file.exists, format!msg(file));
     }
 
-    import std.meta : allSatisfy, staticMap;
-    import std.traits : isSomeString;
-
     alias typeOf(alias T) = typeof(T);
 
     void validateFileExtension(
-        string msg = "expected %-(%s, %) but got %s",
+        string msg = "expected %-(%s or %) but got %s",
         extensions...
     )(in string file)
             if (allSatisfy!(isSomeString, staticMap!(typeOf, extensions)))
     {
-        enum defaultMsg = "expected %-(%s, %) but got %s";
+        enum defaultMsg = "expected %-(%s or %) but got %s";
 
         enforce!CLIException(
             file.endsWith(extensions),

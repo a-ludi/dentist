@@ -8,12 +8,21 @@
 */
 module dentist.util.fasta;
 
-import std.algorithm : count, equal, joiner, startsWith;
-import std.array : appender, array;
+import std.algorithm :
+    count,
+    equal,
+    find,
+    joiner,
+    startsWith;
+import std.ascii : newline;
+import std.array :
+    appender, array;
 import std.conv : to;
-import std.format : format, formattedRead;
+import std.exception : enforce;
+import std.format :
+    format,
+    formattedRead;
 import std.range :
-    back,
     chain,
     chunks,
     drop,
@@ -26,6 +35,7 @@ import std.range :
     popFront,
     take,
     walkLength;
+import std.stdio : File;
 import std.string : indexOf, lineSplitter, outdent;
 import std.traits : isSomeChar, isSomeString;
 import std.typecons : tuple, Tuple;
@@ -311,6 +321,115 @@ EOF".outdent;
     assert(fastaRecord.header == ">sequence1");
     assert(fastaRecord[].equal("CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC"));
     assert(fastaRecord[0 .. 5].equal("CTAAC"));
+}
+
+/**
+    Calculate the sequence length of the first record in fastaFile. Returns
+    the length of the next record in fastaFile if it is a File object.
+*/
+size_t getFastaLength(in string fastaFile)
+{
+    enum headerIndicator = Fasta!string.headerIndicator;
+    alias isHeaderLine = (line) => line.length > 0 && line[0] == headerIndicator;
+
+    return File(fastaFile).getFastaLength();
+}
+
+/// ditto
+size_t getFastaLength(File fastaFile)
+{
+    enum headerIndicator = Fasta!string.headerIndicator;
+    alias isHeaderLine = (line) => line.length > 0 && line[0] == headerIndicator;
+
+    auto fastaLines = fastaFile
+        .byLine
+        .find!isHeaderLine;
+
+    enforce(!fastaLines.empty, "cannot determine FASTA length: file has no records");
+
+    // ignore header
+    fastaLines.popFront();
+
+    char peek()
+    {
+        import core.stdc.stdio : getc, ungetc;
+        import std.exception : errnoEnforce;
+
+        auto c = getc(fastaFile.getFP());
+        ungetc(c, fastaFile.getFP());
+
+        errnoEnforce(!fastaFile.error);
+
+        return cast(char) c;
+    }
+
+    // sum length of all sequence lines up to next record
+    size_t length;
+
+    if (peek() == headerIndicator)
+        return 0;
+    foreach (line; fastaLines)
+    {
+        length += line.length;
+
+        if (peek() == headerIndicator)
+            break;
+    }
+
+    return length;
+}
+
+///
+unittest
+{
+    import std.process : pipe;
+
+    string fastaRecordData = q"EOF
+        >sequence1
+        CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+        AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+EOF".outdent;
+    auto fastaFile = pipe();
+    fastaFile.writeEnd.write(fastaRecordData);
+    fastaFile.writeEnd.close();
+
+    auto fastaLength = getFastaLength(fastaFile.readEnd);
+
+    assert(fastaLength == 100);
+}
+
+///
+unittest
+{
+    import std.process : pipe;
+
+    string fastaRecordData = q"EOF
+        >sequence1
+        CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+        AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+        >sequence2
+        AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+EOF".outdent;
+    auto fastaFile = pipe();
+    fastaFile.writeEnd.write(fastaRecordData);
+    fastaFile.writeEnd.close();
+
+    auto fastaLength1 = getFastaLength(fastaFile.readEnd);
+    auto fastaLength2 = getFastaLength(fastaFile.readEnd);
+
+    assert(fastaLength1 == 100);
+    assert(fastaLength2 == 50);
+}
+
+unittest
+{
+    import std.exception : assertThrown;
+    import std.process : pipe;
+
+    auto fastaFile = pipe();
+    fastaFile.writeEnd.close();
+
+    assertThrown(getFastaLength(fastaFile.readEnd));
 }
 
 template PacBioHeader(T) if (isSomeString!T)

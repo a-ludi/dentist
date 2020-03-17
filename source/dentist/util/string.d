@@ -20,7 +20,14 @@ import std.array :
 import std.conv : to;
 import std.exception : basicExceptionCtors, enforce;
 import std.functional : binaryFun;
-import std.math : round, sqrt;
+import std.math :
+    ceil,
+    floor,
+    isInfinity,
+    isNaN,
+    round,
+    sgn,
+    sqrt;
 import std.range :
     chain,
     chunks,
@@ -29,13 +36,19 @@ import std.range :
     take,
     zip;
 import std.range.primitives : hasSlicing;
-import std.string : lineSplitter;
-import std.traits : isSomeString;
+import std.string : lineSplitter, tr;
+import std.traits :
+    isFloatingPoint,
+    isSomeString;
 import std.typecons :
     Flag,
     No,
     tuple,
     Yes;
+import transforms : snakeCaseCT;
+
+/// Convert a string to `dash-case` at compile time.
+enum dashCaseCT(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
 
 /**
     Adds one level of indentation for a multi-line string. Adds indentSize
@@ -80,6 +93,14 @@ enum EditOp: byte
 }
 
 alias score_t = uint;
+
+static enum Strip : byte
+{
+    none = 0b00,
+    back = 0b01,
+    front = 0b10,
+    both = 0b11,
+}
 
 /// Represents an alignment of two sequences.
 struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
@@ -159,7 +180,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         if (freeShift)
         {
             auto firstSubstitution = editPath.countUntil(EditOp.substitution);
-            result.computedScore -= firstSubstitution > 0
+            result.computedScore -= firstSubstitution >= 0
                 ? firstSubstitution
                 : editPath.length;
         }
@@ -167,17 +188,23 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return result;
     }
 
+    /// Strip leading/trailing insertions.
+    auto stripInsertions(Strip strip) inout pure nothrow
+    {
+        return partial(0, reference.length, strip);
+    }
+
     /**
         Get a partial alignment with respect to `reference`.
     */
-    auto partial(in size_t begin, in size_t end) inout pure nothrow
+    auto partial(in size_t begin, in size_t end, Strip stripInsertions = Strip.none) inout pure nothrow
     in
     {
-        assert(this.isValid());
+        assert(this.isValid(), "Attempting to get a partial alignment of an invalid alignment");
     }
     out (partialAlignment)
     {
-        assert(partialAlignment.isValid());
+        assert(partialAlignment.isValid(), "Partial alignment is invalid");
     }
     do
     {
@@ -185,21 +212,27 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 
         if (end == begin)
             return typeof(this)(0, [], reference[0 .. 0], query[0 .. 0], indelPenalty);
-        else if (0 == begin && end == reference.length)
-            return this;
 
+        bool hasStarted;
         score_t newScore;
         size_t editBegin, editEnd;
         size_t queryBegin, queryEnd;
         size_t i, j;
         foreach (k, editOp; editPath)
         {
-            if (i == begin)
+            if (!hasStarted && i == begin)
             {
+                hasStarted = !(stripInsertions & Strip.front);
                 newScore = 0;
                 editBegin = k;
                 queryBegin = j;
             }
+
+            if (freeShift && i == begin)
+                newScore = 0;
+
+            if (i == end && ((stripInsertions & Strip.back) || editOp != EditOp.insertion))
+                break;
 
             final switch (editOp)
             {
@@ -218,12 +251,21 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
                 break;
             }
 
-            if (i >= end)
+            if (i == end)
             {
                 editEnd = k + 1;
                 queryEnd = j;
-                break;
             }
+        }
+
+        if (
+            !(stripInsertions & Strip.back) &&
+            editEnd < editPath.length &&
+            editPath[editEnd] == EditOp.insertion
+        )
+        {
+            ++editEnd;
+            queryEnd = j;
         }
 
         auto partialAlignment = typeof(this)(
@@ -558,6 +600,69 @@ unittest
 
 unittest
 {
+    enum reference = "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa" ~
+                     "caacatatgattctaaaatttcaaaatgcttaaaggtctga";
+    enum query = "atatcctcaggtgaggactaacaacaaatatatatatatttatatctaac" ~
+                 "aacatatgatttctaaaatttcaaaaatcttaaggctgaattaat";
+    auto alignment = findAlignment(
+        reference,
+        query,
+        1
+    );
+
+    assert(alignment.partial(0, reference.length, Strip.none).toString(50) ==
+        "-tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatct\n" ~
+        " ||||||||||||||| || ||||||||||||||||||| |*|| |||||\n" ~
+        "atatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatct\n" ~
+        "\n" ~
+        "aacaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------\n" ~
+        "|||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "aacaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat");
+    assert(alignment.partial(0, reference.length, Strip.front).toString(50) ==
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "\n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||      \n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat");
+    assert(alignment.partial(0, reference.length, Strip.back).toString(50) ==
+        "-tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatct\n" ~
+        " ||||||||||||||| || ||||||||||||||||||| |*|| |||||\n" ~
+        "atatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatct\n" ~
+        "\n" ~
+        "aacaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga\n" ~
+        "|||||||||||||| ||||||||||||||**||||| || ||||\n" ~
+        "aacaacatatgatttctaaaatttcaaaaatcttaa-gg-ctga");
+    assert(alignment.partial(0, reference.length, Strip.both).toString(50) ==
+        "tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" ~
+        "||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" ~
+        "tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" ~
+        "\n" ~
+        "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga\n" ~
+        "||||||||||||| ||||||||||||||**||||| || ||||\n" ~
+        "acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctga");
+}
+
+unittest
+{
+    enum reference = "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa";
+    enum query = "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn";
+    auto alignment = findAlignment!"1 - (a == b || a == 'n' || b == 'n')"(
+        reference,
+        query,
+        1
+    );
+
+    import std.stdio;
+    assert(alignment.partial(0, reference.length, Strip.front).toString(50) ==
+        "tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa\n" ~
+        "**************************************************\n" ~
+        "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn");
+}
+
+unittest
+{
     auto alignment = findAlignment(
         "tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" ~
         "gttgcaggtttgatctccacctggtcggggcacatgcaggaggcaaccaa" ~
@@ -831,4 +936,50 @@ private struct DPMatrix(T)
 
         return result;
     `;
+}
+
+/// Convert a floating point number to a base-10 string at compile time.
+/// This function is very crude and will not work in many cases!
+string toString(Float)(in Float value, in uint precision) pure nothrow
+    if (isFloatingPoint!Float)
+{
+    if (value.isNaN)
+        return "nan";
+    else if (value.isInfinity)
+        return value > 0 ? "inf" : "-inf";
+
+    if (precision == 0)
+    {
+        auto intPart = cast(long) round(value);
+
+        return intPart.to!string;
+    }
+    else
+    {
+        auto intPart = cast(long) (value > 0 ? floor(value) : ceil(value));
+        auto fraction = sgn(value) * (value - intPart);
+        assert(fraction >= 0, "fractional part of value should be non-negative");
+        auto fracPart = cast(ulong) round(10^^precision * fraction);
+
+        return intPart.to!string ~ "." ~ fracPart.to!string;
+    }
+}
+
+///
+unittest
+{
+    enum x = 42.0;
+    enum y = -13.37f;
+    enum z = 0.9;
+
+    static assert(float.nan.toString(0) == "nan");
+    static assert(double.infinity.toString(0) == "inf");
+    static assert((-double.infinity).toString(0) == "-inf");
+    static assert(x.toString(0) == "42");
+    static assert(x.toString(1) == "42.0");
+    static assert(y.toString(2) == "-13.37");
+    static assert(y.toString(1) == "-13.4");
+    static assert(y.toString(0) == "-13");
+    static assert(z.toString(1) == "0.9");
+    static assert(z.toString(0) == "1");
 }

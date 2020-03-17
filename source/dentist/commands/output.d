@@ -8,17 +8,24 @@
 */
 module dentist.commands.output;
 
-import dentist.commandline : DentistCommand, OptionsFor;
-import dentist.common : ReferenceInterval, ReferencePoint;
+import dentist.commandline : OptionsFor;
+import dentist.common :
+    ReferenceInterval,
+    ReferenceRegion,
+    ReferencePoint;
 import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
+    coord_t,
     id_t,
+    SeededAlignment,
     trace_point_t;
+import dentist.common.commands : DentistCommand;
 import dentist.common.binio :
     CompressedSequence,
     InsertionDb;
 import dentist.common.insertions :
+    getCroppingPosition,
     getInfoForExistingContig,
     getInfoForGap,
     getInfoForNewSequenceInsertion,
@@ -26,8 +33,7 @@ import dentist.common.insertions :
     InsertionInfo,
     isOutputGap,
     isValidInsertion,
-    OutputScaffold,
-    SpliceSite;
+    OutputScaffold;
 import dentist.common.scaffold :
     ContigNode,
     ContigPart,
@@ -36,13 +42,15 @@ import dentist.common.scaffold :
     getUnkownJoin,
     initScaffold,
     isAntiParallel,
+    isCyclic,
     isDefault,
     isExtension,
     isFrontExtension,
     isGap,
     linearWalk,
     normalizeUnkownJoins,
-    removeExtensions;
+    removeExtensions,
+    removeSpanning;
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
@@ -58,8 +66,10 @@ import dentist.util.math :
     add,
     bulkAdd,
     ceil,
+    filterEdges,
     floor,
-    mean;
+    mean,
+    RoundingMode;
 import dentist.util.range : wrapLines;
 import std.algorithm :
     all,
@@ -72,14 +82,19 @@ import std.algorithm :
     fold,
     joiner,
     map,
+    max,
     maxElement,
+    min,
+    predSwitch,
     swap,
     swapAt;
 import std.array : array;
+import std.ascii : toUpper;
 import std.conv : to;
 import std.format : format;
 import std.range :
     enumerate,
+    dropExactly,
     only,
     repeat,
     takeExactly,
@@ -102,6 +117,59 @@ void execute(Options)(in Options options)
     writer.run();
 }
 
+
+enum AGPComponentType : string
+{
+    /// Active Finishing
+    activeFinishing = "A",
+    /// Draft HTG (often phase1 and phase2 are called Draft, whether or not they have the draft keyword).
+    draftHTG = "D",
+    /// Finished HTG (phase3)
+    finishedHTG = "F",
+    /// Whole Genome Finishing
+    wholeGenomeFinishing = "G",
+    /// Other sequence (typically means no HTG keyword)
+    otherSequence = "O",
+    /// Pre Draft
+    preDraft = "P",
+    /// WGS contig
+    wgsContig = "W",
+    /// gap with specified size
+    gapWithSpecifiedSize = "N",
+    /// gap of unknown size, defaulting to 100 bases.
+    gapOfUnknownSize = "U",
+}
+
+
+enum AGPLinkageEvidence : string
+{
+    /// used when no linkage is being asserted (column 8b is ‘no’)
+    na = "na",
+    /// paired sequences from the two ends of a DNA fragment, mate-pairs and molecular-barcoding.
+    pairedEnds = "paired-ends",
+    /// alignment to a reference genome within the same genus.
+    alignGenus = "align_genus",
+    /// alignment to a reference genome within another genus.
+    alignXgenus = "align_xgenus",
+    /// alignment to a transcript from the same species.
+    alignTrnscpt = "align_trnscpt",
+    /// sequence on both sides of the gap is derived from the same clone, but the gap is not spanned by paired-ends. The adjacent sequence contigs have unknown order and orientation.
+    withinClone = "within_clone",
+    /// linkage is provided by a clone contig in the tiling path (TPF). For example, a gap where there is a known clone, but there is not yet sequence for that clone.
+    cloneContig = "clone_contig",
+    /// linkage asserted using a non-sequence based map such as RH, linkage, fingerprint or optical.
+    map = "map",
+    /// PCR using primers on both sides of the gap.
+    pcr = "pcr",
+    /// ligation of segments of DNA that were brought into proximity in chromatin (Hi-C and related technologies).
+    proximityLigation = "proximity_ligation",
+    /// strobe sequencing.
+    strobe = "strobe",
+    /// used only for gaps of type contamination and when converting old AGPs that lack a field for linkage evidence into the new format.
+    unspecified = "unspecified",
+}
+
+
 class AssemblyWriter
 {
     alias FastaWriter = typeof(wrapLines(stdout.lockingTextWriter, 0));
@@ -113,16 +181,22 @@ class AssemblyWriter
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     ContigNode[] scaffoldStartNodes;
-    File assemblyFile;
+    File resultFile;
     FastaWriter writer;
+    File agpFile;
+    string currentScaffold;
+    id_t currentScaffoldPartId;
+    coord_t currentScaffoldCoord;
 
     this(in ref Options options)
     {
         this.options = options;
-        this.assemblyFile = options.assemblyFile is null
+        this.resultFile = options.resultFile is null
             ? stdout
-            : File(options.assemblyFile, "w");
-        this.writer = wrapLines(assemblyFile.lockingTextWriter, options.fastaLineWidth);
+            : File(options.resultFile, "w");
+        this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
+        if (options.agpFile !is null)
+            this.agpFile = File(options.agpFile, "w");
     }
 
     void run()
@@ -133,6 +207,8 @@ class AssemblyWriter
         buildAssemblyGraph();
         scaffoldStartNodes = scaffoldStarts!InsertionInfo(assemblyGraph, incidentEdgesCache).array;
         logStatistics();
+        if (agpFile.isOpen)
+            writeAGPHeader();
 
         foreach (startNode; scaffoldStartNodes)
             writeNewScaffold(startNode);
@@ -166,9 +242,18 @@ class AssemblyWriter
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
-        if (!options.shouldExtendContigs)
+        if (options.onlyFlags.extending)
+        {
+            assemblyGraph.filterEdges!(insertion => skipShortExtension(insertion));
+        }
+        else
         {
             assemblyGraph = assemblyGraph.removeExtensions!InsertionInfo();
+        }
+
+        if (!options.onlyFlags.spanning)
+        {
+            assemblyGraph = assemblyGraph.removeSpanning!InsertionInfo();
         }
 
         assemblyGraph = assemblyGraph
@@ -181,7 +266,6 @@ class AssemblyWriter
             InsertionDb.write(options.assemblyGraphFile, assemblyGraph.edges);
     }
 
-
     protected void appendUnkownJoins()
     {
         auto unkownJoins = scaffoldStructure[]
@@ -193,6 +277,29 @@ class AssemblyWriter
                 InsertionInfo(CompressedSequence(), gapPart.length, []),
             ));
         assemblyGraph.bulkAddForce(unkownJoins);
+    }
+
+    protected Flag!"keepInsertion" skipShortExtension(Insertion insertion) const
+    {
+        assert(insertion.payload.overlaps.length == 1);
+
+        auto extensionOverlap = insertion.payload.overlaps[0];
+        auto extensionLength = extensionOverlap.seed == AlignmentLocationSeed.front
+            ? extensionOverlap.first.contigB.begin
+            : extensionOverlap.contigB.length - extensionOverlap.last.contigB.end;
+
+        if (extensionLength < options.minExtensionLength)
+        {
+            logJsonInfo(
+                "info", "skipping pile up due to `minExtensionLength`",
+                "reason", "minExtensionLength",
+                "flankingContigId", extensionOverlap.contigA.id,
+            );
+
+            return No.keepInsertion;
+        }
+
+        return Yes.keepInsertion;
     }
 
     void logStatistics()
@@ -227,7 +334,7 @@ class AssemblyWriter
                         "payload": [
                             "sequence": join.payload.sequence.to!string.toJson,
                             "contigLength": join.payload.contigLength.toJson,
-                            "spliceSites": join.payload.spliceSites.toJson,
+                            "overlaps": join.payload.overlaps.toJson,
                         ].toJson,
                     ])
                     .array
@@ -237,8 +344,24 @@ class AssemblyWriter
         );
     }
 
+    void writeAGPHeader()
+    {
+        import dentist.swinfo;
+
+        assert(agpFile.isOpen);
+        agpFile.writefln!"##agp-version\t%s"(options.agpVersion);
+        agpFile.writefln!"# TOOL: %s %s"(executableName, version_);
+        agpFile.writefln!"# INPUT_ASSEMBLY: %s"(options.refDb);
+        agpFile.writefln!"# object\tobject_beg\tobject_end\tpart_number\tcomponent_type\tcomponent_id/gap_length\tcomponent_beg/gap_type\tcomponent_end/linkage\torientation\tlinkage_evidence"();
+    }
+
     void logSparseInsertionWalks()
     {
+        auto oldLogLevel = getLogLevel();
+        setLogLevel(LogLevel.fatal);
+        scope (exit)
+            setLogLevel(oldLogLevel);
+
         stderr.write(`{"scaffolds":[`);
 
         foreach (i, startNode; scaffoldStartNodes)
@@ -247,6 +370,9 @@ class AssemblyWriter
                 stderr.write(`[`);
             else
                 stderr.write(`,[`);
+
+            auto insertionBegin = startNode;
+            coord_t currentPosition;
 
             foreach (enumJoin; enumerate(linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache)))
             {
@@ -257,23 +383,58 @@ class AssemblyWriter
                     stderr.write(`,`);
 
                 if (join.isDefault)
-                    stderr.writef!`{"action":"copy","contigId":%d}`(join.start.contigId);
-                else if (join.isOutputGap)
-                    stderr.writef!`{"action":"gap","length":%d}`(join.payload.contigLength);
-                else if (join.isGap)
-                    stderr.writef!`{"action":"insert","contigIds":[%d,%d],"length":%d}`(
+                {
+                    auto insertionInfo = getInfoForExistingContig(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"copy","contigId":%d,"length":%d,"position":%d}`(
                         join.start.contigId,
-                        join.end.contigId,
-                        join.payload.sequence.length
+                        insertionInfo.length,
+                        currentPosition,
                     );
+                    currentPosition += insertionInfo.length;
+                }
+                else if (join.isOutputGap)
+                {
+                    auto insertionInfo = getInfoForGap(join);
+
+                    stderr.writef!`{"action":"gap","length":%d,"position":%d}`(
+                        insertionInfo.length,
+                        currentPosition,
+                    );
+                    currentPosition += insertionInfo.length;
+                }
+                else if (join.isGap)
+                {
+                    auto insertionInfo = getInfoForNewSequenceInsertion(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"insert","contigs":[{"id":%d,"pos":"%s"},{"id":%d,"pos":"%s"}],"length":%d,"position":%d}`(
+                        join.start.contigId,
+                        join.start.contigPart.to!string,
+                        join.end.contigId,
+                        join.end.contigPart.to!string,
+                        insertionInfo.length,
+                        currentPosition,
+                    );
+                    currentPosition += insertionInfo.length;
+                }
                 else if (join.isExtension)
-                    stderr.writef!`{"action":"insert","contigIds":[%d],"contigPart":"%s","length":%d}`(
+                {
+                    auto insertionInfo = getInfoForNewSequenceInsertion(insertionBegin, join, false);
+
+                    stderr.writef!`{"action":"insert","contigs":[{"id":%d,"pos":"%s"}],"length":%d,"position":%d}`(
                         join.start.contigId,
                         join.isFrontExtension ? "front" : "back",
-                        join.payload.sequence.length
+                        join.payload.sequence.length,
+                        currentPosition,
                     );
+                    currentPosition += insertionInfo.length;
+                }
                 else
+                {
                     assert(0, "unexpected join type");
+                }
+
+                insertionBegin = join.target(insertionBegin);
             }
 
             stderr.write(`]`);
@@ -294,7 +455,10 @@ class AssemblyWriter
             "scaffoldId", startNode.contigId,
         );
 
-        writeHeader(startNode);
+        currentScaffold = scaffoldHeader(startNode, isCyclic!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache));
+        currentScaffoldPartId = 1;
+        currentScaffoldCoord = 1;
+        writeHeader();
         foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
         {
             writeInsertion(
@@ -306,6 +470,8 @@ class AssemblyWriter
             insertionBegin = currentInsertion.target(insertionBegin);
             if (currentInsertion.isAntiParallel)
                 globalComplement = !globalComplement;
+            ++currentScaffoldPartId;
+            currentScaffoldCoord += currentInsertion.payload.contigLength - 1;
         }
         "\n".copy(writer);
     }
@@ -324,8 +490,8 @@ class AssemblyWriter
             assert(insertionsChunk
                 .all!(a => a.payload.contigLength == 0 ||
                            a.payload.contigLength == merged.payload.contigLength));
-            merged.payload.spliceSites = insertionsChunk
-                .map!"a.payload.spliceSites"
+            merged.payload.overlaps = insertionsChunk
+                .map!"a.payload.overlaps"
                 .joiner
                 .array;
 
@@ -339,9 +505,17 @@ class AssemblyWriter
         }
     }
 
-    protected void writeHeader(in ContigNode begin)
+    protected string scaffoldHeader(in ContigNode begin, in Flag!"isCyclic" isCyclic)
     {
-        format!">scaffold-%d\n"(begin.contigId).copy(writer);
+        if (isCyclic)
+            return format!"circular-scaffold-%d"(begin.contigId);
+        else
+            return format!"scaffold-%d"(begin.contigId);
+    }
+
+    protected void writeHeader()
+    {
+        format!">%s\n"(currentScaffold).copy(writer);
     }
 
     protected void writeInsertion(
@@ -367,25 +541,38 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForExistingContig(begin, insertion, globalComplement);
-
         auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
-        contigSequence = contigSequence[insertionInfo.spliceStart .. insertionInfo.spliceEnd];
+        auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
+
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                currentScaffold,
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                cast(string) AGPComponentType.wgsContig,
+                to!string(insertionInfo.contigId),
+                to!string(insertionInfo.cropping.begin),
+                to!string(insertionInfo.cropping.end),
+                insertionInfo.complement ? "+" : "-",
+                cast(string) AGPLinkageEvidence.na,
+            ).joiner("\t"));
 
         logJsonDebug(
             "info", "writing contig insertion",
             "contigId", insertionInfo.contigId,
             "contigLength", insertion.payload.contigLength,
-            "spliceStart", insertionInfo.spliceStart,
-            "spliceEnd", insertionInfo.spliceEnd,
-            "spliceSites", insertion.payload.spliceSites.toJson,
+            "spliceStart", insertionInfo.cropping.begin,
+            "spliceEnd", insertionInfo.cropping.end,
+            "overlaps", insertion.payload.overlaps.toJson,
             "start", insertion.start.toJson,
             "end", insertion.end.toJson,
         );
 
         if (insertionInfo.complement)
-            contigSequence.reverseComplementer.copy(writer);
+            croppedContigSequence.reverseComplementer.copy(writer);
         else
-            contigSequence.copy(writer);
+            croppedContigSequence.copy(writer);
     }
 
     protected void writeGap(
@@ -393,6 +580,20 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForGap(insertion);
+
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                currentScaffold,
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                cast(string) AGPComponentType.gapWithSpecifiedSize,
+                to!string(insertion.payload.contigLength),
+                to!string("scaffold"),
+                to!string("yes"),
+                to!string("na"),
+                cast(string) AGPLinkageEvidence.unspecified,
+            ).joiner("\t"));
 
         logJsonDebug(
             "info", "writing gap",
@@ -416,20 +617,51 @@ class AssemblyWriter
     {
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
 
+        if (agpFile.isOpen)
+            agpFile.writeln(only(
+                currentScaffold,
+                to!string(currentScaffoldCoord),
+                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(currentScaffoldPartId),
+                cast(string) AGPComponentType.otherSequence,
+                format!"reads-%(%d-%)"(insertion.payload.readIds),
+                to!string(insertionInfo.cropping.begin),
+                to!string(insertionInfo.cropping.end),
+                to!string(insertionInfo.complement ? '+' : '-'),
+                cast(string) AGPLinkageEvidence.cloneContig,
+            ).joiner("\t"));
+
         logJsonDebug(
             "info", "writing new sequence insertion",
             "type", insertion.isGap ? "gap" : "extension",
-            "insertionLength", insertion.payload.sequence.length,
+            "spliceStart", insertionInfo.cropping.begin,
+            "spliceEnd", insertionInfo.cropping.end,
+            "insertionLength", insertionInfo.length,
             "isAntiParallel", insertion.isAntiParallel,
-            "localComplement", insertion.payload.spliceSites[0].flags.complement,
+            "localComplement", insertionInfo.complement,
             "start", insertion.start.toJson,
             "end", insertion.end.toJson,
         );
 
+        alias highlightIfRequested = (char c) => options.noHighlightInsertions ? c : toUpper(c);
+
         if (insertionInfo.complement)
-            insertionInfo.sequence.bases!(char, Yes.reverse).map!(complement!char).copy(writer);
+            insertionInfo
+                .sequence
+                .bases!(char, Yes.reverse)
+                .map!(complement!char)
+                .dropExactly(insertionInfo.cropping.begin)
+                .takeExactly(insertionInfo.cropping.size)
+                .map!highlightIfRequested
+                .copy(writer);
         else
-            insertionInfo.sequence.bases!char.copy(writer);
+            insertionInfo
+                .sequence
+                .bases!char
+                .dropExactly(insertionInfo.cropping.begin)
+                .takeExactly(insertionInfo.cropping.size)
+                .map!highlightIfRequested
+                .copy(writer);
 
     }
 }
@@ -450,25 +682,26 @@ OutputScaffold fixCropping(
 
     foreach (contigJoin; contigJoins)
     {
-        auto insertionUpdated1 = transferCroppingFromIncidentJoins(contigJoin, incidentEdgesCache);
-        auto insertionUpdated2 = resolveCroppingConflicts(scaffold, contigJoin, incidentEdgesCache,
-                                                         tracePointDistance);
+        auto insertionUpdated = transferCroppingFromIncidentJoins(contigJoin, incidentEdgesCache);
 
         version (assert)
         {
-            auto spliceSites = contigJoin.payload.spliceSites;
+            auto overlaps = contigJoin.payload.overlaps;
 
-            assert(spliceSites.length <= 2);
-            if (spliceSites.length == 2)
+            assert(overlaps.length <= 2);
+            if (overlaps.length == 2)
+            {
+                auto cropPos0 = getCroppingPosition!"contigA"(overlaps[0]);
+                auto cropPos1 = getCroppingPosition!"contigA"(overlaps[1]);
+
                 assert(
-                    spliceSites[0].croppingRefPosition.value == spliceSites[1].croppingRefPosition.value ||
-                    (spliceSites[0].croppingRefPosition.value < spliceSites[1].croppingRefPosition.value)
-                    ==
-                    (spliceSites[0].alignmentSeed < spliceSites[1].alignmentSeed)
+                    cropPos0 == cropPos1 ||
+                    (cropPos0 < cropPos1) == (overlaps[0].seed < overlaps[1].seed)
                 );
+            }
         }
 
-        if (insertionUpdated1 || insertionUpdated2)
+        if (insertionUpdated)
             scaffold.add!replace(contigJoin);
     }
 
@@ -481,7 +714,7 @@ Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
     OutputScaffold.IncidentEdgesCache incidentEdgesCache,
 )
 {
-    SpliceSite spliceSiteFromIncidentJoins(ContigNode contigNode)
+    SeededAlignment overlapsFromIncidentJoins(ContigNode contigNode)
     {
         alias isSomeInsertion = insertion =>
             !insertion.isOutputGap && (insertion.isGap || insertion.isExtension);
@@ -489,109 +722,24 @@ Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
         auto incidentJoins = incidentEdgesCache[contigNode].filter!isSomeInsertion;
 
         if (incidentJoins.empty)
-            return SpliceSite();
+            return SeededAlignment(AlignmentChain.disabledInstance);
 
-        assert(incidentJoins.walkLength(2) == 1, "non-linearized scaffold");
-        auto spliceSitesForContigNode = incidentJoins
+        assert(incidentJoins.save.walkLength(2) == 1, "non-linearized scaffold");
+        auto overlapsForContigNode = incidentJoins
             .front
             .payload
-            .spliceSites
-            .filter!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId);
-        assert(!spliceSitesForContigNode.empty, "missing splice site");
-        assert(spliceSitesForContigNode.walkLength(2) <= 1, "too many splice sites");
+            .overlaps
+            .filter!(overlap => overlap.contigA.id == contigNode.contigId);
+        assert(!overlapsForContigNode.empty, "missing splice site");
+        assert(overlapsForContigNode.save.walkLength(2) <= 1, "too many splice sites");
 
-        return spliceSitesForContigNode.front;
+        return overlapsForContigNode.front;
     }
 
-    contigJoin.payload.spliceSites = only(contigJoin.start, contigJoin.end)
-        .map!spliceSiteFromIncidentJoins
-        .filter!(spliceSite => spliceSite != SpliceSite.init)
+    contigJoin.payload.overlaps = only(contigJoin.start, contigJoin.end)
+        .map!overlapsFromIncidentJoins
+        .filter!"!a.flags.disabled"
         .array;
 
-    return cast(typeof(return)) (contigJoin.payload.spliceSites.length > 0);
-}
-
-Flag!"insertionUpdated" resolveCroppingConflicts(
-    ref OutputScaffold scaffold,
-    ref Insertion contigJoin,
-    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
-    trace_point_t tracePointDistance,
-)
-{
-    auto spliceSites = contigJoin.payload.spliceSites;
-
-    if (spliceSites.length <= 1)
-        return No.insertionUpdated;
-
-    alias croppingRefPos = (spliceSite) => spliceSite.croppingRefPosition.value;
-    if (croppingRefPos(spliceSites[0]) <= croppingRefPos(spliceSites[1]))
-        return No.insertionUpdated;
-
-    resolveOverlappingCropping(scaffold, contigJoin, incidentEdgesCache, tracePointDistance);
-
-    return Yes.insertionUpdated;
-}
-
-private void resolveOverlappingCropping(
-    ref OutputScaffold scaffold,
-    ref Insertion contigJoin,
-    OutputScaffold.IncidentEdgesCache incidentEdgesCache,
-    trace_point_t tracePointDistance,
-)
-{
-    assert(contigJoin.payload.spliceSites.length == 2);
-
-    auto spliceSites = contigJoin.payload.spliceSites;
-    // Crop overlapping insertions to the center of the overlap
-    alias croppingRefPos = (spliceSite) => spliceSite.croppingRefPosition.value;
-    auto newCroppingPos = floor(mean(spliceSites.map!croppingRefPos), tracePointDistance);
-
-    void resolveOverlappingCroppingFor(ref SpliceSite spliceSite)
-    {
-        auto alignmentSeed = spliceSite.alignmentSeed;
-        auto croppingDiff = absdiff(
-            newCroppingPos,
-            spliceSite.croppingRefPosition.value,
-        );
-
-        if (croppingDiff > 0)
-        {
-            alias replace = OutputScaffold.ConflictStrategy.replace;
-
-            auto contigNode = alignmentSeed == AlignmentLocationSeed.front
-                ? contigJoin.start
-                : contigJoin.end;
-            auto incidentInsertion = incidentEdgesCache[contigNode]
-                .find!(insertion => !insertion.isOutputGap && (insertion.isGap || insertion.isExtension))
-                .front;
-            auto insertionSpliceSiteIdx = incidentInsertion
-                .payload
-                .spliceSites
-                .countUntil!(spliceSite => spliceSite.croppingRefPosition.contigId == contigNode.contigId);
-            auto insertionSpliceSite = &incidentInsertion
-                .payload
-                .spliceSites[insertionSpliceSiteIdx];
-            auto shouldCropBack = (alignmentSeed == AlignmentLocationSeed.front) ^
-                                  (insertionSpliceSite.flags.complement);
-
-            // Crop insertion to new cropping position
-            incidentInsertion.payload.sequence = shouldCropBack
-                ? incidentInsertion.payload.sequence[0 .. $ - croppingDiff]
-                : incidentInsertion.payload.sequence[croppingDiff .. $];
-            insertionSpliceSite.croppingRefPosition.value = newCroppingPos;
-
-            // Store updated insertion in scaffold and update the cache
-            scaffold.add!replace(incidentInsertion);
-            incidentEdgesCache[incidentInsertion.start]
-                .replaceInPlace(incidentInsertion, incidentInsertion);
-            incidentEdgesCache[incidentInsertion.end]
-                .replaceInPlace(incidentInsertion, incidentInsertion);
-
-            // Update splice site of contigJoin
-            spliceSite.croppingRefPosition.value = newCroppingPos;
-        }
-    }
-
-    foreach (ref spliceSite; spliceSites)
-        resolveOverlappingCroppingFor(spliceSite);
+    return cast(typeof(return)) (contigJoin.payload.overlaps.length > 0);
 }

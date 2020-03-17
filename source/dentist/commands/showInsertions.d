@@ -33,7 +33,10 @@ void execute(Options)(in Options options)
         totalDbSize,
         insertionDb.insertions.length,
         insertionDb.compressedBaseQuads.length,
-        insertionDb.spliceSites.length,
+        insertionDb.overlaps.length,
+        insertionDb.localAlignments.length,
+        insertionDb.tracePoints.length,
+        insertionDb.readIds.length,
     );
 
     if (options.useJson)
@@ -51,7 +54,8 @@ void execute(Options)(in Options options)
                 "payload": [
                     "sequence": join.payload.sequence.to!string.toJson,
                     "contigLength": join.payload.contigLength.toJson,
-                    "spliceSites": join.payload.spliceSites.toJson,
+                    "overlaps": join.payload.overlaps.toJson,
+                    "readIds": join.payload.readIds.toJson,
                 ].toJson,
             ]));
         }
@@ -63,7 +67,10 @@ struct Stats
     size_t totalDbSize;
     size_t numInsertions;
     size_t numCompressedBaseQuads;
-    size_t numSpliceSites;
+    size_t numOverlaps;
+    size_t numLocalAlignments;
+    size_t numTracePoints;
+    size_t numReadIds;
 
     size_t columnWidth() const nothrow
     {
@@ -73,7 +80,10 @@ struct Stats
             totalDbSize,
             numInsertions,
             numCompressedBaseQuads,
-            numSpliceSites,
+            numOverlaps,
+            numLocalAlignments,
+            numTracePoints,
+            numReadIds,
         )));
 
         return numWidth;
@@ -87,5 +97,8 @@ void writeTabular(Stats stats)
     writefln!"totalDbSize:            %*d bytes"(columnWidth, stats.totalDbSize);
     writefln!"numInsertions:          %*d"(columnWidth, stats.numInsertions);
     writefln!"numCompressedBaseQuads: %*d"(columnWidth, stats.numCompressedBaseQuads);
-    writefln!"numSpliceSites:         %*d"(columnWidth, stats.numSpliceSites);
+    writefln!"numOverlaps:            %*d"(columnWidth, stats.numOverlaps);
+    writefln!"numLocalAlignments:     %*d"(columnWidth, stats.numLocalAlignments);
+    writefln!"numTracePoints:         %*d"(columnWidth, stats.numTracePoints);
+    writefln!"numReadIds:             %*d"(columnWidth, stats.numReadIds);
 }

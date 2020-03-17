@@ -8,9 +8,10 @@
 */
 module dentist.commands.collectPileUps;
 
-import dentist.commandline : DentistCommand, OptionsFor;
+import dentist.commandline : OptionsFor;
 import dentist.commands.collectPileUps.filter :
     AmbiguousAlignmentChainsFilter,
+    ContainedAlignmentChainsFilter,
     ImproperAlignmentChainsFilter,
     RedundantAlignmentChainsFilter,
     WeaklyAnchoredAlignmentChainsFilter;
@@ -22,18 +23,26 @@ import dentist.common.alignments :
     AlignmentChain,
     getType,
     PileUp;
+import dentist.common.commands : DentistCommand;
 import dentist.common.binio : writePileUpsDb;
 import dentist.dazzler :
+    GapSegment,
     getAlignments,
     getNumContigs,
+    getScaffoldStructure,
     readMask;
 import dentist.util.log;
 import dentist.util.math : NaturalNumberSet;
-import std.algorithm : count, isSorted, map, sum;
+import std.algorithm :
+    canFind,
+    count,
+    filter,
+    map,
+    sum;
 import std.array : array;
 import std.conv : to;
 import std.exception : enforce;
-import std.typecons : tuple;
+import std.typecons : tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 /// Options for the `collectPileUps` command.
@@ -55,6 +64,7 @@ class PileUpCollector
     protected size_t numReads;
     protected AlignmentChain[] readsAlignment;
     protected ReferenceRegion repetitiveRegions;
+    protected GapSegment[] inputGaps;
     protected NaturalNumberSet unusedReads;
 
     this(in ref Options options)
@@ -67,7 +77,6 @@ class PileUpCollector
         mixin(traceExecution);
 
         readInputs();
-        initUnusedReads();
         filterAlignments();
         auto pileUps = buildPileUps();
         writePileUps(pileUps);
@@ -79,6 +88,12 @@ class PileUpCollector
 
         numReferenceContigs = getNumContigs(options.refDb, options.workdir);
         numReads = getNumContigs(options.readsDb, options.workdir);
+        unusedReads = NaturalNumberSet(numReads, Yes.addAll);
+        inputGaps = getScaffoldStructure(options.refDb)
+            .filter!(part => part.peek!GapSegment !is null)
+            .map!(gapPart => gapPart.get!GapSegment)
+            .array;
+
         logJsonInfo(
             "numReferenceContigs", numReferenceContigs,
             "numReads", numReads,
@@ -88,14 +103,10 @@ class PileUpCollector
             options.readsDb,
             options.readsAlignmentFile,
             options.workdir,
+            options.tracePointDistance,
         );
-        repetitiveRegions = ReferenceRegion(readMask!ReferenceInterval(
-            options.refDb,
-            options.repeatMask,
-            options.workdir,
-        ));
 
-        foreach (mask; options.additionalMasks)
+        foreach (mask; options.repeatMasks)
             repetitiveRegions |= ReferenceRegion(readMask!ReferenceInterval(
                 options.refDb,
                 mask,
@@ -105,24 +116,14 @@ class PileUpCollector
         enforce!DentistException(readsAlignment.length > 0, "empty ref vs. reads alignment");
     }
 
-    protected void initUnusedReads()
-    {
-        mixin(traceExecution);
-
-        unusedReads.reserveFor(numReads);
-        foreach (readId; 1 .. numReads + 1)
-        {
-            unusedReads.add(readId);
-        }
-    }
-
     protected void filterAlignments()
     {
         mixin(traceExecution);
 
         auto filters = tuple(
+            new ImproperAlignmentChainsFilter(options.properAlignmentAllowance),
             new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
-            new ImproperAlignmentChainsFilter(),
+            new ContainedAlignmentChainsFilter(),
             new AmbiguousAlignmentChainsFilter(&unusedReads),
             new RedundantAlignmentChainsFilter(&unusedReads),
         );
@@ -134,19 +135,28 @@ class PileUpCollector
             "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
         );
 
-        foreach (i, filter; filters)
-        {
-            readsAlignment = filter(readsAlignment);
-            assert(isSorted(readsAlignment));
+        foreach (filter; filters)
+            applyFilter!(typeof(filter))(filter);
 
-            logJsonDiagnostic(
-                "filterStage", typeof(filter).stringof,
-                "readsAlignment", shouldLog(LogLevel.debug_)
-                    ? readsAlignment.toJson
-                    : toJson(null),
-                "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
-            );
-        }
+        enforce!DentistException(
+            readsAlignment.canFind!"!a.flags.disabled",
+            "no alignment chains left after filtering",
+        );
+    }
+
+    protected void applyFilter(alias Filter)(Filter filter)
+    {
+        mixin(traceExecution);
+
+        readsAlignment = filter(readsAlignment);
+
+        logJsonDiagnostic(
+            "filterStage", typeof(filter).stringof,
+            "readsAlignment", shouldLog(LogLevel.debug_)
+                ? readsAlignment.toJson
+                : toJson(null),
+            "numAlignmentChains", readsAlignment.count!"!a.flags.disabled",
+        );
     }
 
     protected PileUp[] buildPileUps()
@@ -157,6 +167,7 @@ class PileUpCollector
         auto pileUps = build(
             numReferenceContigs,
             readsAlignment,
+            inputGaps,
             options,
         );
 

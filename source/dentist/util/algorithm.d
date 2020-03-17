@@ -24,7 +24,7 @@ import std.range.primitives;
     Order `a` and `b` lexicographically by applying each `fun` to them. For
     unary functions compares `fun(a) < fun(b)`.
 */
-bool orderLexicographically(T, fun...)(T a, T b) pure nothrow
+bool orderLexicographically(T, fun...)(T a, T b)
 {
     static foreach (i, getFieldValue; fun)
     {
@@ -46,7 +46,7 @@ bool orderLexicographically(T, fun...)(T a, T b) pure nothrow
     Compare `a` and `b` lexicographically by applying each `fun` to them. For
     unary functions compares `fun(a) < fun(b)`.
 */
-int cmpLexicographically(T, fun...)(T a, T b) pure nothrow
+int cmpLexicographically(T, fun...)(T a, T b)
 {
     static foreach (i, getFieldValue; fun)
     {
@@ -81,7 +81,7 @@ int cmpLexicographically(T, fun...)(T a, T b) pure nothrow
     reflexive (`pred(x,x)` is always true), symmetric
     (`pred(x,y) == pred(y,x)`), and transitive (`pred(x,y) && pred(y,z)`
     implies `pred(x,z)`). If this is not the case, the range returned by
-    chunkBy may assert at runtime or behave erratically.
+    sliceBy may assert at runtime or behave erratically.
 
     Params:
      pred = Predicate for determining equivalence.
@@ -224,12 +224,38 @@ unittest
     assert(a.sliceUntil(7, No.openRight) == [1, 2, 4, 7]);
 }
 
+/// Returns array filtered in-place.
+auto ref Array filterInPlace(alias pred = "a", Array)(auto ref Array array) if (isDynamicArray!Array)
+{
+    import std.algorithm : filter;
+
+    auto bufferRest = array.filter!pred.copy(array);
+
+    array.length -= bufferRest.length;
+
+    return array;
+}
+
+///
+unittest
+{
+    alias isEven = n => n % 2 == 0;
+    auto arr = [1, 2, 2, 2, 3, 3, 4];
+
+    assert(filterInPlace!isEven(arr) == [2, 2, 2, 4]);
+    // The input array gets modified.
+    assert(arr == [2, 2, 2, 4]);
+
+    // Can be called with non-lvalues
+    assert(filterInPlace!isEven([1, 2, 2, 2, 3, 3, 4]) == [2, 2, 2, 4]);
+}
+
 /// Returns array `uniq`ified in-place.
-Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
+auto ref Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
     auto bufferRest = array.uniq.copy(array);
 
-    array = array[0 .. $ - bufferRest.length];
+    array.length -= bufferRest.length;
 
     return array;
 }
@@ -413,3 +439,33 @@ unittest
     static assert("three" == numberName(3));
     static assert("many" == numberName(4));
 }
+
+/**
+    Find an optimal solution using backtracking.
+*/
+T[] backtracking(alias isFeasible, alias score, T)(
+    T[] candidates,
+    T[] solution = [],
+)
+{
+    auto optimalSolution = solution;
+    auto optimalScore = score(optimalSolution);
+
+    foreach (i, candidate; candidates)
+    {
+        if (isFeasible(cast(const(T[])) solution ~ candidate))
+        {
+            auto newSolution = backtracking!(isFeasible, score)(
+                candidates[0 .. i] ~ candidates[i + 1 .. $],
+                solution ~ candidate,
+            );
+            auto newScore = score(cast(const(T[])) newSolution);
+
+            if (newScore > optimalScore)
+                optimalSolution = newSolution;
+        }
+    }
+
+    return optimalSolution;
+}
+

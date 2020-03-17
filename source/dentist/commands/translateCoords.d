@@ -8,16 +8,13 @@
 */
 module dentist.commands.translateCoords;
 
-import dentist.common : isTesting;
-
-static if (isTesting):
-
-import dentist.commandline : OptionsFor, TestingCommand;
+import dentist.commandline : OptionsFor;
 import dentist.common :
     DentistException,
     OutputCoordinate;
 import dentist.common.alignments : arithmetic_t, coord_t, id_t;
 import dentist.common.binio : InsertionDb;
+import dentist.common.commands : DentistCommand;
 import dentist.common.insertions :
     getInfoForExistingContig,
     getInfoForGap,
@@ -58,7 +55,7 @@ import vibe.data.json :
 
 
 /// Options for the `translateCoords` command.
-alias Options = OptionsFor!(TestingCommand.translateCoords);
+alias Options = OptionsFor!(DentistCommand.translateCoords);
 
 /// Execute the `translateCoords` command with `options`.
 void execute(in Options options)
