@@ -4,7 +4,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+
+## [1.0.0-beta.1] - 2020-03-17
 ### Added
 - post-consensus alignment and validation with new parameter
   `--max-insertion-error`
@@ -14,8 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - some mechanisms for early error detection
 - write duplicate contig IDs to contig alignment cache for easier debugging
 - added support for complementary contig alignments in `check-results`
+- allow `.db` databases as reference
+- improved version reporting
+- updated README with additional instructions
 
 ### Changed
+- integrated Snakemake workflow into a single file and removed "testing"
+  workflow
 - cropping and splicing of insertions:
     - existing sequence is completely retained
     - moved from `process-pile-ups` to `output`
@@ -36,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by using the `--mask` parameter and supplying both masks to all commands
 
 ### Fixed
+- trying all possible reference reads for consensus in order to find a
+  non-failing reference
+- corrected insertion splicing in case of reverse-complement alignment of the
+  consensus
 - bug that caused `check-results` to discard all alignments in certain loci
 - added missing logic for cropped contigs in `getGapState` in `check-results`
 
