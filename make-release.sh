@@ -127,6 +127,7 @@ function main()
 
     DENTIST_VERSION="$("$DENTIST" --version |& head -n1)"
     DENTIST_VERSION="${DENTIST_VERSION#dentist }"
+    DENTIST_VERSION="${DENTIST_VERSION% (*)}"
     ARCH="$(uname -m)"
     TARBALL="dentist.$DENTIST_VERSION.$ARCH.tar.gz"
     DIST_DIR="dentist.$DENTIST_VERSION.$ARCH"

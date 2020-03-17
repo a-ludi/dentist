@@ -58,8 +58,9 @@ import dentist.dazzler :
 import dentist.util.process : isExecutable;
 import dentist.swinfo :
     copyright,
-    executableName,
     description,
+    executableName,
+    gitCommit,
     license,
     version_;
 import dentist.util.algorithm : staticPredSwitch;
@@ -316,7 +317,7 @@ private void printBaseHelp()
 
 private void printVersion()
 {
-    stderr.writeln(format!"%s %s"(executableName, version_));
+    stderr.writeln(format!"%s %s (commit %s)"(executableName, version_, gitCommit));
     stderr.writeln();
     stderr.write(copyright);
     stderr.writeln();
