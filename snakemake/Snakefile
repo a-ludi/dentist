@@ -331,7 +331,7 @@ insertions = join(workdir_, workflow_["insertions"])
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
-dbsplit_flags = ensure_threads_flag(make_flags(config.get("dbsplit_flags", [])))
+dbsplit_flags = make_flags(config.get("dbsplit_flags", []))
 dalign_flags = ensure_threads_flag(make_flags(config.get("dalign_flags", [])))
 datander_flags = ensure_threads_flag(make_flags(config.get("datander_flags", [])))
 
