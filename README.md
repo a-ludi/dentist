@@ -177,6 +177,25 @@ have immense influence on the performance of DENTIST.
      assembly. Then the closed gaps must validated by other means afterwards.
   2. DENTIST is used not with real reads but with an independent assembly.
 
+- `--existing-gap-bonus`: If DENTIST finds evidence to join two contigs that
+  are already consecutive in the input assembly (i.e. joined by `N`s) then it
+  will preferred over conflicting joins (if present) with this bonus. The
+  default value is rather conservative, i.e. the preferred join almost always
+  wins over other joins in case of a conflict.
+
+- `--join-policy`: Choose according to your needs:
+  
+  - `scaffoldGaps`: Closes only gaps that are marked by `N`s in the assembly.
+    This is the default mode of operation. Use this if you do not want to alter
+    the scaffolding of the assembly. See also `--existing-gap-bonus`.
+  - `scaffolds`: Allows whole scaffolds to be joined in addition to the effects
+    of `scaffoldGaps`. Use this if you have (many) scaffolds that are not yet
+    full chromosome-scale.
+  - `contigs`: Allows contigs to be rearranged freely. This is especially
+    useful in _de novo_ assemblies **before** applying any other scaffolding
+    methods as it increases the contiguity thus increasing the chance that
+    large-scale scaffolding (e.g. Bionano or Hi-C) finds proper joins.
+
 
 [src-commandline]: ./blob/master/source/dentist/commandline.d
 
