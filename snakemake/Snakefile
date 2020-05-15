@@ -1,6 +1,6 @@
 import json
 from math import *
-from os.path import join
+from os.path import basename, join
 import re
 import subprocess
 
@@ -292,6 +292,19 @@ def insertions_batches():
 
     return (get_insertions_batch(i)  for i in range(num_batches))
 
+
+
+def docstring(string):
+    paragraph_sep = re.compile(r"\n\s*\n")
+    whitespace = re.compile(r"\s+")
+
+    paragraphs = paragraph_sep.split(string)
+    paragraphs = (strip(whitespace.sub(" ", par))  for par in paragraphs)
+
+    return "\n\n".join(paragraphs)
+
+
+
 #-----------------------------------------------------------------------------
 # END functions
 #-----------------------------------------------------------------------------
@@ -339,8 +352,14 @@ if "TMPDIR" in environ:
     dalign_flags = append_flags(dalign_flags, "-P{}".format(environ["TMPDIR"]))
     datander_flags = append_flags(datander_flags, "-P{}".format(environ["TMPDIR"]))
 
-lacheck_failed_notice = "Try setting the environment variable SKIP_LACHECK=1 \
-if the error is `Duplicate LAs`; otherwise rerun this block"
+lacheck_failed_notice = docstring("""
+    Check failed. Possible solutions:
+
+    Duplicate LAs: thse can be fixed by LAsort from 2020-03-22 or later.
+
+    In order to ignore checks entirely you may use the environment variable
+    SKIP_LACHECK=1. Use only if you are positive the files are in fact OK!
+""")
 
 
 #-----------------------------------------------------------------------------
@@ -405,6 +424,8 @@ rule self_alignment_block:
     params:
         aligncmd = lambda _: generate_options_for("self", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
+        alignment_file_a_vs_b = lambda _, output: basename(output[0]),
+        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
     log: log_file("self-alignment.{block_ref}.{block_reads}")
@@ -415,7 +436,8 @@ rule self_alignment_block:
                 {params.aligncmd} {params.dalign_flags} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
-                    LAcheck -v {params.reference_stub} {output} || echo {lacheck_failed_notice}
+                    LAcheck -v {params.reference_stub} {params.alignment_file_a_vs_b} || echo {lacheck_failed_notice}
+                    LAcheck -v {params.reference_stub} {params.alignment_file_b_vs_a} || echo {lacheck_failed_notice}
                 else
                     echo "Skipping LAcheck due to user request"
                 fi
@@ -429,12 +451,14 @@ rule self_alignment:
         block_alignments = lambda _: block_alignments(reference)
     output:
         protected(self_alignment)
+    params:
+        alignment_file = lambda _, output: basename(output[0]),
     shell:
         """
             LAmerge {output} {input[block_alignments]}
             if (( ${{SKIP_LACHECK:-0}} == 0 ))
             then
-                LAcheck -v {reference} {output} || echo {lacheck_failed_notice}
+                LAcheck -v {reference} {params.alignment_file} || echo {lacheck_failed_notice}
             else
                 echo "Skipping LAcheck due to user request"
             fi
@@ -462,6 +486,7 @@ rule tandem_alignment:
     params:
         aligncmd = lambda _: generate_options_for("tandem", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
+        alignment_file = lambda _, output: basename(output[0]),
         datander_flags = prepare_flags(datander_flags)
     log: log_file("tandem-alignment")
     shell:
@@ -471,7 +496,7 @@ rule tandem_alignment:
                 {params.aligncmd} {params.datander_flags} {params.reference_stub}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
-                    LAcheck -v {params.reference_stub} {output} || echo {lacheck_failed_notice}
+                    LAcheck -v {params.reference_stub} {params.alignment_file} || echo {lacheck_failed_notice}
                 else
                     echo "Skipping LAcheck due to user request"
                 fi
@@ -513,6 +538,7 @@ rule ref_vs_reads_alignment_block:
         aligncmd = lambda _: generate_options_for("reads", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
+        alignment_file = lambda _, output: basename(output[0]),
         dalign_flags = prepare_flags(dalign_flags)
     threads: max_threads
     log: log_file("ref-vs-reads-alignment.{block_reads}")
@@ -523,7 +549,7 @@ rule ref_vs_reads_alignment_block:
                 {params.aligncmd} {params.dalign_flags} -m{self_mask} -m{tandem_mask} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
-                    LAcheck -v {params.reference_stub} {params.reads_stub} {output} || echo {lacheck_failed_notice}
+                    LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file} || echo {lacheck_failed_notice}
                 else
                     echo "Skipping LAcheck due to user request"
                 fi
