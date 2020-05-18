@@ -107,6 +107,15 @@ def alignment_file(db_a, db_b=None, block_a=None, block_b=None):
     return join(config["workdir"], filename)
 
 
+def shell_esc(string):
+    try:
+        from shlex import quote
+    except ImportError:
+        from pipes import quote
+
+    return quote(string)
+
+
 def make_flags(flags):
     try:
         from shlex import join
@@ -299,7 +308,7 @@ def docstring(string):
     whitespace = re.compile(r"\s+")
 
     paragraphs = paragraph_sep.split(string)
-    paragraphs = (strip(whitespace.sub(" ", par))  for par in paragraphs)
+    paragraphs = (whitespace.sub(" ", par).strip()  for par in paragraphs)
 
     return "\n\n".join(paragraphs)
 
@@ -352,14 +361,14 @@ if "TMPDIR" in environ:
     dalign_flags = append_flags(dalign_flags, "-P{}".format(environ["TMPDIR"]))
     datander_flags = append_flags(datander_flags, "-P{}".format(environ["TMPDIR"]))
 
-lacheck_failed_notice = docstring("""
+lacheck_failed_notice = shell_esc(docstring("""
     Check failed. Possible solutions:
 
-    Duplicate LAs: thse can be fixed by LAsort from 2020-03-22 or later.
+    Duplicate LAs: can be fixed by LAsort from 2020-03-22 or later.
 
     In order to ignore checks entirely you may use the environment variable
     SKIP_LACHECK=1. Use only if you are positive the files are in fact OK!
-""")
+"""))
 
 
 #-----------------------------------------------------------------------------
