@@ -29,7 +29,7 @@ function get_updated_swinfo()
 
     EXECUTABLE_NAME="$(jq '.targetName' <<<"$INFO_JSON")"
     GIT_VERSION="$(git describe)"
-    GIT_BRANCH="$(git branch --show-current)"
+    GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
     GIT_COMMIT="$(git rev-parse HEAD)"
     DESCRIPTION="$(jq '.description' <<<"$INFO_JSON")"
     COPYRIGHT="$(jq '.copyright' <<<"$INFO_JSON")"
