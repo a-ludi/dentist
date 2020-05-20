@@ -70,6 +70,7 @@ import std.array : array, minimallyInitializedArray;
 import std.conv : to;
 import std.format : format;
 import std.parallelism : parallel, taskPool;
+import std.path : buildPath;
 import std.range : drop, enumerate, evenChunks, chain, iota, only, zip;
 import std.range.primitives : empty, front, popFront;
 import std.typecons : Yes;
@@ -437,7 +438,12 @@ protected class PileUpProcessor
         mixin(traceExecution);
 
         auto flankingContigIds = croppingPositions.map!"a.contigId".array;
+        auto flankingContigsDbName = buildPath(
+            options.workdir,
+            format!"contigs-%-(%d-%).dam"(flankingContigIds),
+        );
         auto flankingContigsDb = dbSubset(
+            flankingContigsDbName,
             options.refDb,
             flankingContigIds,
             options.consensusOptions,
