@@ -375,7 +375,11 @@ protected class PileUpProcessor
         if (referenceReadIdx == size_t.max)
             return false;
 
-        logJsonDiagnostic("referenceReadIdx", referenceReadIdx);
+        logJsonDiagnostic(
+            "referenceReadIdx", referenceReadIdx,
+            "pileUpId", pileUpId,
+            "pileUp", pileUp.pileUpToSimpleJson,
+        );
         assert(referenceRead.length == croppingPositions.length);
 
         return true;
