@@ -73,7 +73,7 @@ import std.parallelism : parallel, taskPool;
 import std.path : buildPath;
 import std.range : drop, enumerate, evenChunks, chain, iota, only, zip;
 import std.range.primitives : empty, front, popFront;
-import std.typecons : Yes;
+import std.typecons : Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -164,6 +164,13 @@ class PileUpsProcessor
     }
 }
 
+
+alias Enumerated(T) = Tuple!(
+    size_t, "index",
+    T, "value",
+);
+
+
 /// This class processes a single pileup.
 protected class PileUpProcessor
 {
@@ -177,6 +184,7 @@ protected class PileUpProcessor
     protected Insertion* resultInsertion;
     protected string croppedDb;
     protected ReferencePoint[] croppingPositions;
+    protected Enumerated!ReadAlignment[] referenceReadCandidates;
     protected size_t referenceReadIdx;
     protected id_t referenceReadTry;
     protected string consensusDb;
@@ -253,6 +261,7 @@ protected class PileUpProcessor
             {
                 adjustRepeatMask();
                 crop();
+                findReferenceReadCandidates(croppingPositions);
                 while (selectReferenceRead(referenceReadTry++))
                 {
                     try
@@ -269,6 +278,7 @@ protected class PileUpProcessor
                             "error", e.message.to!string,
                             "pileUpId", pileUpId,
                             "pileUp", pileUp.pileUpToSimpleJson,
+                            "referenceReadIdx", referenceReadIdx,
                         );
                     }
                 }
@@ -276,6 +286,9 @@ protected class PileUpProcessor
                 dentistEnforce(
                     referenceReadIdx < size_t.max,
                     "no valid reference read found",
+                    [
+                        "referenceReadCandidates": referenceReadCandidates,
+                    ].toJson
                 );
 
                 alignConsensusToFlankingContigs();
@@ -369,9 +382,22 @@ protected class PileUpProcessor
         croppingPositions = croppingResult.referencePositions;
     }
 
+    protected void findReferenceReadCandidates(in ReferencePoint[] referencePositions)
+    {
+        // NOTE pileUp is not modified but the read alignments need to be assignable.
+        referenceReadCandidates = (cast(PileUp) pileUp)
+            .enumerate
+            .filter!(enumReadAlignment =>
+                enumReadAlignment.value.length == referencePositions.length &&
+                enumReadAlignment.value[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
+            .array
+            .sort!"a.value.meanScore > b.value.meanScore"
+            .release;
+    }
+
     protected bool selectReferenceRead(in id_t referenceReadTry)
     {
-        referenceReadIdx = bestReadAlignmentIndex(pileUp, croppingPositions, referenceReadTry);
+        referenceReadIdx = bestReadAlignmentIndex(referenceReadTry);
 
         if (referenceReadIdx == size_t.max)
             return false;
@@ -391,26 +417,12 @@ protected class PileUpProcessor
         return pileUp[referenceReadIdx];
     }
 
-    protected size_t bestReadAlignmentIndex(
-        in PileUp pileUp,
-        in ReferencePoint[] referencePositions,
-        in id_t skip,
-    ) const pure
+    protected size_t bestReadAlignmentIndex(in id_t skip) const pure
     {
-        // NOTE pileUp is not modified but the read alignments need to be assignable.
-        auto candidates = (cast(PileUp) pileUp)
-            .enumerate
-            .filter!(enumReadAlignment =>
-                enumReadAlignment.value.length == referencePositions.length &&
-                enumReadAlignment.value[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
-            .array
-            .sort!"a.value.meanScore > b.value.meanScore"
-            .release;
-
-        if (skip >= candidates.length)
+        if (skip >= referenceReadCandidates.length)
             return size_t.max;
 
-        return candidates[skip].index;
+        return referenceReadCandidates[skip].index;
     }
 
     protected void computeConsensus()
