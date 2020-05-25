@@ -93,6 +93,7 @@ import std.file :
     FileException,
     getcwd,
     isDir,
+    mkdirRecurse,
     tempDir,
     remove,
     rmdirRecurse;
@@ -1784,21 +1785,50 @@ struct OptionsFor(DentistCommand _command)
         /// This is a temporary directory to store all working data.
         @Option("workdir", "P")
         @Help("use <string> as a working directory")
-        @Validate!(value => enforce!CLIException(
-            value is null || value.isDir,
-            format!"workdir is not a directory: %s"(value),
-        ))
         string workdir;
 
         @PostValidate(Priority.high)
         void hookCreateWorkDir()
         {
-            if (workdir !is null)
-                return;
+            if (workdir is null)
+            {
+                auto workdirTemplate = buildPath(tempDir(), workdirTemplate);
 
-            auto workdirTemplate = buildPath(tempDir(), workdirTemplate);
+                workdir = mkdtemp(workdirTemplate);
+            }
+            else
+            {
+                try
+                {
+                    enforce!CLIException(
+                        isDir(workdir),
+                        "--workdir is not a directory",
+                    );
 
-            workdir = mkdtemp(workdirTemplate);
+                    logJsonInfo(
+                        "info", "using existing workdir",
+                        "workdir", workdir,
+                    );
+                }
+                catch (FileException e)
+                {
+                    // `isDir` failed; just ignore that
+                }
+
+                try
+                {
+                    mkdirRecurse(workdir);
+                }
+                catch(Exception e)
+                {
+                    throw new CLIException("could not create workdir: " ~ e.msg, e);
+                }
+
+                logJsonInfo(
+                    "info", "recursively created workdir",
+                    "workdir", workdir,
+                );
+            }
         }
 
         @CleanUp(Priority.low)
