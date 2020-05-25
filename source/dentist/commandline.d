@@ -1901,6 +1901,7 @@ struct OptionsFor(DentistCommand _command)
             return [
                 DalignerOptions.identity,
                 DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     pileUpAlignmentOptionsAverageCorrelationRate,
                 ),
