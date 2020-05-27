@@ -72,12 +72,14 @@ void logJsonError(T...)(lazy T args) nothrow
 void logJson(T...)(LogLevel level, lazy T args) nothrow
 {
     import dentist.util.range : Chunks, chunks;
+    import std.conv : to;
     import std.datetime.systime : Clock;
     import std.traits : isSomeString;
     import vibe.data.json : Json;
 
     enum threadKey = "thread";
     enum timestampKey = "timestamp";
+    enum logLevelKey = "logLevel";
 
     if (level < minLevel)
         return;
@@ -89,6 +91,15 @@ void logJson(T...)(LogLevel level, lazy T args) nothrow
         static foreach (KeyValuePair; Chunks!(2, T))
         {
             static assert(isSomeString!(KeyValuePair.chunks[0]), "missing name");
+        }
+
+        try
+        {
+            json[logLevelKey] = level.to!string;
+        }
+        catch(Exception e)
+        {
+            json[logLevelKey] = null;
         }
 
         json[timestampKey] = Clock.currStdTime;
