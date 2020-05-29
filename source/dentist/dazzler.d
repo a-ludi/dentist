@@ -1260,6 +1260,106 @@ unittest
     }
 }
 
+struct AlignmentHeader
+{
+    size_t numAlignments;
+    size_t numLocalAlignments;
+    size_t maxLocalAlignments;
+    size_t numTracePoints;
+    size_t maxTracePoints;
+    size_t tracePointDistance;
+
+    static AlignmentHeader inferFrom(R)(R alignmentChains) if (isInputRange!R)
+    {
+        AlignmentHeader headerData;
+
+        headerData.tracePointDistance = alignmentChains.front.tracePointDistance;
+
+        foreach (alignmentChain; alignmentChains)
+        {
+            ++headerData.numAlignments;
+            headerData.numLocalAlignments += alignmentChain.localAlignments.length;
+            headerData.maxLocalAlignments = max(
+                headerData.maxLocalAlignments,
+                alignmentChain.localAlignments.length,
+            );
+
+            foreach (localAlignment; alignmentChain.localAlignments)
+            {
+                headerData.numTracePoints += localAlignment.tracePoints.length;
+                headerData.maxTracePoints = max(
+                    headerData.maxTracePoints,
+                    localAlignment.tracePoints.length,
+                );
+            }
+        }
+
+        return headerData;
+    }
+}
+
+@ExternalDependency("dumpLA", null, "https://github.com/thegenemyers/DALIGNER")
+AlignmentHeader writeAlignments(R)(const string lasFile, R alignmentChains)
+    if (isForwardRange!R)
+{
+    auto dumpCommand = ["dumpLA", lasFile];
+    auto converter = pipeProcess(dumpCommand, Redirect.stdin);
+    auto writer = converter.stdin;
+
+    logJsonDiagnostic(
+        "action", "execute",
+        "type", "pipe",
+        "command", dumpCommand.toJson,
+        "state", "pre",
+    );
+
+    auto headerData = AlignmentHeader.inferFrom(alignmentChains.save);
+
+    writer.writefln!"@ T %d"(2 * headerData.maxTracePoints);
+    writer.writefln!"X %d"(headerData.tracePointDistance);
+
+    foreach (alignmentChain; alignmentChains)
+        writer.dumpAlignment(alignmentChain);
+
+    writer.close();
+    wait(converter.pid());
+
+    return headerData;
+}
+
+private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
+{
+    if (alignmentChain.flags.disabled || alignmentChain.localAlignments.length == 0)
+        return;
+
+
+    auto isChain = alignmentChain.localAlignments.length > 1;
+
+    foreach (i, localAlignment; alignmentChain.localAlignments)
+    {
+        writer.writefln!"P %d %d %c %c"(
+            alignmentChain.contigA.id,
+            alignmentChain.contigB.id,
+            alignmentChain.flags.complement ? 'c' : 'n',
+            isChain
+                ? (i == 0
+                    ? ChainPartType.start
+                    : ChainPartType.continuation)
+                : ChainPartType.noChainInFile,
+        );
+        writer.writefln!"C %d %d %d %d"(
+            localAlignment.contigA.begin,
+            localAlignment.contigA.end,
+            localAlignment.contigB.begin,
+            localAlignment.contigB.end,
+        );
+
+        writer.writefln!"T %d"(localAlignment.tracePoints.length);
+        foreach (tracePoint; localAlignment.tracePoints)
+            writer.writefln!"  %d %d"(tracePoint.numDiffs, tracePoint.numBasePairs);
+    }
+}
+
 trace_point_t getTracePointDistance(in string[] dazzlerOptions = []) pure
 {
     enum defaultTracePointDistance = 100;
@@ -2840,7 +2940,33 @@ private string filterAlignmentsForConsensus(Options)(in string dbFile, in Option
             isSomeString!(typeof(options.workdir)))
 {
     auto lasFile = getLasFile(dbFile, options.workdir);
-    auto filteredLasFile = lasFilterAlignments(dbFile, lasFile, options.lasFilterAlignmentsOptions, options.workdir);
+    //auto filteredLasFile = lasFilterAlignments(dbFile, lasFile, options.lasFilterAlignmentsOptions, options.workdir);
+
+    auto alignments = getAlignments(dbFile, lasFile, options.workdir, 1);
+
+    /// An alignment in a pile up is valid iff it is proper and the begin/end
+    /// of both reads match.
+    static bool isValidPileUpAlignment(const ref AlignmentChain ac)
+    {
+        return ac.contigA.id != ac.contigB.id && (
+            (
+                ac.first.contigA.begin == 0 &&
+                ac.first.contigB.begin == 0 &&
+                ac.last.contigB.end == ac.contigB.length
+            ) ||
+            (
+                ac.last.contigA.end == ac.contigA.length &&
+                ac.last.contigB.end == ac.contigB.length &&
+                ac.first.contigB.begin == 0
+            )
+        );
+    }
+
+    foreach (ref alignment; alignments)
+        alignment.disableIf(!isValidPileUpAlignment(alignment));
+
+    string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
+    writeAlignments(filteredLasFile, alignments);
 
     return filteredLasFile;
 }
