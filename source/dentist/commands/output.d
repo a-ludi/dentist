@@ -187,6 +187,7 @@ class AssemblyWriter
     string currentScaffold;
     id_t currentScaffoldPartId;
     coord_t currentScaffoldCoord;
+    coord_t nextScaffoldCoord;
 
     this(in ref Options options)
     {
@@ -471,7 +472,7 @@ class AssemblyWriter
             if (currentInsertion.isAntiParallel)
                 globalComplement = !globalComplement;
             ++currentScaffoldPartId;
-            currentScaffoldCoord += currentInsertion.payload.contigLength - 1;
+            currentScaffoldCoord = nextScaffoldCoord;
         }
         "\n".copy(writer);
     }
@@ -543,12 +544,13 @@ class AssemblyWriter
         auto insertionInfo = getInfoForExistingContig(begin, insertion, globalComplement);
         auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
         auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
+        nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
                 currentScaffold,
                 to!string(currentScaffoldCoord),
-                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
                 cast(string) AGPComponentType.wgsContig,
                 to!string(insertionInfo.contigId),
@@ -580,12 +582,13 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForGap(insertion);
+        nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
                 currentScaffold,
                 to!string(currentScaffoldCoord),
-                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
                 cast(string) AGPComponentType.gapWithSpecifiedSize,
                 to!string(insertion.payload.contigLength),
@@ -616,12 +619,13 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
+        nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
                 currentScaffold,
                 to!string(currentScaffoldCoord),
-                to!string(currentScaffoldCoord + insertion.payload.contigLength - 1),
+                to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
                 cast(string) AGPComponentType.otherSequence,
                 format!"reads-%(%d-%)"(insertion.payload.readIds),
@@ -650,7 +654,7 @@ class AssemblyWriter
                 .sequence
                 .bases!(char, Yes.reverse)
                 .map!(complement!char)
-                .dropExactly(insertionInfo.cropping.begin)
+                .dropExactly(insertionInfo.sequence.length - insertionInfo.cropping.end)
                 .takeExactly(insertionInfo.cropping.size)
                 .map!highlightIfRequested
                 .copy(writer);
