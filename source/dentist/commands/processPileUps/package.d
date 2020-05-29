@@ -22,6 +22,7 @@ import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
     contigs,
+    coord_t,
     getAlignmentRefs,
     getType,
     isExtension,
@@ -63,6 +64,7 @@ import std.algorithm :
     joiner,
     map,
     maxElement,
+    min,
     merge,
     sort,
     uniq;
@@ -375,7 +377,9 @@ protected class PileUpProcessor
     protected void crop()
     {
         auto croppingResult = cropPileUp(pileUp, repeatMask, CropOptions(
+            options.refDb,
             options.readsDb,
+            options.minAnchorLength,
             options.tracePointDistance,
             options.workdir,
         ));

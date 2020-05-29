@@ -26,6 +26,7 @@ import dentist.common.alignments :
     trace_point_t;
 import dentist.dazzler : buildDamFile, getFastaSequences;
 import dentist.util.algorithm : sliceBy;
+import dentist.util.fasta : reverseComplement;
 import dentist.util.log;
 import dentist.util.math : ceil, ceildiv, RoundingMode;
 import dentist.util.region : min, sup;
@@ -33,6 +34,7 @@ import std.algorithm :
     all,
     canFind,
     copy,
+    countUntil,
     joiner,
     filter,
     fold,
@@ -57,7 +59,9 @@ import vibe.data.json : toJson = serializeToJson;
 
 struct CropOptions
 {
+    string refDb;
     string readsDb;
+    coord_t minAnchorLength;
     trace_point_t tracePointDistance;
     string workdir;
 }
@@ -76,6 +80,9 @@ private struct PileUpCropper
     const(ReferenceRegion) repeatMask;
     const(CropOptions) options;
     private ReferencePoint[] croppingRefPositions;
+    private AlignmentLocationSeed[] croppingSeeds;
+    private string[] supportPatches;
+    private string[] supportPatchesRevComp;
     private string croppedDb;
 
     @property auto result()
@@ -89,6 +96,7 @@ private struct PileUpCropper
         enum gapDbName = "pileup-%d-%d.dam";
 
         fetchCroppingRefPositions();
+        fetchSupportPatches();
         auto croppedSequences = pileUpWithSequence().map!(t => getCroppedSequence(t.expand));
 
         if (croppingRefPositions.length == 1)
@@ -108,8 +116,11 @@ private struct PileUpCropper
 
     private void fetchCroppingRefPositions()
     {
-        croppingRefPositions = getCroppingRefPositions();
+        auto result = getCroppingRefPositions();
+        croppingRefPositions = result.refPositions;
+        croppingSeeds = result.seeds;
         logJsonDebug("croppingRefPositions", croppingRefPositions.toJson);
+        logJsonDebug("croppingSeeds", croppingSeeds.toJson);
 
         foreach (refPos; croppingRefPositions)
         {
@@ -125,6 +136,7 @@ private struct PileUpCropper
                     logJsonDiagnostic(
                         "info", "could not find a common trace point",
                         "croppingRefPositions", croppingRefPositions.toJson,
+                        "croppingSeeds", croppingSeeds.toJson,
                         "tracePointDistance", options.tracePointDistance,
                         "pileUp", [
                             "type": pileUp.getType.to!string.toJson,
@@ -139,6 +151,51 @@ private struct PileUpCropper
                 throw new Exception("could not find a common trace point");
             }
         }
+    }
+
+    /// Fetch pieces of the flanking contig(s) that can be appended to the
+    /// cropped reads in case the sequence remaining after cropping is
+    /// insufficient for later alignments, e.i. shorter than
+    /// `options.minAnchorLength`.
+    private void fetchSupportPatches()
+    {
+        auto contigSequences = getFastaSequences(
+            options.refDb,
+            croppingRefPositions.map!"a.contigId",
+            options.workdir,
+        ).map!idup.array;
+
+        foreach (i, ref contigSequence; contigSequences)
+        {
+            auto seed = croppingSeeds[i];
+            auto contigId = croppingRefPositions[i].contigId;
+            auto pos = croppingRefPositions[i].value;
+            auto patchInterval = ReferenceInterval(contigId);
+
+            final switch(seed)
+            {
+                case AlignmentLocationSeed.front:
+                    if (pos < options.minAnchorLength)
+                    {
+                        patchInterval.begin = pos;
+                        patchInterval.end = options.minAnchorLength;
+                    }
+                    break;
+                case AlignmentLocationSeed.back:
+                    assert(pos <= contigSequence.length);
+                    if (contigSequence.length - pos < options.minAnchorLength)
+                    {
+                        patchInterval.begin = contigSequence.length - options.minAnchorLength;
+                        patchInterval.end = pos;
+                    }
+                    break;
+            }
+
+            contigSequence = contigSequence[patchInterval.begin .. patchInterval.end];
+        }
+
+        supportPatches = contigSequences;
+        supportPatchesRevComp = contigSequences.map!reverseComplement.array;
     }
 
     private auto pileUpWithSequence()
@@ -158,12 +215,13 @@ private struct PileUpCropper
 
         See_Also: `getCommonTracePoint`
     */
-    private ReferencePoint[] getCroppingRefPositions()
+    private auto getCroppingRefPositions()
     {
         auto alignmentsByContig = pileUp.splitAlignmentsByContigA();
         auto commonTracePoints = alignmentsByContig
             .map!(acs => getCommonTracePoint(acs, repeatMask, options.tracePointDistance));
         auto contigAIds = alignmentsByContig.map!"a[0].contigA.id";
+        auto seeds = alignmentsByContig.map!"a[0].seed".array;
 
         auto cropPos = zip(contigAIds, commonTracePoints)
             .map!(zipped => ReferencePoint(zipped.expand))
@@ -176,9 +234,16 @@ private struct PileUpCropper
                 "readAlignments": pileUp.map!"a[]".array.toJson,
             ],
             "cropPos", cropPos.toJson,
+            "seeds", seeds.toJson,
         );
 
-        return cropPos;
+        return tuple!(
+            "refPositions",
+            "seeds",
+        )(
+            cropPos,
+            seeds,
+        );
     }
 
     private string getCroppedSequence(
@@ -188,6 +253,7 @@ private struct PileUpCropper
     )
     {
         auto readCroppingSlice = getReadCroppingSlice(readAlignment);
+        auto readPatches = getReadPatches(readAlignment);
         debug logJsonDebug(
             "croppedDbIdx", croppedDbIdx,
             "readCroppingSlice", readCroppingSlice.toJson,
@@ -196,6 +262,8 @@ private struct PileUpCropper
         return getCroppedReadAsFasta(
             readSequence,
             readCroppingSlice,
+            readPatches.pre,
+            readPatches.post,
         );
     }
 
@@ -209,20 +277,65 @@ private struct PileUpCropper
         return readCroppingSlice;
     }
 
-    private string getCroppedReadAsFasta(string readSequence, in ReadInterval readCroppingSlice)
+    private auto getReadPatches(in ReadAlignment readAlignment)
+    {
+        auto readPatches = readAlignment[]
+            .map!(alignment => getSingleReadPatch(alignment))
+            .array
+            .sort
+            .release;
+
+        if (readPatches.length == 2)
+            return tuple!("pre", "post")(readPatches[0].sequence, readPatches[1].sequence);
+        else if (readPatches[0].readSeed == AlignmentLocationSeed.front)
+            return tuple!("pre", "post")(readPatches[0].sequence, "");
+        else
+            return tuple!("pre", "post")("", readPatches[0].sequence);
+    }
+
+    auto getSingleReadPatch(in SeededAlignment alignment)
+    {
+        auto contigA = alignment.contigA.id;
+        auto contigSeed = alignment.seed;
+        auto complement = alignment.flags.complement;
+        auto readSeed = (contigSeed == AlignmentLocationSeed.front) ^ complement
+            ? AlignmentLocationSeed.back
+            : AlignmentLocationSeed.front;
+        auto cropIdx = croppingRefPositions.countUntil!(refPos => refPos.contigId == contigA);
+        auto sequence = complement
+            ? supportPatchesRevComp[cropIdx]
+            : supportPatches[cropIdx];
+
+        return tuple!("readSeed", "sequence")(readSeed, sequence);
+    }
+
+    private string getCroppedReadAsFasta(
+        string readSequence,
+        in ReadInterval readCroppingSlice,
+        string prePatch,
+        string postPatch,
+    )
     {
         static enum fastaLineWidth = 100;
         auto fastaHeader = format!">read-%d"(readCroppingSlice.readId);
+        auto patchedSequence = chain(
+            prePatch,
+            readSequence[readCroppingSlice.begin .. readCroppingSlice.end],
+            postPatch,
+        );
+        auto patchedSequenceLength = prePatch.length +
+                                     readCroppingSlice.size +
+                                     postPatch.length;
         auto fastaLength =
-            fastaHeader.length + 1 +                          // header line + line break
-            readCroppingSlice.size +                          // sequence + ...
-            ceildiv(readCroppingSlice.size, fastaLineWidth);  // line breaks for sequence +
-                                                              // new line at the end of file
+            fastaHeader.length + 1 +                      // header line + line break
+            patchedSequenceLength +                       // sequence + ...
+            ceildiv(patchedSequenceLength, fastaLineWidth);  // line breaks for sequence +
+                                                          // new line at the end of file
         auto croppedFasta = minimallyInitializedArray!(ubyte[])(fastaLength);
         chain(
             fastaHeader[],
             "\n",
-            readSequence[readCroppingSlice.begin .. readCroppingSlice.end]
+            patchedSequence
                 .chunks(fastaLineWidth)
                 .joiner("\n"),
             "\n",
