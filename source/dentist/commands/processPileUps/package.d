@@ -287,7 +287,9 @@ protected class PileUpProcessor
                     referenceReadIdx < size_t.max,
                     "no valid reference read found",
                     [
-                        "referenceReadCandidates": referenceReadCandidates,
+                        "referenceReadCandidateIds": referenceReadCandidates
+                            .map!(enumReadAlignment => enumReadAlignment.value[0].contigB.id)
+                            .array,
                     ].toJson
                 );
 
