@@ -10,6 +10,7 @@ module dentist.commands.output;
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
+    isTesting,
     ReferenceInterval,
     ReferenceRegion,
     ReferencePoint;
@@ -20,6 +21,11 @@ import dentist.common.alignments :
     id_t,
     SeededAlignment,
     trace_point_t;
+static if (isTesting)
+    import dentist.commands.checkResults :
+        Complement,
+        ContigAlignmentsCache,
+        ContigMapping;
 import dentist.common.commands : DentistCommand;
 import dentist.common.binio :
     CompressedSequence,
@@ -69,6 +75,7 @@ import dentist.util.math :
     filterEdges,
     floor,
     mean,
+    NaturalNumberSet,
     RoundingMode;
 import dentist.util.range : wrapLines;
 import std.algorithm :
@@ -188,6 +195,14 @@ class AssemblyWriter
     id_t currentScaffoldPartId;
     coord_t currentScaffoldCoord;
     coord_t nextScaffoldCoord;
+    id_t currentContigId;
+    coord_t currentContigCoord;
+    coord_t nextContigCoord;
+    static if (isTesting)
+    {
+        ContigAlignmentsCache contigAlignmentsCache;
+        ContigMapping[] contigAlignments;
+    }
 
     this(in ref Options options)
     {
@@ -198,6 +213,16 @@ class AssemblyWriter
         this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
         if (options.agpFile !is null)
             this.agpFile = File(options.agpFile, "w");
+        static if (isTesting)
+            if (options.contigAlignmentsCache !is null)
+            {
+                with (this.contigAlignmentsCache)
+                {
+                    contigAlignmentsCache = options.contigAlignmentsCache;
+                    dbA = options.resultFile;
+                    dbB = options.refDb;
+                }
+            }
     }
 
     void run()
@@ -213,6 +238,16 @@ class AssemblyWriter
 
         foreach (startNode; scaffoldStartNodes)
             writeNewScaffold(startNode);
+
+        gotoNextContig();
+
+        static if (isTesting)
+            if (contigAlignmentsCache.contigAlignmentsCache !is null)
+                contigAlignmentsCache.write(
+                    contigAlignments,
+                    NaturalNumberSet(),
+                    Yes.forceOverwrite,
+                );
     }
 
     protected void init()
@@ -226,6 +261,8 @@ class AssemblyWriter
             .map!(contigPart => contigPart.get!ContigSegment)
             .map!(contigPart => contigPart.end - contigPart.begin + 0)
             .array;
+        static if (isTesting)
+            contigAlignments.reserve(numReferenceContigs);
     }
 
 
@@ -459,6 +496,7 @@ class AssemblyWriter
         currentScaffold = scaffoldHeader(startNode, isCyclic!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache));
         currentScaffoldPartId = 1;
         currentScaffoldCoord = 1;
+        gotoNextContig();
         writeHeader();
         foreach (currentInsertion; linearWalk!InsertionInfo(assemblyGraph, startNode, incidentEdgesCache))
         {
@@ -473,8 +511,25 @@ class AssemblyWriter
                 globalComplement = !globalComplement;
             ++currentScaffoldPartId;
             currentScaffoldCoord = nextScaffoldCoord;
+            currentContigCoord = nextContigCoord;
         }
         "\n".copy(writer);
+    }
+
+    void gotoNextContig()
+    {
+        static if (isTesting)
+            foreach_reverse (ref contigAlignment; contigAlignments)
+            {
+                if (contigAlignment.reference.contigId == currentContigId)
+                    contigAlignment.referenceContigLength = currentContigCoord;
+                else
+                    break;
+            }
+
+        ++currentContigId;
+        currentContigCoord = 0;
+        nextContigCoord = 0;
     }
 
     Insertion mergeInsertions(Insertion[] insertionsChunk)
@@ -545,6 +600,7 @@ class AssemblyWriter
         auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
         auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
         nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
+        nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
@@ -559,6 +615,18 @@ class AssemblyWriter
                 insertionInfo.complement ? "+" : "-",
                 cast(string) AGPLinkageEvidence.na,
             ).joiner("\t"));
+
+        static if (isTesting)
+            contigAlignments ~= ContigMapping(
+                ReferenceInterval(
+                    currentContigId,
+                    currentContigCoord,
+                    nextContigCoord,
+                ),
+                0,
+                insertionInfo.contigId,
+                cast(Complement) insertionInfo.complement,
+            );
 
         logJsonDebug(
             "info", "writing contig insertion",
@@ -583,6 +651,7 @@ class AssemblyWriter
     {
         auto insertionInfo = getInfoForGap(insertion);
         nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
+        nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
@@ -610,6 +679,8 @@ class AssemblyWriter
             .repeat
             .takeExactly(insertionInfo.length)
             .copy(writer);
+
+        gotoNextContig();
     }
 
     protected void writeNewSequenceInsertion(
@@ -620,6 +691,7 @@ class AssemblyWriter
     {
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
         nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
+        nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(

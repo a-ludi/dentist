@@ -1568,7 +1568,7 @@ private struct ResultAnalyzer
     }
 }
 
-private struct ContigAlignmentsCache
+struct ContigAlignmentsCache
 {
     string contigAlignmentsCache;
     string dbA;
@@ -1610,15 +1610,20 @@ private struct ContigAlignmentsCache
         return _cachedAlignments;
     }
 
-    void write(ContigMapping[] contigAlignments, NaturalNumberSet duplicateContigIds)
+    void write(
+        ContigMapping[] contigAlignments,
+        NaturalNumberSet duplicateContigIds,
+        Flag!"forceOverwrite" forceOverwrite = No.forceOverwrite,
+    )
     {
-        assert(!isValid, "refusing to overwrite a valid ContigAlignmentsCache");
+        assert(forceOverwrite || !isValid, "refusing to overwrite a valid ContigAlignmentsCache");
         assert(contigAlignmentsCache !is null, "cannot write ContigAlignmentsCache: no file given");
-        assert(canWrite);
+        assert(forceOverwrite || canWrite);
 
         logJsonDiagnostic(
             "info", "caching contig alignments",
             "contigAlignmentsCache", contigAlignmentsCache,
+            "forceOverwrite", forceOverwrite,
         );
 
         auto cache = File(contigAlignmentsCache, "w");

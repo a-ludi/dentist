@@ -984,12 +984,17 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         TestingCommand.checkResults,
+        testingOnly!(DentistCommand.output),
     ))
     {
         @Option("cache-contig-alignments")
-        @Help(format!q"{
-            if given results of contig alignments will be cached as JSON (default: %s)
-        }"(defaultValue!contigAlignmentsCache))
+        @Help(format!(command == TestingCommand.checkResults
+            ? "if given results of contig alignments will be cached as JSON
+               (default: %s)"
+            : "if given the contig location will be cached as JSON faking the
+               effect of the same option in `check-results`. NOTE: the result
+               has to amended manually to be fully valid. (default: %s)"
+        )(defaultValue!contigAlignmentsCache))
         string contigAlignmentsCache;
     }
 
