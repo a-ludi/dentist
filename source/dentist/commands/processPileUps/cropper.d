@@ -51,7 +51,9 @@ import std.range :
     chain,
     chunks,
     iota,
+    only,
     retro,
+    takeExactly,
     zip;
 import std.typecons : tuple;
 import vibe.data.json : toJson = serializeToJson;
@@ -381,7 +383,8 @@ private long getCommonTracePoint(
 {
     static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion tracePointRegion) pure
     {
-        auto commonTracePoints = tracePointCandidates.filter!(c => c in tracePointRegion);
+        auto commonTracePoints = tracePointCandidates
+            .filter!(c => c in tracePointRegion || c.value == tracePointRegion.intervals[$ - 1].end);
 
         return commonTracePoints.empty ? -1 : commonTracePoints.front.value.to!long;
     }
@@ -410,15 +413,22 @@ private long getCommonTracePoint(
 
         auto tracePointMin = ceil(min(tracePointRegion), tracePointDistance);
         auto tracePointSup = ceil(sup(tracePointRegion), tracePointDistance);
-        auto tracePointCandidates = iota(tracePointMin, tracePointSup, tracePointDistance)
-            .map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
+        auto contigEndTracePoint = tracePointSup > contigA.length
+            ? [contigA.length]
+            : [];
+        auto tracePointCandidates = chain(
+            iota(tracePointMin, tracePointSup, tracePointDistance),
+            contigEndTracePoint,
+        ).map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
 
-        if (tracePointCandidates.empty)
-            continue;
-
-        return locationSeed == AlignmentLocationSeed.front
+        auto commonTracePoint = locationSeed == AlignmentLocationSeed.front
             ? _getCommonTracePoint(tracePointCandidates.retro, tracePointRegion)
             : _getCommonTracePoint(tracePointCandidates, tracePointRegion);
+
+        if (commonTracePoint < 0)
+            continue;
+
+        return commonTracePoint;
     }
 
     return -1;
