@@ -68,6 +68,7 @@ import std.algorithm :
     min,
     merge,
     sort,
+    swap,
     uniq;
 import std.array : array, minimallyInitializedArray;
 import std.conv : to;
@@ -76,7 +77,7 @@ import std.parallelism : parallel, taskPool;
 import std.path : buildPath;
 import std.range : drop, enumerate, evenChunks, chain, iota, only, zip;
 import std.range.primitives : empty, front, popFront;
-import std.typecons : Tuple, Yes;
+import std.typecons : tuple, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -186,7 +187,9 @@ protected class PileUpProcessor
     protected PileUp pileUp;
     protected Insertion* resultInsertion;
     protected string croppedDb;
+    protected AlignmentChain.Contig[] pileUpContigs;
     protected ReferencePoint[] croppingPositions;
+    protected AlignmentLocationSeed[] croppingSeeds;
     protected Enumerated!ReadAlignment[] referenceReadCandidates;
     protected size_t referenceReadIdx;
     protected id_t referenceReadTry;
@@ -214,6 +217,7 @@ protected class PileUpProcessor
         this.pileUpId = pileUpIdMapping[pileUpIdx];
         this.pileUp = pileUp;
         this.resultInsertion = resultInsertion;
+        this.pileUpContigs = pileUp.contigs();
 
         if (
             (!options.onlyFlags.extending && pileUp.isExtension) ||
@@ -262,8 +266,9 @@ protected class PileUpProcessor
             }
             else
             {
-                adjustRepeatMask();
+                reduceRepeatMaskToFlankingContigs();
                 crop();
+                adjustRepeatMaskToMakeMappingPossible();
                 findReferenceReadCandidates(croppingPositions);
                 while (selectReferenceRead(referenceReadTry++))
                 {
@@ -352,27 +357,14 @@ protected class PileUpProcessor
         return false;
     }
 
-    protected void adjustRepeatMask()
+    protected void reduceRepeatMaskToFlankingContigs()
     {
-        auto pileUpContigs = pileUp.contigs();
         auto pileUpContigsRegion = ReferenceRegion(
             pileUpContigs
                 .map!(contig => ReferenceInterval(contig.id, 0, contig.length))
                 .array
         );
-        auto reducedRepeatMask = originalRepeatMask & pileUpContigsRegion;
-
-        foreach (pileUpContigInterval; pileUpContigsRegion.intervals)
-        {
-            auto numMaskedBps = (reducedRepeatMask & pileUpContigInterval).size;
-            auto numContigBps = pileUpContigInterval.size;
-            auto shouldIgnoreMask = numContigBps - numMaskedBps <= options.maskCoverAllowance;
-
-            if (shouldIgnoreMask)
-                reducedRepeatMask -= pileUpContigInterval;
-        }
-
-        repeatMask = reducedRepeatMask;
+        repeatMask = originalRepeatMask & pileUpContigsRegion;
     }
 
     protected void crop()
@@ -387,6 +379,43 @@ protected class PileUpProcessor
 
         croppedDb = croppingResult.db;
         croppingPositions = croppingResult.referencePositions;
+        croppingSeeds = croppingResult.seeds;
+
+        if (pileUpContigs[0].id != croppingPositions[0].contigId)
+            swap(pileUpContigs[0], pileUpContigs[1]);
+    }
+
+    protected void adjustRepeatMaskToMakeMappingPossible()
+    {
+        auto croppings = zip(pileUpContigs, croppingPositions, croppingSeeds)
+            .map!(pair => tuple!(
+                "contig",
+                "position",
+                "seed",
+            )(
+                pair[0],
+                pair[1].value,
+                pair[2],
+            ));
+
+
+        foreach (cropping; croppings)
+        {
+            auto contigInterval = ReferenceInterval(cropping.contig.id, 0, cropping.contig.length);
+            auto croppedInterval = contigInterval;
+
+            if (cropping.seed == AlignmentLocationSeed.front)
+                croppedInterval.end = cropping.position;
+            else
+                croppedInterval.begin = cropping.position;
+
+            auto localMask = repeatMask & croppedInterval;
+            auto numUnmaskedBps = cropping.contig.length - localMask.size;
+
+            // Remove mask from contig if insufficient number of anchor bps
+            if (numUnmaskedBps < options.minAnchorLength)
+                repeatMask -= contigInterval;
+        }
     }
 
     protected void findReferenceReadCandidates(in ReferencePoint[] referencePositions)

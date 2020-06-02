@@ -87,7 +87,15 @@ private struct PileUpCropper
 
     @property auto result()
     {
-        return tuple!("db", "referencePositions")(croppedDb, croppingRefPositions);
+        return tuple!(
+            "db",
+            "referencePositions",
+            "seeds",
+        )(
+            croppedDb,
+            croppingRefPositions,
+            croppingSeeds,
+        );
     }
 
     void buildDb()

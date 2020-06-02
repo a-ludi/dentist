@@ -1579,29 +1579,6 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("mask-cover-allowance")
-        @MetaVar("num")
-        @Help("
-            When selecting splice sites for insertions, the repeat mask of
-            repetitive contigs is ignored if there are at most <num> bp
-            unmasked bases.
-            (default: --proper-alignment-allowance)
-        ")
-        coord_t maskCoverAllowance;
-
-        @PostValidate(Priority.low)
-        void hookEnsurePresenceOfMaskCoverAllowance()
-        {
-            if (maskCoverAllowance > 0)
-                return;
-
-            maskCoverAllowance = properAlignmentAllowance;
-        }
-    }
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
