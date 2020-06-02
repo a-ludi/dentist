@@ -371,9 +371,9 @@ private long getCommonTracePoint(
     in size_t tracePointDistance,
 )
 {
-    static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion allowedTracePointRegion) pure
+    static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion tracePointRegion) pure
     {
-        auto commonTracePoints = tracePointCandidates.filter!(c => c in allowedTracePointRegion);
+        auto commonTracePoints = tracePointCandidates.filter!(c => c in tracePointRegion);
 
         return commonTracePoints.empty ? -1 : commonTracePoints.front.value.to!long;
     }
@@ -383,28 +383,37 @@ private long getCommonTracePoint(
     auto commonAlignmentRegion = alignments
         .map!(to!(ReferenceRegion, "contigA"))
         .fold!"a & b";
-    auto allowedTracePointRegion = commonAlignmentRegion - mask;
+    auto unmaskedTracePointRegion = commonAlignmentRegion - mask;
 
     assert(alignments.all!(a => a.contigA == contigA && a.seed == locationSeed));
     debug logJsonDebug(
         "alignments", alignments.toJson,
         "commonAlignmentRegion", commonAlignmentRegion.toJson,
-        "allowedTracePointRegion", allowedTracePointRegion.toJson,
+        "unmaskedTracePointRegion", unmaskedTracePointRegion.toJson,
     );
 
-    if (allowedTracePointRegion.empty)
+    foreach (ReferenceRegion tracePointRegion; [
+        unmaskedTracePointRegion,
+        commonAlignmentRegion,
+    ])
     {
-        return -1;
+        if (tracePointRegion.empty)
+            continue;
+
+        auto tracePointMin = ceil(min(tracePointRegion), tracePointDistance);
+        auto tracePointSup = ceil(sup(tracePointRegion), tracePointDistance);
+        auto tracePointCandidates = iota(tracePointMin, tracePointSup, tracePointDistance)
+            .map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
+
+        if (tracePointCandidates.empty)
+            continue;
+
+        return locationSeed == AlignmentLocationSeed.front
+            ? _getCommonTracePoint(tracePointCandidates.retro, tracePointRegion)
+            : _getCommonTracePoint(tracePointCandidates, tracePointRegion);
     }
 
-    auto tracePointMin = ceil(min(allowedTracePointRegion), tracePointDistance);
-    auto tracePointSup = ceil(sup(allowedTracePointRegion), tracePointDistance);
-    auto tracePointCandidates = iota(tracePointMin, tracePointSup, tracePointDistance)
-        .map!(tracePointCandidate => ReferencePoint(contigA.id, tracePointCandidate));
-
-    return locationSeed == AlignmentLocationSeed.front
-        ? _getCommonTracePoint(tracePointCandidates.retro, allowedTracePointRegion)
-        : _getCommonTracePoint(tracePointCandidates, allowedTracePointRegion);
+    return -1;
 }
 
 private ReadInterval getCroppingSlice(
