@@ -212,6 +212,15 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
 }
 
 /**
+    Remove database and hidden files.
+*/
+@ExternalDependency("DBrm", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+void removeDB(in string dbFile)
+{
+    executeCommand(only("DBrm", dbFile));
+}
+
+/**
     Build `outputDb` by using the given subset of reads in `inDbFile`. If no
     `outputDb` is given a temporary file with the same extension as `inDbFile`
     will be created.
