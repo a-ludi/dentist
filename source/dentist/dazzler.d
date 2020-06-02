@@ -2804,6 +2804,28 @@ unittest
     }
 }
 
+/// Options for `DBdump`.
+enum DBdustOptions : string
+{
+    // DUST algorithm window size.
+    windowSize = "-w",
+    // DUST algorithm threshold.
+    dustThreshold = "-t",
+    // Record only low-complexity intervals >= this size.
+    minIntervalSize = "-m",
+    // Take into account base composition bias.
+    baseCompositionBias = "-b",
+}
+
+enum dbdustMaskName = "dust";
+
+/// Run DBdust on dbFile.
+@ExternalDependency("DBdust", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+void dbdust(in string dbFile, in string[] dbdustOptions)
+{
+    executeCommand(chain(only("DBdust"), dbdustOptions, only(dbFile)));
+}
+
 /**
     Align DB(s) to each other using `daligner`.
 

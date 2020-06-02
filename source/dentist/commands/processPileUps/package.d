@@ -47,6 +47,7 @@ import dentist.common.scaffold :
 import dentist.util.log;
 import dentist.util.math : absdiff;
 import dentist.dazzler :
+    dbdust,
     dbEmpty,
     dbSubset,
     getAlignments,
@@ -481,6 +482,8 @@ protected class PileUpProcessor
             flankingContigsRepeatMask,
             options.workdir,
         );
+        dbdust(flankingContigsDb, options.consensusOptions.dbdustOptions);
+
         postConsensusAlignment = getAlignments(
             flankingContigsDb,
             consensusDb,

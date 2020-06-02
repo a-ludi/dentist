@@ -49,6 +49,7 @@ import dentist.dazzler :
     DalignerOptions,
     DamapperOptions,
     DatanderOptions,
+    dbdustMaskName,
     getHiddenDbFiles,
     getMaskFiles,
     getNumContigs,
@@ -1963,6 +1964,7 @@ struct OptionsFor(DentistCommand _command)
             return [
                 DalignerOptions.asymmetric,
                 DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DalignerOptions.masks ~ dbdustMaskName,
                 DalignerOptions.masks ~ flankingContigsRepeatMaskName,
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
@@ -2018,6 +2020,7 @@ struct OptionsFor(DentistCommand _command)
             string[] dalignerOptions;
             string[] dbsplitOptions;
             string[] lasFilterAlignmentsOptions;
+            string[] dbdustOptions;
             string workdir;
         }
 
@@ -2037,6 +2040,8 @@ struct OptionsFor(DentistCommand _command)
                 [
                     LasFilterAlignmentsOptions.errorThresold ~ (2.0 * readsErrorRate).to!string,
                 ],
+                // dbdustOptions
+                [],
                 // workdir
                 workdir,
             );
