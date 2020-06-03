@@ -606,7 +606,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
     }
 
     /// Add a set of edges to this graph without any checks.
-    void bulkAddForce(R)(R edges) if (isForwardRange!R && is(ElementType!R == Edge))
+    void bulkAddForce(R)(R edges) if (isInputRange!R && is(ElementType!R == Edge))
     {
         this._edges ~= edges;
         _edges.data.sort;
@@ -1338,7 +1338,7 @@ unittest
 
 /// Add a set of edges to this graph and merge mutli-edges using `merge`.
 void bulkAdd(alias merge, G, R)(ref G graph, R edges)
-        if (is(G : Graph!Params, Params...) && isForwardRange!R && is(ElementType!R == G.Edge))
+        if (is(G : Graph!Params, Params...) && isInputRange!R && is(ElementType!R == G.Edge))
 {
     alias Edge = G.Edge;
     alias ReturnTypeMerge = typeof(merge(new Edge[0]));
