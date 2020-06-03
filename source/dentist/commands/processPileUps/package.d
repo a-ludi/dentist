@@ -65,6 +65,7 @@ import std.algorithm :
     find,
     joiner,
     map,
+    max,
     maxElement,
     min,
     merge,
@@ -396,7 +397,9 @@ protected class PileUpProcessor
                 "seed",
             )(
                 pair[0],
-                pair[1].value,
+                pair[2] == AlignmentLocationSeed.front
+                    ? max(pair[1].value, options.minAnchorLength)
+                    : min(pair[1].value, pair[0].length - options.minAnchorLength),
                 pair[2],
             ));
 
@@ -411,8 +414,8 @@ protected class PileUpProcessor
             else
                 croppedInterval.begin = cropping.position;
 
-            auto localMask = repeatMask & croppedInterval;
-            auto numUnmaskedBps = cropping.contig.length - localMask.size;
+            auto localInvertedMask = ReferenceRegion(croppedInterval) - repeatMask;
+            auto numUnmaskedBps = localInvertedMask.size;
 
             // Remove mask from contig if insufficient number of anchor bps
             if (numUnmaskedBps < options.minAnchorLength)
