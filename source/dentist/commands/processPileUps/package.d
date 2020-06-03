@@ -594,15 +594,6 @@ protected class PileUpProcessor
                 format!"consensus does not align to flanking contig %d"(croppingPos.contigId),
                 ["consensusDb": consensusDb].toJson,
             );
-            dentistEnforce(
-                flankAlignments.front.averageErrorRate <= options.maxInsertionError,
-                format!"consensus quality is too low on flanking contig %d"(croppingPos.contigId),
-                [
-                    "consensusDb": consensusDb.toJson,
-                    "averageErrorRate": flankAlignments.front.averageErrorRate.toJson,
-                    "maxErrorRate": options.maxInsertionError.toJson,
-                ].toJson,
-            );
 
             auto flankAlignment = SeededAlignment(flankAlignments.front, alignmentSeed);
             insertionAlignmentBuffer[refReadFlankAlignmentIdx] = flankAlignment;

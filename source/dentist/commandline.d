@@ -1398,7 +1398,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.processPileUps,
+        DentistCommand.output,
     ))
     {
         @Option("max-insertion-error")
@@ -1923,18 +1923,12 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (
-        is(typeof(OptionsFor!command().maxInsertionError)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
         is(typeof(OptionsFor!command().tracePointDistance)) &&
         is(typeof(OptionsFor!command().workdir))
     ) {
         enum flankingContigsRepeatMaskName = "rep";
-
-        @Validate!validateAverageCorrelationRate
-        @property auto postConsensusAlignmentOptionsAverageCorrelationRate() const
-        {
-            return 1 - maxInsertionError;
-        }
+        enum postConsensusAlignmentOptionsAverageCorrelationRate = 0.7;
 
         @property string[] postConsensusAlignmentOptions() const
         {

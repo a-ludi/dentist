@@ -279,12 +279,10 @@ class AssemblyWriter
             .enumerate
             .filter!(enumInsertion => !enumInsertion.value.isExtension || (
                 options.onlyFlags.extending &&
-                skipShortExtension(
-                    enumInsertion.index,
-                    enumInsertion.value,
-                )
+                skipShortExtension(enumInsertion.expand)
             ))
             .filter!(enumInsertion => !enumInsertion.value.isGap || options.onlyFlags.spanning)
+            .filter!(enumInsertion => ensureHighQualityConsensus(enumInsertion.expand))
             .map!"a.value";
 
         assemblyGraph = initScaffold!(
@@ -295,7 +293,6 @@ class AssemblyWriter
         appendUnkownJoins();
 
         Insertion[] forbiddenInsertions;
-
         assemblyGraph = assemblyGraph
             .enforceJoinPolicy!InsertionInfo(options.joinPolicy, forbiddenInsertions)
             .normalizeUnkownJoins!InsertionInfo()
@@ -348,6 +345,30 @@ class AssemblyWriter
             );
 
             return No.keepInsertion;
+        }
+
+        return Yes.keepInsertion;
+    }
+
+    protected Flag!"keepInsertion" ensureHighQualityConsensus(size_t insertionId, Insertion insertion) const
+    {
+        foreach (consensusAlignment; insertion.payload.overlaps)
+        {
+            if (consensusAlignment.averageErrorRate > options.maxInsertionError)
+            {
+                logJsonWarn(
+                    "info", "skipping insertion due to `maxInsertionError`",
+                    "event", "insertionSkipped",
+                    "reason", "maxInsertionError",
+                    "insertionId", insertionId,
+                    "insertion", insertion.insertionToSimpleJson,
+                    "skippedContigId", consensusAlignment.contigA.id,
+                    "averageErrorRate", consensusAlignment.averageErrorRate,
+                    "maxErrorRate", options.maxInsertionError,
+                );
+
+                return No.keepInsertion;
+            }
         }
 
         return Yes.keepInsertion;
