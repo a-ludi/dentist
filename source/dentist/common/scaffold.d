@@ -550,6 +550,14 @@ enum JoinPolicy
 /// Enforce joinPolicy in scaffold.
 Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
 {
+    Join!T[] unused;
+
+    return enforceJoinPolicy!T(scaffold, joinPolicy, unused);
+}
+
+/// ditto
+Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy, out Join!T[] forbiddenJoins)
+{
     mixin(traceExecution);
 
     if (joinPolicy == JoinPolicy.contigs)
@@ -581,7 +589,7 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
         ))
         .joiner;
     auto gapJoins = scaffold.edges.filter!isGap;
-    auto forbiddenJoins = setDifference!orderByNodes(gapJoins, allowedJoins).array;
+    forbiddenJoins = setDifference!orderByNodes(gapJoins, allowedJoins).array;
 
     // NOTE: joins between scaffolds will be re-included into the graph later
     //       if joinPolicy == scaffolds.

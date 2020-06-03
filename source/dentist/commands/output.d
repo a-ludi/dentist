@@ -19,6 +19,7 @@ import dentist.common.alignments :
     AlignmentLocationSeed,
     coord_t,
     id_t,
+    ReadAlignmentType,
     SeededAlignment,
     trace_point_t;
 static if (isTesting)
@@ -52,6 +53,7 @@ import dentist.common.scaffold :
     isDefault,
     isExtension,
     isFrontExtension,
+    isBackExtension,
     isGap,
     linearWalk,
     normalizeUnkownJoins,
@@ -93,6 +95,7 @@ import std.algorithm :
     maxElement,
     min,
     predSwitch,
+    sort,
     swap,
     swapAt;
 import std.array : array;
@@ -109,7 +112,7 @@ import std.range :
 import std.range.primitives : empty, front, popFront, save;
 import std.stdio : File, stderr, stdout;
 import std.typecons : Flag, No, tuple, Tuple, Yes;
-import vibe.data.json : toJson = serializeToJson;
+import vibe.data.json : Json, toJson = serializeToJson;
 
 
 /// Options for the `output` command.
@@ -271,7 +274,18 @@ class AssemblyWriter
         mixin(traceExecution);
 
         auto insertionDb = InsertionDb.parse(options.insertionsFile);
-        auto insertions = insertionDb[];
+        auto allInsertions = insertionDb[].sort;
+        auto insertions = allInsertions
+            .enumerate
+            .filter!(enumInsertion => !enumInsertion.value.isExtension || (
+                options.onlyFlags.extending &&
+                skipShortExtension(
+                    enumInsertion.index,
+                    enumInsertion.value,
+                )
+            ))
+            .filter!(enumInsertion => !enumInsertion.value.isGap || options.onlyFlags.spanning)
+            .map!"a.value";
 
         assemblyGraph = initScaffold!(
             contigId => InsertionInfo(CompressedSequence(), contigLengths[contigId - 1], []),
@@ -280,25 +294,22 @@ class AssemblyWriter
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
-        if (options.onlyFlags.extending)
-        {
-            assemblyGraph.filterEdges!(insertion => skipShortExtension(insertion));
-        }
-        else
-        {
-            assemblyGraph = assemblyGraph.removeExtensions!InsertionInfo();
-        }
-
-        if (!options.onlyFlags.spanning)
-        {
-            assemblyGraph = assemblyGraph.removeSpanning!InsertionInfo();
-        }
+        Insertion[] forbiddenInsertions;
 
         assemblyGraph = assemblyGraph
-            .enforceJoinPolicy!InsertionInfo(options.joinPolicy)
+            .enforceJoinPolicy!InsertionInfo(options.joinPolicy, forbiddenInsertions)
             .normalizeUnkownJoins!InsertionInfo()
             .fixCropping(options.tracePointDistance);
         incidentEdgesCache = assemblyGraph.allIncidentEdges();
+
+        foreach (forbiddenInsertion; forbiddenInsertions)
+            logJsonInfo(
+                "info", "skipping pile up due to `joinPolicy`",
+                "event", "insertionSkipped",
+                "reason", "joinPolicy",
+                "insertionId", allInsertions.lowerBound(forbiddenInsertion).length,
+                "insertion", forbiddenInsertion.insertionToSimpleJson,
+            );
 
         if (options.assemblyGraphFile !is null)
             InsertionDb.write(options.assemblyGraphFile, assemblyGraph.edges);
@@ -317,7 +328,7 @@ class AssemblyWriter
         assemblyGraph.bulkAddForce(unkownJoins);
     }
 
-    protected Flag!"keepInsertion" skipShortExtension(Insertion insertion) const
+    protected Flag!"keepInsertion" skipShortExtension(size_t insertionId, Insertion insertion) const
     {
         assert(insertion.payload.overlaps.length == 1);
 
@@ -330,8 +341,10 @@ class AssemblyWriter
         {
             logJsonInfo(
                 "info", "skipping pile up due to `minExtensionLength`",
+                "event", "insertionSkipped",
                 "reason", "minExtensionLength",
-                "flankingContigId", extensionOverlap.contigA.id,
+                "insertionId", insertionId,
+                "insertion", insertion.insertionToSimpleJson,
             );
 
             return No.keepInsertion;
@@ -818,4 +831,33 @@ Flag!"insertionUpdated" transferCroppingFromIncidentJoins(
         .array;
 
     return cast(typeof(return)) (contigJoin.payload.overlaps.length > 0);
+}
+
+/// Converts the pileup into a simple JSON object for diagnostic purposes.
+Json insertionToSimpleJson(in Insertion insertion)
+{
+    return [
+        "type": insertion.getType.to!string.toJson,
+        "numReads": insertion.payload.readIds.length.toJson,
+        "contigIds": insertion
+            .payload
+            .overlaps
+            .map!(sa => sa.contigA.id + 0)
+            .array
+            .sort
+            .release
+            .toJson,
+    ].toJson;
+}
+
+private ReadAlignmentType getType(in Insertion insertion)
+{
+    if (insertion.isGap)
+        return ReadAlignmentType.gap;
+    else if (insertion.isFrontExtension)
+        return ReadAlignmentType.front;
+    else if (insertion.isBackExtension)
+        return ReadAlignmentType.back;
+    else
+        assert(0, "illegal insertion type");
 }
