@@ -1904,6 +1904,8 @@ struct OptionsFor(DentistCommand _command)
         is(typeof(OptionsFor!command().readsErrorRate)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     ) {
+        enum forceLargeTracePointType = 200;
+
         @Validate!validateAverageCorrelationRate
         @property auto pileUpAlignmentOptionsAverageCorrelationRate() const
         {
@@ -1914,6 +1916,8 @@ struct OptionsFor(DentistCommand _command)
         {
             return [
                 DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DalignerOptions.bridge,
+                format!(DalignerOptions.tracePointDistance ~ "%d")(forceLargeTracePointType),
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     pileUpAlignmentOptionsAverageCorrelationRate,

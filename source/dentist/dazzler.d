@@ -3709,6 +3709,8 @@ enum DalignerOptions : string
     /// Let the program automatically select a value of t that meets a given
     /// memory usage limit specified (in Gb) by the -M parameter.
     maxKmerMemory = "-M",
+    /// Bridge consecutive aligned segments into one if possible
+    bridge = "-B",
     tempDir = "-P",
     /// Searching for local alignments involving at least -l base pairs
     /// (default 1000) or more, that have an average correlation rate of
