@@ -19,6 +19,7 @@ import std.bitmanip : bitfields;
 import std.conv : to;
 import std.exception : enforce, ErrnoException;
 import std.format : format;
+import std.process : environment;
 import std.range :
     chunks,
     dropExactly,
@@ -36,10 +37,44 @@ import std.traits :
     isSomeString,
     Unqual;
 import std.typecons : BitFlags, Flag, No, Yes;
+import std.utf : UTFException;
 
 
 void lockIfPossible(ref File file) nothrow
 {
+    enum skipFileLocking = "SKIP_FILE_LOCKING";
+
+    try
+    {
+        if (environment.get(skipFileLocking, null) == "1")
+        {
+            logJsonInfo(
+                "info", "skipping file locking on user's request",
+                "file", file.name,
+            );
+
+            return;
+        }
+    }
+    catch (UTFException e)
+    {
+        logJsonError(
+            "info", "ignoring environment variable " ~ skipFileLocking ~ ": " ~
+                    "contains invalid UTF characters",
+            "file", file.name,
+            "error", e.message().to!string,
+        );
+    }
+    catch (Exception e)
+    {
+        logJsonError(
+            "info", "ignoring environment variable " ~ skipFileLocking ~ ": " ~
+                    e.message().to!string,
+            "file", file.name,
+            "error", e.message().to!string,
+        );
+    }
+
     try
     {
         file.lock();
