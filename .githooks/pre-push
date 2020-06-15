@@ -26,43 +26,37 @@ IFS=$'\n\t'
 remote="$1"
 url="$2"
 num_commits="$(wc -l)"
+export git_root
+git_root="$PWD"
 
 
-function git_stash_push()
+create_testdir()
 {
-    local message='stashing changes to working tree before unit tests'
-    git stash push --quiet --include-untracked -m "$message"
-    echo "--- $message"
+    testdir="$(mktemp --tmpdir -d dentist-testing-XXXXXX)"
+    trap 'rm -rf "$testdir"' EXIT
 }
 
 
-function git_checkout_head()
+set_submodule_upstream_to_local_path()
 {
-    git checkout HEAD .
+    git config --file=.gitmodules --get-regexp 'submodule\..*\.path' | \
+        sed -E 's/^submodule\.([^.]+)\.path\s+(.*)$/git config submodule.\1.url "$git_root\/\2"/' | \
+        sh -
 }
 
 
-function git_stash_pop()
+locally_checkout_head()
 {
-    git_checkout_head
-    git stash pop --quiet
-    echo "--- restoring changes to working tree after unit tests"
+    git clone --local --no-hardlinks --shallow-submodules "$git_root" ./
+    set_submodule_upstream_to_local_path
+    git submodule update --checkout --recursive
 }
 
 
-function stash_working_tee_changes_for_testing()
-{
-    if (( $(git status --porcelain | wc -l) > 0 ));
-    then
-        git_stash_push && trap git_stash_pop exit
-    else
-        trap git_checkout_head exit
-    fi
-}
-
-
-if (( num_commits > 0 ));
+if [ "$num_commits" -gt 0 ];
 then
-    stash_working_tee_changes_for_testing
+    create_testdir
+    cd "$testdir"
+    locally_checkout_head
     dub test --config=testing
 fi
