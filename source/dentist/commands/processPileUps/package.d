@@ -55,7 +55,6 @@ import dentist.dazzler :
     getConsensus,
     getFastaSequence,
     readMask,
-    removeDB,
     writeMask;
 import std.algorithm :
     canFind,
@@ -470,8 +469,6 @@ protected class PileUpProcessor
     {
         mixin(traceExecution);
 
-        if (exists(consensusDb))
-            removeDB(consensusDb);
         consensusDb = getConsensus(
             croppedDb,
             referenceReadIdx + 1,

@@ -152,6 +152,13 @@ class DazzlerCommandException : Exception
     }
 }
 
+alias Append = Flag!"append";
+
+/// This funcion is called if writing to an existing DB is attempted without
+/// passing `Yes.append` or similar to the called function.
+void delegate(string dbFile) handleExistingDb = (dbFile) => removeDB(dbFile);
+
+
 /// Returns true iff lasFile contains zero parts.
 bool lasEmpty(in string lasFile, in string dbA, in string workdir)
 {
@@ -195,8 +202,17 @@ bool dbEmpty(in string dbFile, in string workdir)
     return numDbRecords(dbFile, workdir) == 0;
 }
 
+/**
+    Remove database and hidden files.
+*/
+@ExternalDependency("DBrm", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+void removeDB(in string dbFile)
+{
+    executeCommand(only("DBrm", dbFile));
+}
+
 /// Build outputDb file by using the given subset of reads in inDbFile.
-string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
+string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options, Append append = No.append)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
@@ -208,16 +224,7 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options)
     outDb.file.close();
     remove(outDb.name);
 
-    return dbSubset(outDb.name, inDbFile, readIds, options);
-}
-
-/**
-    Remove database and hidden files.
-*/
-@ExternalDependency("DBrm", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-void removeDB(in string dbFile)
-{
-    executeCommand(only("DBrm", dbFile));
+    return dbSubset(outDb.name, inDbFile, readIds, options, append);
 }
 
 /**
@@ -227,7 +234,7 @@ void removeDB(in string dbFile)
 
     Returns: DB file name
 */
-string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options)
+string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options, Append append = No.append)
         if (isSomeString!(typeof(options.workdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
@@ -235,7 +242,7 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
         ? outputDb
         : outputDb ~ inDbFile.extension;
 
-    buildSubsetDb(inDbFile, _outputDb, readIds, options.workdir);
+    buildSubsetDb(inDbFile, _outputDb, readIds, options.workdir, append);
     dbsplit(_outputDb, options.dbsplitOptions, options.workdir);
 
     return outputDb;
@@ -2756,7 +2763,7 @@ EOF".outdent;
 
     Returns: DB file name
 */
-string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [])
+string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [], Append append = No.append)
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     enum tempDbNameTemplate = "auxiliary-XXXXXX";
@@ -2771,11 +2778,12 @@ string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbs
 }
 
 /// ditto
-string buildDamFile(Range)(string outputDb, Range fastaRecords, in string[] dbsplitOptions = [])
+string buildDamFile(Range)(string outputDb, Range fastaRecords, in string[] dbsplitOptions = [], Append append = No.append)
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     assert(outputDb.endsWith(damFileExtension), "outputDb must end with " ~ damFileExtension);
-    fasta2dam(outputDb, fastaRecords);
+
+    fasta2dam(outputDb, fastaRecords, null, append);
     dbsplit(outputDb, dbsplitOptions);
 
     return outputDb;
@@ -3887,6 +3895,11 @@ enum LasFilterAlignmentsOptions : string
 
 private
 {
+    void ensureWritableDb(string dbFile, Append append)
+    {
+        if (!append && dbFile.exists)
+            handleExistingDb(dbFile);
+    }
 
     void dalign(in string refDam, in string[] dalignerOpts, in string workdir)
     {
@@ -3971,6 +3984,8 @@ private
         alias esc = escapeShellCommand;
         string daccordedDb = dbFile.stripExtension.to!string ~ "-daccord.dam";
 
+        ensureWritableDb(daccordedDb, No.append);
+
         executeShell(chain(
             only("daccord"),
             only(esc(daccordOpts)),
@@ -3999,8 +4014,10 @@ private
     @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir)
+    void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir, Append append)
     {
+        ensureWritableDb(outDbFile, append);
+
         alias esc = escapeShellCommand;
         auto escapedReadIds = readIds
             .map!(to!size_t)
@@ -4019,12 +4036,14 @@ private
     }
 
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null)
+    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null, Append append = No.append)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : each, joiner;
         import std.process : Config, pipeProcess, Redirect, wait;
         import std.range : chunks;
+
+        ensureWritableDb(outFile, append);
 
         enum writeChunkSize = 1024 * 1024;
         auto outFileArg = outFile.relativeToWorkdir(workdir);
@@ -4075,8 +4094,10 @@ private
     }
 
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(in string inFile, in string outFile, in string workdir = null)
+    void fasta2dam(in string inFile, in string outFile, in string workdir = null, Append append = No.append)
     {
+        ensureWritableDb(outFile, append);
+
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
