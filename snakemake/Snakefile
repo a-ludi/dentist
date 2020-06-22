@@ -1,5 +1,6 @@
 import json
 from math import *
+from os import environ
 from os.path import basename, join
 import re
 import subprocess
@@ -302,7 +303,6 @@ def insertions_batches():
     return (get_insertions_batch(i)  for i in range(num_batches))
 
 
-
 def docstring(string):
     paragraph_sep = re.compile(r"\n\s*\n")
     whitespace = re.compile(r"\s+")
@@ -313,6 +313,41 @@ def docstring(string):
     return "\n\n".join(paragraphs)
 
 
+def replace_env(string):
+    import re
+
+    env_re = re.compile(r"\$(?P<var>\$|[a-zA-Z_][a-zA-Z0-9_]*|\{[a-zA-Z_][a-zA-Z0-9_]*\})")
+
+    def fetch_env(match):
+        varname = match["var"]
+
+        if varname == "$":
+            return "$"
+        elif varname.startswith("{"):
+            return environ[varname[1:-1]]
+        else:
+            return environ[varname]
+
+    return env_re.sub(fetch_env, string)
+
+
+def replace_env_rec(obj):
+    iterable = None
+
+    if isinstance(obj, str):
+        return replace_env(obj)
+    elif isinstance(obj, list):
+        iterable = enumerate(obj)
+    elif isinstance(obj, dict):
+        iterable = obj.items()
+    else:
+        return obj
+
+    for k, v in iterable:
+        obj[k] = replace_env_rec(v)
+
+    return obj
+
 
 #-----------------------------------------------------------------------------
 # END functions
@@ -322,6 +357,17 @@ def docstring(string):
 #-----------------------------------------------------------------------------
 # Variables for rules
 #-----------------------------------------------------------------------------
+
+env_config = replace_env_rec(config.pop("env", dict()))
+
+if isinstance(env_config, dict):
+    for k, v in env_config.items():
+        if not k in environ:
+            environ[k] = v
+else:
+    raise Exception("expected dictionary for config[env] but got: " + type(env_config))
+
+config = replace_env_rec(config)
 
 # config shortcuts
 inputs = config["inputs"]
