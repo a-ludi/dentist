@@ -1696,7 +1696,7 @@ struct OptionsFor(DentistCommand _command)
         @Help("trace point spacing used for the ref vs. reads alignment")
         trace_point_t tracePointDistance;
 
-        @PostValidate()
+        @PostValidate(Priority.medium)
         void hookEnsurePresenceOfTracePointDistance()
         {
             if (tracePointDistance > 0)
