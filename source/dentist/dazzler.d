@@ -58,6 +58,7 @@ import std.array :
     appender,
     Appender,
     array,
+    replace,
     split,
     uninitializedArray;
 import std.conv : to;
@@ -2879,6 +2880,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
             isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
+            is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
             isSomeString!(typeof(options.workdir)))
 {
     static struct ModifiedOptions
@@ -2888,6 +2890,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         string[] dbsplitOptions;
         string[] lasFilterAlignmentsOptions;
         string workdir;
+        coord_t properAlignmentAllowance;
     }
 
     auto readIdx = readId - 1;
@@ -2897,6 +2900,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         options.dbsplitOptions,
         options.lasFilterAlignmentsOptions,
         options.workdir,
+        options.properAlignmentAllowance,
     ));
 
     if (consensusDb is null)
@@ -2913,6 +2917,7 @@ string getConsensus(Options)(in string dbFile, in Options options)
             isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
+            is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
             isSomeString!(typeof(options.workdir)))
 {
     dalign(dbFile, options.dalignerOptions, options.workdir);
@@ -2958,6 +2963,7 @@ private void computeIntrinsticQualityValuesForConsensus(Options)(in string dbFil
 
 private string filterAlignmentsForConsensus(Options)(in string dbFile, in Options options)
         if (isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
+            is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
             isSomeString!(typeof(options.workdir)))
 {
     auto lasFile = getLasFile(dbFile, options.workdir);
@@ -2967,24 +2973,25 @@ private string filterAlignmentsForConsensus(Options)(in string dbFile, in Option
 
     /// An alignment in a pile up is valid iff it is proper and the begin/end
     /// of both reads match.
-    static bool isValidPileUpAlignment(const ref AlignmentChain ac)
+    static bool isValidPileUpAlignment(const ref AlignmentChain ac, const coord_t allowance)
     {
+        alias isLeftAnchored = () =>
+            ac.beginsWith!"contigA"(allowance) && ac.beginsWith!"contigB"(allowance);
+        alias isLeftProper = () =>
+            ac.beginsWith!"contigA"(allowance) || ac.beginsWith!"contigB"(allowance);
+        alias isRightAnchored = () =>
+            ac.endsWith!"contigA"(allowance) && ac.endsWith!"contigB"(allowance);
+        alias isRightProper = () =>
+            ac.endsWith!"contigA"(allowance) || ac.endsWith!"contigB"(allowance);
+
         return ac.contigA.id != ac.contigB.id && (
-            (
-                ac.first.contigA.begin == 0 &&
-                ac.first.contigB.begin == 0 &&
-                ac.last.contigB.end == ac.contigB.length
-            ) ||
-            (
-                ac.last.contigA.end == ac.contigA.length &&
-                ac.last.contigB.end == ac.contigB.length &&
-                ac.first.contigB.begin == 0
-            )
+            (isLeftAnchored() && isRightProper()) ||
+            (isRightAnchored() && isLeftProper())
         );
     }
 
     foreach (ref alignment; alignments)
-        alignment.disableIf(!isValidPileUpAlignment(alignment));
+        alignment.disableIf(!isValidPileUpAlignment(alignment, options.properAlignmentAllowance));
 
     string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
     writeAlignments(filteredLasFile, alignments);

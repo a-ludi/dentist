@@ -418,11 +418,20 @@ struct AlignmentChain
     /// This alignment is called proper iff it starts and ends at a read boundary.
     @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
-        enum beginsWith(string contig) = "first."~contig~".begin <= allowance";
-        enum endsWith(string contig) = "last."~contig~".end + allowance >= "~contig~".length";
+        return (beginsWith!"contigA" || beginsWith!"contigB") &&
+               (endsWith!"contigA" || endsWith!"contigB");
+    }
 
-        return (mixin(beginsWith!"contigA") || mixin(beginsWith!"contigB")) &&
-               (mixin(endsWith!"contigA") || mixin(endsWith!"contigB"));
+    @property bool beginsWith(string contig)(coord_t allowance = 0) const pure nothrow @safe
+        if (contig.among("contigA", "contigB"))
+    {
+        return mixin("first."~contig~".begin <= allowance");
+    }
+
+    @property bool endsWith(string contig)(coord_t allowance = 0) const pure nothrow @safe
+        if (contig.among("contigA", "contigB"))
+    {
+        return mixin("last."~contig~".end + allowance >= "~contig~".length");
     }
 
     /// Returns true iff this alignment covers `contig` completely.

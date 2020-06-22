@@ -2008,6 +2008,7 @@ struct OptionsFor(DentistCommand _command)
             string[] lasFilterAlignmentsOptions;
             string[] dbdustOptions;
             string workdir;
+            coord_t properAlignmentAllowance;
         }
 
         @property auto consensusOptions() const
@@ -2030,6 +2031,8 @@ struct OptionsFor(DentistCommand _command)
                 [],
                 // workdir
                 workdir,
+                // properAlignmentAllowance
+                properAlignmentAllowance,
             );
         }
     }
