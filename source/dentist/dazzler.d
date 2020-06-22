@@ -3037,6 +3037,7 @@ unittest
         string[] lasFilterAlignmentsOptions;
         size_t fastaLineWidth;
         string workdir;
+        coord_t properAlignmentAllowance;
     }
 
     auto tmpDir = mkdtemp("./.unittest-XXXXXX");
@@ -3049,6 +3050,7 @@ unittest
         ],
         74,
         tmpDir,
+        100,
     );
     scope (exit)
         rmdirRecurse(tmpDir);
