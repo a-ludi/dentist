@@ -2928,11 +2928,7 @@ string getConsensus(Options)(in string dbFile, in Options options)
     );
 
     computeIntrinsticQualityValuesForConsensus(dbFile, options);
-    // FIXME remove if bug in lasfilteralignments is fixed
-    version(unittest)
-        auto filteredLasFile = lasFile;
-    else
-        auto filteredLasFile = filterAlignmentsForConsensus(dbFile, options);
+    auto filteredLasFile = filterAlignmentsForConsensus(dbFile, options);
     enforce!DazzlerCommandException(
         !lasEmpty(
             filteredLasFile,
