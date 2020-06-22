@@ -86,6 +86,7 @@ import std.range :
     only,
     repeat,
     slide,
+    take,
     takeExactly,
     zip;
 import std.range.primitives :
@@ -1376,43 +1377,28 @@ private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
     }
 }
 
-trace_point_t getTracePointDistance(in string[] dazzlerOptions = []) pure
+trace_point_t getTracePointDistance(in string dbA, in string lasFile)
 {
-    enum defaultTracePointDistance = 100;
-
-    foreach (option; dazzlerOptions)
-    {
-        if (option.startsWith(cast(const(string)) DalignerOptions.tracePointDistance))
-        {
-            return option[2 .. $].to!trace_point_t;
-        }
-    }
-
-    return defaultTracePointDistance;
+    return getTracePointDistance(dbA, null, lasFile);
 }
 
-unittest
+trace_point_t getTracePointDistance(in string dbA, in string dbB, in string lasFile)
 {
-    with (DalignerOptions)
-    {
-        assert(getTracePointDistance([]) == 100);
-        assert(getTracePointDistance([identity]) == 100);
-        assert(getTracePointDistance([
-            tracePointDistance ~ "42",
-            averageCorrelationRate ~ ".8",
-            identity,
-        ]) == 42);
-        assert(getTracePointDistance([
-            identity,
-            tracePointDistance ~ "42",
-            averageCorrelationRate ~ ".8",
-        ]) == 42);
-        assert(getTracePointDistance([
-            averageCorrelationRate ~ ".8",
-            identity,
-            tracePointDistance ~ "42",
-        ]) == 42);
-    }
+    auto dumpHeader = ladump(lasFile, dbA, dbB, [LAdumpOptions.tracePoints], null);
+
+    trace_point_t tracePointDistance;
+
+    foreach (line; dumpHeader.take(100))
+        if (line.startsWith('X'))
+            break;
+
+    enforce!DazzlerCommandException(
+        !dumpHeader.empty && dumpHeader.front.startsWith('X'),
+        "empty or corrupted LAS file",
+    );
+    dumpHeader.front.formattedRead!"X %d"(tracePointDistance);
+
+    return tracePointDistance;
 }
 
 auto getExactAlignment(

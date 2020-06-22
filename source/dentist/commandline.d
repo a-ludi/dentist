@@ -1702,7 +1702,18 @@ struct OptionsFor(DentistCommand _command)
             if (tracePointDistance > 0)
                 return;
 
-            tracePointDistance = getTracePointDistance();
+            static if (is(typeof(readsDb)) && is(typeof(readsAlignmentFile)))
+                tracePointDistance = getTracePointDistance(
+                    refDb,
+                    readsDb,
+                    readsAlignmentFile,
+                );
+            else static if (is(typeof(dbAlignmentFile)))
+                tracePointDistance = getTracePointDistance(
+                    refDb,
+                    readsDb,
+                    dbAlignmentFile,
+                );
         }
     }
 
