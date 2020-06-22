@@ -3964,7 +3964,22 @@ private
     string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
     {
         alias esc = escapeShellCommand;
-        string daccordedDb = dbFile.stripExtension.to!string ~ "-daccord.dam";
+
+        auto readIntervalOptFinder = daccordOpts.find!(opt => opt.startsWith(cast(string) DaccordOptions.readInterval));
+        string daccordedDb;
+
+        if (readIntervalOptFinder.empty)
+        {
+            daccordedDb = dbFile.stripExtension.to!string ~ "-daccord.dam";
+        }
+        else
+        {
+            auto readInterval = readIntervalOptFinder
+                .front
+                .replace(",", "-");
+
+            daccordedDb = dbFile.stripExtension.to!string ~ "-daccord" ~ readInterval ~ ".dam";
+        }
 
         ensureWritableDb(daccordedDb, No.append);
 
