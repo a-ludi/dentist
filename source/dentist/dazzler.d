@@ -2020,6 +2020,8 @@ private enum DbDumpLineFormat : DbDumpLineFormatTuple
     maxHeaderLength = DbDumpLineFormatTuple('@', 'H', "@ H %d"),
     totalSequenceCount = DbDumpLineFormatTuple('+', 'S', "+ S %d"),
     maxSequenceLength = DbDumpLineFormatTuple('@', 'S', "@ S %d"),
+    totalIntrinsicQualityVector = DbDumpLineFormatTuple('+', 'I', "+ I %d"),
+    maxIntrinsicQualityVector = DbDumpLineFormatTuple('@', 'I', "@ I %d"),
     readNumber = DbDumpLineFormatTuple('R', '\0', "R %d"),
     header = DbDumpLineFormatTuple('H', '\0', "H %d %s"),
     pbLocation = DbDumpLineFormatTuple('L', '\0', "L %d %d %d"),
@@ -2063,6 +2065,31 @@ struct DbRecord
     PacBioReadInfo pacBioReadInfo;
     alias location = pacBioReadInfo;
     string sequence;
+    byte[] intrinsicQualityVector;
+    alias intrinsicQVs = intrinsicQualityVector;
+
+    enum maxQV = 50;
+
+    static byte fromQVChar(const char qv)
+    {
+        if ('a' <= qv && qv <= 'z')
+            return cast(byte) (qv - 'a');
+        else if ('A' <= qv && qv <= 'Y')
+            return cast(byte) (26 + qv - 'A');
+        else
+            return -1;
+    }
+
+
+    static char toQVChar(const byte qv)
+    {
+        if (qv <= 25)
+            return cast(char) ('a' + qv);
+        else if (qv <= 50)
+            return cast(char) ('A' + qv - 26);
+        else
+            return '\xFF';
+    }
 }
 
 private struct DbDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
@@ -2096,6 +2123,8 @@ public:
                 maxHeaderLength.indicator,
                 totalSequenceCount.indicator,
                 maxSequenceLength.indicator,
+                totalIntrinsicQualityVector.indicator,
+                maxIntrinsicQualityVector.indicator,
             ];
         }
         this.popFront();
@@ -2164,6 +2193,7 @@ private:
                     static assert(totalMCount.indicator == totalReadNumberCount.indicator);
                     static assert(totalHeaderCount.indicator == totalReadNumberCount.indicator);
                     static assert(totalSequenceCount.indicator == totalReadNumberCount.indicator);
+                    static assert(totalIntrinsicQualityVector.indicator == totalReadNumberCount.indicator);
 
                     switch (currentLineSubType)
                     {
@@ -2176,6 +2206,7 @@ private:
                             pbLocation.indicator,
                             pbQuality.indicator,
                             sequence.indicator,
+                            intrinsicQualityVector.indicator,
                         ];
 
                         // do not try to read empty dump
@@ -2190,14 +2221,17 @@ private:
                     case totalSequenceCount.subIndicator:
                         read!totalSequenceCount();
                         break;
+                    case totalIntrinsicQualityVector.subIndicator:
+                        break; // ignore
                     default:
                         error(format!"unknown line sub-type `%c`"(currentLineSubType));
                     }
                     break;
                 case maxHeaderLength.indicator:
                     static assert(maxSequenceLength.indicator == maxHeaderLength.indicator);
+                    static assert(maxIntrinsicQualityVector.indicator == maxHeaderLength.indicator);
                     break; // ignore both
-                static foreach (lineTypeFormat; [readNumber, header, pbLocation, pbQuality, sequence])
+                static foreach (lineTypeFormat; [readNumber, header, pbLocation, pbQuality, sequence, intrinsicQualityVector])
                 {
                     case lineTypeFormat.indicator:
                         static if (lineTypeFormat == pbLocation)
@@ -2228,6 +2262,7 @@ private:
                                 pbLocation.indicator,
                                 pbQuality.indicator,
                                 sequence.indicator,
+                                intrinsicQualityVector.indicator,
                             ];
                             return; // DB record completed; stay on current dump line
                         }
@@ -2349,6 +2384,24 @@ private:
         assert(currentRecord.sequence.length == sequenceLength, "mismatched sequence length");
     }
 
+    void read(DbDumpLineFormat lineTypeFormat)()
+        if (lineTypeFormat == DbDumpLineFormat.intrinsicQualityVector)
+    {
+        coord_t vectorLength;
+        char[] qvChars;
+
+        currentDumpLine[].formattedRead!(lineTypeFormat.format)(
+            vectorLength,
+            qvChars,
+        );
+
+        assert(qvChars.length == vectorLength, "mismatched QVs length");
+
+        currentRecord.intrinsicQualityVector = cast(byte[]) qvChars;
+        foreach (ref qv; currentRecord.intrinsicQualityVector)
+            qv = DbRecord.fromQVChar(qv);
+    }
+
     debug void disallowCurrentLineType() {
         allowedLineTypes = allowedLineTypes
             .filter!(type => type != currentLineType)
@@ -2385,26 +2438,31 @@ unittest
         L 1 0 62
         Q 0.851
         S 62 ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc
+        I 1 q
         R 2
         H 3 Sim
         L 2 0 63
         Q 0.852
         S 63 cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat
+        I 1 l
         R 3
         H 3 Sim
         L 3 0 62
         Q 0.853
         S 62 aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa
+        I 1 m
         R 4
         H 3 Sim
         L 4 0 62
         Q 0.854
         S 62 ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca
+        I 1 S
         R 5
         H 3 Sim
         L 5 0 32
         Q 0.855
         S 32 gtgtctgctgttttttttcttttagtggacat
+        I 1 j
 EOF".outdent;
 
     import std.algorithm : equal;
@@ -2422,6 +2480,7 @@ EOF".outdent;
                 0.851,
             ),
             "ctaaattaacacttgtgatgaaccagtgaggaaggaggctggctaaacaatgtgaacggttc",
+            [16]
         ),
         DbRecord(
             2,
@@ -2433,6 +2492,7 @@ EOF".outdent;
                 0.852,
             ),
             "cctaactaaaccttctgaaactacagcgcaagatcagagggggtttgaaggtcatattattat",
+            [11]
         ),
         DbRecord(
             3,
@@ -2444,6 +2504,7 @@ EOF".outdent;
                 0.853,
             ),
             "aaccgatgagaaatccatatatctgggagctagagacaccaagaaaaagataccagccaaaa",
+            [12]
         ),
         DbRecord(
             4,
@@ -2455,6 +2516,7 @@ EOF".outdent;
                 0.854,
             ),
             "ttttgttcatcaaatgcaggccataaatccaatttagccactggctttcacgtaaccgttca",
+            [44]
         ),
         DbRecord(
             5,
@@ -2466,6 +2528,7 @@ EOF".outdent;
                 0.855,
             ),
             "gtgtctgctgttttttttcttttagtggacat",
+            [9]
         ),
     ];
 
@@ -2807,6 +2870,23 @@ unittest
             assert(hiddenDbFile.isFile);
     }
 }
+
+
+enum id_t minQVCoverage = 4;
+
+
+void computeQVs(in string dbFile, in string lasFile, id_t coverage = 0)
+{
+    computeQVs(dbFile, lasFile, [], coverage);
+}
+
+
+void computeQVs(in string dbFile, in string lasFile, in string[] masks, id_t coverage = 0)
+{
+    dascover(dbFile, lasFile, masks);
+    dasqv(dbFile, lasFile, coverage);
+}
+
 
 /// Options for `DBdump`.
 enum DBdustOptions : string
@@ -3918,6 +3998,22 @@ private
 
         executeCommand(chain(only("daligner"), additionalOptions, dalignerOpts,
                 inputFilesRelativeToWorkDir), workdir);
+    }
+
+    @ExternalDependency("DAScover", "DASCRUBBER", "https://github.com/thegenemyers/DASCRUBBER")
+    void dascover(in string dbFile, in string lasFile, in string[] masks)
+    {
+        auto maskArgs = masks.map!"`-m` ~ a";
+
+        executeCommand(chain(only("dascover", "-v"), maskArgs, only(dbFile[], lasFile[])), null);
+    }
+
+    @ExternalDependency("DASqv", "DASCRUBBER", "https://github.com/thegenemyers/DASCRUBBER")
+    void dasqv(in string dbFile, in string lasFile, in id_t coverage)
+    {
+        auto coverageArg = coverage > 0 ? format!"-c%d"(coverage) : null;
+
+        executeCommand(only("DASqv", "-v", coverageArg, dbFile, lasFile), null);
     }
 
     void damapper(in string refDam, in string readsDam, in string[] damapperOpts, in string workdir)
