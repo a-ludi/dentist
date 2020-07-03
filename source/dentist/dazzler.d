@@ -4067,17 +4067,11 @@ private
     {
         assert(dbList.length >= 1);
         auto isSelfAlignment = dbList.length == 1;
-        auto needIdentityOption = !dalignerOpts.canFind(DalignerOptions.identity);
-        auto additionalOptions = only(isSelfAlignment && needIdentityOption
-            ? DalignerOptions.identity
-            : null
-        );
         auto inputFiles = isSelfAlignment ? [dbList[0], dbList[0]] : dbList;
         const(string[]) inputFilesRelativeToWorkDir = inputFiles.map!(
                 f => f.relativeToWorkdir(workdir)).array;
 
-        executeCommand(chain(only("daligner"), additionalOptions, dalignerOpts,
-                inputFilesRelativeToWorkDir), workdir);
+        executeCommand(chain(only("daligner"), dalignerOpts, inputFilesRelativeToWorkDir), workdir);
     }
 
     @ExternalDependency("DAScover", "DASCRUBBER", "https://github.com/thegenemyers/DASCRUBBER")
