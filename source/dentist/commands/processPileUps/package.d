@@ -44,21 +44,31 @@ import dentist.common.scaffold :
     ContigNode,
     getDefaultJoin,
     isParallel;
+import dentist.util.containers : hashSet, HashSet;
 import dentist.util.log;
 import dentist.util.math : absdiff;
 import dentist.dazzler :
+    computeQVs,
     dbdust,
     dbEmpty,
     dbSubset,
+    DBdumpOptions,
+    DbRecord,
+    filterPileUpAlignments,
     getAlignments,
     getDalignment,
+    getDbRecords,
     getConsensus,
     getFastaSequence,
+    lasEmpty,
+    minQVCoverage,
     readMask,
     writeMask;
 import std.algorithm :
     canFind,
+    count,
     countUntil,
+    cumulativeFold,
     equal,
     filter,
     find,
@@ -66,6 +76,7 @@ import std.algorithm :
     map,
     max,
     maxElement,
+    mean,
     min,
     merge,
     sort,
@@ -77,7 +88,15 @@ import std.file : exists;
 import std.format : format;
 import std.parallelism : parallel, taskPool;
 import std.path : buildPath;
-import std.range : drop, enumerate, evenChunks, chain, iota, only, zip;
+import std.range :
+    chain,
+    drop,
+    enumerate,
+    evenChunks,
+    iota,
+    only,
+    retro,
+    zip;
 import std.range.primitives : empty, front, popFront;
 import std.typecons : tuple, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
@@ -192,7 +211,9 @@ protected class PileUpProcessor
     protected AlignmentChain.Contig[] pileUpContigs;
     protected ReferencePoint[] croppingPositions;
     protected AlignmentLocationSeed[] croppingSeeds;
-    protected Enumerated!ReadAlignment[] referenceReadCandidates;
+    protected string pileUpAlignment;
+    protected HashSet!id_t allowedReferenceReadIds;
+    protected id_t[] referenceReadCandidateIndices;
     protected size_t referenceReadIdx;
     protected id_t referenceReadTry;
     protected string consensusDb;
@@ -271,7 +292,9 @@ protected class PileUpProcessor
                 reduceRepeatMaskToFlankingContigs();
                 crop();
                 adjustRepeatMaskToMakeMappingPossible();
-                findReferenceReadCandidates(croppingPositions);
+                selectAllowedReferenceReadIds();
+                computeQVs();
+                findReferenceReadCandidates();
                 while (selectReferenceRead(referenceReadTry++))
                 {
                     try
@@ -297,8 +320,8 @@ protected class PileUpProcessor
                     referenceReadIdx < size_t.max,
                     "no valid reference read found",
                     [
-                        "referenceReadCandidateIds": referenceReadCandidates
-                            .map!(enumReadAlignment => enumReadAlignment.value[0].contigB.id)
+                        "referenceReadCandidateIds": referenceReadCandidateIndices
+                            .map!(idx => pileUp[idx][0].contigB.id)
                             .array,
                     ].toJson
                 );
@@ -422,22 +445,104 @@ protected class PileUpProcessor
         }
     }
 
-    protected void findReferenceReadCandidates(in ReferencePoint[] referencePositions)
+    protected void selectAllowedReferenceReadIds()
     {
         // NOTE pileUp is not modified but the read alignments need to be assignable.
-        referenceReadCandidates = (cast(PileUp) pileUp)
-            .enumerate
-            .filter!(enumReadAlignment =>
-                enumReadAlignment.value.length == referencePositions.length &&
-                enumReadAlignment.value[].map!"a.contigA.id".equal(referencePositions.map!"a.contigId"))
-            .array
-            .sort!"a.value.meanScore > b.value.meanScore"
-            .release;
+        allowedReferenceReadIds = hashSet(
+            (cast(PileUp) pileUp)
+                .enumerate
+                .filter!(enumRA =>
+                    enumRA.value.length == croppingPositions.length &&
+                    enumRA.value[].map!"a.contigA.id".equal(croppingPositions.map!"a.contigId"))
+                .map!(enumRA => cast(id_t) (enumRA.index + 1))
+        );
+    }
+
+    protected void computeQVs()
+    {
+        dbdust(croppedDb, options.pileUpDustOptions);
+
+        auto rawPileUpAlignment = getDalignment(
+            croppedDb,
+            options.pileUpAlignmentOptions,
+            options.workdir,
+        );
+
+        dentistEnforce(
+            !lasEmpty(rawPileUpAlignment, croppedDb, options.workdir),
+            "empty raw pileup alignment",
+        );
+
+        auto coverage = cast(id_t) allowedReferenceReadIds.size;
+
+        if (coverage < minQVCoverage && pileUp.length >= minQVCoverage)
+            coverage = minQVCoverage;
+
+        .computeQVs(croppedDb, rawPileUpAlignment, coverage);
+
+        pileUpAlignment = filterPileUpAlignments(croppedDb, rawPileUpAlignment, options.properAlignmentAllowance);
+
+        dentistEnforce(
+            !lasEmpty(pileUpAlignment, croppedDb, options.workdir),
+            "empty pileup alignment after filtering",
+        );
+    }
+
+    protected void findReferenceReadCandidates()
+    {
+        auto croppedReads = getDbRecords(croppedDb, [
+            DBdumpOptions.readNumber,
+            DBdumpOptions.intrinsicQualityVector,
+        ]).filter!(read => read.readNumber in allowedReferenceReadIds).array;
+
+        auto hist = new size_t[DbRecord.maxQV];
+        size_t histTotal;
+        foreach (read; croppedReads)
+            foreach (qv; read.intrinsicQVs)
+                if (qv < DbRecord.maxQV)
+                {
+                    ++hist[qv];
+                    ++histTotal;
+                }
+
+        auto badThres = cast(size_t) (options.badFraction * histTotal);
+        auto badQV = DbRecord.maxQV - 1 - hist
+            .retro
+            .cumulativeFold!"a + b"(0UL)
+            .countUntil!"a >= b"(badThres);
+
+        logJsonInfo(
+            "badQV", badQV,
+            "pileUpId", pileUpId,
+            "pileUp", pileUp.pileUpToSimpleJson,
+        );
+
+        auto readsWithScores = croppedReads.map!(read => tuple!(
+            "numBadQVs",
+            "meanQV",
+            "readId",
+        )(
+            read.intrinsicQVs.count!"a >= b"(badQV),
+            read.intrinsicQVs.mean,
+            read.readNumber,
+        )).array;
+
+        sort(readsWithScores);
+
+        logJsonDebug(
+            "readsWithScores", readsWithScores.toJson,
+            "pileUpId", pileUpId,
+            "pileUp", pileUp.pileUpToSimpleJson,
+        );
+
+        referenceReadCandidateIndices = readsWithScores
+            .map!(rws => cast(id_t) (rws.readId - 1))
+            .array;
     }
 
     protected bool selectReferenceRead(in id_t referenceReadTry)
     {
-        referenceReadIdx = bestReadAlignmentIndex(referenceReadTry);
+        referenceReadIdx = bestReferenceReadIndex(referenceReadTry);
 
         if (referenceReadIdx == size_t.max)
             return false;
@@ -457,12 +562,12 @@ protected class PileUpProcessor
         return pileUp[referenceReadIdx];
     }
 
-    protected size_t bestReadAlignmentIndex(in id_t skip) const pure
+    protected size_t bestReferenceReadIndex(in id_t skip) const pure
     {
-        if (skip >= referenceReadCandidates.length)
+        if (skip >= referenceReadCandidateIndices.length)
             return size_t.max;
 
-        return referenceReadCandidates[skip].index;
+        return referenceReadCandidateIndices[skip];
     }
 
     protected void computeConsensus()
@@ -471,6 +576,7 @@ protected class PileUpProcessor
 
         consensusDb = getConsensus(
             croppedDb,
+            pileUpAlignment,
             referenceReadIdx + 1,
             options.consensusOptions,
         );

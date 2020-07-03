@@ -825,6 +825,23 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.processPileUps,
     ))
     {
+        @Option("bad-fraction")
+        @MetaVar("<frac>")
+        @Help("
+            Intrinsic QVs are categorized as \"bad\" if they are greater or equal to the best QV
+            of the worst <frac> trace point intervals.
+        ")
+        @(Validate!(value => enforce!CLIException(
+            0.0 <= value && value < 0.5,
+            "--bad-fraction must be within [1, 0.5)")
+        ))
+        double badFraction = 0.08;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
         @Option("batch", "b")
         @MetaVar("<idx-spec>[,<idx-spec>...]")
         @Help(q"{
@@ -1930,10 +1947,16 @@ struct OptionsFor(DentistCommand _command)
                 DalignerOptions.bridge,
                 format!(DalignerOptions.tracePointDistance ~ "%d")(forceLargeTracePointType),
                 format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
+                DalignerOptions.masks ~ "dust",
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     pileUpAlignmentOptionsAverageCorrelationRate,
                 ),
             ];
+        }
+
+        @property string[] pileUpDustOptions() const
+        {
+            return [];
         }
     }
 

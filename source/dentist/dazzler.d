@@ -3030,6 +3030,52 @@ string getDamapping(
     return lasFile;
 }
 
+
+string filterPileUpAlignments(
+    in string dbFile,
+    in string lasFile,
+    in coord_t properAlignmentAllowance,
+)
+{
+    auto alignments = getAlignments(dbFile, lasFile, null, 1);
+
+    filterPileUpAlignments(alignments, properAlignmentAllowance);
+
+    string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
+    writeAlignments(filteredLasFile, alignments);
+
+    return filteredLasFile;
+}
+
+void filterPileUpAlignments(
+    ref AlignmentChain[] alignments,
+    in coord_t properAlignmentAllowance,
+)
+{
+    /// An alignment in a pile up is valid iff it is proper and the begin/end
+    /// of both reads match.
+    static bool isValidPileUpAlignment(const ref AlignmentChain ac, const coord_t allowance)
+    {
+        alias isLeftAnchored = () =>
+            ac.beginsWith!"contigA"(allowance) && ac.beginsWith!"contigB"(allowance);
+        alias isLeftProper = () =>
+            ac.beginsWith!"contigA"(allowance) || ac.beginsWith!"contigB"(allowance);
+        alias isRightAnchored = () =>
+            ac.endsWith!"contigA"(allowance) && ac.endsWith!"contigB"(allowance);
+        alias isRightProper = () =>
+            ac.endsWith!"contigA"(allowance) || ac.endsWith!"contigB"(allowance);
+
+        return ac.contigA.id != ac.contigB.id && (
+            (isLeftAnchored() && isRightProper()) ||
+            (isRightAnchored() && isLeftProper())
+        );
+    }
+
+    foreach (ref alignment; alignments)
+        alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
+}
+
+
 /**
     Self-dalign dbFile and build consensus using daccord.
 
@@ -3092,8 +3138,47 @@ string getConsensus(Options)(in string dbFile, in Options options)
         "empty pre-consensus alignment",
     );
 
-    computeIntrinsticQualityValuesForConsensus(dbFile, options);
-    auto filteredLasFile = filterAlignmentsForConsensus(dbFile, options);
+    auto filteredLasFile = filterPileUpAlignments(dbFile, lasFile, options.properAlignmentAllowance);
+
+    return getConsensus(dbFile, filteredLasFile, options);
+}
+
+/// ditto
+string getConsensus(Options)(in string dbFile, in string filteredLasFile, in size_t readId, in Options options)
+        if (isOptionsList!(typeof(options.daccordOptions)) &&
+            isOptionsList!(typeof(options.dbsplitOptions)) &&
+            isSomeString!(typeof(options.workdir)))
+{
+    static struct ModifiedOptions
+    {
+        string[] daccordOptions;
+        string[] dbsplitOptions;
+        string workdir;
+    }
+
+    auto readIdx = readId - 1;
+    auto consensusDb = getConsensus(dbFile, filteredLasFile, const(ModifiedOptions)(
+        options.daccordOptions ~ format!"%s%d,%d"(cast(string) DaccordOptions.readInterval, readIdx, readIdx),
+        options.dbsplitOptions,
+        options.workdir,
+    ));
+
+    if (consensusDb is null)
+    {
+        throw new Exception("empty consensus");
+    }
+
+    return consensusDb;
+}
+
+/// ditto
+string getConsensus(Options)(in string dbFile, in string filteredLasFile, in Options options)
+        if (isOptionsList!(typeof(options.daccordOptions)) &&
+            isOptionsList!(typeof(options.dbsplitOptions)) &&
+            isSomeString!(typeof(options.workdir)))
+{
+    computeIntrinsticQualityValuesForConsensus(dbFile, filteredLasFile);
+
     enforce!DazzlerCommandException(
         !lasEmpty(
             filteredLasFile,
@@ -3105,63 +3190,21 @@ string getConsensus(Options)(in string dbFile, in Options options)
     );
 
     computeErrorProfile(dbFile, filteredLasFile, options);
-
     auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.workdir);
     dbsplit(consensusDb, options.dbsplitOptions, options.workdir);
 
     return consensusDb;
 }
 
-private void computeIntrinsticQualityValuesForConsensus(Options)(in string dbFile, in Options options)
-        if (isSomeString!(typeof(options.workdir)))
+private void computeIntrinsticQualityValuesForConsensus(in string dbFile, in string lasFile)
 {
-    auto readDepth = getNumContigs(dbFile, options.workdir);
-    auto lasFile = getLasFile(dbFile, options.workdir);
+    auto readDepth = getNumContigs(dbFile, null);
 
-    computeIntrinsicQV(dbFile, lasFile, readDepth, options.workdir);
-}
-
-private string filterAlignmentsForConsensus(Options)(in string dbFile, in Options options)
-        if (isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
-            is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
-            isSomeString!(typeof(options.workdir)))
-{
-    auto lasFile = getLasFile(dbFile, options.workdir);
-    //auto filteredLasFile = lasFilterAlignments(dbFile, lasFile, options.lasFilterAlignmentsOptions, options.workdir);
-
-    auto alignments = getAlignments(dbFile, lasFile, options.workdir, 1);
-
-    /// An alignment in a pile up is valid iff it is proper and the begin/end
-    /// of both reads match.
-    static bool isValidPileUpAlignment(const ref AlignmentChain ac, const coord_t allowance)
-    {
-        alias isLeftAnchored = () =>
-            ac.beginsWith!"contigA"(allowance) && ac.beginsWith!"contigB"(allowance);
-        alias isLeftProper = () =>
-            ac.beginsWith!"contigA"(allowance) || ac.beginsWith!"contigB"(allowance);
-        alias isRightAnchored = () =>
-            ac.endsWith!"contigA"(allowance) && ac.endsWith!"contigB"(allowance);
-        alias isRightProper = () =>
-            ac.endsWith!"contigA"(allowance) || ac.endsWith!"contigB"(allowance);
-
-        return ac.contigA.id != ac.contigB.id && (
-            (isLeftAnchored() && isRightProper()) ||
-            (isRightAnchored() && isLeftProper())
-        );
-    }
-
-    foreach (ref alignment; alignments)
-        alignment.disableIf(!isValidPileUpAlignment(alignment, options.properAlignmentAllowance));
-
-    string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
-    writeAlignments(filteredLasFile, alignments);
-
-    return filteredLasFile;
+    computeIntrinsicQV(dbFile, lasFile, readDepth, null);
 }
 
 private void computeErrorProfile(Options)(in string dbFile, in string lasFile, in Options options)
-        if (isOptionsList!(typeof(options.daccordOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+        if (isOptionsList!(typeof(options.daccordOptions)))
 {
     auto eProfOptions = options
         .daccordOptions
@@ -3174,7 +3217,7 @@ private void computeErrorProfile(Options)(in string dbFile, in string lasFile, i
         .array;
 
     // Produce error profile
-    silentDaccord(dbFile, lasFile, eProfOptions, options.workdir);
+    silentDaccord(dbFile, lasFile, eProfOptions, null);
 }
 
 
@@ -4079,7 +4122,7 @@ private
     {
         auto maskArgs = masks.map!"`-m` ~ a";
 
-        executeCommand(chain(only("dascover", "-v"), maskArgs, only(dbFile[], lasFile[])), null);
+        executeCommand(chain(only("DAScover", "-v"), maskArgs, only(dbFile[], lasFile[])), null);
     }
 
     @ExternalDependency("DASqv", "DASCRUBBER", "https://github.com/thegenemyers/DASCRUBBER")
