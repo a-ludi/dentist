@@ -145,6 +145,18 @@ auto getHiddenDbFiles(string dbFile)
             "." ~ dbFile.baseName.withExtension(suffix).to!string));
 }
 
+
+string stripDbExtension(in string dbFile) pure nothrow @safe
+{
+    if (dbFile.endsWith(dbFileExtension))
+        return dbFile[0 .. $ - dbFileExtension.length];
+    else if (dbFile.endsWith(damFileExtension))
+        return dbFile[0 .. $ - damFileExtension.length];
+    else
+        return dbFile[];
+}
+
+
 class DazzlerCommandException : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
@@ -2907,7 +2919,7 @@ enum dbdustMaskName = "dust";
 @ExternalDependency("DBdust", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
 void dbdust(in string dbFile, in string[] dbdustOptions)
 {
-    executeCommand(chain(only("DBdust"), dbdustOptions, only(dbFile)));
+    executeCommand(chain(only("DBdust"), dbdustOptions, only(dbFile.stripDbExtension)));
 }
 
 /**
