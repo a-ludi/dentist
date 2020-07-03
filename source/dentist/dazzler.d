@@ -2886,6 +2886,71 @@ unittest
     }
 }
 
+/**
+    Build `outputDb` with the given set of FASTA records. If no `outputDb`
+    is given a temporary `.db` file will be created.
+
+    Returns: DB file name
+*/
+string buildDbFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [], Append append = No.append)
+        if (isInputRange!Range && isSomeString!(ElementType!Range))
+{
+    enum tempDbNameTemplate = "auxiliary-XXXXXX";
+
+    auto tempDbTemplate = buildPath(tmpdir, tempDbNameTemplate);
+    auto tempDb = mkstemp(tempDbTemplate, dbFileExtension);
+
+    tempDb.file.close();
+    remove(tempDb.name);
+
+    return buildDbFile(tempDb.name, fastaRecords, dbsplitOptions);
+}
+
+/// ditto
+string buildDbFile(Range)(string outputDb, Range fastaRecords, in string[] dbsplitOptions = [], Append append = No.append)
+        if (isInputRange!Range && isSomeString!(ElementType!Range))
+{
+    assert(outputDb.endsWith(dbFileExtension), "outputDb must end with " ~ dbFileExtension);
+
+    fasta2db(outputDb, fastaRecords, null, append);
+    dbsplit(outputDb, dbsplitOptions);
+
+    return outputDb;
+}
+
+unittest
+{
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse, isFile;
+
+    auto fastaRecords = [
+        ">Sim/1/0_14 RQ=0.975\nggcccacccaggcagccc",
+        ">Sim/3/0_11 RQ=0.975\ngagtgcgtgcagtgg",
+    ];
+
+    auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+    scope (exit)
+        rmdirRecurse(tmpDir);
+
+    {
+        string dbName = buildDamFile(fastaRecords[], tmpDir);
+
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
+    }
+    {
+        string wantedDbName = buildPath(tmpDir, "unit-test.dam");
+        string dbName = buildDamFile(wantedDbName, fastaRecords[]);
+
+        assert(dbName == wantedDbName);
+        assert(dbName.isFile);
+        foreach (hiddenDbFile; getHiddenDbFiles(dbName))
+            assert(hiddenDbFile.isFile);
+    }
+}
+
+
 
 enum id_t minQVCoverage = 4;
 
@@ -4216,6 +4281,72 @@ private
         ensureWritableDb(outFile, append);
 
         executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
+    }
+
+    @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    void fasta2db(Range)(in string outFile, Range fastaRecords, in string workdir = null, Append append = No.append)
+            if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
+    {
+        import std.algorithm : each, joiner;
+        import std.process : Config, pipeProcess, Redirect, wait;
+        import std.range : chunks;
+
+        ensureWritableDb(outFile, append);
+
+        enum writeChunkSize = 1024 * 1024;
+        auto outFileArg = outFile.relativeToWorkdir(workdir);
+        auto command = ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFileArg];
+
+        if (shouldLog(LogLevel.diagnostic))
+        {
+            static if (isForwardRange!Range)
+                auto input = fastaRecords
+                    .save
+                    .map!(record => record[0 .. min(1024, $)].toJson)
+                    .array[0 .. min(1024, $)]
+                    .toJson;
+            else
+                auto input = toJson(null);
+
+            logJsonDiagnostic(
+                "action", "execute",
+                "type", "pipe",
+                "command", command.map!Json.array,
+                "input", input,
+                "state", "pre",
+            );
+        }
+
+        auto process = pipeProcess(
+            ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFileArg],
+            Redirect.stdin,
+            null, // env
+            Config.none,
+            workdir
+        );
+        fastaRecords
+            .filter!(fastaRecord => parseFastaRecord(fastaRecord).length >= minSequenceLength)
+            .joiner(only('\n'))
+            .chain("\n")
+            .chunks(writeChunkSize)
+            .each!(chunk => process.stdin.write(chunk.array));
+        process.stdin.close();
+        auto exitStatus = wait(process.pid);
+        if (exitStatus != 0)
+        {
+            throw new DazzlerCommandException(
+                    format!"command `fasta2db` failed with exit code %d"(exitStatus));
+        }
+
+        return;
+    }
+
+    @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    void fasta2db(in string inFile, in string outFile, in string workdir = null, Append append = No.append)
+    {
+        ensureWritableDb(outFile, append);
+
+        executeCommand(only("fasta2DB", outFile.relativeToWorkdir(workdir), inFile), workdir);
     }
 
     @ExternalDependency("DBsplit", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")

@@ -24,7 +24,7 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment,
     trace_point_t;
-import dentist.dazzler : buildDamFile, getFastaSequences;
+import dentist.dazzler : buildDbFile, getFastaSequences;
 import dentist.util.algorithm : sliceBy;
 import dentist.util.fasta : reverseComplement;
 import dentist.util.log;
@@ -102,8 +102,8 @@ private struct PileUpCropper
 
     void buildDb()
     {
-        enum extensionDbName = "pileup-%d.dam";
-        enum gapDbName = "pileup-%d-%d.dam";
+        enum extensionDbName = "pileup-%d.db";
+        enum gapDbName = "pileup-%d-%d.db";
 
         fetchCroppingRefPositions();
         fetchSupportPatches();
@@ -118,7 +118,7 @@ private struct PileUpCropper
             );
         croppedDb = buildPath(options.workdir, croppedDb);
 
-        buildDamFile(
+        buildDbFile(
             croppedDb,
             croppedSequences,
         );
@@ -327,7 +327,12 @@ private struct PileUpCropper
     )
     {
         static enum fastaLineWidth = 100;
-        auto fastaHeader = format!">read-%d"(readCroppingSlice.readId);
+        auto fastaHeader = format!">read-%d/%d/%d_%d"(
+            readCroppingSlice.readId,
+            readCroppingSlice.readId,
+            0,
+            prePatch.length + readCroppingSlice.size + postPatch.length,
+        );
         auto patchedSequence = chain(
             prePatch,
             readSequence[readCroppingSlice.begin .. readCroppingSlice.end],
