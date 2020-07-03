@@ -49,6 +49,7 @@ static import dentist.dazzler;
 static import dentist.modules;
 static import dentist.swinfo;
 static import dentist.util.algorithm;
+static import dentist.util.containers;
 static import dentist.util.fasta;
 static import dentist.util.log;
 static import dentist.util.math;
@@ -98,6 +99,7 @@ alias modules = AliasSeq!(
     dentist.modules,
     dentist.swinfo,
     dentist.util.algorithm,
+    dentist.util.containers,
     dentist.util.fasta,
     dentist.util.log,
     dentist.util.math,
