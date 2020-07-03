@@ -1303,7 +1303,10 @@ struct AlignmentHeader
     {
         AlignmentHeader headerData;
 
-        headerData.tracePointDistance = alignmentChains.front.tracePointDistance;
+        if (alignmentChains.empty)
+            headerData.tracePointDistance = 100;
+        else
+            headerData.tracePointDistance = alignmentChains.front.tracePointDistance;
 
         foreach (alignmentChain; alignmentChains)
         {
