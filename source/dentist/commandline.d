@@ -1444,7 +1444,7 @@ struct OptionsFor(DentistCommand _command)
         @Validate!(
             (value, options) => enforce!CLIException(
                 value > options.tracePointDistance,
-                "minimum anchor length should be greater than --trace-point-spacing"
+                "minimum anchor length should be greater than trace point spacing of *.las file"
             ),
             is(typeof(OptionsFor!command().tracePointDistance)),
         )
@@ -1709,28 +1709,15 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.output,
     ))
     {
-        @Option("trace-point-spacing", "s")
-        @Help("trace point spacing used for the ref vs. reads alignment")
         trace_point_t tracePointDistance;
 
-        @PostValidate(Priority.medium)
-        void hookEnsurePresenceOfTracePointDistance()
+        @PreValidate(Priority.medium)
+        void hookGetTracePointDistance()
         {
-            if (tracePointDistance > 0)
-                return;
-
             static if (is(typeof(readsDb)) && is(typeof(readsAlignmentFile)))
-                tracePointDistance = getTracePointDistance(
-                    refDb,
-                    readsDb,
-                    readsAlignmentFile,
-                );
+                tracePointDistance = getTracePointDistance(readsAlignmentFile);
             else static if (is(typeof(dbAlignmentFile)))
-                tracePointDistance = getTracePointDistance(
-                    refDb,
-                    readsDb,
-                    dbAlignmentFile,
-                );
+                tracePointDistance = getTracePointDistance(dbAlignmentFile);
         }
     }
 

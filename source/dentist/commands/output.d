@@ -296,7 +296,7 @@ class AssemblyWriter
         assemblyGraph = assemblyGraph
             .enforceJoinPolicy!InsertionInfo(options.joinPolicy, forbiddenInsertions)
             .normalizeUnkownJoins!InsertionInfo()
-            .fixCropping(options.tracePointDistance);
+            .fixCropping();
         incidentEdgesCache = assemblyGraph.allIncidentEdges();
 
         foreach (forbiddenInsertion; forbiddenInsertions)
@@ -781,7 +781,6 @@ class AssemblyWriter
 /// cropping where cropped regions overlap.
 OutputScaffold fixCropping(
     OutputScaffold scaffold,
-    trace_point_t tracePointDistance,
 )
 {
     mixin(traceExecution);

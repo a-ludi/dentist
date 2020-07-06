@@ -64,7 +64,6 @@ struct CropOptions
     string refDb;
     string readsDb;
     coord_t minAnchorLength;
-    trace_point_t tracePointDistance;
     string workdir;
 }
 
@@ -147,7 +146,9 @@ private struct PileUpCropper
                         "info", "could not find a common trace point",
                         "croppingRefPositions", croppingRefPositions.toJson,
                         "croppingSeeds", croppingSeeds.toJson,
-                        "tracePointDistance", options.tracePointDistance,
+                        "tracePointDistance", pileUp.length > 0
+                            ? pileUp[0][0].tracePointDistance
+                            : 0,
                         "pileUp", [
                             "type": pileUp.getType.to!string.toJson,
                             "readAlignments": shouldLog(LogLevel.debug_)
@@ -229,7 +230,7 @@ private struct PileUpCropper
     {
         auto alignmentsByContig = pileUp.splitAlignmentsByContigA();
         auto commonTracePoints = alignmentsByContig
-            .map!(acs => getCommonTracePoint(acs, repeatMask, options.tracePointDistance));
+            .map!(acs => getCommonTracePoint(acs, repeatMask));
         auto contigAIds = alignmentsByContig.map!"a[0].contigA.id";
         auto seeds = alignmentsByContig.map!"a[0].seed".array;
 
@@ -383,7 +384,6 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
 private long getCommonTracePoint(
     in SeededAlignment[] alignments,
     in ReferenceRegion mask,
-    in size_t tracePointDistance,
 )
 {
     static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion tracePointRegion) pure
@@ -396,6 +396,7 @@ private long getCommonTracePoint(
 
     auto contigA = alignments[0].contigA;
     auto locationSeed = alignments[0].seed;
+    auto tracePointDistance = alignments[0].tracePointDistance;
     auto commonAlignmentRegion = alignments
         .map!(to!(ReferenceRegion, "contigA"))
         .fold!"a & b";

@@ -398,7 +398,6 @@ protected class PileUpProcessor
             options.refDb,
             options.readsDb,
             options.minAnchorLength,
-            options.tracePointDistance,
             options.workdir,
         ));
 
