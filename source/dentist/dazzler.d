@@ -378,53 +378,9 @@ AlignmentChain[] getAlignments(
     return alignmentChains;
 }
 
-void attachTracePoints(
-    AlignmentChain*[] alignmentChains,
-    in string dbA,
-    in string dbB,
-    in string lasFile,
-    in trace_point_t tracePointDistance,
-    in string workdir
-)
-{
-    static enum ladumpOptions = [
-        LAdumpOptions.coordinates,
-        LAdumpOptions.tracePoints,
-    ];
 
-    // NOTE: dump only for matching A reads; better would be for matching
-    //       B reads but that is not possible with `LAdump`.
-    auto aReadIds = alignmentChains.map!"a.contigA.id".uniq.array;
-    auto lasdumpReader = readLasDump(ladump(
-        lasFile,
-        dbA,
-        dbB,
-        aReadIds,
-        ladumpOptions,
-        workdir,
-    ));
-    scope (exit) lasdumpReader.closePipe();
-    auto acsWithTracePoints = lasdumpReader.array;
-    acsWithTracePoints.sort!"a < b";
-    assert(isSorted!"*a < *b"(alignmentChains), "alignmentChains must be sorted");
-
-    auto numAttached = alignmentChains.attachTracePoints(acsWithTracePoints, tracePointDistance);
-    assert(numAttached == alignmentChains.length,
-            "missing trace point lists for some alignment chains");
-
-    debug logJsonDebug("acsWithTracePoints", acsWithTracePoints.toJson);
-    version (assert)
-    {
-        // ensure all alignment chains are valid...
-        foreach (alignmentChain; alignmentChains)
-        {
-            // trigger invariant of AlignmentChain
-            cast(void) alignmentChain.first;
-        }
-    }
-}
-
-auto fingerprint(in AlignmentChain* alignmentChain) pure nothrow
+/// Returns a tuple of contig IDs and first and last begin/end coords.
+auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
 {
     return tuple(
         alignmentChain.contigA.id,
@@ -436,193 +392,6 @@ auto fingerprint(in AlignmentChain* alignmentChain) pure nothrow
     );
 }
 
-private id_t attachTracePoints(AlignmentChain*[] alignmentChains,
-        ref AlignmentChain[] acsWithTracePoints, in trace_point_t tracePointDistance) pure
-{
-    assert(tracePointDistance > 0);
-
-    id_t numAlignmentChainsAffected = 0;
-    id_t numLoops = 0;
-    id_t i = 0;
-    id_t j = 0;
-
-    while (i < alignmentChains.length && j < acsWithTracePoints.length
-            && numLoops < alignmentChains.length + acsWithTracePoints.length)
-    {
-        auto alignmentChain = alignmentChains[i];
-        auto acWithTracePoints = &acsWithTracePoints[j];
-        auto acFingerprint = alignmentChain.fingerprint;
-        auto tpFingerprint = acWithTracePoints.fingerprint;
-
-        debug logJsonDebug(
-            "acFingerprint", acFingerprint.toJson,
-            "tpFingerprint", tpFingerprint.toJson,
-        );
-
-        if (acFingerprint == tpFingerprint)
-        {
-            foreach (k, ref localAlignment; alignmentChain.localAlignments)
-            {
-                localAlignment.tracePoints = acWithTracePoints.localAlignments[k].tracePoints;
-            }
-            alignmentChain.tracePointDistance = tracePointDistance;
-            numAlignmentChainsAffected = i + 1;
-            ++i;
-        }
-        else if (tpFingerprint < acFingerprint)
-        {
-            ++j;
-        }
-        else
-        {
-            assert(tpFingerprint > acFingerprint);
-            throw new Exception(
-                    format!"missing trace point data for alignment chain: %s"(*alignmentChain));
-        }
-
-        ++numLoops;
-    }
-
-    return numAlignmentChainsAffected;
-}
-
-unittest
-{
-    with (AlignmentChain) with (LocalAlignment)
-    {
-        auto alignmentChains = [
-            new AlignmentChain(
-                1,
-                Contig(1, 1337),
-                Contig(1, 307),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1337), Locus(0, 307), 1),
-                ],
-            ),
-            new AlignmentChain(
-                2,
-                Contig(1, 1338),
-                Contig(1, 309),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1338), Locus(0, 309), 2),
-                ],
-            ),
-            new AlignmentChain(
-                3,
-                Contig(1, 1340),
-                Contig(3, 508),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1339), Locus(0, 403), 3),
-                    LocalAlignment(Locus(0, 1340), Locus(404, 508), 4),
-                ],
-            ),
-        ];
-        auto acsWithTracePoints = [
-            AlignmentChain(
-                1,
-                Contig(1, 1337),
-                Contig(1, 307),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1337), Locus(0, 307), 0, [
-                        TracePoint(1, 102),
-                        TracePoint(2, 101),
-                        TracePoint(3, 104),
-                    ]),
-                ],
-                101
-            ),
-            AlignmentChain(
-                2,
-                Contig(1, 1338),
-                Contig(1, 309),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1338), Locus(0, 309), 0, [
-                        TracePoint(4, 103),
-                        TracePoint(5, 104),
-                        TracePoint(6, 102),
-                    ]),
-                ],
-                101
-            ),
-            AlignmentChain(
-                3,
-                Contig(1, 1340),
-                Contig(3, 508),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1339), Locus(0, 403), 0, [
-                        TracePoint(7, 105),
-                        TracePoint(8, 101),
-                        TracePoint(9, 100),
-                        TracePoint(10, 97),
-                    ]),
-                    LocalAlignment(Locus(0, 1340), Locus(404, 508), 0, [
-                        TracePoint(11, 2),
-                        TracePoint(12, 102),
-                    ]),
-                ],
-                101
-            ),
-        ];
-        auto expectedAlignmentChains = [
-            AlignmentChain(
-                1,
-                Contig(1, 1337),
-                Contig(1, 307),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1337), Locus(0, 307), 1, [
-                        TracePoint(1, 102),
-                        TracePoint(2, 101),
-                        TracePoint(3, 104),
-                    ]),
-                ],
-                101
-            ),
-            AlignmentChain(
-                2,
-                Contig(1, 1338),
-                Contig(1, 309),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1338), Locus(0, 309), 2, [
-                        TracePoint(4, 103),
-                        TracePoint(5, 104),
-                        TracePoint(6, 102),
-                    ]),
-                ],
-                101
-            ),
-            AlignmentChain(
-                3,
-                Contig(1, 1340),
-                Contig(3, 508),
-                emptyFlags,
-                [
-                    LocalAlignment(Locus(0, 1339), Locus(0, 403), 3, [
-                        TracePoint(7, 105),
-                        TracePoint(8, 101),
-                        TracePoint(9, 100),
-                        TracePoint(10, 97),
-                    ]),
-                    LocalAlignment(Locus(0, 1340), Locus(404, 508), 4, [
-                        TracePoint(11, 2),
-                        TracePoint(12, 102),
-                    ]),
-                ],
-                101
-            ),
-        ];
-
-        assert(alignmentChains.attachTracePoints(acsWithTracePoints, 101) == 3);
-        assert(alignmentChains.map!"*a".array == expectedAlignmentChains);
-    }
-}
 
 private struct LasDumpLineFormatTuple
 {
@@ -1689,7 +1458,7 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
                 logJsonWarn(
                     "info", "faking too long alignment gap",
                     "gapSize", aSubsequence.length,
-                    "acFingerprint", [fingerprint(&ac).expand].toJson,
+                    "acFingerprint", [fingerprint(ac).expand].toJson,
                 );
                 auto fakeAlignment = typeof(_paddedAlignment)(
                     0,
@@ -1815,7 +1584,7 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
                 _paddedAlignment.isValid(),
                 format
                     !"exact alignment invalid after stitching: %1$d %2$d [%3$d, %5$d) [%4$d, %6$d)"
-                    (fingerprint(&ac).expand),
+                    (fingerprint(ac).expand),
             );
         }
 
