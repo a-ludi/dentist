@@ -2656,7 +2656,7 @@ private
         );
         validateFileExists(lasFile);
         enforce!CLIException(
-            !lasEmpty(lasFile, dbA, dbB, cwd),
+            !lasEmpty(lasFile),
             format!"empty alignment file `%s`"(lasFile),
         );
     }

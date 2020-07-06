@@ -469,7 +469,7 @@ protected class PileUpProcessor
         );
 
         dentistEnforce(
-            !lasEmpty(rawPileUpAlignment, croppedDb, options.workdir),
+            !lasEmpty(rawPileUpAlignment),
             "empty raw pileup alignment",
         );
 
@@ -483,7 +483,7 @@ protected class PileUpProcessor
         pileUpAlignment = filterPileUpAlignments(croppedDb, rawPileUpAlignment, options.properAlignmentAllowance);
 
         dentistEnforce(
-            !lasEmpty(pileUpAlignment, croppedDb, options.workdir),
+            !lasEmpty(pileUpAlignment),
             "empty pileup alignment after filtering",
         );
     }

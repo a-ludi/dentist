@@ -174,27 +174,26 @@ void delegate(string dbFile) handleExistingDb = (dbFile) => removeDB(dbFile);
 
 
 /// Returns true iff lasFile contains zero parts.
+bool lasEmpty(in string lasFile)
+{
+    auto header = readLasHeader(lasFile);
+
+    return header.numParts == 0;
+}
+
+deprecated("use the one argument version")
 bool lasEmpty(in string lasFile, in string dbA, in string workdir)
 {
-    return lasEmpty(lasFile, dbA, null, workdir);
+    return lasEmpty(lasFile);
 }
 
 /// ditto
+deprecated("use the one argument version")
 bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir)
 {
-    auto dumpHeader = ladump(lasFile, dbA, dbB, [], workdir);
-
-    if (dumpHeader.empty)
-    {
-        return true;
-    }
-
-    size_t numParts;
-
-    dumpHeader.front.formattedRead!"+ P %d"(numParts);
-
-    return numParts == 0;
+    return lasEmpty(lasFile);
 }
+
 
 /// Returns the number of records in dbFile.
 id_t numDbRecords(in string dbFile, in string workdir)
@@ -1393,29 +1392,25 @@ private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
     }
 }
 
+
+/// Returns the trace point distance in lasFile.
+trace_point_t getTracePointDistance(in string lasFile)
+{
+    return readLasHeader(lasFile).tracePointSpacing;
+}
+
+/// ditto
 trace_point_t getTracePointDistance(in string dbA, in string lasFile)
 {
-    return getTracePointDistance(dbA, null, lasFile);
+    return getTracePointDistance(lasFile);
 }
 
+/// ditto
 trace_point_t getTracePointDistance(in string dbA, in string dbB, in string lasFile)
 {
-    auto dumpHeader = ladump(lasFile, dbA, dbB, [LAdumpOptions.tracePoints], null);
-
-    trace_point_t tracePointDistance;
-
-    foreach (line; dumpHeader.take(100))
-        if (line.startsWith('X'))
-            break;
-
-    enforce!DazzlerCommandException(
-        !dumpHeader.empty && dumpHeader.front.startsWith('X'),
-        "empty or corrupted LAS file",
-    );
-    dumpHeader.front.formattedRead!"X %d"(tracePointDistance);
-
-    return tracePointDistance;
+    return getTracePointDistance(lasFile);
 }
+
 
 auto getExactAlignment(
     in string dbA,
@@ -3128,15 +3123,7 @@ string getConsensus(Options)(in string dbFile, in Options options)
 {
     dalign(dbFile, options.dalignerOptions, options.workdir);
     auto lasFile = getLasFile(dbFile, options.workdir);
-    enforce!DazzlerCommandException(
-        !lasEmpty(
-            lasFile,
-            dbFile,
-            null,
-            options.workdir,
-        ),
-        "empty pre-consensus alignment",
-    );
+    enforce!DazzlerCommandException(!lasEmpty(lasFile), "empty pre-consensus alignment");
 
     auto filteredLasFile = filterPileUpAlignments(dbFile, lasFile, options.properAlignmentAllowance);
 
@@ -3179,15 +3166,7 @@ string getConsensus(Options)(in string dbFile, in string filteredLasFile, in Opt
 {
     computeIntrinsticQualityValuesForConsensus(dbFile, filteredLasFile);
 
-    enforce!DazzlerCommandException(
-        !lasEmpty(
-            filteredLasFile,
-            dbFile,
-            null,
-            options.workdir,
-        ),
-        "empty pre-consensus alignment",
-    );
+    enforce!DazzlerCommandException(!lasEmpty(filteredLasFile), "empty pre-consensus alignment");
 
     computeErrorProfile(dbFile, filteredLasFile, options);
     auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.workdir);
@@ -4089,6 +4068,101 @@ enum LasFilterAlignmentsOptions : string
 
 private
 {
+    auto readLasHeader(in string lasFile)
+    {
+        long numParts;
+        int tracePointSpacing;
+
+        auto las = File(lasFile, "rb");
+
+        enforce!DazzlerCommandException(
+            las.rawRead((&numParts)[0 .. 1]).length == 1,
+            "corrupted las header: could not read number of local alignments",
+        );
+        enforce!DazzlerCommandException(
+            las.rawRead((&tracePointSpacing)[0 .. 1]).length == 1,
+            "corrupted las header: could not read trace point spacing",
+        );
+
+        return tuple!(
+            "numParts",
+            "tracePointSpacing",
+        )(
+            numParts.to!size_t,
+            tracePointSpacing.to!trace_point_t,
+        );
+    }
+
+    unittest
+    {
+        import dentist.util.tempfile : mkdtemp;
+        import std.file : rmdirRecurse;
+
+        alias Contig = AlignmentChain.Contig;
+        alias Flags = AlignmentChain.Flags;
+        enum complement = AlignmentChain.Flag.complement;
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias Locus = LocalAlignment.Locus;
+        alias TracePoint = LocalAlignment.TracePoint;
+
+        auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+        scope (exit)
+            rmdirRecurse(tmpDir);
+
+        auto lasFile = buildPath(tmpDir, "test.las");
+        enum tracePointSpacing = 1337;
+
+        lasFile.writeAlignments([
+            AlignmentChain(
+                0,
+                Contig(1, 13),
+                Contig(2, 15),
+                Flags(),
+                [
+                    LocalAlignment(
+                        Locus(3, 4),
+                        Locus(5, 6),
+                        7,
+                    ),
+                    LocalAlignment(
+                        Locus(12, 13),
+                        Locus(14, 15),
+                        16,
+                    ),
+                ],
+                tracePointSpacing,
+            ),
+            AlignmentChain(
+                1,
+                Contig(19, 31),
+                Contig(20, 33),
+                Flags(complement),
+                [
+                    LocalAlignment(
+                        Locus(21, 22),
+                        Locus(23, 24),
+                        25,
+                    ),
+                    LocalAlignment(
+                        Locus(30, 31),
+                        Locus(32, 33),
+                        34,
+                        [
+                            TracePoint(0, 1),
+                        ]
+                    ),
+                ],
+                tracePointSpacing,
+            ),
+        ]);
+
+        auto h = readLasHeader(lasFile);
+
+        assert(h.numParts == 4);
+        assert(h.tracePointSpacing == tracePointSpacing);
+    }
+
+
     void ensureWritableDb(string dbFile, Append append)
     {
         if (!append && dbFile.exists)
