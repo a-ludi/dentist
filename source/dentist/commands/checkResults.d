@@ -588,7 +588,6 @@ private struct ResultAnalyzer
             options.resultDb,
             croppedContigDb,
             croppedContigMappingFile,
-            options.workdir,
         );
 
         foreach (ref ac; croppedContigAlignments)

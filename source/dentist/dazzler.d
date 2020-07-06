@@ -332,13 +332,63 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
 AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
+    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+)
+{
+    return getAlignments(dbA, null, lasFile, includeTracePoints);
+}
+
+AlignmentChain[] getAlignments(
+    in string dbA,
+    in string dbB,
+    in string lasFile,
+    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+)
+{
+    string[] ladumpOptions = [
+        LAdumpOptions.coordinates,
+        LAdumpOptions.numDiffs,
+        LAdumpOptions.lengths,
+    ];
+    trace_point_t tracePointDistance;
+
+    if (includeTracePoints)
+    {
+        ladumpOptions ~= LAdumpOptions.tracePoints;
+        tracePointDistance = getTracePointDistance(lasFile);
+    }
+
+    auto lasdumpReader = readLasDump(ladump(
+        lasFile,
+        dbA,
+        dbB,
+        ladumpOptions,
+        null,
+    ), tracePointDistance);
+    scope (exit) lasdumpReader.closePipe();
+    auto alignmentChains = lasdumpReader.array;
+    alignmentChains.sort!("a < b", SwapStrategy.stable);
+
+    return alignmentChains;
+}
+
+deprecated("use version without arguments workdir and tracePointDistance 1")
+AlignmentChain[] getAlignments(
+    in string dbA,
+    in string lasFile,
     in string workdir,
     in trace_point_t tracePointDistance = 0,
 )
 {
-    return getAlignments(dbA, null, lasFile, workdir, tracePointDistance);
+    return getAlignments(
+        dbA,
+        null,
+        lasFile,
+        cast(Flag!"includeTracePoints") (tracePointDistance > 0),
+    );
 }
 
+deprecated("use version without arguments workdir and tracePointDistance 2")
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
@@ -347,35 +397,12 @@ AlignmentChain[] getAlignments(
     in trace_point_t tracePointDistance = 0,
 )
 {
-    string[] ladumpOptions = [
-        LAdumpOptions.coordinates,
-        LAdumpOptions.numDiffs,
-        LAdumpOptions.lengths,
-    ];
-
-    if (tracePointDistance > 0)
-        ladumpOptions ~= LAdumpOptions.tracePoints;
-
-    auto lasdumpReader = readLasDump(ladump(
-        lasFile,
+    return getAlignments(
         dbA,
         dbB,
-        ladumpOptions,
-        workdir,
-    ));
-    scope (exit) lasdumpReader.closePipe();
-    auto alignmentChains = lasdumpReader.array;
-    alignmentChains.sort!("a < b", SwapStrategy.stable);
-
-    if (
-        tracePointDistance > 0 &&
-        alignmentChains.length > 0 &&
-        alignmentChains[0].tracePointDistance == 0
-    )
-        foreach (ref alignmentChain; alignmentChains)
-            alignmentChain.tracePointDistance = tracePointDistance;
-
-    return alignmentChains;
+        lasFile,
+        cast(Flag!"includeTracePoints") (tracePointDistance > 0),
+    );
 }
 
 
@@ -447,9 +474,10 @@ private:
     debug dchar[] allowedLineTypes;
 
 public:
-    this(S lasDump)
+    this(S lasDump, trace_point_t tracePointDistance)
     {
         this.lasDump = getDumpLines(lasDump);
+        this.tracePointDistance = tracePointDistance;
         debug with (LasDumpLineFormat)
         {
             this.allowedLineTypes = [
@@ -817,9 +845,9 @@ private:
     }
 }
 
-private auto readLasDump(S)(S lasDump)
+private auto readLasDump(S)(S lasDump, trace_point_t tracePointDistance)
 {
-    return LasDumpReader!S(lasDump);
+    return LasDumpReader!S(lasDump, tracePointDistance);
 }
 
 unittest
@@ -900,7 +928,7 @@ unittest
 
     with (AlignmentChain) with (Flag) with (LocalAlignment)
     {
-        auto alignmentChains = readLasDump(testLasDump).array;
+        auto alignmentChains = readLasDump(testLasDump, 0).array;
         auto expectedResult = [
             AlignmentChain(
                 0,
@@ -2801,7 +2829,7 @@ string filterPileUpAlignments(
     in coord_t properAlignmentAllowance,
 )
 {
-    auto alignments = getAlignments(dbFile, lasFile, null, 1);
+    auto alignments = getAlignments(dbFile, lasFile, Yes.includeTracePoints);
 
     filterPileUpAlignments(alignments, properAlignmentAllowance);
 

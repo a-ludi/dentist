@@ -632,8 +632,7 @@ protected class PileUpProcessor
                 options.postConsensusAlignmentOptions,
                 options.workdir,
             ),
-            options.workdir,
-            options.tracePointDistance,
+            Yes.includeTracePoints,
         );
 
         postConsensusAlignment = filterContainedAlignmentChains(postConsensusAlignment);

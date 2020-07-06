@@ -73,7 +73,6 @@ private struct GapTranslocator
             options.trueAssemblyDb,
             options.shortReadAssemblyDb,
             options.shortReadAssemblyAlignmentFile,
-            options.workdir,
         );
     }
 

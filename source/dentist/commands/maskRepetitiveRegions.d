@@ -94,7 +94,6 @@ class RepeatMaskAssessor
                 alignment = getAlignments(
                     options.refDb,
                     options.dbAlignmentFile,
-                    options.workdir,
                 );
                 break;
             case AlignmentType.reads:
@@ -102,7 +101,6 @@ class RepeatMaskAssessor
                     options.refDb,
                     options.readsDb,
                     options.dbAlignmentFile,
-                    options.workdir,
                 );
                 break;
         }

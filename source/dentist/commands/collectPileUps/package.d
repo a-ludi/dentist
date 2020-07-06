@@ -102,8 +102,7 @@ class PileUpCollector
             options.refDb,
             options.readsDb,
             options.readsAlignmentFile,
-            options.workdir,
-            options.tracePointDistance,
+            Yes.includeTracePoints,
         );
 
         foreach (mask; options.repeatMasks)
