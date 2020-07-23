@@ -5,6 +5,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+[standard-readme]: https://github.com/RichardLitt/standard-readme
+
+
+## [1.0.0-beta.2] - 2020-07-23
+### Added
+- Allow use of environment variables in Snakemake workflow config
+- Avoid appending to DBs by design
+- Improved README:
+    - Advice on how to choose parameters
+    - Advice on how to run DENTIST with different read types
+    - Version information to dependencies
+- Log level information to log messages
+- More logging on failed gap closing
+
+### Changed
+- Simplified usage of `--workdir`: no need to manually create
+  the designated directory
+- Improvements to close more gaps:
+    - Custom pre-consensus alignment filtering
+    - Add support sequence to cropped reads to ensure daligner finds alignments
+    - Allow cropping in masked region if necessary
+    - Selectively ignore repeat mask to allow post consensus alignments
+    - Increased sensitivity in pileup alignments by adding the bridging option
+      of `daligner`
+- Select reference read for consensus by intrinsic QVs → better
+  consensus quality
+- Moved flag `--max-insertion-error` from `process` to `output` stage so
+  trying different values becomes much faster
+- Automatically deduce trace point spacing in all places
+- Faster check if `.las` files are empty → faster CLI options checking
+- Naming of temporary files for easier inspection
+- Use `DBdust` for post consensus alignment
+- Produce `.db` for cropped pileups (temporary files) to make `DAScover`
+  and `DASqv` work
+- Removed `-I` option from `daligner` calls (avoid useless alignment)
+
+### Fixed
+- Several bugs in Snakemake workflow
+- Significantly improved number of closed gaps
+- Coordinates in AGP output
+- Bug in procedure that identifies a good cropping position
+- Error that caused `--proper-alignment-allowance` to have no effect by default
+
+
 ## [1.0.0-beta.1] - 2020-03-17
 ### Added
 - post-consensus alignment and validation with new parameter
@@ -48,9 +92,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consensus
 - bug that caused `check-results` to discard all alignments in certain loci
 - added missing logic for cropped contigs in `getGapState` in `check-results`
-
-
-[standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
 ## [0.0.1] - 2018-01-03
