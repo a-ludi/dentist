@@ -57,11 +57,11 @@ dub build
 
 The following software packages are required to run `dentist`:
 
-- [The Dazzler Data Base][DAZZ_DB]
-- [`daligner`][daligner]
-- [`damapper`][damapper]
-- [`TANmask`][damasker]
-- [`daccord`][daccord]
+- [The Dazzler Data Base][DAZZ_DB] (>=2020-01-15)
+- [`daligner`][daligner] (>=2019-07-21 && <=2020-01-15)
+- [`damapper`][damapper] (>=2020-03-10)
+- [`TANmask`][damasker] (>=2020-01-15)
+- [`daccord`][daccord] (>=v0.0.17)
 
 Please see their own documentation for installtion instructions. Note, the
 available packages on Bioconda are outdated and should not be used at the
