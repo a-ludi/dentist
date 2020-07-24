@@ -544,6 +544,7 @@ rule tandem_alignment:
         alignment_file = lambda _, output: basename(output[0]),
         datander_flags = prepare_flags(datander_flags)
     log: log_file("tandem-alignment")
+    threads: max_threads
     shell:
         """
             {{
