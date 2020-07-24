@@ -1709,15 +1709,30 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.output,
     ))
     {
+        @(Validate!(validatePositive!("trace-point-distance", trace_point_t)))
         trace_point_t tracePointDistance;
 
         @PreValidate(Priority.medium)
         void hookGetTracePointDistance()
         {
             static if (is(typeof(readsDb)) && is(typeof(readsAlignmentFile)))
-                tracePointDistance = getTracePointDistance(readsAlignmentFile);
+                auto alignmentFile = readsAlignmentFile;
             else static if (is(typeof(dbAlignmentFile)))
-                tracePointDistance = getTracePointDistance(dbAlignmentFile);
+                auto alignmentFile = dbAlignmentFile;
+
+            static if (is(typeof(alignmentFile)))
+            {
+                try
+                {
+                    validateLasFile(alignmentFile);
+                    tracePointDistance = getTracePointDistance(alignmentFile);
+                }
+                catch (Exception e)
+                {
+                    // this will trigger the validation if need be
+                    assert(tracePointDistance == 0);
+                }
+            }
         }
     }
 
@@ -2260,7 +2275,7 @@ private
         }
         catch (Exception e)
         {
-            stderr.writeln("Error: " ~ (shouldLog(LogLevel.diagnostic)
+            stderr.writeln("Error: " ~ (true || shouldLog(LogLevel.diagnostic)
                 ? e.to!string
                 : e.msg));
             stderr.writeln();
@@ -2633,7 +2648,7 @@ private
         }
     }
 
-    void validateLasFile(in string lasFile, in string dbA, in string dbB=null)
+    void validateLasFile(in string lasFile, in string dbA=null, in string dbB=null)
     {
         auto cwd = getcwd.absolutePath;
 
