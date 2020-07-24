@@ -94,7 +94,7 @@ working directory:
 
 Next edit `snakemake.yml` to fit your needs and test your configuration with
 
-    snakemake --configfile=snakemake.yml extend_dentist_config
+    snakemake --configfile=snakemake.yml -- extend_dentist_config
 
 If no errors occurred the whole workflow can be executed using
 
