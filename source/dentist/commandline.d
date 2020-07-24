@@ -1812,6 +1812,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         TestingCommand.checkResults,
@@ -2295,7 +2296,8 @@ template commandSummary(DentistCommand command)
         }".wrap;
     else static if (command == DentistCommand.chainLocalAlignments)
         enum commandSummary = q"{
-            Chain local alignment.
+            Chain local alignments. Right now this produces just the single
+            best chain per combination of A-read and B-read.
         }".wrap;
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{

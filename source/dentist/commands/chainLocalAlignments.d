@@ -11,13 +11,15 @@ module dentist.commands.chainLocalAlignments;
 import dentist.commandline : OptionsFor;
 import dentist.common.alignments :
     AlignmentChain,
-    chainLocalAlignments;
+    chainLocalAlignments,
+    cmpIdsAndComplement;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     AlignmentHeader,
     getAlignments,
     writeAlignments;
 import dentist.util.log;
+import std.algorithm : sort;
 import std.range : tee;
 import std.typecons : Yes;
 
@@ -54,6 +56,7 @@ class CLIChainer
         mixin(traceExecution);
 
         readAlignments();
+        sortAlignments();
         inferHeaderData();
         chainLocalAlignments();
     }
@@ -69,6 +72,16 @@ class CLIChainer
             options.dbAlignmentFile,
             Yes.includeTracePoints
         );
+    }
+
+
+    void sortAlignments()
+    {
+        mixin(traceExecution);
+
+        // Order required for faster chaining because local aligments with
+        // different complements must not be chained.
+        sort!((a, b) => cmpIdsAndComplement(a, b) < 0)(alignments);
     }
 
 

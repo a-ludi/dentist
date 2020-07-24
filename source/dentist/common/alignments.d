@@ -22,6 +22,7 @@ import std.algorithm :
     all,
     among,
     any,
+    cache,
     canFind,
     chunkBy,
     countUntil,
@@ -45,6 +46,7 @@ import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
 import std.format : format;
 import std.math : sgn;
+import std.parallelism : defaultTaskPool = taskPool, TaskPool;
 import std.range :
     assumeSorted,
     chain,
@@ -1405,8 +1407,20 @@ unittest
 }
 
 
+int cmpIdsAndComplement(ref const AlignmentChain lhs, ref const AlignmentChain rhs)
+{
+    return cmpLexicographically!(
+        const(AlignmentChain),
+        ac => ac.contigA.id,
+        ac => ac.contigB.id,
+        ac => ac.flags.complement,
+    )(lhs, rhs);
+}
+
+
 /// Chain local alignments contained in `inputAlignments`.
-auto chainLocalAlignments(R)(R inputAlignments) if (isInputRange!R && is(ElementType!R == AlignmentChain))
+auto chainLocalAlignments(R)(R inputAlignments, size_t numThreads = size_t.max)
+    if (isInputRange!R && is(ElementType!R == AlignmentChain))
 {
     enum maxIndelBps = 5_000;
     enum maxRelativeOverlap = 1f/3f;
@@ -1453,9 +1467,9 @@ auto chainLocalAlignments(R)(R inputAlignments) if (isInputRange!R && is(Element
     alias minLength(char seq) = (x, y) => min(length!seq(x), length!seq(y));
     alias indel               = (x, y) => absdiff(gap!'a'(x, y), gap!'b'(x, y));
 
-    static bool haveEqualIds(const FlatLocalAlignment x, const FlatLocalAlignment y) pure nothrow
+    static bool sameIdsAndComplement(const FlatLocalAlignment x, const FlatLocalAlignment y) pure nothrow
     {
-        return x.aId == y.aId && x.bId == y.bId;
+        return x.aId == y.aId && x.bId == y.bId && x.flags.complement == y.flags.complement;
     }
 
     // Returns true iff `x` may precede `y` in a chain.
@@ -1525,12 +1539,27 @@ auto chainLocalAlignments(R)(R inputAlignments) if (isInputRange!R && is(Element
         ? 0
         : inputAlignments.front.tracePointDistance;
 
-    return inputAlignments
+    auto chunksForChaining = inputAlignments
         .filter!"!a.flags.disabled"
         .map!toFlatLocalAlignments
         .joiner
-        .chunkBy!haveEqualIds
-        .map!(chunk => buildAlignmentChain(chunk.array, tracePointDistance));
+        .chunkBy!sameIdsAndComplement
+        .map!(chunk => tuple(chunk.array, tracePointDistance));
+
+    static auto staticBuildAlignmentChain(Args)(Args args)
+    {
+        return buildAlignmentChain(args.expand);
+    }
+
+    auto taskPool = numThreads < size_t.max
+        ? new TaskPool(numThreads)
+        : defaultTaskPool;
+
+    return taskPool.map!staticBuildAlignmentChain(
+        chunksForChaining,
+        10_000,
+        1_000,
+    );
 }
 
 
