@@ -25,6 +25,7 @@ mixin("enum DentistCommand {" ~
     "generateDazzlerOptions," ~
     "maskRepetitiveRegions," ~
     "showMask," ~
+    "chainLocalAlignments," ~
     "collectPileUps," ~
     "showPileUps," ~
     "processPileUps," ~

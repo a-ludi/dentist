@@ -14,6 +14,7 @@ import dentist.common.scaffold :
     ContigPart,
     Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
+import dentist.util.floydwarshallalgorithm : allPairsShortestPaths;
 import dentist.util.log;
 import dentist.util.math : absdiff, ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
@@ -31,6 +32,7 @@ import std.algorithm :
     isSorted,
     joiner,
     map,
+    max,
     mean,
     min,
     sort,
@@ -47,10 +49,12 @@ import std.range :
     assumeSorted,
     chain,
     chunks,
+    ElementType,
     enumerate,
     InputRange,
     inputRangeObject,
     iota,
+    isInputRange,
     only,
     radial,
     repeat,
@@ -58,6 +62,7 @@ import std.range :
     slide,
     takeNone,
     zip;
+import std.range.primitives;
 import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
@@ -1398,6 +1403,136 @@ unittest
 
     assert(alignmentCoverage(alignments) == 80.0 / 100.0);
 }
+
+
+/// Chain local alignments contained in `inputAlignments`.
+auto chainLocalAlignments(R)(R inputAlignments) if (isInputRange!R && is(ElementType!R == AlignmentChain))
+{
+    enum maxIndelBps = 5_000;
+    enum maxRelativeOverlap = 1f/3f;
+
+    alias FlatLocalAlignment = Tuple!(
+        id_t, "alignmentId",
+        id_t, "aId",
+        coord_t, "aLength",
+        id_t, "bId",
+        coord_t, "bLength",
+        AlignmentChain.Flags, "flags",
+        arithmetic_t, "aBegin",
+        arithmetic_t, "aEnd",
+        arithmetic_t, "bBegin",
+        arithmetic_t, "bEnd",
+        diff_t, "numDiffs",
+        AlignmentChain.LocalAlignment.TracePoint[], "tracePoints",
+    );
+
+    static auto toFlatLocalAlignments(AlignmentChain ac) pure nothrow
+        in (ac.localAlignments.length == 1, "alignment already chained")
+    {
+        return ac
+            .localAlignments
+            .map!(la => FlatLocalAlignment(
+                ac.id,
+                ac.contigA.id,
+                ac.contigA.length,
+                ac.contigB.id,
+                ac.contigB.length,
+                ac.flags,
+                la.contigA.begin.to!arithmetic_t,
+                la.contigA.end.to!arithmetic_t,
+                la.contigB.begin.to!arithmetic_t,
+                la.contigB.end.to!arithmetic_t,
+                la.numDiffs,
+                la.tracePoints,
+            ));
+    }
+
+    alias gap(char seq)       = (x, y) => mixin("y." ~ seq ~ "Begin - x." ~ seq ~ "End");
+    alias overlap(char seq)   = (x, y) => max(0, -gap!seq(x, y));
+    alias length(char seq)    = (la)   => mixin("la." ~ seq ~ "End - la." ~ seq ~ "Begin");
+    alias minLength(char seq) = (x, y) => min(length!seq(x), length!seq(y));
+    alias indel               = (x, y) => absdiff(gap!'a'(x, y), gap!'b'(x, y));
+
+    static bool haveEqualIds(const FlatLocalAlignment x, const FlatLocalAlignment y) pure nothrow
+    {
+        return x.aId == y.aId && x.bId == y.bId;
+    }
+
+    // Returns true iff `x` may precede `y` in a chain.
+    // This relation is asymmetric and irreflexive but not transitive.
+    static bool areChainable(const FlatLocalAlignment x, const FlatLocalAlignment y) pure nothrow
+        in (x.aId == y.aId && x.bId == y.bId, "local alignments must be grouped by ids")
+        out (chainable; !chainable || !areChainable(y, x), "should be asymmetric")
+        out (chainable; x.alignmentId != y.alignmentId || !chainable, "should be irreflexive")
+    {
+        if (x.flags.complement != y.flags.complement)
+            return false;
+
+        return x.aBegin < y.aBegin && x.bBegin < y.bBegin && // chain only if both seqs advance
+               indel(x, y) <= maxIndelBps &&
+               (overlap!'a'(x, y) <= maxRelativeOverlap * minLength!'a'(x, y)) &&
+               (overlap!'b'(x, y) <= maxRelativeOverlap * minLength!'b'(x, y));
+    }
+
+    static arithmetic_t chainScore(const FlatLocalAlignment x, const FlatLocalAlignment y) pure nothrow
+        in (areChainable(x, y))
+    {
+        return indel(x, y) - (length!'a'(y) + length!'b'(y))/2;
+    }
+
+    static AlignmentChain buildAlignmentChain(FlatLocalAlignment[] flatLocalAlignments, trace_point_t tracePointDistance)
+    {
+        auto bestConnections = new size_t[2][1];
+        auto bestChains = allPairsShortestPaths!(
+            (x, y) => areChainable(flatLocalAlignments[x], flatLocalAlignments[y]),
+            (x, y) => chainScore(flatLocalAlignments[x], flatLocalAlignments[y]),
+        )(flatLocalAlignments.length, bestConnections);
+        auto bestChain = bestChains
+            .shortestPath(bestConnections[0][0], bestConnections[0][1])
+            .map!(idx => flatLocalAlignments[idx]);
+
+        alias Contig = AlignmentChain.Contig;
+        alias Flag = AlignmentChain.Flag;
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias Locus = AlignmentChain.LocalAlignment.Locus;
+
+        auto firstLA = flatLocalAlignments.front;
+
+        return AlignmentChain(
+            firstLA.alignmentId,
+            Contig(
+                firstLA.aId,
+                firstLA.aLength,
+            ),
+            Contig(
+                firstLA.bId,
+                firstLA.bLength,
+            ),
+            firstLA.flags & Flag.complement,
+            bestChain
+                .map!(fla => LocalAlignment(
+                    Locus(fla.aBegin, fla.aEnd),
+                    Locus(fla.bBegin, fla.bEnd),
+                    fla.numDiffs,
+                    fla.tracePoints,
+                ))
+                .array,
+            tracePointDistance,
+        );
+    }
+
+    trace_point_t tracePointDistance = inputAlignments.empty
+        ? 0
+        : inputAlignments.front.tracePointDistance;
+
+    return inputAlignments
+        .filter!"!a.flags.disabled"
+        .map!toFlatLocalAlignments
+        .joiner
+        .chunkBy!haveEqualIds
+        .map!(chunk => buildAlignmentChain(chunk.array, tracePointDistance));
+}
+
 
 /// Type of the read alignment.
 enum AlignmentLocationSeed : ubyte

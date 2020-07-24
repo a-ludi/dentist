@@ -370,7 +370,10 @@ struct OptionsFor(DentistCommand _command)
     @Option()
     string executableVersion = version_;
 
-    static if (command == DentistCommand.maskRepetitiveRegions)
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
+    ))
     {
         @ArgumentsParser
         auto parseArguments(const(string)[] leftOver)
@@ -439,6 +442,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -465,11 +469,15 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
     {
-        static if (command == DentistCommand.maskRepetitiveRegions)
+        static if (command.among(
+            DentistCommand.maskRepetitiveRegions,
+            DentistCommand.chainLocalAlignments,
+        ))
             enum argReadsMultiplicity = Multiplicity.optional;
         else
             enum argReadsMultiplicity = 1;
@@ -516,6 +524,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
     ))
     {
         @Argument("<in:alignment>")
@@ -685,6 +694,16 @@ struct OptionsFor(DentistCommand _command)
         @Help("write inferred repeat mask into a Dazzler mask.")
         @Validate!((value, options) => validateOutputMask(options.refDb, value))
         string repeatMask;
+    }
+
+    static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Argument("<out:chained-las>")
+        @Help("write alignment chains to <chained-las>.")
+        @Validate!(value => validateFileWritable(value))
+        string chainedAlignments;
     }
 
     static if (command.among(
@@ -1638,6 +1657,47 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("progress")
+        @Help("Print regular status reports on the progress.")
+        OptionFlag printProgress;
+
+        @Option("progress-every")
+        @MetaVar("<msecs>")
+        @Help(format!"
+            Print status reports every <msecs>. (default: %d)
+        "(defaultValue!printProgressEvery))
+        uint printProgressEvery = 500;
+
+        @Option("progress-format")
+        @MetaVar("<format>")
+        @Help(format!"
+            Use <format> for status report lines where <format> is either
+            `human` or `json`. The former prints a status line that updates
+            regularly while the latter prints a full JSON record per line with
+            every update (default: %s)
+        "(defaultValue!progressFormat))
+        ProgressMeter.Format progressFormat = ProgressMeter.Format.human;
+
+
+        ProgressMeter createProgressMeter() const @safe
+        {
+            import std.typecons : Flag;
+
+            ProgressMeter progress;
+
+            progress.silent = cast(Flag!"silent") !printProgress;
+            progress.unit = ProgressMeter.Unit.auto_;
+            progress.printEveryMsecs = printProgressEvery;
+            progress.format = progressFormat;
+
+            return progress;
+        }
+    }
+
+    static if (command.among(
         TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
@@ -1773,6 +1833,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -2231,6 +2292,10 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.showMask)
         enum commandSummary = q"{
             Show a short summary of the mask.
+        }".wrap;
+    else static if (command == DentistCommand.chainLocalAlignments)
+        enum commandSummary = q"{
+            Chain local alignment.
         }".wrap;
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{
