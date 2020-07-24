@@ -14,6 +14,7 @@ import dentist.common.scaffold :
     ContigPart,
     Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
+import dentist.util.floydwarshallalgorithm : allPairsShortestPaths;
 import dentist.util.log;
 import dentist.util.math : absdiff, ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
@@ -21,6 +22,7 @@ import std.algorithm :
     all,
     among,
     any,
+    cache,
     canFind,
     chunkBy,
     countUntil,
@@ -31,6 +33,7 @@ import std.algorithm :
     isSorted,
     joiner,
     map,
+    max,
     mean,
     min,
     sort,
@@ -43,21 +46,26 @@ import std.conv : to;
 import std.exception : assertNotThrown, assertThrown, enforce, ErrnoException;
 import std.format : format;
 import std.math : sgn;
+import std.parallelism : defaultTaskPool = taskPool, TaskPool;
 import std.range :
     assumeSorted,
     chain,
     chunks,
+    ElementType,
     enumerate,
     InputRange,
     inputRangeObject,
     iota,
+    isInputRange,
     only,
     radial,
     repeat,
     retro,
     slide,
+    tee,
     takeNone,
     zip;
+import std.range.primitives;
 import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
@@ -1457,6 +1465,156 @@ struct FlatLocalAlignment
     Flags flags;
     trace_point_t tracePointDistance;
     TracePoint[] tracePoints;
+}
+
+
+int cmpIdsAndComplement(ref const AlignmentChain lhs, ref const AlignmentChain rhs)
+{
+    return cmpLexicographically!(
+        const(AlignmentChain),
+        ac => ac.contigA.id,
+        ac => ac.contigB.id,
+        ac => ac.flags.complement,
+    )(lhs, rhs);
+}
+
+
+struct ChainingOptions
+{
+    coord_t maxIndelBps;
+    double maxRelativeOverlap;
+}
+
+
+/// Chain local alignments contained in `inputAlignments`.
+auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
+    if (isInputRange!R && is(ElementType!R == FlatLocalAlignment))
+{
+    alias gap(char seq)       = (x, y) => mixin("cast(arithmetic_t) y.contig" ~ seq ~ ".begin - cast(arithmetic_t) x.contig" ~ seq ~ ".end");
+    alias overlap(char seq)   = (x, y) => max(0, -gap!seq(x, y));
+    alias length(char seq)    = (la)   => mixin("cast(arithmetic_t) la.contig" ~ seq ~ ".end - la.contig" ~ seq ~ ".begin");
+    alias minLength(char seq) = (x, y) => min(length!seq(x), length!seq(y));
+    alias indel               = (x, y) => absdiff(gap!'A'(x, y), gap!'B'(x, y));
+
+    static bool sameIds(
+        const FlatLocalAlignment x,
+        const FlatLocalAlignment y,
+    ) pure nothrow
+    {
+        return x.contigA.id == y.contigA.id &&
+               x.contigB.id == y.contigB.id;
+    }
+
+    static int cmpIds(ref const FlatLocalAlignment lhs, ref const FlatLocalAlignment rhs)
+    {
+        return cmpLexicographically!(
+            const(FlatLocalAlignment),
+            la => la.contigA.id,
+            la => la.contigB.id,
+        )(lhs, rhs);
+    }
+
+    // Returns true iff `x` may precede `y` in a chain.
+    // This relation is asymmetric and irreflexive but not transitive.
+    static bool areChainable(
+        ref const FlatLocalAlignment x,
+        ref const FlatLocalAlignment y,
+        const ChainingOptions options,
+    ) pure nothrow
+        in (x.contigA.id == y.contigA.id && x.contigB.id == y.contigB.id, "local alignments must be grouped by ids")
+        out (chainable; !chainable || !areChainable(y, x, options), "should be asymmetric")
+        out (chainable; x.id != y.id || !chainable, "should be irreflexive")
+    {
+        if (x.flags.complement != y.flags.complement)
+            return false;
+
+        return x.contigA.begin < y.contigA.begin && x.contigB.begin < y.contigB.begin && // chain only if both seqs advance
+               indel(x, y) <= options.maxIndelBps &&
+               (overlap!'A'(x, y) <= options.maxRelativeOverlap * minLength!'A'(x, y)) &&
+               (overlap!'B'(x, y) <= options.maxRelativeOverlap * minLength!'B'(x, y));
+    }
+
+    static arithmetic_t chainScore(
+        ref const FlatLocalAlignment x,
+        ref const FlatLocalAlignment y,
+        const ChainingOptions options,
+    ) pure nothrow
+        in (areChainable(x, y, options))
+    {
+        return indel(x, y) - (length!'A'(y) + length!'B'(y))/2;
+    }
+
+    static AlignmentChain buildAlignmentChain(
+        FlatLocalAlignment[] flatLocalAlignments,
+        const ChainingOptions options,
+    )
+    {
+        auto bestConnections = new size_t[2][1];
+        auto bestChains = allPairsShortestPaths!(
+            (x, y) => areChainable(
+                flatLocalAlignments[x],
+                flatLocalAlignments[y],
+                options,
+            ),
+            (x, y) => chainScore(
+                flatLocalAlignments[x],
+                flatLocalAlignments[y],
+                options,
+            ),
+        )(flatLocalAlignments.length, bestConnections);
+        auto bestChain = bestChains
+            .shortestPath(bestConnections[0][0], bestConnections[0][1])
+            .map!(idx => flatLocalAlignments[idx]);
+
+        alias Contig = AlignmentChain.Contig;
+        alias Flag = AlignmentChain.Flag;
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias Locus = AlignmentChain.LocalAlignment.Locus;
+
+        auto firstLA = flatLocalAlignments.front;
+
+        return AlignmentChain(
+            firstLA.id,
+            Contig(
+                firstLA.contigA.id,
+                firstLA.contigA.length,
+            ),
+            Contig(
+                firstLA.contigB.id,
+                firstLA.contigB.length,
+            ),
+            firstLA.flags & Flag.complement,
+            bestChain
+                .map!(fla => LocalAlignment(
+                    Locus(fla.contigA.begin, fla.contigA.end),
+                    Locus(fla.contigB.begin, fla.contigB.end),
+                    0,
+                    fla.tracePoints,
+                ))
+                .array,
+            firstLA.tracePointDistance,
+        );
+    }
+
+    FlatLocalAlignment lastLA;
+    lastLA.id = id_t.max;
+
+    return inputAlignments
+        .filter!"!a.flags.disabled"
+        .tee!((ref la) {
+            // duplicate buffer of trace points
+            la.tracePoints = la.tracePoints.dup;
+
+            // make sure local alignments are orderd...
+            enforce(
+                lastLA.id == id_t.max || cmpIds(lastLA, la) <= 0,
+                "local alignments are not ordered properly",
+            );
+
+            lastLA = la;
+        })
+        .chunkBy!sameIds
+        .map!(chunk => buildAlignmentChain(chunk.array, options));
 }
 
 

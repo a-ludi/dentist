@@ -370,7 +370,10 @@ struct OptionsFor(DentistCommand _command)
     @Option()
     string executableVersion = version_;
 
-    static if (command == DentistCommand.maskRepetitiveRegions)
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
+    ))
     {
         @ArgumentsParser
         auto parseArguments(const(string)[] leftOver)
@@ -439,6 +442,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -465,11 +469,15 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
     {
-        static if (command == DentistCommand.maskRepetitiveRegions)
+        static if (command.among(
+            DentistCommand.maskRepetitiveRegions,
+            DentistCommand.chainLocalAlignments,
+        ))
             enum argReadsMultiplicity = Multiplicity.optional;
         else
             enum argReadsMultiplicity = 1;
@@ -516,6 +524,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
     ))
     {
         @Argument("<in:alignment>")
@@ -685,6 +694,16 @@ struct OptionsFor(DentistCommand _command)
         @Help("write inferred repeat mask into a Dazzler mask.")
         @Validate!((value, options) => validateOutputMask(options.refDb, value))
         string repeatMask;
+    }
+
+    static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Argument("<out:chained-las>")
+        @Help("write alignment chains to <chained-las>.")
+        @Validate!(value => validateFileWritable(value))
+        string chainedAlignments;
     }
 
     static if (command.among(
@@ -1484,6 +1503,19 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("max-indel")
+        @MetaVar("<bps>")
+        @Help(format!"
+            two local alignments may only be chained if the resulting
+            insertion or deletion is at most <bps> (default: %d)
+        "(defaultValue!maxIndelBps))
+        coord_t maxIndelBps = 1_000;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1496,6 +1528,25 @@ struct OptionsFor(DentistCommand _command)
             "maximum insertion error rate must be in (0, 0.3]"
         ))
         double maxInsertionError = 1e-2;
+    }
+
+    static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("max-relative-overlap")
+        @MetaVar("<fraction>")
+        @Help(format!"
+            two local alignments may only be chained if the overlap between
+            them is at most <fraction> times the size of the shorter local
+            alignment. This must hold for the reference and query.
+            (default: %s)
+        "(defaultValue!maxRelativeOverlap))
+        @(Validate!(value => enforce!CLIException(
+            0.0 < value && value < 1.0,
+            "maximum relative overlap must be in (0, 1)"
+        )))
+        double maxRelativeOverlap = 1e-2;
     }
 
     static if (command.among(
@@ -1638,6 +1689,47 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("progress")
+        @Help("Print regular status reports on the progress.")
+        OptionFlag printProgress;
+
+        @Option("progress-every")
+        @MetaVar("<msecs>")
+        @Help(format!"
+            Print status reports every <msecs>. (default: %d)
+        "(defaultValue!printProgressEvery))
+        uint printProgressEvery = 500;
+
+        @Option("progress-format")
+        @MetaVar("<format>")
+        @Help(format!"
+            Use <format> for status report lines where <format> is either
+            `human` or `json`. The former prints a status line that updates
+            regularly while the latter prints a full JSON record per line with
+            every update (default: %s)
+        "(defaultValue!progressFormat))
+        ProgressMeter.Format progressFormat = ProgressMeter.Format.human;
+
+
+        ProgressMeter createProgressMeter() const @safe
+        {
+            import std.typecons : Flag;
+
+            ProgressMeter progress;
+
+            progress.silent = cast(Flag!"silent") !printProgress;
+            progress.unit = ProgressMeter.Unit.auto_;
+            progress.printEveryMsecs = printProgressEvery;
+            progress.format = progressFormat;
+
+            return progress;
+        }
+    }
+
+    static if (command.among(
         TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
@@ -1773,6 +1865,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -2231,6 +2324,11 @@ template commandSummary(DentistCommand command)
     else static if (command == DentistCommand.showMask)
         enum commandSummary = q"{
             Show a short summary of the mask.
+        }".wrap;
+    else static if (command == DentistCommand.chainLocalAlignments)
+        enum commandSummary = q"{
+            Chain local alignments. Right now this produces just the single
+            best chain per combination of A-read and B-read.
         }".wrap;
     else static if (command == DentistCommand.collectPileUps)
         enum commandSummary = q"{

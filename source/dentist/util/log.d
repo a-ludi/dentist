@@ -314,3 +314,244 @@ unittest
     assert(observed2["state"] == "exit");
     assert(matchFirst(observed2["function"].to!string, functionFQN));
 }
+
+
+struct ProgressMeter
+{
+    import std.datetime.stopwatch : StopWatch;
+    import std.algorithm : max;
+    import std.stdio :
+        File,
+        stderr;
+    import std.typecons :
+        Flag,
+        No,
+        Tuple,
+        Yes;
+
+    alias UnitSpec = Tuple!(size_t, "multiplier", char, "name");
+
+
+    enum Unit : UnitSpec
+    {
+        auto_ = UnitSpec(0, '\0'),
+        one = UnitSpec(1, ' '),
+        kilo = UnitSpec(10^^3, 'k'),
+        mega = UnitSpec(10^^6, 'M'),
+        giga = UnitSpec(10^^9, 'G'),
+        peta = UnitSpec(10^^12, 'P'),
+        min = one,
+        max = peta,
+    }
+
+
+    enum Format : ubyte
+    {
+        human,
+        json,
+    }
+
+
+    size_t printEveryMsecs = 500;
+    Unit unit;
+    size_t precision = 3;
+    size_t totalTicks;
+    size_t numTicks;
+    Flag!"silent" silent;
+    Format format;
+    private File _output;
+    private bool hasOutput;
+    private StopWatch timer;
+    private StopWatch lastPrint;
+
+
+    @property void output(File output)
+    {
+        hasOutput = true;
+        _output = output;
+    }
+
+
+    @property auto ref File output()
+    {
+        if (!hasOutput)
+            output = stderr;
+
+        return _output;
+    }
+
+
+    void start()
+    {
+        numTicks = 0;
+        if (!silent)
+        {
+            lastPrint.reset();
+            lastPrint.start();
+            printProgressLine(LineLocation.first);
+        }
+        timer.reset();
+        timer.start();
+    }
+
+
+    void tick()
+    {
+        ++numTicks;
+
+        if (!silent && lastPrint.peek.total!"msecs" > printEveryMsecs)
+            printProgressLine(LineLocation.middle);
+    }
+
+
+    void stop()
+    {
+        timer.stop();
+
+        if (!silent)
+            printProgressLine(LineLocation.last);
+    }
+
+
+    static enum isValidTimeUnit(string timeUnit) = is(typeof(timer.peek.total!timeUnit));
+    static assert(isValidTimeUnit!"msecs");
+
+
+    @property auto elapsed(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
+    {
+        return timer.peek.total!timeUnit;
+    }
+
+
+    @property auto ticksPer(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
+    {
+        return cast(double) numTicks / elapsed!timeUnit;
+    }
+
+
+    @property auto hasETA() const nothrow @safe
+    {
+        return totalTicks > 0 && numTicks > 0;
+    }
+
+    alias hasEstimatedTimeOfArrival = hasETA;
+
+
+    @property auto eta(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
+    {
+        return (totalTicks - numTicks)/ticksPer!timeUnit;
+    }
+
+    alias estimatedTimeOfArrival = eta;
+
+
+    static Unit selectUnitFor(size_t number) pure nothrow @safe
+    {
+        import std.traits : EnumMembers;
+
+        foreach (unit; EnumMembers!Unit)
+            if (unit.multiplier > 0 && number / unit.multiplier < 1000)
+                return unit;
+        return Unit.max;
+    }
+
+
+private:
+
+
+    enum LineLocation : ubyte
+    {
+        first,
+        middle,
+        last,
+    }
+
+
+    void printProgressLine(LineLocation lineLocation)
+    {
+        final switch (format)
+        {
+            case Format.human:
+                printHumanProgressLine(lineLocation);
+                break;
+            case Format.json:
+                printJsonProgressLine(lineLocation);
+                break;
+        }
+
+        lastPrint.reset();
+    }
+
+
+    void printHumanProgressLine(LineLocation lineLocation)
+    {
+        enum progressFormat = "\rrecords: %04.*f%c  elapsed: %04.*f sec  rate: %04.*f records/sec";
+        enum progressFormatWithTotal = "\rrecords: %04.*f/%04.*f%c (%04.2f%%) eta: %04.*f sec  elapsed: %04.*f sec  rate: %04.*f records/sec";
+        auto elapsedSecs = timer.peek.total!"msecs" * 1e-3;
+
+        auto unit = this.unit == Unit.auto_
+            ? selectUnitFor(max(numTicks, totalTicks))
+            : this.unit;
+
+        if (totalTicks == 0)
+            output.writef!progressFormat(
+                precision,
+                cast(double) numTicks / unit.multiplier,
+                unit.name,
+                precision,
+                elapsedSecs,
+                precision,
+                cast(double) numTicks / elapsedSecs,
+            );
+        else
+            output.writef!progressFormatWithTotal(
+                precision,
+                cast(double) numTicks / unit.multiplier,
+                precision,
+                cast(double) totalTicks / unit.multiplier,
+                unit.name,
+                (100.0 * numTicks / totalTicks),
+                precision,
+                eta!"seconds",
+                precision,
+                elapsedSecs,
+                precision,
+                cast(double) numTicks / elapsedSecs,
+            );
+
+        final switch (lineLocation)
+        {
+            case LineLocation.first:
+            case LineLocation.middle:
+                output.flush();
+                break;
+            case LineLocation.last:
+                output.writeln();
+                break;
+        }
+    }
+
+
+    void printJsonProgressLine(LineLocation lineLocation)
+    {
+        import vibe.data.json;
+
+        if (lineLocation == LineLocation.first)
+            return;
+
+        auto elapsedSecs = timer.peek.total!"msecs" * 1e-3;
+        auto unit = this.unit == Unit.auto_
+            ? selectUnitFor(max(numTicks, totalTicks))
+            : this.unit;
+
+        auto status = Json.emptyObject;
+
+        status["ticks"] = numTicks;
+        status["elapsedSecs"] = elapsedSecs;
+        status["ticksPerSec"] = cast(double) numTicks / elapsedSecs;
+        if (totalTicks > 0)
+            status["etaSecs"] = eta!"seconds";
+
+        output.writeln(status.toString());
+    }
+}

@@ -14,6 +14,7 @@ module dentist.modules;
 import std.meta : AliasSeq;
 static import dentist.commandline;
 static import dentist.commands.buildPartialAssembly;
+static import dentist.commands.chainLocalAlignments;
 static import dentist.commands.checkResults;
 static import dentist.commands.collectPileUps;
 static import dentist.commands.collectPileUps.filter;
@@ -51,11 +52,13 @@ static import dentist.swinfo;
 static import dentist.util.algorithm;
 static import dentist.util.containers;
 static import dentist.util.fasta;
+static import dentist.util.floydwarshallalgorithm;
 static import dentist.util.log;
 static import dentist.util.math;
 static import dentist.util.process;
 static import dentist.util.range;
 static import dentist.util.region;
+static import dentist.util.saturationmath;
 static import dentist.util.string;
 static import dentist.util.suffixtree;
 static import dentist.util.tempfile;
@@ -64,6 +67,7 @@ static import dentist.util.tempfile;
 alias modules = AliasSeq!(
     dentist.commandline,
     dentist.commands.buildPartialAssembly,
+    dentist.commands.chainLocalAlignments,
     dentist.commands.checkResults,
     dentist.commands.collectPileUps,
     dentist.commands.collectPileUps.filter,
@@ -101,11 +105,13 @@ alias modules = AliasSeq!(
     dentist.util.algorithm,
     dentist.util.containers,
     dentist.util.fasta,
+    dentist.util.floydwarshallalgorithm,
     dentist.util.log,
     dentist.util.math,
     dentist.util.process,
     dentist.util.range,
     dentist.util.region,
+    dentist.util.saturationmath,
     dentist.util.string,
     dentist.util.suffixtree,
     dentist.util.tempfile,

@@ -1684,9 +1684,20 @@ struct AlignmentHeader
     }
 }
 
-@ExternalDependency("dumpLA", null, "https://github.com/thegenemyers/DALIGNER")
 AlignmentHeader writeAlignments(R)(const string lasFile, R alignmentChains)
     if (isForwardRange!R)
+{
+    auto headerData = AlignmentHeader.inferFrom(alignmentChains.save);
+
+    return lasFile.writeAlignments(alignmentChains, headerData);
+}
+
+@ExternalDependency("dumpLA", null, "https://github.com/thegenemyers/DALIGNER")
+AlignmentHeader writeAlignments(R)(
+    const string lasFile,
+    R alignmentChains,
+    AlignmentHeader headerData,
+) if (isInputRange!R)
 {
     auto dumpCommand = ["dumpLA", lasFile];
     auto converter = pipeProcess(dumpCommand, Redirect.stdin);
@@ -1698,8 +1709,6 @@ AlignmentHeader writeAlignments(R)(const string lasFile, R alignmentChains)
         "command", dumpCommand.toJson,
         "state", "pre",
     );
-
-    auto headerData = AlignmentHeader.inferFrom(alignmentChains.save);
 
     writer.writefln!"@ T %d"(2 * headerData.maxTracePoints);
     writer.writefln!"X %d"(headerData.tracePointDistance);
