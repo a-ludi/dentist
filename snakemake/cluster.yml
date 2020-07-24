@@ -12,6 +12,21 @@ mask_self:
     memory:     16384
     time:       00:15
 
+tandem_alignment:
+    jobname:    dentist.{rule}
+    memory:     32768
+    time:       00:30
+
+mask_tandem:
+    jobname:    dentist.{rule}
+    memory:     32768
+    time:       00:30
+
+dbdust:
+    jobname:    dentist.{rule}.{wildcards.dbstub}
+    memory:     2048
+    time:       00:30
+
 ref_vs_reads_alignment_block:
     jobname:    dentist.{rule}.{wildcards.block_reads}
     memory:     32768
@@ -29,10 +44,6 @@ process:
     jobname:    dentist.{rule}.{wildcards.batch_id}
     memory:     16384
     time:       02:00
-
-merge:
-    memory:     1024
-    time:       00:10
 
 output:
     memory:     16384
