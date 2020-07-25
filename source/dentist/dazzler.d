@@ -10,7 +10,13 @@ module dentist.dazzler;
 
 import core.memory : GC;
 import dentist.common : ReferenceInterval, ReferenceRegion;
-import dentist.common.alignments : AlignmentChain, coord_t, diff_t, id_t, trace_point_t;
+import dentist.common.alignments :
+    AlignmentChain,
+    coord_t,
+    diff_t,
+    FlatLocalAlignment,
+    id_t,
+    trace_point_t;
 import dentist.common.binio : CompressedSequence;
 import dentist.common.external : ExternalDependency;
 import dentist.util.algorithm : sliceUntil;
@@ -1085,6 +1091,557 @@ unittest
         assert(alignmentChains == expectedResult);
     }
 }
+
+
+auto getFlatLocalAlignments(
+    in string dbA,
+    in string lasFile,
+    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+)
+{
+    return getFlatLocalAlignments(dbA, null, lasFile, includeTracePoints);
+}
+
+auto getFlatLocalAlignments(
+    in string dbA,
+    in string dbB,
+    in string lasFile,
+    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+)
+{
+    string[] ladumpOptions = [
+        LAdumpOptions.coordinates,
+        LAdumpOptions.lengths,
+    ];
+    trace_point_t tracePointDistance;
+
+    if (includeTracePoints)
+    {
+        ladumpOptions ~= LAdumpOptions.tracePoints;
+        tracePointDistance = getTracePointDistance(lasFile);
+    }
+
+    return readFlatLasDump(ladump(
+        lasFile,
+        dbA,
+        dbB,
+        ladumpOptions,
+        null,
+    ), tracePointDistance);
+}
+
+
+private class FlatLasDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
+{
+    static alias dstring = immutable(dchar)[];
+    static alias LasDump = ReturnType!getDumpLines;
+    static alias FlatLocus = FlatLocalAlignment.FlatLocus;
+    static alias TracePoint = FlatLocalAlignment.TracePoint;
+
+private:
+
+    LasDump lasDump;
+    bool _empty;
+    FlatLocalAlignment currentLA;
+    id_t currentLAId;
+    dstring currentDumpLine;
+    size_t currentDumpLineNumber;
+    dchar currentLineType;
+    dchar currentLineSubType;
+    size_t numLocalAlignments;
+    public size_t maxTracePointCount;
+    size_t numTracePointsLeft;
+    TracePoint[] tracePointsAcc;
+    public trace_point_t tracePointDistance;
+
+public:
+
+    this(S lasDump, trace_point_t tracePointDistance)
+    {
+        this.lasDump = getDumpLines(lasDump);
+        this.tracePointDistance = tracePointDistance;
+        this.popFront();
+    }
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty FlatLasDumpReader");
+
+        if (lasDump.empty)
+        {
+            return setEmpty();
+        }
+
+        readNextFlatLocalAlignment();
+    }
+
+    @property bool empty() const pure nothrow
+    {
+        return _empty;
+    }
+
+    @property FlatLocalAlignment front() pure nothrow
+    {
+        assert(!empty, "Attempting to fetch the front of an empty FlatLasDumpReader");
+
+        return currentLA;
+    }
+
+    @property size_t length() const pure nothrow @safe
+    {
+        return numLocalAlignments;
+    }
+
+    static if (__traits(hasMember, lasDump, "destroy"))
+        alias closePipe = setEmpty;
+
+    void setEmpty() pure nothrow
+    {
+        static if (__traits(hasMember, lasDump, "destroy"))
+            lasDump.destroy();
+        _empty = true;
+    }
+
+private:
+
+    static auto getDumpLines(S lasDump)
+    {
+        return lasDump.enumerate(1).filter!"!a[1].empty";
+    }
+
+    void readNextFlatLocalAlignment()
+    {
+        currentLA = FlatLocalAlignment.init;
+        tracePointsAcc.length = 0;
+        peekDumpLine();
+
+        while (true)
+        {
+            with (LasDumpLineFormat)
+            {
+                switch (currentLineType)
+                {
+                case totalChainPartsCount.indicator:
+                    static assert(totalTracePointsCount.indicator == totalChainPartsCount.indicator);
+
+                    switch (currentLineSubType)
+                    {
+                    case totalChainPartsCount.subIndicator:
+                        numLocalAlignments = readTotalChainPartsCount();
+
+                        if (numLocalAlignments == 0)
+                            // do not try to read empty dump
+                            return setEmpty();
+                        ++numLocalAlignments;
+                        break;
+                    case totalTracePointsCount.subIndicator:
+                        break; // ignore
+                    default:
+                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
+                    }
+                    break;
+                case maxChainPartsCountPerPile.indicator:
+                    static assert(maxTracePointsCountPerPile.indicator == maxChainPartsCountPerPile.indicator);
+                    break; // ignore
+                case maxTracePointCount.indicator:
+                    switch (currentLineSubType)
+                    {
+                        case maxTracePointCount.subIndicator:
+                            readMaxTracePointCount();
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                case tracePointDistance.indicator:
+                    readTracePointDistance();
+                    break;
+                case chainPart.indicator:
+                    _enforce(
+                        numTracePointsLeft == 0,
+                        "unexpected end of trace points: next local alignment started before the " ~
+                        "expected number of trace points was read",
+                    );
+                    _enforce(
+                        numLocalAlignments > 0,
+                        "more local alignments than expected",
+                    );
+                    if (currentLA != FlatLocalAlignment.init)
+                        return finishCurrentLA(); // currentLA finished; stay on current line
+                    --numLocalAlignments;
+                    readChainPart();
+                    break;
+                case lengths.indicator:
+                    readLengths();
+                    break;
+                case coordinates.indicator:
+                    readCoordinates();
+                    break;
+                case tracePointBegin.indicator:
+                    readTracePointBegin();
+                    break;
+                case tracePoint.indicator:
+                    readTracePoint();
+                    break;
+                default:
+                    error(format!"unknown line type `%c`"(currentLineType));
+                }
+            }
+
+            if (popDumpLine() == Yes.empty)
+            {
+                _enforce(
+                    numTracePointsLeft == 0,
+                    "unexpected end of dump: file ended before the " ~
+                    "expected number of trace points was read",
+                );
+
+                return finishCurrentLA(); // EOF reached
+            }
+        }
+    }
+
+    void peekDumpLine()
+    {
+        auto currentLine = lasDump.front;
+
+        currentDumpLineNumber = currentLine[0];
+        currentDumpLine = currentLine[1].array;
+        currentLineType = currentDumpLine[0];
+        currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
+    }
+
+    Flag!"empty" popDumpLine()
+    {
+        if (lasDump.empty)
+        {
+            return Yes.empty;
+        }
+
+        lasDump.popFront();
+        ++currentDumpLineNumber;
+
+        if (lasDump.empty)
+        {
+            return Yes.empty;
+        }
+        else
+        {
+            peekDumpLine();
+
+            return No.empty;
+        }
+    }
+
+    id_t readTotalChainPartsCount()
+    {
+        enum totalChainPartsCountFormat = LasDumpLineFormat.totalChainPartsCount.format;
+
+        id_t totalChainPartsCount;
+        currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
+
+        return totalChainPartsCount;
+    }
+
+    void readMaxTracePointCount()
+    {
+        enum maxTracePointCountFormat = LasDumpLineFormat.maxTracePointCount.format;
+
+        currentDumpLine[].formattedRead!maxTracePointCountFormat(maxTracePointCount);
+
+        tracePointsAcc.reserve(maxTracePointCount);
+    }
+
+    void readTracePointDistance()
+    {
+        enum tracePointDistanceFormat = LasDumpLineFormat.tracePointDistance.format;
+
+        currentDumpLine[].formattedRead!tracePointDistanceFormat(tracePointDistance);
+    }
+
+    void readChainPart()
+    {
+        enum chainPartFormat = LasDumpLineFormat.chainPart.format;
+        enum yesComplement = FlatLocalAlignment.Flags(FlatLocalAlignment.Flag.complement);
+        enum noComplement = FlatLocalAlignment.Flags();
+        id_t contigAID;
+        id_t contigBID;
+        char rawComplement;
+        char rawChainPartType;
+
+        currentDumpLine[].formattedRead!chainPartFormat(
+            contigAID,
+            contigBID,
+            rawComplement,
+            rawChainPartType,
+        );
+
+        auto flags = rawComplement == 'c' ? yesComplement : noComplement;
+        auto chainPartType = rawChainPartType.to!ChainPartType;
+
+        currentLA.id = currentLAId++;
+        currentLA.contigA.id = contigAID;
+        currentLA.contigB.id = contigBID;
+        currentLA.flags = flags;
+        currentLA.tracePointDistance = tracePointDistance;
+    }
+
+    void readLengths()
+    {
+        enum lengthsFormat = LasDumpLineFormat.lengths.format;
+
+        currentDumpLine[].formattedRead!lengthsFormat(
+            currentLA.contigA.length,
+            currentLA.contigB.length,
+        );
+    }
+
+    void readCoordinates()
+    {
+        enum coordinatesFormat = LasDumpLineFormat.coordinates.format;
+
+        currentDumpLine[].formattedRead!coordinatesFormat(
+            currentLA.contigA.begin,
+            currentLA.contigA.end,
+            currentLA.contigB.begin,
+            currentLA.contigB.end,
+        );
+    }
+
+    void readTracePointBegin()
+    {
+        enum tracePointBeginFormat = LasDumpLineFormat.tracePointBegin.format;
+
+        currentDumpLine[].formattedRead!tracePointBeginFormat(numTracePointsLeft);
+
+        tracePointsAcc.length = 0;
+    }
+
+    void readTracePoint()
+    {
+        enum tracePointFormat = LasDumpLineFormat.tracePoint.format;
+        TracePoint currentTP;
+
+        currentDumpLine[].formattedRead!tracePointFormat(
+            currentTP.numDiffs,
+            currentTP.numBasePairs,
+        );
+
+        tracePointsAcc ~= currentTP;
+        --numTracePointsLeft;
+    }
+
+    void finishCurrentLA()
+    {
+        currentLA.tracePoints = tracePointsAcc;
+    }
+
+    void error(in string reason)
+    {
+        _enforce(false, reason);
+    }
+
+    void _enforce(bool condition, lazy string reason)
+    {
+        enforce!DazzlerCommandException(condition, format!"ill-formatted LAdump output: %s (line %d)"(reason, currentDumpLineNumber));
+    }
+}
+
+private auto readFlatLasDump(S)(S lasDump, trace_point_t tracePointDistance)
+{
+    return new FlatLasDumpReader!S(lasDump, tracePointDistance);
+}
+
+unittest
+{
+    import std.algorithm : equal;
+    import std.range : tee;
+
+    enum expectedTracePointDistance = 100;
+    enum testLasDump = [
+        "+ P 11",
+        "% P 4",
+        "+ T 17",
+        "% T 4",
+        "@ T 4",
+        "X 100",
+        "P 1 2 n >",
+        "L 13 15",
+        "C 3 4 5 6",
+        "P 1 2 n -",
+        "L 13 15",
+        "C 12 13 14 15",
+        "P 19 20 c +",
+        "L 31 33",
+        "C 21 22 23 24",
+        "P 19 20 c -",
+        "L 31 33",
+        "C 30 31 32 33",
+        "T 1",
+        "   0 1",
+        "P 37 38 n .",
+        "L 40 42",
+        "C 39 40 41 42",
+        "P 46 47 c .",
+        "L 58 60",
+        "C 48 49 50 51",
+        "T 3",
+        "   2 102",
+        "   3 101",
+        "   4 104",
+        "P 46 47 n .",
+        "L 58 60",
+        "C 57 58 59 60",
+        "T 3",
+        "   3 101",
+        "   4 104",
+        "   2 102",
+        "P 64 65 c >",
+        "L 71 72",
+        "C 66 67 68 69",
+        "T 4",
+        "   6 105",
+        "   1 101",
+        "   2 100",
+        "   3  97",
+        "P 55 56 c -",
+        "L 80 81",
+        "C 75 76 77 78",
+        "T 2",
+        "   0   2",
+        "   2 102",
+        "P 1 3197 c >",
+        "C 0 71 12 86",
+        "T 1",
+        "   3  74",
+        "P 1 3197 c -",
+        "C 0 8300 0 318",
+        "T 3",
+        "   6 105",
+        "   9 108",
+        "   7 105",
+    ];
+
+    with (FlatLocalAlignment) with (Flag)
+    {
+        auto flatLocalAlignments = readFlatLasDump(testLasDump, 0)
+            .tee!((ref la) { la.tracePoints = la.tracePoints.dup; })
+            .array;
+        auto expectedResult = [
+            FlatLocalAlignment(
+                0,
+                FlatLocus(1, 13, 3, 4),
+                FlatLocus(2, 15, 5, 6),
+                emptyFlags,
+                expectedTracePointDistance,
+            ),
+            FlatLocalAlignment(
+                1,
+                FlatLocus(1, 13, 12, 13),
+                FlatLocus(2, 15, 14, 15),
+                emptyFlags,
+                expectedTracePointDistance,
+            ),
+            FlatLocalAlignment(
+                2,
+                FlatLocus(19, 31, 21, 22),
+                FlatLocus(20, 33, 23, 24),
+                Flags(complement),
+                expectedTracePointDistance,
+            ),
+            FlatLocalAlignment(
+                3,
+                FlatLocus(19, 31, 30, 31),
+                FlatLocus(20, 33, 32, 33),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(0, 1),
+                ],
+            ),
+            FlatLocalAlignment(
+                4,
+                FlatLocus(37, 40, 39, 40),
+                FlatLocus(38, 42, 41, 42),
+                emptyFlags,
+                expectedTracePointDistance,
+            ),
+            FlatLocalAlignment(
+                5,
+                FlatLocus(46, 58, 48, 49),
+                FlatLocus(47, 60, 50, 51),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(2, 102),
+                    TracePoint(3, 101),
+                    TracePoint(4, 104),
+                ],
+            ),
+            FlatLocalAlignment(
+                6,
+                FlatLocus(46, 58, 57, 58),
+                FlatLocus(47, 60, 59, 60),
+                emptyFlags,
+                expectedTracePointDistance,
+                [
+                    TracePoint(3, 101),
+                    TracePoint(4, 104),
+                    TracePoint(2, 102),
+                ],
+            ),
+            FlatLocalAlignment(
+                7,
+                FlatLocus(64, 71, 66, 67),
+                FlatLocus(65, 72, 68, 69),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(6, 105),
+                    TracePoint(1, 101),
+                    TracePoint(2, 100),
+                    TracePoint(3, 97),
+                ],
+            ),
+            FlatLocalAlignment(
+                8,
+                FlatLocus(55, 80, 75, 76),
+                FlatLocus(56, 81, 77, 78),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(0, 2),
+                    TracePoint(2, 102),
+                ],
+            ),
+            FlatLocalAlignment(
+                9,
+                FlatLocus(1, 0, 0, 71),
+                FlatLocus(3197, 0, 12, 86),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(3, 74),
+                ],
+            ),
+            FlatLocalAlignment(
+                10,
+                FlatLocus(1, 0, 0, 8300),
+                FlatLocus(3197, 0, 0, 318),
+                Flags(complement),
+                expectedTracePointDistance,
+                [
+                    TracePoint(6, 105),
+                    TracePoint(9, 108),
+                    TracePoint(7, 105),
+                ],
+            ),
+        ];
+
+        assert(flatLocalAlignments == expectedResult);
+    }
+}
+
 
 struct AlignmentHeader
 {

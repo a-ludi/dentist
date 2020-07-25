@@ -1407,6 +1407,66 @@ unittest
 }
 
 
+struct FlatLocalAlignment
+{
+    alias Flag = AlignmentChain.Flag;
+    alias Flags = AlignmentChain.Flags;
+    enum emptyFlags = AlignmentChain.emptyFlags;
+    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
+
+    static struct FlatLocus
+    {
+        id_t id;
+        coord_t length;
+        coord_t begin;
+        coord_t end;
+
+
+        @property coord_t mappedLength() const pure nothrow @safe
+        {
+            return end - begin;
+        }
+
+
+        @property void boundedBegin(coord_t begin) pure nothrow @safe
+        {
+            this.begin = min(begin, length);
+        }
+
+
+        @property void boundedEnd(coord_t end) pure nothrow @safe
+        {
+            this.end = min(end, length);
+        }
+
+
+        bool beginsWithin(coord_t allowance) const pure nothrow @safe
+        {
+            return begin <= allowance;
+        }
+
+
+        bool endsWithin(coord_t allowance) const pure nothrow @safe
+        {
+            return end + allowance >= length;
+        }
+
+
+        bool isFullyContained(coord_t allowance) const pure nothrow @safe
+        {
+            return beginsWithin(allowance) && endsWithin(allowance);
+        }
+    }
+
+    id_t id;
+    FlatLocus contigA;
+    FlatLocus contigB;
+    Flags flags;
+    trace_point_t tracePointDistance;
+    TracePoint[] tracePoints;
+}
+
+
 int cmpIdsAndComplement(ref const AlignmentChain lhs, ref const AlignmentChain rhs)
 {
     return cmpLexicographically!(
