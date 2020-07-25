@@ -11,12 +11,12 @@ module dentist.commands.chainLocalAlignments;
 import dentist.commandline : OptionsFor;
 import dentist.common.alignments :
     AlignmentChain,
-    chainLocalAlignments,
-    cmpIdsAndComplement;
+    ChainingOptions,
+    chainLocalAlignments;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     AlignmentHeader,
-    getAlignments,
+    getFlatLocalAlignments,
     writeAlignments;
 import dentist.util.log;
 import std.algorithm : sort;
@@ -38,8 +38,11 @@ void execute(in Options options)
 
 class CLIChainer
 {
+    alias FlatLocalAlignments = typeof(getFlatLocalAlignments("", ""));
+
     const Options options;
-    AlignmentChain[] alignments;
+    const ChainingOptions chainingOptions;
+    FlatLocalAlignments alignments;
     AlignmentHeader headerData;
     ProgressMeter progress;
 
@@ -47,6 +50,10 @@ class CLIChainer
     this(const Options options)
     {
         this.options = options;
+        this.chainingOptions = ChainingOptions(
+            options.maxIndelBps,
+            options.maxRelativeOverlap,
+        );
         this.progress = options.createProgressMeter();
     }
 
@@ -56,7 +63,6 @@ class CLIChainer
         mixin(traceExecution);
 
         readAlignments();
-        sortAlignments();
         inferHeaderData();
         chainLocalAlignments();
     }
@@ -66,7 +72,7 @@ class CLIChainer
     {
         mixin(traceExecution);
 
-        alignments = getAlignments(
+        alignments = getFlatLocalAlignments(
             options.refDb,
             options.readsDb,
             options.dbAlignmentFile,
@@ -75,21 +81,12 @@ class CLIChainer
     }
 
 
-    void sortAlignments()
-    {
-        mixin(traceExecution);
-
-        // Order required for faster chaining because local aligments with
-        // different complements must not be chained.
-        sort!((a, b) => cmpIdsAndComplement(a, b) < 0)(alignments);
-    }
-
-
     void inferHeaderData()
     {
         mixin(traceExecution);
 
-        headerData = AlignmentHeader.inferFrom(alignments);
+        headerData.maxTracePoints = alignments.maxTracePointCount;
+        headerData.tracePointDistance = alignments.tracePointDistance;
     }
 
 
@@ -100,7 +97,7 @@ class CLIChainer
         progress.start();
 
         auto chainedAlignments = alignments
-            .chainLocalAlignments()
+            .chainLocalAlignments(chainingOptions)
             .tee!(_ => progress.tick());
 
         options.chainedAlignments.writeAlignments(chainedAlignments, headerData);

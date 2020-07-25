@@ -1503,6 +1503,19 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("max-indel")
+        @MetaVar("<bps>")
+        @Help(format!"
+            two local alignments may only be chained if the resulting
+            insertion or deletion is at most <bps> (default: %d)
+        "(defaultValue!maxIndelBps))
+        coord_t maxIndelBps = 1_000;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1515,6 +1528,25 @@ struct OptionsFor(DentistCommand _command)
             "maximum insertion error rate must be in (0, 0.3]"
         ))
         double maxInsertionError = 1e-2;
+    }
+
+    static if (command.among(
+        DentistCommand.chainLocalAlignments,
+    ))
+    {
+        @Option("max-relative-overlap")
+        @MetaVar("<fraction>")
+        @Help(format!"
+            two local alignments may only be chained if the overlap between
+            them is at most <fraction> times the size of the shorter local
+            alignment. This must hold for the reference and query.
+            (default: %s)
+        "(defaultValue!maxRelativeOverlap))
+        @(Validate!(value => enforce!CLIException(
+            0.0 < value && value < 1.0,
+            "maximum relative overlap must be in (0, 1)"
+        )))
+        double maxRelativeOverlap = 1e-2;
     }
 
     static if (command.among(
@@ -1812,7 +1844,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         TestingCommand.checkResults,
