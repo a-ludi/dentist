@@ -1504,6 +1504,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.chainLocalAlignments,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("max-indel")
@@ -1532,6 +1533,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.chainLocalAlignments,
+        DentistCommand.processPileUps,
     ))
     {
         @Option("max-relative-overlap")

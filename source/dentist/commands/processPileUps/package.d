@@ -21,6 +21,7 @@ import dentist.common :
 import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
+    ChainingOptions,
     contigs,
     coord_t,
     getAlignmentRefs,
@@ -52,6 +53,7 @@ import dentist.dazzler :
     dbdust,
     dbEmpty,
     dbSubset,
+    chainLocalAlignments,
     DBdumpOptions,
     DbRecord,
     filterPileUpAlignments,
@@ -472,14 +474,23 @@ protected class PileUpProcessor
             "empty raw pileup alignment",
         );
 
+        auto chainedPileUpAlignment = chainLocalAlignments(
+            croppedDb,
+            rawPileUpAlignment,
+            ChainingOptions(
+                options.maxIndelBps,
+                options.maxRelativeOverlap,
+            ),
+        );
+
         auto coverage = cast(id_t) allowedReferenceReadIds.size;
 
         if (coverage < minQVCoverage && pileUp.length >= minQVCoverage)
             coverage = minQVCoverage;
 
-        .computeQVs(croppedDb, rawPileUpAlignment, coverage);
+        .computeQVs(croppedDb, chainedPileUpAlignment, coverage);
 
-        pileUpAlignment = filterPileUpAlignments(croppedDb, rawPileUpAlignment, options.properAlignmentAllowance);
+        pileUpAlignment = filterPileUpAlignments(croppedDb, chainedPileUpAlignment, options.properAlignmentAllowance);
 
         dentistEnforce(
             !lasEmpty(pileUpAlignment),
