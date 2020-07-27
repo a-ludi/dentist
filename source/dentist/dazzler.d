@@ -1751,9 +1751,15 @@ private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
             localAlignment.contigB.end,
         );
 
+        size_t totalDiffs;
         writer.writefln!"T %d"(localAlignment.tracePoints.length);
         foreach (tracePoint; localAlignment.tracePoints)
+        {
+            totalDiffs += tracePoint.numDiffs;
             writer.writefln!"  %d %d"(tracePoint.numDiffs, tracePoint.numBasePairs);
+        }
+
+        writer.writefln!"D %d"(totalDiffs);
     }
 }
 
