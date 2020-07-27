@@ -1706,7 +1706,6 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
-        DentistCommand.output,
     ))
     {
         @(Validate!(validatePositive!("trace-point-distance", trace_point_t)))
