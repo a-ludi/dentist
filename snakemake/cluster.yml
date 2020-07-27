@@ -8,6 +8,10 @@ self_alignment_block:
     memory:     32768
     time:       "00:30"
 
+mask_dust:
+    memory:     4096
+    time:       "00:30"
+
 mask_self:
     memory:     16384
     time:       "00:15"
