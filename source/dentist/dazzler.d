@@ -12,6 +12,8 @@ import core.memory : GC;
 import dentist.common : ReferenceInterval, ReferenceRegion;
 import dentist.common.alignments :
     AlignmentChain,
+    ChainingOptions,
+    chainLocalAlignmentsAlgo = chainLocalAlignments,
     coord_t,
     diff_t,
     FlatLocalAlignment,
@@ -3392,6 +3394,34 @@ string getDamapping(
     auto lasFile = getLasFile(refDb, queryDb, workdir);
 
     return lasFile;
+}
+
+
+string chainLocalAlignments(
+    in string dbFile,
+    in string lasFile,
+    in ChainingOptions options,
+)
+{
+    string chainedLasFile = lasFile.stripExtension.to!string ~ "-chained.las";
+    auto flatLocalAlignments = getFlatLocalAlignments(
+        dbFile,
+        lasFile,
+        Yes.includeTracePoints,
+    );
+
+    AlignmentHeader headerData;
+    headerData.maxTracePoints = flatLocalAlignments.maxTracePointCount;
+    headerData.tracePointDistance = flatLocalAlignments.tracePointDistance;
+
+    auto chainedAlignments = chainLocalAlignmentsAlgo(
+        flatLocalAlignments,
+        options,
+    );
+
+    chainedLasFile.writeAlignments(chainedAlignments, headerData);
+
+    return chainedLasFile;
 }
 
 
