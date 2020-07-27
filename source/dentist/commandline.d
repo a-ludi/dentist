@@ -450,6 +450,17 @@ struct OptionsFor(DentistCommand _command)
         @Help("reference assembly in .dam format")
         @Validate!(validateDB)
         string refDb;
+
+
+        @property id_t numReferenceContigs() inout
+        {
+            static id_t _numReferenceContigs;
+
+            if (_numReferenceContigs == 0)
+                _numReferenceContigs = getNumContigs(refDb, null);
+
+            return _numReferenceContigs;
+        }
     }
 
     static if (command.among(
@@ -756,19 +767,6 @@ struct OptionsFor(DentistCommand _command)
             }
         }
 
-        @property id_t numReferenceContigs() inout
-        {
-            static id_t _numReferenceContigs;
-
-            if (_numReferenceContigs == 0)
-            {
-                _numReferenceContigs = getNumContigs(refDb, "/");
-            }
-
-            return _numReferenceContigs;
-        }
-
-
         @Option()
         @Validate!validateReferenceContigBatchRange
         id_t[2] referenceContigBatch;
@@ -970,6 +968,77 @@ struct OptionsFor(DentistCommand _command)
             return pileUpBatches
                 .map!(pileUpBatch => pileUpBatch[1] - pileUpBatch[0])
                 .sum;
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("skip-gaps")
+        @MetaVar("<gap-spec>[,<gap-spec>...]")
+        @Help(q"{
+            Do not close the specified gaps. Each <gap-spec> is a pair
+            of contig IDs <contigA>-<contigA> meaning that the specified
+            contigs should not be closed. They will still be joined by a
+            prexisting gap.
+        }")
+        void parseSkipGaps(string skipGapsString) pure
+        {
+            foreach (gapSpec; skipGapsString.split(","))
+                try
+                    skipGaps ~= parseGapSpec(gapSpec);
+                catch (Exception e)
+                    throw new CLIException("ill-formatted <gap-spec>; should be <contigA>-<contigA>");
+        }
+
+        static id_t[2] parseGapSpec(string gapSpec) pure
+        {
+            id_t[2] gap;
+
+            gapSpec.formattedRead!"%d-%d"(gap[0], gap[1]);
+
+            return gap;
+        }
+
+        @Option()
+        @(Validate!validateSkipGaps)
+        id_t[2][] skipGaps;
+
+        static void validateSkipGaps(id_t[2][] skipGaps, OptionsFor!command options)
+        {
+            foreach (skipGap; skipGaps)
+                validatePileUpSkipGap(skipGap, options);
+        }
+
+        static void validatePileUpSkipGap(id_t[2] skipGap, OptionsFor!command options)
+        {
+            auto numReferenceContigs = options.numReferenceContigs;
+            auto contigA = skipGap[0];
+            auto contigB = skipGap[1];
+
+            enforce!CLIException(
+                0 < contigA && contigA <= numReferenceContigs,
+                format!"invalid <gap-spec>: <contigA> == %d is out of bounds [1, %d]"(contigA, numReferenceContigs),
+            );
+            enforce!CLIException(
+                0 < contigB && contigB <= numReferenceContigs,
+                format!"invalid <gap-spec>: <contigB> == %d is out of bounds [1, %d]"(contigB, numReferenceContigs),
+            );
+            enforce!CLIException(
+                contigA != contigB,
+                "invalid <gap-spec>: <contigA> mut not be equal to <contigB>",
+            );
+        }
+
+        @PostValidate()
+        void hookSortSkipGaps()
+        {
+            foreach (ref skipGap; skipGaps)
+                if (skipGap[0] > skipGap[1])
+                    swap(skipGap[0], skipGap[1]);
+
+            sort(skipGaps);
         }
     }
 

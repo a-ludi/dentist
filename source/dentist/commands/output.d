@@ -57,6 +57,7 @@ import dentist.common.scaffold :
     isGap,
     linearWalk,
     normalizeUnkownJoins,
+    removeBlacklisted,
     removeExtensions,
     removeSpanning;
 import dentist.dazzler :
@@ -188,6 +189,7 @@ class AssemblyWriter
     protected const(ScaffoldSegment)[] scaffoldStructure;
     size_t numReferenceContigs;
     size_t[] contigLengths;
+    bool[size_t[2]] skipGaps;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     ContigNode[] scaffoldStartNodes;
@@ -264,6 +266,14 @@ class AssemblyWriter
             .map!(contigPart => contigPart.get!ContigSegment)
             .map!(contigPart => contigPart.end - contigPart.begin + 0)
             .array;
+        foreach (skipGap; options.skipGaps)
+        {
+
+            skipGaps[[
+                cast(size_t) skipGap[0],
+                cast(size_t) skipGap[1],
+            ]] = true;
+        }
         static if (isTesting)
             contigAlignments.reserve(numReferenceContigs);
     }
@@ -292,8 +302,10 @@ class AssemblyWriter
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
         appendUnkownJoins();
 
+        Insertion[] blacklistedInsertions;
         Insertion[] forbiddenInsertions;
         assemblyGraph = assemblyGraph
+            .removeBlacklisted!InsertionInfo(skipGaps, blacklistedInsertions)
             .enforceJoinPolicy!InsertionInfo(options.joinPolicy, forbiddenInsertions)
             .normalizeUnkownJoins!InsertionInfo()
             .fixCropping();

@@ -630,6 +630,50 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy, o
     return scaffold;
 }
 
+/// Remove blacklisted gap joins.
+Scaffold!T removeBlacklisted(T)(Scaffold!T scaffold, in bool[size_t[2]] blacklist)
+{
+    Join!T[] unused;
+
+    return removeBlacklisted!T(scaffold, joinPolicy, unused);
+}
+
+/// ditto
+Scaffold!T removeBlacklisted(T)(Scaffold!T scaffold, in bool[size_t[2]] blacklist, out Join!T[] forbiddenJoins)
+{
+    mixin(traceExecution);
+
+    forbiddenJoins.reserve(blacklist.length);
+
+    bool applyBlacklist(Join!T join)
+    {
+        size_t[2] contigIds = [
+            join.start.contigId,
+            join.end.contigId,
+        ];
+
+        auto discardJoin = join.isGap && blacklist.get(contigIds, false);
+
+        if (discardJoin)
+            forbiddenJoins ~= join;
+
+        return !discardJoin;
+    }
+
+    scaffold.filterEdges!applyBlacklist;
+
+    logJsonInfo("forbiddenJoins", forbiddenJoins
+        .filter!(gapJoin => scaffold.degree(gapJoin.start) == 1 && scaffold.degree(gapJoin.end) == 1)
+        .map!(join => [
+            "start": join.start.toJson,
+            "end": join.end.toJson,
+        ])
+        .array
+        .toJson);
+
+    return scaffold;
+}
+
 /// Enforce joinPolicy in scaffold.
 Scaffold!T removeExtensions(T)(Scaffold!T scaffold)
 {
