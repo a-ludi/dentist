@@ -1,4 +1,5 @@
 import json
+from itertools import chain
 from math import *
 from os import environ
 from os.path import basename, join
@@ -240,6 +241,14 @@ def block_alignments(db_a, db_b=None, damapper=False):
         return (alignment_file(db_a, db_b, i, j)  for i in blocks_a for j in blocks_b)
 
 
+def block_mask(mask, block):
+    return "{}.{}".format(block, mask)
+
+
+def block_masks(mask, db):
+    return [block_mask(mask, b + 1)  for b in range(get_num_blocks(db))]
+
+
 def mask_files(db, mask):
     from os.path import dirname
 
@@ -387,6 +396,7 @@ dentist_config_file = join(workdir_, workflow_["config"])
 dentist_merge_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
+tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 self_mask = workflow_["self_mask"]
 dust_mask = "dust"
@@ -404,6 +414,7 @@ dbsplit_flags = make_flags(config.get("dbsplit_flags", []))
 dbdust_flags = make_flags(config.get("dbdust_flags", []))
 dalign_flags = ensure_threads_flag(make_flags(config.get("dalign_flags", [])))
 datander_flags = ensure_threads_flag(make_flags(config.get("datander_flags", [])))
+tanmask_flags = make_flags(config.get("tanmask_flags", []))
 
 if "TMPDIR" in environ:
     dalign_flags = append_flags(dalign_flags, "-P{}".format(environ["TMPDIR"]))
@@ -427,6 +438,7 @@ localrules:
     ALL,
     extend_dentist_config,
     reference2dam,
+    mask_tandem,
     self_alignment,
     reads2db,
     ref_vs_reads_alignment,
@@ -547,24 +559,24 @@ rule mask_self:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {self_alignment} {self_mask} 2> {log}"
 
 
-rule tandem_alignment:
+rule tandem_alignment_block:
     input:
         dentist_config_file,
         await_db_files(reference)
     output:
-        tandem_alignment
+        temp(tandem_alignment_block)
     params:
         aligncmd = lambda _: generate_options_for("tandem", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file = lambda _, output: basename(output[0]),
         datander_flags = prepare_flags(datander_flags)
-    log: log_file("tandem-alignment")
+    log: log_file("tandem-alignment.{block}")
     threads: max_threads
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.datander_flags} {params.reference_stub}
+                {params.aligncmd} {params.datander_flags} {params.reference_stub}.{wildcards[block]}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
                     LAcheck -v {params.reference_stub} {params.alignment_file} || echo {lacheck_failed_notice}
@@ -575,17 +587,30 @@ rule tandem_alignment:
         """
 
 
+rule mask_tandem_block:
+    input:
+        dentist_config_file,
+        await_db_files(reference),
+        alignment = tandem_alignment_block
+    output:
+        temp(mask_files(reference, block_mask(tandem_mask, "{block}")))
+    params:
+        reference_stub = db_stub(reference)
+    log: log_file("mask-tandem.{block}")
+    shell:
+        "TANmask -v {tanmask_flags} -n{tandem_mask} {params.reference_stub} {input[alignment]} &> {log}"
+
+
 rule mask_tandem:
     input:
         dentist_config_file,
         await_db_files(reference),
-        tandem_alignment
+        lambda _: chain(*(mask_files(reference, m)  for m in block_masks(tandem_mask, reference)))
     output:
         *mask_files(reference, tandem_mask)
-    params:
-        reference_stub = db_stub(reference),
+    log: log_file("mask-tandem")
     shell:
-        "TANmask -n{tandem_mask} {params.reference_stub} {tandem_alignment}"
+        "Catrack -v {reference} {tandem_mask} &> {log}"
 
 
 _fast2dam_checkpoint[reads] = "reads2db"
