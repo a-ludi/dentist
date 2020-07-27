@@ -588,6 +588,7 @@ rule ref_vs_reads_alignment_block:
         dentist_config_file,
         await_db_files(reference),
         lambda _: mask_files(reference, self_mask),
+        lambda _: mask_files(reference, tandem_mask),
         await_db_files(reads)
     output: temp(alignment_file(reference, reads, block_b='{block_reads}'))
     params:
