@@ -58,10 +58,11 @@ dub build
 
 The following software packages are required to run `dentist`:
 
-- [The Dazzler Data Base][DAZZ_DB] (>=2020-01-15)
-- [`daligner`][daligner] (>=2019-07-21 && <=2020-01-15)
+- [The Dazzler Data Base][DAZZ_DB] (>=2020-07-27)
+- [`daligner`][daligner] ((>=2019-07-21 && <=2020-01-15) || >=2020-07-27)
 - [`damapper`][damapper] (>=2020-03-10)
 - [`TANmask`][damasker] (>=2020-01-15)
+- [`dascrubber`][dascrubber] (>=2020-07-26)
 - [`daccord`][daccord] (>=v0.0.17)
 
 Please see their own documentation for installtion instructions. Note, the
@@ -74,6 +75,7 @@ moment.
 [daligner]: https://github.com/thegenemyers/DALIGNER
 [damapper]: https://github.com/thegenemyers/DAMAPPER
 [damasker]: https://github.com/thegenemyers/DAMASKER
+[dascrubber]: https://github.com/thegenemyers/DASCRUBBER
 [daccord]: https://gitlab.com/german.tischler/daccord
 
 Usage
