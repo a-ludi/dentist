@@ -1519,11 +1519,11 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!"
             insertion and existing contigs must match with less error than <double> (default: %s)
         "(defaultValue!maxInsertionError))
-        @Validate!(value => enforce!CLIException(
+        @(Validate!(value => enforce!CLIException(
             0.0 < value && value <= 0.3,
             "maximum insertion error rate must be in (0, 0.3]"
-        ))
-        double maxInsertionError = 1e-2;
+        )))
+        double maxInsertionError = 0.1;
     }
 
     static if (command.among(
