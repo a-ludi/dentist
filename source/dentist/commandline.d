@@ -1393,12 +1393,12 @@ struct OptionsFor(DentistCommand _command)
 
             enforce!CLIException(
                 maxCoverageReads != maxCoverageReads.init ||
-                readCoverage != readCoverage.init,
+                hasReadCoverage,
                 "must provide either --read-coverage or --max-coverage-reads",
             );
             enforce!CLIException(
                 (maxCoverageReads != maxCoverageReads.init) ^
-                (readCoverage != readCoverage.init),
+                hasReadCoverage,
                 "must not provide both --read-coverage and --max-coverage-reads",
             );
 
@@ -1411,7 +1411,7 @@ struct OptionsFor(DentistCommand _command)
                 return to!id_t(x / log_e(log_e(log_e(bReads * x + cReads)/log_e(aReads))));
             }
 
-            if (readCoverage != readCoverage.init)
+            if (hasReadCoverage)
                 maxCoverageReads = upperBound(readCoverage);
 
             coverageBoundsReads = [0, maxCoverageReads];
@@ -1444,12 +1444,12 @@ struct OptionsFor(DentistCommand _command)
 
             enforce!CLIException(
                 maxImproperCoverageReads != maxImproperCoverageReads.init ||
-                readCoverage != readCoverage.init,
+                hasReadCoverage,
                 "must provide either --read-coverage or --max-improper-coverage-reads",
             );
             enforce!CLIException(
                 (maxImproperCoverageReads != maxImproperCoverageReads.init) ^
-                (readCoverage != readCoverage.init),
+                hasReadCoverage,
                 "must not provide both --read-coverage and --max-improper-coverage-reads",
             );
 
@@ -1463,7 +1463,7 @@ struct OptionsFor(DentistCommand _command)
                 return to!id_t(a*x + exp(b*(c - x)));
             }
 
-            if (readCoverage != readCoverage.init)
+            if (hasReadCoverage)
                 maxImproperCoverageReads = upperBound(readCoverage);
 
             improperCoverageBoundsReads = [0, maxImproperCoverageReads];
@@ -1765,6 +1765,14 @@ struct OptionsFor(DentistCommand _command)
             both options are mutually exclusive
         }")
         double readCoverage;
+
+
+        @property bool hasReadCoverage() const pure nothrow @safe
+        {
+            import std.math : isNaN;
+
+            return !isNaN(readCoverage);
+        }
     }
 
     static if (command.among(
