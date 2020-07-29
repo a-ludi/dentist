@@ -125,6 +125,126 @@ struct TranslatedTracePoint
 }
 
 
+struct Trace
+{
+    Locus contigA;
+    Locus contigB;
+    trace_point_t tracePointDistance;
+    const(TracePoint)[] tracePoints;
+
+
+    TranslatedTracePoint translateTracePoint(string contig)(
+        coord_t contigPos,
+        RoundingMode roundingMode,
+    ) const pure if (contig.among("contigA", "contigB"))
+    {
+        assert(mixin(contig ~ `.begin <= contigPos && contigPos <= ` ~ contig ~ `.end`));
+
+        auto tracePointIndex = tracePointsUpTo!contig(contigPos, roundingMode);
+        auto contigBPos = contigB.begin + tracePoints[0 .. tracePointIndex]
+                .map!"a.numBasePairs"
+                .sum;
+        auto contigAPos = tracePointIndex == 0
+            ? contigA.begin
+            : tracePointIndex < tracePoints.length
+                ? floor(contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance)
+                : contigA.end;
+
+        return TranslatedTracePoint(contigAPos, contigBPos);
+    }
+
+
+    auto tracePointsUpTo(string contig)(
+        coord_t contigAPos,
+        RoundingMode roundingMode,
+    ) const pure nothrow if (contig == "contigA")
+    {
+        assert(contigA.begin <= contigAPos && contigAPos <= contigA.end);
+
+        auto firstTracePointRefPos = contigA.begin;
+        auto secondTracePointRefPos = floor(firstTracePointRefPos, tracePointDistance) + tracePointDistance;
+        auto secondFromLastTracePointRefPos = floor(contigA.end - 1, tracePointDistance);
+
+        final switch (roundingMode)
+        {
+        case RoundingMode.floor:
+            if (contigAPos < secondTracePointRefPos)
+                return 0;
+            if (contigAPos < contigA.end)
+                return 1 + (contigAPos - secondTracePointRefPos) / tracePointDistance;
+            else
+                return tracePoints.length;
+        case RoundingMode.round:
+            assert(0, "unimplemented");
+        case RoundingMode.ceil:
+            if (firstTracePointRefPos == contigAPos)
+                return 0;
+            if (contigAPos <= secondTracePointRefPos)
+                return 1;
+            else if (contigAPos <= secondFromLastTracePointRefPos)
+                return 1 + ceildiv(contigAPos - secondTracePointRefPos, tracePointDistance);
+            else
+                return tracePoints.length;
+        }
+    }
+
+    unittest
+    {
+        auto trace = Trace(
+            Locus(50, 2897),
+            Locus(50, 2905),
+            100,
+            [TracePoint(1, 50), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
+             TracePoint(7, 105)],
+        );
+        coord_t contigPos = 79;
+        auto roundingMode = RoundingMode.ceil;
+        auto tpsUpTo = trace.tracePointsUpTo!"contigA"(contigPos, roundingMode);
+
+        assert(0 <= tpsUpTo && tpsUpTo <= trace.tracePoints.length);
+    }
+
+    auto tracePointsUpTo(string contig)(
+        coord_t contigBPos,
+        RoundingMode roundingMode,
+    ) const pure nothrow if (contig == "contigB")
+    {
+        assert(contigB.begin <= contigBPos && contigBPos <= contigB.end);
+
+        if (contigBPos == contigB.begin)
+            return 0;
+        else if (contigBPos == contigB.end)
+            return tracePoints.length;
+
+        auto tracePointPositions = chain(only(contigB.begin), tracePoints.map!"a.numBasePairs")
+            .cumulativeFold!"a + b"
+            .enumerate;
+
+        final switch (roundingMode)
+        {
+        case RoundingMode.floor:
+            return tracePointPositions
+                .find!(pair => contigBPos < pair.value)
+                .front
+                .index - 1;
+        case RoundingMode.round:
+            assert(0, "unimplemented");
+        case RoundingMode.ceil:
+            return tracePointPositions
+                .find!(pair => contigBPos <= pair.value)
+                .front
+                .index;
+        }
+    }
+}
+
+
 /**
     Holds a chain of local alignments that form a compound alignment. An AlignmentChain should
     contain at least one element.
@@ -141,25 +261,25 @@ struct AlignmentChain
         diff_t numDiffs;
         TracePoint[] tracePoints;
 
+
+        Trace getTrace(trace_point_t tracePointDistance) const pure nothrow @safe
+        {
+            return Trace(
+                cast(Locus) contigA,
+                cast(Locus) contigB,
+                tracePointDistance,
+                tracePoints,
+            );
+        }
+
+
         TranslatedTracePoint translateTracePoint(string contig = "contigA")(
-            in coord_t contigPos,
-            in trace_point_t tracePointDistance,
+            coord_t contigPos,
+            trace_point_t tracePointDistance,
             RoundingMode roundingMode,
         ) const pure if (contig.among("contigA", "contigB"))
         {
-            assert(mixin(contig ~ `.begin <= contigPos && contigPos <= ` ~ contig ~ `.end`));
-
-            auto tracePointIndex = tracePointsUpTo!contig(contigPos, tracePointDistance, roundingMode);
-            auto contigBPos = contigB.begin + tracePoints[0 .. tracePointIndex]
-                    .map!"a.numBasePairs"
-                    .sum;
-            auto contigAPos = tracePointIndex == 0
-                ? contigA.begin
-                : tracePointIndex < tracePoints.length
-                    ? floor(contigA.begin, tracePointDistance) + cast(coord_t) (tracePointIndex * tracePointDistance)
-                    : contigA.end;
-
-            return TranslatedTracePoint(contigAPos, contigBPos);
+            return getTrace(tracePointDistance).translateTracePoint!contig(contigPos, roundingMode);
         }
 
         /// Crops this local alignment from startingSeed to contigPos.
@@ -195,99 +315,15 @@ struct AlignmentChain
         }
 
         auto tracePointsUpTo(string contig)(
-            in coord_t contigAPos,
-            in trace_point_t tracePointDistance,
+            coord_t contigPos,
+            trace_point_t tracePointDistance,
             RoundingMode roundingMode,
-        ) const pure nothrow if (contig == "contigA")
+        ) const pure nothrow if (contig.among("contigA", "contigB"))
         {
-            assert(contigA.begin <= contigAPos && contigAPos <= contigA.end);
-
-            auto firstTracePointRefPos = contigA.begin;
-            auto secondTracePointRefPos = floor(firstTracePointRefPos, tracePointDistance) + tracePointDistance;
-            auto secondFromLastTracePointRefPos = floor(contigA.end - 1, tracePointDistance);
-
-            final switch (roundingMode)
-            {
-            case RoundingMode.floor:
-                if (contigAPos < secondTracePointRefPos)
-                    return 0;
-                if (contigAPos < contigA.end)
-                    return 1 + (contigAPos - secondTracePointRefPos) / tracePointDistance;
-                else
-                    return tracePoints.length;
-            case RoundingMode.round:
-                assert(0, "unimplemented");
-            case RoundingMode.ceil:
-                if (firstTracePointRefPos == contigAPos)
-                    return 0;
-                if (contigAPos <= secondTracePointRefPos)
-                    return 1;
-                else if (contigAPos <= secondFromLastTracePointRefPos)
-                    return 1 + ceildiv(contigAPos - secondTracePointRefPos, tracePointDistance);
-                else
-                    return tracePoints.length;
-            }
-        }
-
-        unittest
-        {
-            auto localAlignment = LocalAlignment(
-                Locus(50, 2897),
-                Locus(50, 2905),
-                8,
-                [TracePoint(1, 50), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100), TracePoint(0, 100),
-                 TracePoint(7, 105)],
-            );
-            coord_t contigPos = 79;
-            trace_point_t tracePointDistance = 100;
-            auto roundingMode = RoundingMode.ceil;
-            auto tpsUpTo = localAlignment.tracePointsUpTo!"contigA"(
+            return getTrace(tracePointDistance).tracePointsUpTo!contig(
                 contigPos,
-                tracePointDistance,
                 roundingMode,
             );
-
-            assert(0 <= tpsUpTo && tpsUpTo <= localAlignment.tracePoints.length);
-        }
-
-        auto tracePointsUpTo(string contig)(
-            in coord_t contigBPos,
-            in trace_point_t tracePointDistance,
-            RoundingMode roundingMode,
-        ) const pure nothrow if (contig == "contigB")
-        {
-            assert(contigB.begin <= contigBPos && contigBPos <= contigB.end);
-
-            if (contigBPos == contigB.begin)
-                return 0;
-            else if (contigBPos == contigB.end)
-                return tracePoints.length;
-
-            auto tracePointPositions = chain(only(contigB.begin), tracePoints.map!"a.numBasePairs")
-                .cumulativeFold!"a + b"
-                .enumerate;
-
-            final switch (roundingMode)
-            {
-            case RoundingMode.floor:
-                return tracePointPositions
-                    .find!(pair => contigBPos < pair.value)
-                    .front
-                    .index - 1;
-            case RoundingMode.round:
-                assert(0, "unimplemented");
-            case RoundingMode.ceil:
-                return tracePointPositions
-                    .find!(pair => contigBPos <= pair.value)
-                    .front
-                    .index;
-            }
         }
     }
 
