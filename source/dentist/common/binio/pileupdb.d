@@ -12,7 +12,9 @@ module dentist.common.binio.pileupdb;
 import core.exception : AssertError;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlags = Flags,
     AlignmentLocationSeed,
+    Contig,
     coord_t,
     diff_t,
     id_t,
@@ -254,7 +256,6 @@ struct PileUpDb
     )
     {
         // Parse `SeededAlignment`s
-        alias Contig = AlignmentChain.Contig;
         pileUpDb.seek(dbSlices.seededAlignments.ptr);
 
         size_t[2] seededAlignmentsSlice;
@@ -804,7 +805,7 @@ private struct SeededAlignmentStorage
     coord_t contigALength;
     id_t contigBId;
     coord_t contigBLength;
-    AlignmentChain.Flags flags;
+    AlignmentFlags flags;
     StorageType!(LocalAlignment[]) localAlignments;
     trace_point_t tracePointDistance;
     AlignmentLocationSeed seed;

@@ -14,8 +14,11 @@ import dentist.common :
     ReferenceRegion;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlags = Flags,
+    Contig,
     coord_t,
-    id_t;
+    id_t,
+    Locus;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     getAlignments,
@@ -244,69 +247,68 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
         */
         private static AlignmentChain[] getTestAlignments()
         {
-            with (AlignmentChain) with (LocalAlignment)
-                {
-                    id_t alignmentChainId = 0;
-                    id_t contReadId = 0;
-                    AlignmentChain getDummyAlignment(id_t contigId,
-                            coord_t contigLength, coord_t beginIdx, coord_t endIdx)
-                    {
-                        return AlignmentChain(
-                            ++alignmentChainId,
-                            Contig(contigId, contigLength),
-                            Contig(alignmentChainId, endIdx),
-                            emptyFlags,
-                            [
-                                LocalAlignment(
-                                    Locus(beginIdx, beginIdx + 1),
-                                    Locus(0, 1),
-                                    0,
-                                ),
-                                LocalAlignment(
-                                    Locus(endIdx - 1, endIdx),
-                                    Locus(2, 3),
-                                    0,
-                                ),
-                            ],
-                        );
-                    }
+            alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-                    return [
-                        getDummyAlignment(1, 30,  5, 18), //  #1
-                        getDummyAlignment(1, 30,  5, 18), //  #2
-                        getDummyAlignment(1, 30,  5, 20), //  #3
-                        getDummyAlignment(1, 30, 10, 20), //  #4
-                        getDummyAlignment(1, 30, 10, 30), //  #5
-                        getDummyAlignment(1, 30, 10, 30), //  #6
-                        getDummyAlignment(1, 30, 13, 30), //  #7
-                        getDummyAlignment(1, 30, 20, 30), //  #8
-                        getDummyAlignment(1, 30, 20, 30), //  #9
-                        getDummyAlignment(1, 30, 20, 30), // #10
-                        getDummyAlignment(1, 30, 24, 30), // #11
-                        getDummyAlignment(2, 15,  0,  3), // #12
-                        getDummyAlignment(2, 15,  0,  3), // #13
-                        getDummyAlignment(2, 15,  0,  5), // #14
-                        getDummyAlignment(2, 15,  0,  5), // #15
-                        getDummyAlignment(2, 15,  0, 15), // #16
-                        getDummyAlignment(2, 15,  0, 15), // #17
-                        getDummyAlignment(2, 15,  0, 15), // #18
-                        getDummyAlignment(2, 15,  5, 15), // #19
-                        getDummyAlignment(2, 15,  5, 15), // #20
-                        getDummyAlignment(2, 15,  5, 15), // #21
-                        getDummyAlignment(2, 15,  9, 15), // #22
-                        getDummyAlignment(3, 15,  1,  4), // #23
-                        getDummyAlignment(3, 15,  2,  5), // #24
-                        getDummyAlignment(3, 15,  3,  6), // #25
-                        getDummyAlignment(3, 15,  4,  7), // #26
-                        getDummyAlignment(3, 15,  5,  8), // #27
-                        getDummyAlignment(3, 15,  6,  9), // #28
-                        getDummyAlignment(3, 15,  7, 10), // #29
-                        getDummyAlignment(3, 15,  8, 11), // #30
-                        getDummyAlignment(3, 15,  9, 12), // #31
-                        getDummyAlignment(3, 15, 10, 13), // #32
-                        getDummyAlignment(3, 15, 11, 14), // #33
-                    ];
-                }
+            id_t alignmentChainId = 0;
+            id_t contReadId = 0;
+            AlignmentChain getDummyAlignment(id_t contigId,
+                    coord_t contigLength, coord_t beginIdx, coord_t endIdx)
+            {
+                return AlignmentChain(
+                    ++alignmentChainId,
+                    Contig(contigId, contigLength),
+                    Contig(alignmentChainId, endIdx),
+                    AlignmentFlags(),
+                    [
+                        LocalAlignment(
+                            Locus(beginIdx, beginIdx + 1),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(endIdx - 1, endIdx),
+                            Locus(2, 3),
+                            0,
+                        ),
+                    ],
+                );
+            }
+
+            return [
+                getDummyAlignment(1, 30,  5, 18), //  #1
+                getDummyAlignment(1, 30,  5, 18), //  #2
+                getDummyAlignment(1, 30,  5, 20), //  #3
+                getDummyAlignment(1, 30, 10, 20), //  #4
+                getDummyAlignment(1, 30, 10, 30), //  #5
+                getDummyAlignment(1, 30, 10, 30), //  #6
+                getDummyAlignment(1, 30, 13, 30), //  #7
+                getDummyAlignment(1, 30, 20, 30), //  #8
+                getDummyAlignment(1, 30, 20, 30), //  #9
+                getDummyAlignment(1, 30, 20, 30), // #10
+                getDummyAlignment(1, 30, 24, 30), // #11
+                getDummyAlignment(2, 15,  0,  3), // #12
+                getDummyAlignment(2, 15,  0,  3), // #13
+                getDummyAlignment(2, 15,  0,  5), // #14
+                getDummyAlignment(2, 15,  0,  5), // #15
+                getDummyAlignment(2, 15,  0, 15), // #16
+                getDummyAlignment(2, 15,  0, 15), // #17
+                getDummyAlignment(2, 15,  0, 15), // #18
+                getDummyAlignment(2, 15,  5, 15), // #19
+                getDummyAlignment(2, 15,  5, 15), // #20
+                getDummyAlignment(2, 15,  5, 15), // #21
+                getDummyAlignment(2, 15,  9, 15), // #22
+                getDummyAlignment(3, 15,  1,  4), // #23
+                getDummyAlignment(3, 15,  2,  5), // #24
+                getDummyAlignment(3, 15,  3,  6), // #25
+                getDummyAlignment(3, 15,  4,  7), // #26
+                getDummyAlignment(3, 15,  5,  8), // #27
+                getDummyAlignment(3, 15,  6,  9), // #28
+                getDummyAlignment(3, 15,  7, 10), // #29
+                getDummyAlignment(3, 15,  8, 11), // #30
+                getDummyAlignment(3, 15,  9, 12), // #31
+                getDummyAlignment(3, 15, 10, 13), // #32
+                getDummyAlignment(3, 15, 11, 14), // #33
+            ];
         }
     }
 

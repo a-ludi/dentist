@@ -16,14 +16,19 @@ import dentist.common :
     to;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlag = Flag,
+    AlignmentFlags = Flags,
     AlignmentLocationSeed,
+    Contig,
     coord_t,
     getType,
     isExtension,
+    Locus,
     PileUp,
     ReadAlignment,
     SeededAlignment,
-    trace_point_t;
+    trace_point_t,
+    TracePoint;
 import dentist.dazzler : buildDbFile, getFastaSequences;
 import dentist.util.algorithm : sliceBy;
 import dentist.util.fasta : reverseComplement;
@@ -490,13 +495,8 @@ private ReadInterval getCroppingSlice(
 
 unittest
 {
-    alias Contig = AlignmentChain.Contig;
-    alias Flags = AlignmentChain.Flags;
-    alias emptyFlags = AlignmentChain.emptyFlags;
-    alias complement = AlignmentChain.Flag.complement;
     alias LocalAlignment = AlignmentChain.LocalAlignment;
-    alias Locus = LocalAlignment.Locus;
-    alias TracePoint = LocalAlignment.TracePoint;
+    alias complement = AlignmentFlag.complement;
     enum tracePointDistance = 100;
 
     {
@@ -505,7 +505,7 @@ unittest
                 0,
                 Contig(1, 2584),
                 Contig(58024, 10570),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [LocalAlignment(
                     Locus(579, 2584),
                     Locus(0, 2158),
@@ -554,7 +554,7 @@ unittest
                 0,
                 Contig(1, 2584),
                 Contig(7194, 9366),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(0, 724),
                     Locus(8612, 9366),

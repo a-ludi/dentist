@@ -15,12 +15,16 @@ import dentist.common :
     toInterval;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlag = Flag,
+    AlignmentFlags = Flags,
     AlignmentLocationSeed,
     arithmetic_t,
-    id_t,
+    Contig,
     coord_t,
     getType,
+    id_t,
     isValid,
+    Locus,
     makeJoin,
     PileUp,
     pileUpToSimpleJson,
@@ -355,7 +359,9 @@ unittest
                 auto readLength = beginContigId == endContigId
                     ? endIdx - beginIdx
                     : contigLength - beginIdx + gapLength + endIdx;
-                auto flags = complement ? Flags(Flag.complement) : emptyFlags;
+                auto flags = complement
+                    ? AlignmentFlags(AlignmentFlag.complement)
+                    : AlignmentFlags();
                 coord_t firstReadBeginIdx;
                 coord_t firstReadEndIdx;
 
@@ -556,117 +562,117 @@ Join!ScaffoldPayload makeScaffoldJoin(ReadAlignment readAlignment)
 ///
 unittest
 {
-    with (AlignmentChain) with (LocalAlignment) with (Flag)
-            {
-                auto frontExtension = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        3,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(2, 3),
-                                Locus(5, 6),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(5, 6),
-                                Locus(9, 10),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-                auto backExtension = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        5,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-                auto gap = ReadAlignment(
-                    SeededAlignment.from(AlignmentChain(
-                        11,
-                        Contig(1, 100),
-                        Contig(1, 10),
-                        Flags(complement),
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                    SeededAlignment.from(AlignmentChain(
-                        12,
-                        Contig(2, 100),
-                        Contig(1, 10),
-                        emptyFlags,
-                        [
-                            LocalAlignment(
-                                Locus(94, 95),
-                                Locus(0, 1),
-                                0,
-                            ),
-                            LocalAlignment(
-                                Locus(97, 98),
-                                Locus(4, 5),
-                                0,
-                            ),
-                        ],
-                    )).front,
-                );
-                auto inputGap = GapSegment(
-                    1, // beginGlobalContigId
-                    2, // endGlobalContigId
-                    0,  // scaffoldId
-                    0,  // beginContigId
-                    1,  // endContigId
-                    15, // begin
-                    25, // end
-                );
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    enum complement = AlignmentFlag.complement;
 
-                auto join1 = makeScaffoldJoin(frontExtension);
-                auto join2 = makeScaffoldJoin(backExtension);
-                auto join3 = makeScaffoldJoin(gap);
-                auto join4 = makeScaffoldJoin(inputGap);
+    auto frontExtension = ReadAlignment(
+        SeededAlignment.from(AlignmentChain(
+            3,
+            Contig(1, 100),
+            Contig(1, 10),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(2, 3),
+                    Locus(5, 6),
+                    0,
+                ),
+                LocalAlignment(
+                    Locus(5, 6),
+                    Locus(9, 10),
+                    0,
+                ),
+            ],
+        )).front,
+    );
+    auto backExtension = ReadAlignment(
+        SeededAlignment.from(AlignmentChain(
+            5,
+            Contig(1, 100),
+            Contig(1, 10),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(94, 95),
+                    Locus(0, 1),
+                    0,
+                ),
+                LocalAlignment(
+                    Locus(97, 98),
+                    Locus(4, 5),
+                    0,
+                ),
+            ],
+        )).front,
+    );
+    auto gap = ReadAlignment(
+        SeededAlignment.from(AlignmentChain(
+            11,
+            Contig(1, 100),
+            Contig(1, 10),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(94, 95),
+                    Locus(0, 1),
+                    0,
+                ),
+                LocalAlignment(
+                    Locus(97, 98),
+                    Locus(4, 5),
+                    0,
+                ),
+            ],
+        )).front,
+        SeededAlignment.from(AlignmentChain(
+            12,
+            Contig(2, 100),
+            Contig(1, 10),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(94, 95),
+                    Locus(0, 1),
+                    0,
+                ),
+                LocalAlignment(
+                    Locus(97, 98),
+                    Locus(4, 5),
+                    0,
+                ),
+            ],
+        )).front,
+    );
+    auto inputGap = GapSegment(
+        1, // beginGlobalContigId
+        2, // endGlobalContigId
+        0,  // scaffoldId
+        0,  // beginContigId
+        1,  // endContigId
+        15, // begin
+        25, // end
+    );
 
-                assert(join1.start == ContigNode(1, ContigPart.pre));
-                assert(join1.end == ContigNode(1, ContigPart.begin));
-                assert(join1.payload == ScaffoldPayload.pileUp([frontExtension]));
+    auto join1 = makeScaffoldJoin(frontExtension);
+    auto join2 = makeScaffoldJoin(backExtension);
+    auto join3 = makeScaffoldJoin(gap);
+    auto join4 = makeScaffoldJoin(inputGap);
 
-                assert(join2.start == ContigNode(1, ContigPart.end));
-                assert(join2.end == ContigNode(1, ContigPart.post));
-                assert(join2.payload == ScaffoldPayload.pileUp([backExtension]));
+    assert(join1.start == ContigNode(1, ContigPart.pre));
+    assert(join1.end == ContigNode(1, ContigPart.begin));
+    assert(join1.payload == ScaffoldPayload.pileUp([frontExtension]));
 
-                assert(join3.start == ContigNode(1, ContigPart.end));
-                assert(join3.end == ContigNode(2, ContigPart.end));
-                assert(join3.payload == ScaffoldPayload.pileUp([gap]));
+    assert(join2.start == ContigNode(1, ContigPart.end));
+    assert(join2.end == ContigNode(1, ContigPart.post));
+    assert(join2.payload == ScaffoldPayload.pileUp([backExtension]));
 
-                assert(join4.start == ContigNode(1, ContigPart.end));
-                assert(join4.end == ContigNode(2, ContigPart.begin));
-                assert(join4.payload == ScaffoldPayload.inputGap());
-            }
+    assert(join3.start == ContigNode(1, ContigPart.end));
+    assert(join3.end == ContigNode(2, ContigPart.end));
+    assert(join3.payload == ScaffoldPayload.pileUp([gap]));
+
+    assert(join4.start == ContigNode(1, ContigPart.end));
+    assert(join4.end == ContigNode(2, ContigPart.begin));
+    assert(join4.payload == ScaffoldPayload.inputGap());
 }
 
 /// Generate join from inputGap.
@@ -757,10 +763,7 @@ ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments, string* r
 
 unittest
 {
-    alias Contig = AlignmentChain.Contig;
-    alias Flags = AlignmentChain.Flags;
-    enum emptyFlags = AlignmentChain.emptyFlags;
-    enum complement = AlignmentChain.Flag.complement;
+    enum complement = AlignmentFlag.complement;
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias Locus = LocalAlignment.Locus;
     alias Seed = AlignmentLocationSeed;
@@ -776,7 +779,7 @@ unittest
                 0,
                 Contig(1, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(10, 20),
                     Locus(0, 10),
@@ -786,7 +789,7 @@ unittest
                 1,
                 Contig(2, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(0, 20),
                     Locus(20, 40),
@@ -796,7 +799,7 @@ unittest
                 2,
                 Contig(3, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(0, 10),
                     Locus(50, 60),
@@ -825,7 +828,7 @@ unittest
                 0,
                 Contig(1, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(10, 20),
                     Locus(0, 10),
@@ -835,7 +838,7 @@ unittest
                 1,
                 Contig(2, 20),
                 Contig(1, 60),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [LocalAlignment(
                     Locus(0, 20),
                     Locus(20, 40),
@@ -845,7 +848,7 @@ unittest
                 2,
                 Contig(3, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(0, 10),
                     Locus(50, 60),
@@ -874,7 +877,7 @@ unittest
                 1,
                 Contig(2, 20),
                 Contig(1, 60),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [LocalAlignment(
                     Locus(0, 20),
                     Locus(20, 40),
@@ -884,7 +887,7 @@ unittest
                 2,
                 Contig(3, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(0, 10),
                     Locus(50, 60),
@@ -912,7 +915,7 @@ unittest
                 0,
                 Contig(1, 20),
                 Contig(1, 60),
-                emptyFlags,
+                AlignmentFlags(),
                 [LocalAlignment(
                     Locus(10, 20),
                     Locus(0, 10),
@@ -922,7 +925,7 @@ unittest
                 1,
                 Contig(2, 20),
                 Contig(1, 60),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [LocalAlignment(
                     Locus(0, 20),
                     Locus(20, 40),
@@ -950,7 +953,7 @@ unittest
                 1,
                 Contig(2, 20),
                 Contig(1, 60),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [LocalAlignment(
                     Locus(0, 20),
                     Locus(20, 40),

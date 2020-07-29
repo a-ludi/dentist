@@ -14,10 +14,16 @@ version (unittest)
     import dentist.common.binio : CompressedSequence;
     import dentist.common.alignments :
         AlignmentChain,
+        AlignmentFlag = Flag,
+        AlignmentFlags = Flags,
         AlignmentLocationSeed,
+        Contig,
         id_t,
+        Locus,
         PileUp,
-        SeededAlignment;
+        ReadAlignment,
+        SeededAlignment,
+        TracePoint;
     import dentist.common.insertions :
         Insertion,
         InsertionInfo;
@@ -35,7 +41,10 @@ version (unittest)
 
     Insertion[] getInsertionsTestData()
     {
-        with (AlignmentChain) with (Flag) with (LocalAlignment) with (ContigPart)
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias complement = AlignmentFlag.complement;
+
+        with (ContigPart)
             return [
                 Insertion(
                     ContigNode(23, end),
@@ -49,7 +58,7 @@ version (unittest)
                                     0,
                                     Contig(23, 2189),
                                     Contig(1, 4386),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(1000, 2189),
@@ -80,7 +89,7 @@ version (unittest)
                                     2,
                                     Contig(24, 2598),
                                     Contig(1, 4386),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 500),
@@ -115,7 +124,7 @@ version (unittest)
                                     0,
                                     Contig(24, 2598),
                                     Contig(1, 3296),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(1600, 2598),
@@ -144,7 +153,7 @@ version (unittest)
                                     1,
                                     Contig(25, 3198),
                                     Contig(1, 3296),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(0, 700),
@@ -183,7 +192,7 @@ version (unittest)
                                     0,
                                     Contig(25, 3198),
                                     Contig(1, 2609),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(2700, 3198),
@@ -207,7 +216,7 @@ version (unittest)
                                     1,
                                     Contig(26, 1128),
                                     Contig(1, 2609),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(0, 500),
@@ -245,7 +254,7 @@ version (unittest)
                                     0,
                                     Contig(26, 1128),
                                     Contig(1, 1930),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(400, 1128),
@@ -272,7 +281,7 @@ version (unittest)
                                     1,
                                     Contig(27, 2317),
                                     Contig(1, 1930),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(0, 1000),
@@ -316,7 +325,7 @@ version (unittest)
                                     0,
                                     Contig(27, 2317),
                                     Contig(1, 2377),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(1698, 2317),
@@ -343,7 +352,7 @@ version (unittest)
                                     1,
                                     Contig(28, 1062),
                                     Contig(1, 2377),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 600),
@@ -384,7 +393,7 @@ version (unittest)
                                     0,
                                     Contig(28, 1062),
                                     Contig(1, 4224),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(99, 1062),
@@ -431,7 +440,7 @@ version (unittest)
                                     0,
                                     Contig(30, 26781),
                                     Contig(1, 3884),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 1600),
@@ -484,7 +493,7 @@ version (unittest)
                                     0,
                                     Contig(30, 26781),
                                     Contig(1, 2959),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(26200, 26781),
@@ -509,7 +518,7 @@ version (unittest)
                                     2,
                                     Contig(31, 7099),
                                     Contig(1, 2959),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 700),
@@ -554,7 +563,7 @@ version (unittest)
                                     0,
                                     Contig(31, 7099),
                                     Contig(1, 1891),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(5800, 7099),
@@ -586,7 +595,7 @@ version (unittest)
                                     1,
                                     Contig(32, 18877),
                                     Contig(1, 1891),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 500),
@@ -630,7 +639,7 @@ version (unittest)
                                     0,
                                     Contig(32, 18877),
                                     Contig(1, 3197),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(18399, 18877),
@@ -655,7 +664,7 @@ version (unittest)
                                     1,
                                     Contig(33, 1084),
                                     Contig(1, 3197),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 600),
@@ -701,7 +710,7 @@ version (unittest)
                                     0,
                                     Contig(33, 1084),
                                     Contig(1, 1561),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(600, 1084),
@@ -725,7 +734,7 @@ version (unittest)
                                     1,
                                     Contig(34, 3004),
                                     Contig(1, 1561),
-                                    Flags(complement),
+                                    AlignmentFlags(complement),
                                     [
                                         LocalAlignment(
                                             Locus(0, 500),
@@ -771,7 +780,7 @@ version (unittest)
                                     0,
                                     Contig(34, 3004),
                                     Contig(1, 3811),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(2200, 3004),
@@ -799,7 +808,7 @@ version (unittest)
                                     1,
                                     Contig(35, 10490),
                                     Contig(1, 3811),
-                                    emptyFlags,
+                                    AlignmentFlags(),
                                     [
                                         LocalAlignment(
                                             Locus(0, 600),

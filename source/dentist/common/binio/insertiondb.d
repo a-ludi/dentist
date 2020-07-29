@@ -13,12 +13,15 @@ import core.exception : AssertError;
 import dentist.common : ReferencePoint;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlags = Flags,
     AlignmentLocationSeed,
+    Contig,
     coord_t,
     diff_t,
     id_t,
     SeededAlignment,
-    trace_point_t;
+    trace_point_t,
+    TracePoint;
 import dentist.common.binio._base :
     ArrayStorage,
     CompressedBaseQuad,
@@ -335,7 +338,6 @@ struct InsertionDb
     )
     {
         // Parse `SeededAlignment`s
-        alias Contig = AlignmentChain.Contig;
         file.seek(slices.overlaps.ptr);
 
         size_t[2] localAlignmentsSlice;
@@ -368,7 +370,7 @@ struct InsertionDb
 
     private void parse(
         ref AlignmentChain.LocalAlignment[] localAlignments,
-        AlignmentChain.LocalAlignment.TracePoint[] tracePoints
+        TracePoint[] tracePoints
     )
     {
         alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -398,7 +400,7 @@ struct InsertionDb
         }
     }
 
-    private void parse(ref AlignmentChain.LocalAlignment.TracePoint[] tracePoints)
+    private void parse(ref TracePoint[] tracePoints)
     {
         alias LocalAlignment = AlignmentChain.LocalAlignment;
         alias TracePoint = LocalAlignment.TracePoint;
@@ -921,9 +923,9 @@ private template StorageType(T)
         alias StorageType = ArrayStorage!(StorageType!(AlignmentChain.LocalAlignment));
     else static if (is(T == AlignmentChain.LocalAlignment))
         alias StorageType = LocalAlignmentStorage;
-    else static if (is(T == AlignmentChain.LocalAlignment.TracePoint[]))
-        alias StorageType = ArrayStorage!(StorageType!(AlignmentChain.LocalAlignment.TracePoint));
-    else static if (is(T == AlignmentChain.LocalAlignment.TracePoint))
+    else static if (is(T == TracePoint[]))
+        alias StorageType = ArrayStorage!(StorageType!TracePoint);
+    else static if (is(T == TracePoint))
         alias StorageType = TracePointStorage;
     else static if (is(T == id_t))
         alias StorageType = id_t;
@@ -952,7 +954,7 @@ private struct SeededAlignmentStorage
     coord_t contigALength;
     id_t contigBId;
     coord_t contigBLength;
-    AlignmentChain.Flags flags;
+    AlignmentFlags flags;
     StorageType!(LocalAlignment[]) localAlignments;
     trace_point_t tracePointDistance;
     AlignmentLocationSeed seed;
@@ -960,8 +962,6 @@ private struct SeededAlignmentStorage
 
 private struct LocalAlignmentStorage
 {
-    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
-
     coord_t contigABegin;
     coord_t contigAEnd;
     coord_t contigBBegin;

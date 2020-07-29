@@ -15,6 +15,8 @@ import dentist.common :
     ReferenceRegion;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlag = Flag,
+    AlignmentFlags = Flags,
     coord_t,
     id_t;
 import dentist.common.commands : TestingCommand;
@@ -163,16 +165,13 @@ struct ClosableGap
 
 struct TrueAlignment
 {
-    static alias Flag = AlignmentChain.Flag;
-    static alias Flags = AlignmentChain.Flags;
-
     id_t scaffoldId;
     coord_t begin;
     coord_t end;
-    Flags flags;
+    AlignmentFlags flags;
     id_t readId;
 
-    static foreach(flagName; __traits(allMembers, Flag))
+    static foreach(flagName; __traits(allMembers, AlignmentFlag))
     {
         mixin(format!(q"<
             static alias %1$s = PhobosFlag!"%2$s";
@@ -229,7 +228,7 @@ TrueAlignment parseTrueAlignment(EnumLine)(EnumLine enumLine)
     if (trueAlignment.begin > trueAlignment.end)
     {
         swap(trueAlignment.begin, trueAlignment.end);
-        trueAlignment.flags |= TrueAlignment.Flag.complement;
+        trueAlignment.flags |= AlignmentFlag.complement;
     }
 
     return trueAlignment;

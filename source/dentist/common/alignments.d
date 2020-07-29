@@ -80,44 +80,61 @@ alias diff_t = uint;
 alias id_t = uint;
 alias trace_point_t = ushort;
 
+
+
+struct Contig
+{
+    id_t id;
+    coord_t length;
+}
+
+
+struct Locus
+{
+    coord_t begin;
+    coord_t end;
+
+    @property coord_t length() const pure nothrow
+    {
+        return end - begin;
+    }
+}
+
+
+enum Flag : ubyte
+{
+    complement = 1 << 0,
+    disabled = 1 << 1,
+}
+
+
+alias Flags = BitFlags!Flag;
+
+
+struct TracePoint
+{
+    trace_point_t numDiffs;
+    trace_point_t numBasePairs;
+}
+
+
+struct TranslatedTracePoint
+{
+    coord_t contigA;
+    coord_t contigB;
+}
+
+
 /**
     Holds a chain of local alignments that form a compound alignment. An AlignmentChain should
     contain at least one element.
 */
 struct AlignmentChain
 {
-    static enum Flag : ubyte
-    {
-        complement = 1 << 0,
-        disabled = 1 << 1,
-    }
-
-    static alias Flags = BitFlags!Flag;
-
-    static struct TranslatedTracePoint
-    {
-        coord_t contigA;
-        coord_t contigB;
-    }
-
     static struct LocalAlignment
     {
-        static struct Locus
-        {
-            coord_t begin;
-            coord_t end;
-
-            @property coord_t length() const pure nothrow
-            {
-                return end - begin;
-            }
-        }
-
-        static struct TracePoint
-        {
-            trace_point_t numDiffs;
-            trace_point_t numBasePairs;
-        }
+        alias Locus = .Locus;
+        alias TracePoint = .TracePoint;
 
         Locus contigA;
         Locus contigB;
@@ -274,14 +291,7 @@ struct AlignmentChain
         }
     }
 
-    static struct Contig
-    {
-        id_t id;
-        coord_t length;
-    }
-
     static enum maxScore = 2 ^^ 16;
-    static enum emptyFlags = Flags();
 
     id_t id;
     Contig contigA;
@@ -357,17 +367,17 @@ struct AlignmentChain
     {
         with (LocalAlignment)
             {
-                auto acZeroLength = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, []);
-                auto ac1 = AlignmentChain(1, Contig(1, 10), Contig(1, 10), emptyFlags,
+                auto acZeroLength = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), []);
+                auto ac1 = AlignmentChain(1, Contig(1, 10), Contig(1, 10), Flags(),
                         [LocalAlignment(Locus(1, 1), Locus(1, 9), 0)]);
-                auto ac2 = AlignmentChain(2, Contig(1, 10), Contig(1, 10), emptyFlags,
+                auto ac2 = AlignmentChain(2, Contig(1, 10), Contig(1, 10), Flags(),
                         [LocalAlignment(Locus(1, 11), Locus(1, 9), 0)]);
-                auto ac3 = AlignmentChain(3, Contig(1, 10), Contig(1, 10), emptyFlags,
+                auto ac3 = AlignmentChain(3, Contig(1, 10), Contig(1, 10), Flags(),
                         [LocalAlignment(Locus(1, 9), Locus(1, 1), 0)]);
-                auto ac4 = AlignmentChain(4, Contig(1, 10), Contig(1, 10), emptyFlags,
+                auto ac4 = AlignmentChain(4, Contig(1, 10), Contig(1, 10), Flags(),
                         [LocalAlignment(Locus(1, 9), Locus(1, 11), 0)]);
                 auto acFine = AlignmentChain(5, Contig(1, 10), Contig(1, 10),
-                        emptyFlags, [LocalAlignment(Locus(1, 9), Locus(1, 9), 0)]);
+                        Flags(), [LocalAlignment(Locus(1, 9), Locus(1, 9), 0)]);
 
                 assertThrown!AssertError(acZeroLength.totalLength);
                 assertThrown!AssertError(ac1.totalLength);
@@ -389,7 +399,7 @@ struct AlignmentChain
             {
                 auto firstLA = LocalAlignment(Locus(1, 9), Locus(1, 9), 0);
                 auto otherLA = LocalAlignment(Locus(9, 10), Locus(9, 10), 0);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [firstLA, otherLA]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [firstLA, otherLA]);
 
                 assert(ac.first == firstLA);
             }
@@ -406,7 +416,7 @@ struct AlignmentChain
             {
                 auto lastLA = LocalAlignment(Locus(1, 9), Locus(1, 9), 0);
                 auto otherLA = LocalAlignment(Locus(9, 10), Locus(9, 10), 0);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [otherLA, lastLA]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [otherLA, lastLA]);
 
                 assert(ac.last == lastLA);
             }
@@ -490,7 +500,7 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(30, 35), Locus(5, 10), 1);
-                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), emptyFlags, [la]);
+                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
 
                 // read with extension align an contigA from 25 to 40
                 assert(ac.isFullyContained);
@@ -500,7 +510,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(10, 20), Locus(5, 10), 1);
                 auto la2 = LocalAlignment(Locus(30, 40), Locus(5, 10), 1);
-                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la1, la2]);
 
                 // read with extension align an contigA from 5 to 45
                 assert(ac.isFullyContained);
@@ -509,7 +519,7 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 10), Locus(5, 10), 1);
-                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), emptyFlags, [la]);
+                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
 
                 // read with extension align an contigA from -5 to 15
                 assert(!ac.isFullyContained);
@@ -518,7 +528,7 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(40, 50), Locus(5, 10), 1);
-                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), emptyFlags, [la]);
+                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
 
                 // read with extension align an contigA from 35 to 55
                 assert(!ac.isFullyContained);
@@ -528,7 +538,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(0, 20), Locus(5, 10), 1);
                 auto la2 = LocalAlignment(Locus(30, 50), Locus(5, 10), 1);
-                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la1, la2]);
 
                 // read with extension align an contigA from -5 to 55
                 assert(!ac.isFullyContained);
@@ -551,7 +561,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.totalLength == 9);
             }
@@ -568,7 +578,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.totalDiffs == 3);
             }
@@ -588,7 +598,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.totalGapLength == 2);
             }
@@ -605,7 +615,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.numMatchingBps == 9 - (3 + 2));
             }
@@ -622,7 +632,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.score == 4 * maxScore / 9);
             }
@@ -639,7 +649,7 @@ struct AlignmentChain
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la1, la2]);
+                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.averageErrorRate == 3.0 / 7.0);
             }
@@ -660,10 +670,10 @@ struct AlignmentChain
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
                 auto acs = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
-                    AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
+                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la]),
+                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(), [la]),
+                    AlignmentChain(2, Contig(2, 10), Contig(1, 10), Flags(), [la]),
+                    AlignmentChain(3, Contig(2, 10), Contig(2, 10), Flags(), [la]),
                 ];
 
                 foreach (i; 0 .. acs.length)
@@ -703,10 +713,10 @@ struct AlignmentChain
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
                 auto acs = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
-                    AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
+                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la]),
+                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(), [la]),
+                    AlignmentChain(2, Contig(2, 10), Contig(1, 10), Flags(), [la]),
+                    AlignmentChain(3, Contig(2, 10), Contig(2, 10), Flags(), [la]),
                 ];
 
                 foreach (i; 0 .. acs.length)
@@ -729,31 +739,31 @@ struct AlignmentChain
         with (Complement) with (LocalAlignment)
             {
                 auto acs = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(0, 2), Locus(0, 2), 1),
                         LocalAlignment(Locus(3, 5), Locus(3, 5), 1)
                     ]),
-                    AlignmentChain(1, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(1, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(0, 2), Locus(1, 2), 1),
                         LocalAlignment(Locus(3, 5), Locus(3, 5), 1)
                     ]),
-                    AlignmentChain(2, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(2, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(1, 2), Locus(0, 2), 1),
                         LocalAlignment(Locus(3, 5), Locus(3, 5), 1)
                     ]),
-                    AlignmentChain(3, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(3, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(1, 2), Locus(1, 2), 1),
                         LocalAlignment(Locus(3, 5), Locus(3, 5), 1)
                     ]),
-                    AlignmentChain(4, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(4, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(1, 2), Locus(1, 2), 1),
                         LocalAlignment(Locus(3, 5), Locus(3, 6), 1)
                     ]),
-                    AlignmentChain(5, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(5, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(1, 2), Locus(1, 2), 1),
                         LocalAlignment(Locus(3, 6), Locus(3, 5), 1)
                     ]),
-                    AlignmentChain(6, Contig(1, 10), Contig(1, 10), emptyFlags, [
+                    AlignmentChain(6, Contig(1, 10), Contig(1, 10), Flags(), [
                         LocalAlignment(Locus(1, 2), Locus(1, 2), 1),
                         LocalAlignment(Locus(3, 6), Locus(3, 6), 1)
                     ]),
@@ -1135,36 +1145,35 @@ struct AlignmentChain
     ///
     unittest
     {
-        with (AlignmentChain) with (LocalAlignment) with (Complement)
-        {
-            auto acs = [
-                AlignmentChain(
-                    0,
-                    Contig(1, 10),
-                    Contig(1, 10),
-                    emptyFlags,
-                    [
-                        LocalAlignment(Locus(0, 3), Locus(0, 3)),
-                        LocalAlignment(Locus(4, 5), Locus(4, 5)),
-                    ]),
-                AlignmentChain(
-                    1,
-                    Contig(1, 10),
-                    Contig(1, 10),
-                    Flags(Flag.complement),
-                    [
-                        LocalAlignment(Locus(5, 8), Locus(0, 3)),
-                        LocalAlignment(Locus(9, 10), Locus(4, 5)),
-                    ]),
-            ];
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-            assert(cartoon!"contigA"(1, acs) == "----------\n" ~
-                                                "---=-\n" ~
-                                                "     ---=-");
-            assert(cartoon!"contigB"(1, acs) == "----------\n" ~
-                                                "---=-\n" ~
-                                                "     -=---");
-        }
+        auto acs = [
+            AlignmentChain(
+                0,
+                Contig(1, 10),
+                Contig(1, 10),
+                Flags(),
+                [
+                    LocalAlignment(Locus(0, 3), Locus(0, 3)),
+                    LocalAlignment(Locus(4, 5), Locus(4, 5)),
+                ]),
+            AlignmentChain(
+                1,
+                Contig(1, 10),
+                Contig(1, 10),
+                Flags(Flag.complement),
+                [
+                    LocalAlignment(Locus(5, 8), Locus(0, 3)),
+                    LocalAlignment(Locus(9, 10), Locus(4, 5)),
+                ]),
+        ];
+
+        assert(cartoon!"contigA"(1, acs) == "----------\n" ~
+                                            "---=-\n" ~
+                                            "     ---=-");
+        assert(cartoon!"contigB"(1, acs) == "----------\n" ~
+                                            "---=-\n" ~
+                                            "     -=---");
     }
 }
 
@@ -1177,29 +1186,28 @@ bool idsPred(in AlignmentChain ac1, in AlignmentChain ac2) pure
 
 unittest
 {
-    with (AlignmentChain) with (LocalAlignment) with (Complement)
-            {
-                auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
-                auto acs = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), emptyFlags, [la]),
-                    AlignmentChain(2, Contig(2, 10), Contig(1, 10), emptyFlags, [la]),
-                    AlignmentChain(3, Contig(2, 10), Contig(2, 10), emptyFlags, [la]),
-                ];
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-                foreach (i; 0 .. acs.length)
-                    foreach (j; 0 .. acs.length)
-                    {
-                        auto compareValue = idsPred(acs[i], acs[j]);
-                        alias errorMessage = (expValue) => format!"expected idsPred(%s, %s) to be %s but got %s"(
-                                acs[i], acs[j], expValue, compareValue);
+    auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
+    auto acs = [
+        AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la]),
+        AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(), [la]),
+        AlignmentChain(2, Contig(2, 10), Contig(1, 10), Flags(), [la]),
+        AlignmentChain(3, Contig(2, 10), Contig(2, 10), Flags(), [la]),
+    ];
 
-                        if (i < j)
-                            assert(compareValue, errorMessage(true));
-                        else
-                            assert(!compareValue, errorMessage(false));
-                    }
-            }
+    foreach (i; 0 .. acs.length)
+        foreach (j; 0 .. acs.length)
+        {
+            auto compareValue = idsPred(acs[i], acs[j]);
+            alias errorMessage = (expValue) => format!"expected idsPred(%s, %s) to be %s but got %s"(
+                    acs[i], acs[j], expValue, compareValue);
+
+            if (i < j)
+                assert(compareValue, errorMessage(true));
+            else
+                assert(!compareValue, errorMessage(false));
+        }
 }
 
 auto haveEqualIds(in AlignmentChain ac1, in AlignmentChain ac2) pure
@@ -1211,66 +1219,63 @@ auto haveEqualIds(in AlignmentChain ac1, in AlignmentChain ac2) pure
 
 unittest
 {
-    with (AlignmentChain) with (Complement) with (LocalAlignment)
-            {
-                auto sortedTestChains = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 10), Locus(0, 1), 0)]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 10), Locus(0, 2), 0)]),
-                    AlignmentChain(2, Contig(1, 10), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 10), Locus(0, 3), 0)]),
-                    AlignmentChain(3, Contig(2, 20), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 20), Locus(0, 4), 0)]),
-                    AlignmentChain(4, Contig(2, 20), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 20), Locus(0, 5), 0)]),
-                    AlignmentChain(5, Contig(2, 20), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 20), Locus(0, 6), 0)]),
-                    AlignmentChain(6, Contig(3, 30), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 30), Locus(0, 7), 0)]),
-                    AlignmentChain(7, Contig(3, 30), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 30), Locus(0, 8), 0)]),
-                    AlignmentChain(8, Contig(3, 30), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 30), Locus(0, 9), 0)]),
-                ];
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-                assert(sortedTestChains.chunkBy!haveEqualIds.equal!equal([
-                    sortedTestChains[0..1],
-                    sortedTestChains[1..2],
-                    sortedTestChains[2..3],
-                    sortedTestChains[3..5],
-                    sortedTestChains[5..6],
-                    sortedTestChains[6..7],
-                    sortedTestChains[7..8],
-                    sortedTestChains[8..9],
-                ]));
-            }
+    auto sortedTestChains = [
+        AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 10), Locus(0, 1), 0)]),
+        AlignmentChain(1, Contig(1, 10), Contig(2, 20), Flags(), [LocalAlignment(Locus(0, 10), Locus(0, 2), 0)]),
+        AlignmentChain(2, Contig(1, 10), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 10), Locus(0, 3), 0)]),
+        AlignmentChain(3, Contig(2, 20), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 20), Locus(0, 4), 0)]),
+        AlignmentChain(4, Contig(2, 20), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 20), Locus(0, 5), 0)]),
+        AlignmentChain(5, Contig(2, 20), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 20), Locus(0, 6), 0)]),
+        AlignmentChain(6, Contig(3, 30), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 30), Locus(0, 7), 0)]),
+        AlignmentChain(7, Contig(3, 30), Contig(2, 20), Flags(), [LocalAlignment(Locus(0, 30), Locus(0, 8), 0)]),
+        AlignmentChain(8, Contig(3, 30), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 30), Locus(0, 9), 0)]),
+    ];
+
+    assert(sortedTestChains.chunkBy!haveEqualIds.equal!equal([
+        sortedTestChains[0..1],
+        sortedTestChains[1..2],
+        sortedTestChains[2..3],
+        sortedTestChains[3..5],
+        sortedTestChains[5..6],
+        sortedTestChains[6..7],
+        sortedTestChains[7..8],
+        sortedTestChains[8..9],
+    ]));
 }
 
 auto equalIdsRange(in AlignmentChain[] acList, in id_t contigAID, in id_t contigBID) pure
 {
     assert(isSorted!idsPred(acList));
-    AlignmentChain needle = {
-        contigA: AlignmentChain.Contig(contigAID, 1),
-        contigB: AlignmentChain.Contig(contigBID, 1),
-        localAlignments: [AlignmentChain.LocalAlignment(AlignmentChain.LocalAlignment.Locus(0, 1), AlignmentChain.LocalAlignment.Locus(0, 1))],
-    };
+    AlignmentChain needle;
+    needle.contigA = Contig(contigAID, 1);
+    needle.contigB = Contig(contigBID, 1);
+    needle.localAlignments = [AlignmentChain.LocalAlignment(Locus(0, 1), Locus(0, 1))];
 
     return acList.assumeSorted!idsPred.equalRange(needle);
 }
 
 unittest
 {
-    with (AlignmentChain) with (Complement) with (LocalAlignment)
-            {
-                auto sortedTestChains = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 1), Locus(0, 1), 0)]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 2), Locus(0, 2), 0)]),
-                    AlignmentChain(2, Contig(1, 10), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 3), Locus(0, 3), 0)]),
-                    AlignmentChain(3, Contig(2, 20), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 4), Locus(0, 4), 0)]),
-                    AlignmentChain(4, Contig(2, 20), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 5), Locus(0, 5), 0)]),
-                    AlignmentChain(5, Contig(2, 20), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 6), Locus(0, 6), 0)]),
-                    AlignmentChain(6, Contig(3, 30), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(0, 7), Locus(0, 7), 0)]),
-                    AlignmentChain(7, Contig(3, 30), Contig(2, 20), emptyFlags, [LocalAlignment(Locus(0, 8), Locus(0, 8), 0)]),
-                    AlignmentChain(8, Contig(3, 30), Contig(3, 30), emptyFlags, [LocalAlignment(Locus(0, 9), Locus(0, 9), 0)]),
-                ];
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-                assert(sortedTestChains.equalIdsRange(1, 1).equal(sortedTestChains[0 .. 1]));
-                assert(sortedTestChains.equalIdsRange(2, 1).equal(sortedTestChains[3 .. 5]));
-                assert(sortedTestChains.equalIdsRange(3, 1).equal(sortedTestChains[6 .. 7]));
-                assert(sortedTestChains.equalIdsRange(42, 1337).equal(sortedTestChains[0 .. 0]));
-            }
+    auto sortedTestChains = [
+        AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 1), Locus(0, 1), 0)]),
+        AlignmentChain(1, Contig(1, 10), Contig(2, 20), Flags(), [LocalAlignment(Locus(0, 2), Locus(0, 2), 0)]),
+        AlignmentChain(2, Contig(1, 10), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 3), Locus(0, 3), 0)]),
+        AlignmentChain(3, Contig(2, 20), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 4), Locus(0, 4), 0)]),
+        AlignmentChain(4, Contig(2, 20), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 5), Locus(0, 5), 0)]),
+        AlignmentChain(5, Contig(2, 20), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 6), Locus(0, 6), 0)]),
+        AlignmentChain(6, Contig(3, 30), Contig(1, 10), Flags(), [LocalAlignment(Locus(0, 7), Locus(0, 7), 0)]),
+        AlignmentChain(7, Contig(3, 30), Contig(2, 20), Flags(), [LocalAlignment(Locus(0, 8), Locus(0, 8), 0)]),
+        AlignmentChain(8, Contig(3, 30), Contig(3, 30), Flags(), [LocalAlignment(Locus(0, 9), Locus(0, 9), 0)]),
+    ];
+
+    assert(sortedTestChains.equalIdsRange(1, 1).equal(sortedTestChains[0 .. 1]));
+    assert(sortedTestChains.equalIdsRange(2, 1).equal(sortedTestChains[3 .. 5]));
+    assert(sortedTestChains.equalIdsRange(3, 1).equal(sortedTestChains[6 .. 7]));
+    assert(sortedTestChains.equalIdsRange(42, 1337).equal(sortedTestChains[0 .. 0]));
 }
 
 /**
@@ -1295,29 +1300,29 @@ bool isBefore(string contig)(in AlignmentChain ac1, in AlignmentChain ac2) pure
 
 unittest
 {
-    with (AlignmentChain) with (Flag) with (LocalAlignment)
-            {
-                auto acs = [
-                    AlignmentChain(0, Contig(1, 10), Contig(1, 10), emptyFlags, [LocalAlignment(Locus(1, 6), Locus(0, 1), 0)]),
-                    AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(complement), [LocalAlignment(Locus(2, 6), Locus(0, 1), 0)]),
-                    AlignmentChain(2, Contig(1, 10), Contig(3, 10), emptyFlags, [LocalAlignment(Locus(3, 6), Locus(0, 1), 0)]),
-                    AlignmentChain(3, Contig(1, 10), Contig(4, 10), Flags(complement), [LocalAlignment(Locus(4, 6), Locus(0, 1), 0)]),
-                    AlignmentChain(4, Contig(1, 10), Contig(5, 10), emptyFlags, [LocalAlignment(Locus(5, 6), Locus(0, 1), 0)]),
-                ];
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    enum complement = Flag.complement;
 
-                foreach (i; 0 .. acs.length)
-                    foreach (j; 0 .. acs.length)
-                    {
-                        auto compareValue = isBefore!"contigA"(acs[i], acs[j]);
-                        alias errorMessage = (expValue) => format!"expected isBefore!\"contigA\"(%s, %s) to be %s but got %s"(
-                                acs[i], acs[j], expValue, compareValue);
+    auto acs = [
+        AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [LocalAlignment(Locus(1, 6), Locus(0, 1), 0)]),
+        AlignmentChain(1, Contig(1, 10), Contig(2, 10), Flags(complement), [LocalAlignment(Locus(2, 6), Locus(0, 1), 0)]),
+        AlignmentChain(2, Contig(1, 10), Contig(3, 10), Flags(), [LocalAlignment(Locus(3, 6), Locus(0, 1), 0)]),
+        AlignmentChain(3, Contig(1, 10), Contig(4, 10), Flags(complement), [LocalAlignment(Locus(4, 6), Locus(0, 1), 0)]),
+        AlignmentChain(4, Contig(1, 10), Contig(5, 10), Flags(), [LocalAlignment(Locus(5, 6), Locus(0, 1), 0)]),
+    ];
 
-                        if (i < j)
-                            assert(compareValue, errorMessage(true));
-                        else
-                            assert(!compareValue, errorMessage(false));
-                    }
-            }
+    foreach (i; 0 .. acs.length)
+        foreach (j; 0 .. acs.length)
+        {
+            auto compareValue = isBefore!"contigA"(acs[i], acs[j]);
+            alias errorMessage = (expValue) => format!"expected isBefore!\"contigA\"(%s, %s) to be %s but got %s"(
+                    acs[i], acs[j], expValue, compareValue);
+
+            if (i < j)
+                assert(compareValue, errorMessage(true));
+            else
+                assert(!compareValue, errorMessage(false));
+        }
 }
 
 /// Calculates the coverage of the contigs by the given alignments. Only
@@ -1344,60 +1349,63 @@ double alignmentCoverage(in AlignmentChain[] alignments)
 
 unittest
 {
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    enum complement = Flag.complement;
+
     auto alignments = [
         AlignmentChain(
             0,
-            AlignmentChain.Contig(1, 100),
-            AlignmentChain.Contig(1, 50),
-            AlignmentChain.emptyFlags,
+            Contig(1, 100),
+            Contig(1, 50),
+            Flags(),
             [
-                AlignmentChain.LocalAlignment(
-                    AlignmentChain.LocalAlignment.Locus(0, 10),
-                    AlignmentChain.LocalAlignment.Locus(40, 50),
+                LocalAlignment(
+                    Locus(0, 10),
+                    Locus(40, 50),
                     0
                 ),
             ],
         ),
         AlignmentChain(
             1,
-            AlignmentChain.Contig(1, 100),
-            AlignmentChain.Contig(2, 30),
-            AlignmentChain.Flags(AlignmentChain.Flag.complement),
+            Contig(1, 100),
+            Contig(2, 30),
+            Flags(complement),
             [
-                AlignmentChain.LocalAlignment(
-                    AlignmentChain.LocalAlignment.Locus(10, 20),
-                    AlignmentChain.LocalAlignment.Locus(0, 10),
+                LocalAlignment(
+                    Locus(10, 20),
+                    Locus(0, 10),
                     0
                 ),
-                AlignmentChain.LocalAlignment(
-                    AlignmentChain.LocalAlignment.Locus(30, 40),
-                    AlignmentChain.LocalAlignment.Locus(20, 30),
+                LocalAlignment(
+                    Locus(30, 40),
+                    Locus(20, 30),
                     0
                 ),
             ],
         ),
         AlignmentChain(
             2,
-            AlignmentChain.Contig(1, 100),
-            AlignmentChain.Contig(3, 20),
-            AlignmentChain.emptyFlags,
+            Contig(1, 100),
+            Contig(3, 20),
+            Flags(),
             [
-                AlignmentChain.LocalAlignment(
-                    AlignmentChain.LocalAlignment.Locus(40, 60),
-                    AlignmentChain.LocalAlignment.Locus(0, 20),
+                LocalAlignment(
+                    Locus(40, 60),
+                    Locus(0, 20),
                     0
                 ),
             ],
         ),
         AlignmentChain(
             3,
-            AlignmentChain.Contig(1, 100),
-            AlignmentChain.Contig(4, 50),
-            AlignmentChain.Flags(AlignmentChain.Flag.complement),
+            Contig(1, 100),
+            Contig(4, 50),
+            Flags(complement),
             [
-                AlignmentChain.LocalAlignment(
-                    AlignmentChain.LocalAlignment.Locus(70, 100),
-                    AlignmentChain.LocalAlignment.Locus(0, 30),
+                LocalAlignment(
+                    Locus(70, 100),
+                    Locus(0, 30),
                     0
                 ),
             ],
@@ -1410,17 +1418,38 @@ unittest
 
 struct FlatLocalAlignment
 {
-    alias Flag = AlignmentChain.Flag;
-    alias Flags = AlignmentChain.Flags;
-    enum emptyFlags = AlignmentChain.emptyFlags;
-    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
-
     static struct FlatLocus
     {
         id_t id;
         coord_t length;
         coord_t begin;
         coord_t end;
+
+
+        @property Contig contig() const pure nothrow @safe
+        {
+            return Contig(begin, end);
+        }
+
+
+        @property void contig(Contig newContig) pure nothrow @safe
+        {
+            this.id = newContig.id;
+            this.length = newContig.length;
+        }
+
+
+        @property Locus locus() const pure nothrow @safe
+        {
+            return Locus(begin, end);
+        }
+
+
+        @property void locus(Locus newLocus) pure nothrow @safe
+        {
+            this.begin = newLocus.begin;
+            this.end = newLocus.end;
+        }
 
 
         @property coord_t mappedLength() const pure nothrow @safe
@@ -1566,10 +1595,7 @@ auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
             .shortestPath(bestConnections[0][0], bestConnections[0][1])
             .map!(idx => flatLocalAlignments[idx]);
 
-        alias Contig = AlignmentChain.Contig;
-        alias Flag = AlignmentChain.Flag;
         alias LocalAlignment = AlignmentChain.LocalAlignment;
-        alias Locus = AlignmentChain.LocalAlignment.Locus;
 
         auto firstLA = flatLocalAlignments.front;
 
@@ -1927,355 +1953,355 @@ struct ReadAlignment
 
     unittest
     {
-        with (AlignmentChain) with (LocalAlignment) with (Flag)
-                {
-                    auto testData = [
-                        // TODO drop this case?
-                        //"innerAlignment": ReadAlignment(
-                        //    SeededAlignment.from(AlignmentChain(
-                        //        1,
-                        //        Contig(1, 100),
-                        //        Contig(1, 10),
-                        //        no,
-                        //        [
-                        //            LocalAlignment(
-                        //                Locus(10, 11),
-                        //                Locus(0, 1),
-                        //                0,
-                        //            ),
-                        //            LocalAlignment(
-                        //                Locus(19, 20),
-                        //                Locus(9, 10),
-                        //                0,
-                        //            ),
-                        //        ],
-                        //    )).front,
-                        //),
-                        // TODO drop this case?
-                        //"innerAlignmentComplement": ReadAlignment(
-                        //    SeededAlignment.from(AlignmentChain(
-                        //        2,
-                        //        Contig(1, 100),
-                        //        Contig(1, 10),
-                        //        yes,
-                        //        [
-                        //            LocalAlignment(
-                        //                Locus(10, 11),
-                        //                Locus(0, 1),
-                        //                0,
-                        //            ),
-                        //            LocalAlignment(
-                        //                Locus(19, 20),
-                        //                Locus(9, 10),
-                        //                0,
-                        //            ),
-                        //        ],
-                        //    )).front,
-                        //),
-                        "frontExtension": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                3,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "frontExtensionComplement": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                4,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "backExtension": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                5,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "backExtensionComplement": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                6,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "gapEnd2Front": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                7,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                            SeededAlignment.from(AlignmentChain(
-                                8,
-                                Contig(2, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "gapFront2EndComplement": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                9,
-                                Contig(2, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                            SeededAlignment.from(AlignmentChain(
-                                10,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "gapEnd2End": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                11,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                            SeededAlignment.from(AlignmentChain(
-                                12,
-                                Contig(2, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(94, 95),
-                                        Locus(0, 1),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(97, 98),
-                                        Locus(4, 5),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                        "gapBegin2Begin": ReadAlignment(
-                            SeededAlignment.from(AlignmentChain(
-                                13,
-                                Contig(2, 100),
-                                Contig(1, 10),
-                                emptyFlags,
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                            SeededAlignment.from(AlignmentChain(
-                                14,
-                                Contig(1, 100),
-                                Contig(1, 10),
-                                Flags(complement),
-                                [
-                                    LocalAlignment(
-                                        Locus(2, 3),
-                                        Locus(5, 6),
-                                        0,
-                                    ),
-                                    LocalAlignment(
-                                        Locus(5, 6),
-                                        Locus(9, 10),
-                                        0,
-                                    ),
-                                ],
-                            )).front,
-                        ),
-                    ];
-                    //                               +--------- isInOrder
-                    //                               |+-------- isValid
-                    //                               ||+------- type
-                    //                               |||+------ isExtension
-                    //                               ||||+----- isFrontExt
-                    //                               |||||+---- isBackExt
-                    //                               ||||||+--- isGap
-                    //                               |||||||+-- isParallel
-                    //                               ||||||||+- isAntiParallel
-                    //                               |||||||||
-                    //                               |||||||||
-                    auto testCases = [
-                        //"innerAlignment":           "+.F......",
-                        //"innerAlignmentComplement": "+.F......",
-                        "frontExtension":           "++F++....",
-                        "frontExtensionComplement": "++F++....",
-                        "backExtension":            "++B+.+...",
-                        "backExtensionComplement":  "++B+.+...",
-                        "gapEnd2Front":             "++G...++.",
-                        "gapFront2EndComplement":   ".+G...++.",
-                        "gapEnd2End":               "++G...+.+",
-                        "gapBegin2Begin":           ".+G...+.+",
-                    ];
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias complement = Flag.complement;
 
-                    alias getFailureMessage = (testCase, testFunction, expectedValue) => format!"expected %s.%s to be %s"(
-                            testCase, testFunction, expectedValue);
-                    alias toBool = (c) => c == '+' ? true : false;
-                    alias toRAT = (c) => c == 'F'
-                        ? ReadAlignmentType.front
-                        : c == 'B'
-                            ? ReadAlignmentType.back
-                            : ReadAlignmentType.gap;
+        auto testData = [
+            // TODO drop this case?
+            //"innerAlignment": ReadAlignment(
+            //    SeededAlignment.from(AlignmentChain(
+            //        1,
+            //        Contig(1, 100),
+            //        Contig(1, 10),
+            //        no,
+            //        [
+            //            LocalAlignment(
+            //                Locus(10, 11),
+            //                Locus(0, 1),
+            //                0,
+            //            ),
+            //            LocalAlignment(
+            //                Locus(19, 20),
+            //                Locus(9, 10),
+            //                0,
+            //            ),
+            //        ],
+            //    )).front,
+            //),
+            // TODO drop this case?
+            //"innerAlignmentComplement": ReadAlignment(
+            //    SeededAlignment.from(AlignmentChain(
+            //        2,
+            //        Contig(1, 100),
+            //        Contig(1, 10),
+            //        yes,
+            //        [
+            //            LocalAlignment(
+            //                Locus(10, 11),
+            //                Locus(0, 1),
+            //                0,
+            //            ),
+            //            LocalAlignment(
+            //                Locus(19, 20),
+            //                Locus(9, 10),
+            //                0,
+            //            ),
+            //        ],
+            //    )).front,
+            //),
+            "frontExtension": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    3,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "frontExtensionComplement": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    4,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "backExtension": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    5,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "backExtensionComplement": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    6,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "gapEnd2Front": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    7,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+                SeededAlignment.from(AlignmentChain(
+                    8,
+                    Contig(2, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "gapFront2EndComplement": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    9,
+                    Contig(2, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+                SeededAlignment.from(AlignmentChain(
+                    10,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "gapEnd2End": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    11,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+                SeededAlignment.from(AlignmentChain(
+                    12,
+                    Contig(2, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(94, 95),
+                            Locus(0, 1),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(97, 98),
+                            Locus(4, 5),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+            "gapBegin2Begin": ReadAlignment(
+                SeededAlignment.from(AlignmentChain(
+                    13,
+                    Contig(2, 100),
+                    Contig(1, 10),
+                    Flags(),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+                SeededAlignment.from(AlignmentChain(
+                    14,
+                    Contig(1, 100),
+                    Contig(1, 10),
+                    Flags(complement),
+                    [
+                        LocalAlignment(
+                            Locus(2, 3),
+                            Locus(5, 6),
+                            0,
+                        ),
+                        LocalAlignment(
+                            Locus(5, 6),
+                            Locus(9, 10),
+                            0,
+                        ),
+                    ],
+                )).front,
+            ),
+        ];
+        //                               +--------- isInOrder
+        //                               |+-------- isValid
+        //                               ||+------- type
+        //                               |||+------ isExtension
+        //                               ||||+----- isFrontExt
+        //                               |||||+---- isBackExt
+        //                               ||||||+--- isGap
+        //                               |||||||+-- isParallel
+        //                               ||||||||+- isAntiParallel
+        //                               |||||||||
+        //                               |||||||||
+        auto testCases = [
+            //"innerAlignment":           "+.F......",
+            //"innerAlignmentComplement": "+.F......",
+            "frontExtension":           "++F++....",
+            "frontExtensionComplement": "++F++....",
+            "backExtension":            "++B+.+...",
+            "backExtensionComplement":  "++B+.+...",
+            "gapEnd2Front":             "++G...++.",
+            "gapFront2EndComplement":   ".+G...++.",
+            "gapEnd2End":               "++G...+.+",
+            "gapBegin2Begin":           ".+G...+.+",
+        ];
 
-                    foreach (testCase, expectations; testCases)
-                    {
-                        auto readAlignment = testData[testCase];
+        alias getFailureMessage = (testCase, testFunction, expectedValue) => format!"expected %s.%s to be %s"(
+                testCase, testFunction, expectedValue);
+        alias toBool = (c) => c == '+' ? true : false;
+        alias toRAT = (c) => c == 'F'
+            ? ReadAlignmentType.front
+            : c == 'B'
+                ? ReadAlignmentType.back
+                : ReadAlignmentType.gap;
 
-                        auto expIsInOrder = toBool(expectations[0]);
-                        auto expIsValid = toBool(expectations[1]);
-                        auto expType = toRAT(expectations[2]);
-                        auto expIsExtension = toBool(expectations[3]);
-                        auto expIsFrontExt = toBool(expectations[4]);
-                        auto expIsBackExt = toBool(expectations[5]);
-                        auto expIsGap = toBool(expectations[6]);
-                        auto expIsParallel = toBool(expectations[7]);
-                        auto expIsAntiParallel = toBool(expectations[8]);
+        foreach (testCase, expectations; testCases)
+        {
+            auto readAlignment = testData[testCase];
 
-                        assert(expIsInOrder == readAlignment.isInOrder,
-                                getFailureMessage(testCase, "isInOrder", expIsInOrder));
-                        assert(expIsValid == readAlignment.isValid,
-                                getFailureMessage(testCase, "isValid", expIsValid));
-                        if (readAlignment.isValid)
-                            assert(expType == readAlignment.type,
-                                    getFailureMessage(testCase, "type", expType));
-                        else
-                            assertThrown!AssertError(readAlignment.type,
-                                    format!"expected type(%s) to throw"(testCase));
-                        assert(expIsExtension == readAlignment.isExtension,
-                                getFailureMessage(testCase, "isExtension", expIsExtension));
-                        assert(expIsFrontExt == readAlignment.isFrontExtension,
-                                getFailureMessage(testCase, "isFrontExtension", expIsFrontExt));
-                        assert(expIsBackExt == readAlignment.isBackExtension,
-                                getFailureMessage(testCase, "isBackExtension", expIsBackExt));
-                        assert(expIsGap == readAlignment.isGap,
-                                getFailureMessage(testCase, "isGap", expIsGap));
-                        assert(expIsParallel == readAlignment.isParallel,
-                                getFailureMessage(testCase, "isParallel", expIsParallel));
-                        assert(expIsAntiParallel == readAlignment.isAntiParallel,
-                                getFailureMessage(testCase, "isAntiParallel", expIsAntiParallel));
-                    }
-                }
+            auto expIsInOrder = toBool(expectations[0]);
+            auto expIsValid = toBool(expectations[1]);
+            auto expType = toRAT(expectations[2]);
+            auto expIsExtension = toBool(expectations[3]);
+            auto expIsFrontExt = toBool(expectations[4]);
+            auto expIsBackExt = toBool(expectations[5]);
+            auto expIsGap = toBool(expectations[6]);
+            auto expIsParallel = toBool(expectations[7]);
+            auto expIsAntiParallel = toBool(expectations[8]);
+
+            assert(expIsInOrder == readAlignment.isInOrder,
+                    getFailureMessage(testCase, "isInOrder", expIsInOrder));
+            assert(expIsValid == readAlignment.isValid,
+                    getFailureMessage(testCase, "isValid", expIsValid));
+            if (readAlignment.isValid)
+                assert(expType == readAlignment.type,
+                        getFailureMessage(testCase, "type", expType));
+            else
+                assertThrown!AssertError(readAlignment.type,
+                        format!"expected type(%s) to throw"(testCase));
+            assert(expIsExtension == readAlignment.isExtension,
+                    getFailureMessage(testCase, "isExtension", expIsExtension));
+            assert(expIsFrontExt == readAlignment.isFrontExtension,
+                    getFailureMessage(testCase, "isFrontExtension", expIsFrontExt));
+            assert(expIsBackExt == readAlignment.isBackExtension,
+                    getFailureMessage(testCase, "isBackExtension", expIsBackExt));
+            assert(expIsGap == readAlignment.isGap,
+                    getFailureMessage(testCase, "isGap", expIsGap));
+            assert(expIsParallel == readAlignment.isParallel,
+                    getFailureMessage(testCase, "isParallel", expIsParallel));
+            assert(expIsAntiParallel == readAlignment.isAntiParallel,
+                    getFailureMessage(testCase, "isAntiParallel", expIsAntiParallel));
+        }
     }
 
     double meanScore() const pure
@@ -2400,9 +2426,9 @@ auto isAntiParallel(in PileUp pileUp) pure nothrow
         .isAntiParallel;
 }
 
-AlignmentChain.Contig[] contigs(in PileUp pileUp) nothrow
+Contig[] contigs(in PileUp pileUp) nothrow
 {
-    AlignmentChain.Contig[] contigs;
+    Contig[] contigs;
     contigs.reserve(2);
 
     foreach (readAlignment; pileUp)

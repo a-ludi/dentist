@@ -12,13 +12,19 @@ import core.memory : GC;
 import dentist.common : ReferenceInterval, ReferenceRegion;
 import dentist.common.alignments :
     AlignmentChain,
+    AlignmentFlag = Flag,
+    AlignmentFlags = Flags,
     ChainingOptions,
     chainLocalAlignmentsAlgo = chainLocalAlignments,
+    Contig,
     coord_t,
     diff_t,
     FlatLocalAlignment,
     id_t,
-    trace_point_t;
+    Locus,
+    trace_point_t,
+    TracePoint,
+    TranslatedTracePoint;
 import dentist.common.binio : CompressedSequence;
 import dentist.common.external : ExternalDependency;
 import dentist.util.algorithm : sliceUntil;
@@ -702,8 +708,8 @@ private:
     Flag!"wasDumpPartConsumed" readChainPart()
     {
         enum chainPartFormat = LasDumpLineFormat.chainPart.format;
-        enum yesComplement = AlignmentChain.Flags(AlignmentChain.Flag.complement);
-        enum noComplement = AlignmentChain.emptyFlags;
+        enum yesComplement = AlignmentFlags(AlignmentFlag.complement);
+        enum noComplement = AlignmentFlags();
         id_t contigAID;
         id_t contigBID;
         char rawComplement;
@@ -933,164 +939,164 @@ unittest
         "   7 105",
     ];
 
-    with (AlignmentChain) with (Flag) with (LocalAlignment)
-    {
-        auto alignmentChains = readLasDump(testLasDump, 0).array;
-        auto expectedResult = [
-            AlignmentChain(
-                0,
-                Contig(1, 13),
-                Contig(2, 15),
-                emptyFlags,
-                [
-                    LocalAlignment(
-                        Locus(3, 4),
-                        Locus(5, 6),
-                        7,
-                    ),
-                    LocalAlignment(
-                        Locus(12, 13),
-                        Locus(14, 15),
-                        16,
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                1,
-                Contig(19, 31),
-                Contig(20, 33),
-                Flags(complement),
-                [
-                    LocalAlignment(
-                        Locus(21, 22),
-                        Locus(23, 24),
-                        25,
-                    ),
-                    LocalAlignment(
-                        Locus(30, 31),
-                        Locus(32, 33),
-                        34,
-                        [
-                            TracePoint(0, 1),
-                        ]
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                2,
-                Contig(37, 40),
-                Contig(38, 42),
-                emptyFlags,
-                [
-                    LocalAlignment(
-                        Locus(39, 40),
-                        Locus(41, 42),
-                        43,
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                3,
-                Contig(46, 58),
-                Contig(47, 60),
-                Flags(complement),
-                [
-                    LocalAlignment(
-                        Locus(48, 49),
-                        Locus(50, 51),
-                        52,
-                        [
-                            TracePoint(2, 102),
-                            TracePoint(3, 101),
-                            TracePoint(4, 104),
-                        ],
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                4,
-                Contig(46, 58),
-                Contig(47, 60),
-                emptyFlags,
-                [
-                    LocalAlignment(
-                        Locus(57, 58),
-                        Locus(59, 60),
-                        61,
-                        [
-                            TracePoint(3, 101),
-                            TracePoint(4, 104),
-                            TracePoint(2, 102),
-                        ],
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                5,
-                Contig(64, 71),
-                Contig(65, 72),
-                Flags(complement),
-                [
-                    LocalAlignment(
-                        Locus(66, 67),
-                        Locus(68, 69),
-                        70,
-                        [
-                            TracePoint(6, 105),
-                            TracePoint(1, 101),
-                            TracePoint(2, 100),
-                            TracePoint(3, 97),
-                        ],
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                6,
-                Contig(55, 80),
-                Contig(56, 81),
-                Flags(complement),
-                [
-                    LocalAlignment(
-                        Locus(75, 76),
-                        Locus(77, 78),
-                        79,
-                        [
-                            TracePoint(0, 2),
-                            TracePoint(2, 102),
-                        ],
-                    ),
-                ],
-            ),
-            AlignmentChain(
-                7,
-                Contig(1, 0),
-                Contig(3197, 0),
-                Flags(complement),
-                [
-                    LocalAlignment(
-                        Locus(0, 71),
-                        Locus(12, 86),
-                        0,
-                        [
-                            TracePoint(3, 74),
-                        ],
-                    ),
-                    LocalAlignment(
-                        Locus(0, 8300),
-                        Locus(0, 318),
-                        0,
-                        [
-                            TracePoint(6, 105),
-                            TracePoint(9, 108),
-                            TracePoint(7, 105),
-                        ],
-                    ),
-                ],
-            ),
-        ];
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    alias complement = AlignmentFlag.complement;
 
-        assert(alignmentChains == expectedResult);
-    }
+    auto alignmentChains = readLasDump(testLasDump, 0).array;
+    auto expectedResult = [
+        AlignmentChain(
+            0,
+            Contig(1, 13),
+            Contig(2, 15),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(3, 4),
+                    Locus(5, 6),
+                    7,
+                ),
+                LocalAlignment(
+                    Locus(12, 13),
+                    Locus(14, 15),
+                    16,
+                ),
+            ],
+        ),
+        AlignmentChain(
+            1,
+            Contig(19, 31),
+            Contig(20, 33),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(21, 22),
+                    Locus(23, 24),
+                    25,
+                ),
+                LocalAlignment(
+                    Locus(30, 31),
+                    Locus(32, 33),
+                    34,
+                    [
+                        TracePoint(0, 1),
+                    ]
+                ),
+            ],
+        ),
+        AlignmentChain(
+            2,
+            Contig(37, 40),
+            Contig(38, 42),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(39, 40),
+                    Locus(41, 42),
+                    43,
+                ),
+            ],
+        ),
+        AlignmentChain(
+            3,
+            Contig(46, 58),
+            Contig(47, 60),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(48, 49),
+                    Locus(50, 51),
+                    52,
+                    [
+                        TracePoint(2, 102),
+                        TracePoint(3, 101),
+                        TracePoint(4, 104),
+                    ],
+                ),
+            ],
+        ),
+        AlignmentChain(
+            4,
+            Contig(46, 58),
+            Contig(47, 60),
+            AlignmentFlags(),
+            [
+                LocalAlignment(
+                    Locus(57, 58),
+                    Locus(59, 60),
+                    61,
+                    [
+                        TracePoint(3, 101),
+                        TracePoint(4, 104),
+                        TracePoint(2, 102),
+                    ],
+                ),
+            ],
+        ),
+        AlignmentChain(
+            5,
+            Contig(64, 71),
+            Contig(65, 72),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(66, 67),
+                    Locus(68, 69),
+                    70,
+                    [
+                        TracePoint(6, 105),
+                        TracePoint(1, 101),
+                        TracePoint(2, 100),
+                        TracePoint(3, 97),
+                    ],
+                ),
+            ],
+        ),
+        AlignmentChain(
+            6,
+            Contig(55, 80),
+            Contig(56, 81),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(75, 76),
+                    Locus(77, 78),
+                    79,
+                    [
+                        TracePoint(0, 2),
+                        TracePoint(2, 102),
+                    ],
+                ),
+            ],
+        ),
+        AlignmentChain(
+            7,
+            Contig(1, 0),
+            Contig(3197, 0),
+            AlignmentFlags(complement),
+            [
+                LocalAlignment(
+                    Locus(0, 71),
+                    Locus(12, 86),
+                    0,
+                    [
+                        TracePoint(3, 74),
+                    ],
+                ),
+                LocalAlignment(
+                    Locus(0, 8300),
+                    Locus(0, 318),
+                    0,
+                    [
+                        TracePoint(6, 105),
+                        TracePoint(9, 108),
+                        TracePoint(7, 105),
+                    ],
+                ),
+            ],
+        ),
+    ];
+
+    assert(alignmentChains == expectedResult);
 }
 
 
@@ -1136,7 +1142,6 @@ private class FlatLasDumpReader(S) if (isInputRange!S && isSomeString!(ElementTy
     static alias dstring = immutable(dchar)[];
     static alias LasDump = ReturnType!getDumpLines;
     static alias FlatLocus = FlatLocalAlignment.FlatLocus;
-    static alias TracePoint = FlatLocalAlignment.TracePoint;
 
 private:
 
@@ -1377,8 +1382,8 @@ private:
     void readChainPart()
     {
         enum chainPartFormat = LasDumpLineFormat.chainPart.format;
-        enum yesComplement = FlatLocalAlignment.Flags(FlatLocalAlignment.Flag.complement);
-        enum noComplement = FlatLocalAlignment.Flags();
+        enum yesComplement = AlignmentFlags(AlignmentFlag.complement);
+        enum noComplement = AlignmentFlags();
         id_t contigAID;
         id_t contigBID;
         char rawComplement;
@@ -1537,124 +1542,122 @@ unittest
         "   7 105",
     ];
 
-    with (FlatLocalAlignment) with (Flag)
-    {
-        auto flatLocalAlignments = readFlatLasDump(testLasDump, 0)
-            .tee!((ref la) { la.tracePoints = la.tracePoints.dup; })
-            .array;
-        auto expectedResult = [
-            FlatLocalAlignment(
-                0,
-                FlatLocus(1, 13, 3, 4),
-                FlatLocus(2, 15, 5, 6),
-                emptyFlags,
-                expectedTracePointDistance,
-            ),
-            FlatLocalAlignment(
-                1,
-                FlatLocus(1, 13, 12, 13),
-                FlatLocus(2, 15, 14, 15),
-                emptyFlags,
-                expectedTracePointDistance,
-            ),
-            FlatLocalAlignment(
-                2,
-                FlatLocus(19, 31, 21, 22),
-                FlatLocus(20, 33, 23, 24),
-                Flags(complement),
-                expectedTracePointDistance,
-            ),
-            FlatLocalAlignment(
-                3,
-                FlatLocus(19, 31, 30, 31),
-                FlatLocus(20, 33, 32, 33),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(0, 1),
-                ],
-            ),
-            FlatLocalAlignment(
-                4,
-                FlatLocus(37, 40, 39, 40),
-                FlatLocus(38, 42, 41, 42),
-                emptyFlags,
-                expectedTracePointDistance,
-            ),
-            FlatLocalAlignment(
-                5,
-                FlatLocus(46, 58, 48, 49),
-                FlatLocus(47, 60, 50, 51),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(2, 102),
-                    TracePoint(3, 101),
-                    TracePoint(4, 104),
-                ],
-            ),
-            FlatLocalAlignment(
-                6,
-                FlatLocus(46, 58, 57, 58),
-                FlatLocus(47, 60, 59, 60),
-                emptyFlags,
-                expectedTracePointDistance,
-                [
-                    TracePoint(3, 101),
-                    TracePoint(4, 104),
-                    TracePoint(2, 102),
-                ],
-            ),
-            FlatLocalAlignment(
-                7,
-                FlatLocus(64, 71, 66, 67),
-                FlatLocus(65, 72, 68, 69),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(6, 105),
-                    TracePoint(1, 101),
-                    TracePoint(2, 100),
-                    TracePoint(3, 97),
-                ],
-            ),
-            FlatLocalAlignment(
-                8,
-                FlatLocus(55, 80, 75, 76),
-                FlatLocus(56, 81, 77, 78),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(0, 2),
-                    TracePoint(2, 102),
-                ],
-            ),
-            FlatLocalAlignment(
-                9,
-                FlatLocus(1, 0, 0, 71),
-                FlatLocus(3197, 0, 12, 86),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(3, 74),
-                ],
-            ),
-            FlatLocalAlignment(
-                10,
-                FlatLocus(1, 0, 0, 8300),
-                FlatLocus(3197, 0, 0, 318),
-                Flags(complement),
-                expectedTracePointDistance,
-                [
-                    TracePoint(6, 105),
-                    TracePoint(9, 108),
-                    TracePoint(7, 105),
-                ],
-            ),
-        ];
+    auto flatLocalAlignments = readFlatLasDump(testLasDump, 0)
+        .tee!((ref la) { la.tracePoints = la.tracePoints.dup; })
+        .array;
+    alias FlatLocus = FlatLocalAlignment.FlatLocus;
+    auto expectedResult = [
+        FlatLocalAlignment(
+            0,
+            FlatLocus(1, 13, 3, 4),
+            FlatLocus(2, 15, 5, 6),
+            AlignmentFlags(),
+            expectedTracePointDistance,
+        ),
+        FlatLocalAlignment(
+            1,
+            FlatLocus(1, 13, 12, 13),
+            FlatLocus(2, 15, 14, 15),
+            AlignmentFlags(),
+            expectedTracePointDistance,
+        ),
+        FlatLocalAlignment(
+            2,
+            FlatLocus(19, 31, 21, 22),
+            FlatLocus(20, 33, 23, 24),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+        ),
+        FlatLocalAlignment(
+            3,
+            FlatLocus(19, 31, 30, 31),
+            FlatLocus(20, 33, 32, 33),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 1),
+            ],
+        ),
+        FlatLocalAlignment(
+            4,
+            FlatLocus(37, 40, 39, 40),
+            FlatLocus(38, 42, 41, 42),
+            AlignmentFlags(),
+            expectedTracePointDistance,
+        ),
+        FlatLocalAlignment(
+            5,
+            FlatLocus(46, 58, 48, 49),
+            FlatLocus(47, 60, 50, 51),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(2, 102),
+                TracePoint(3, 101),
+                TracePoint(4, 104),
+            ],
+        ),
+        FlatLocalAlignment(
+            6,
+            FlatLocus(46, 58, 57, 58),
+            FlatLocus(47, 60, 59, 60),
+            AlignmentFlags(),
+            expectedTracePointDistance,
+            [
+                TracePoint(3, 101),
+                TracePoint(4, 104),
+                TracePoint(2, 102),
+            ],
+        ),
+        FlatLocalAlignment(
+            7,
+            FlatLocus(64, 71, 66, 67),
+            FlatLocus(65, 72, 68, 69),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(6, 105),
+                TracePoint(1, 101),
+                TracePoint(2, 100),
+                TracePoint(3, 97),
+            ],
+        ),
+        FlatLocalAlignment(
+            8,
+            FlatLocus(55, 80, 75, 76),
+            FlatLocus(56, 81, 77, 78),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 2),
+                TracePoint(2, 102),
+            ],
+        ),
+        FlatLocalAlignment(
+            9,
+            FlatLocus(1, 0, 0, 71),
+            FlatLocus(3197, 0, 12, 86),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(3, 74),
+            ],
+        ),
+        FlatLocalAlignment(
+            10,
+            FlatLocus(1, 0, 0, 8300),
+            FlatLocus(3197, 0, 0, 318),
+            AlignmentFlags(AlignmentFlag.complement),
+            expectedTracePointDistance,
+            [
+                TracePoint(6, 105),
+                TracePoint(9, 108),
+                TracePoint(7, 105),
+            ],
+        ),
+    ];
 
-        assert(flatLocalAlignments == expectedResult);
-    }
+    assert(flatLocalAlignments == expectedResult);
 }
 
 
@@ -2126,7 +2129,6 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
             in AlignmentChain.LocalAlignment rhs,
         )
         {
-            alias TranslatedTracePoint = AlignmentChain.TranslatedTracePoint;
             alias ResolvedCoords = Tuple!(
                 TranslatedTracePoint, "begin",
                 TranslatedTracePoint, "end",
@@ -2221,19 +2223,15 @@ auto getPaddedAlignment(S, TranslatedTracePoint)(
 
 unittest
 {
-    enum tracePointDistance = 100;
-    enum complement = AlignmentChain.Flag.complement;
-    alias Contig = AlignmentChain.Contig;
     alias LocalAlignment = AlignmentChain.LocalAlignment;
-    alias Flags = AlignmentChain.Flags;
-    alias Locus = AlignmentChain.LocalAlignment.Locus;
-    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
+    enum complement = AlignmentFlag.complement;
+    enum tracePointDistance = 100;
 
     auto ac = AlignmentChain(
         0,
         Contig(1, 1092),
         Contig(12407, 12767),
-        Flags(complement),
+        AlignmentFlags(complement),
         [
             LocalAlignment(
                 Locus(0, 439),
@@ -2307,19 +2305,16 @@ unittest
 unittest
 {
     import std.range : repeat;
-    enum complement = AlignmentChain.Flag.complement;
-    alias Contig = AlignmentChain.Contig;
+
     alias LocalAlignment = AlignmentChain.LocalAlignment;
-    alias Flags = AlignmentChain.Flags;
-    alias Locus = AlignmentChain.LocalAlignment.Locus;
-    alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
+    enum complement = AlignmentFlag.complement;
 
     // TODO reduce test case to two consecutive "overlap" scenarios
     auto ac = AlignmentChain(
         574,
         Contig(5, 33046024),
         Contig(344, 73824),
-        Flags(complement),
+        AlignmentFlags(complement),
         [
             LocalAlignment(
                 Locus(8372381, 8419325),
@@ -4503,12 +4498,8 @@ private
         import dentist.util.tempfile : mkdtemp;
         import std.file : rmdirRecurse;
 
-        alias Contig = AlignmentChain.Contig;
-        alias Flags = AlignmentChain.Flags;
-        enum complement = AlignmentChain.Flag.complement;
         alias LocalAlignment = AlignmentChain.LocalAlignment;
-        alias Locus = LocalAlignment.Locus;
-        alias TracePoint = LocalAlignment.TracePoint;
+        enum complement = AlignmentFlag.complement;
 
         auto tmpDir = mkdtemp("./.unittest-XXXXXX");
         scope (exit)
@@ -4522,7 +4513,7 @@ private
                 0,
                 Contig(1, 13),
                 Contig(2, 15),
-                Flags(),
+                AlignmentFlags(),
                 [
                     LocalAlignment(
                         Locus(3, 4),
@@ -4541,7 +4532,7 @@ private
                 1,
                 Contig(19, 31),
                 Contig(20, 33),
-                Flags(complement),
+                AlignmentFlags(complement),
                 [
                     LocalAlignment(
                         Locus(21, 22),

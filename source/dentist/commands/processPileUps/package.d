@@ -22,6 +22,7 @@ import dentist.common.alignments :
     AlignmentChain,
     AlignmentLocationSeed,
     ChainingOptions,
+    Contig,
     contigs,
     coord_t,
     getAlignmentRefs,
@@ -209,7 +210,7 @@ protected class PileUpProcessor
     protected PileUp pileUp;
     protected Insertion* resultInsertion;
     protected string croppedDb;
-    protected AlignmentChain.Contig[] pileUpContigs;
+    protected Contig[] pileUpContigs;
     protected ReferencePoint[] croppingPositions;
     protected AlignmentLocationSeed[] croppingSeeds;
     protected string pileUpAlignment;
