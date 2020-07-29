@@ -27,6 +27,7 @@ static import dentist.commands.mergeInsertions;
 static import dentist.commands.output;
 static import dentist.commands.processPileUps;
 static import dentist.commands.processPileUps.cropper;
+static import dentist.commands.propagateMask;
 static import dentist.commands.showInsertions;
 static import dentist.commands.showMask;
 static import dentist.commands.showPileUps;
@@ -80,6 +81,7 @@ alias modules = AliasSeq!(
     dentist.commands.output,
     dentist.commands.processPileUps,
     dentist.commands.processPileUps.cropper,
+    dentist.commands.propagateMask,
     dentist.commands.showInsertions,
     dentist.commands.showMask,
     dentist.commands.showPileUps,

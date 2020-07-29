@@ -24,6 +24,7 @@ mixin("enum DentistCommand {" ~
     testingOnly!"findClosableGaps," ~
     "generateDazzlerOptions," ~
     "maskRepetitiveRegions," ~
+    "propagateMask," ~
     "showMask," ~
     "chainLocalAlignments," ~
     "collectPileUps," ~

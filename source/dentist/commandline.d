@@ -367,6 +367,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.propagateMask,
         DentistCommand.chainLocalAlignments,
     ))
     {
@@ -437,6 +438,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.propagateMask,
         DentistCommand.chainLocalAlignments,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -464,6 +466,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.propagateMask,
         DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -471,6 +474,7 @@ struct OptionsFor(DentistCommand _command)
     {
         static if (command.among(
             DentistCommand.maskRepetitiveRegions,
+            DentistCommand.propagateMask,
             DentistCommand.chainLocalAlignments,
         ))
             enum argReadsMultiplicity = Multiplicity.optional;
@@ -519,6 +523,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.propagateMask,
         DentistCommand.chainLocalAlignments,
     ))
     {
@@ -683,6 +688,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.propagateMask,
     ))
     {
         @Argument("<out:repeat-mask>")
@@ -1329,6 +1335,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.propagateMask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
     ))
@@ -2326,6 +2333,17 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Mask regions that have a alignment coverage that is out of bounds.
         }".wrap;
+    else static if (command == DentistCommand.propagateMask)
+        enum commandSummary = "
+            Propagate masked regions through the provided alignment. That
+            means the mask is first transferred to the B-contigs/reads
+            according to the given alignments.
+        ".wrap ~ "\n" ~ "
+            The default workflow is to first propagate from the reference
+            assembly to the reads and then back again to the reference.
+            Propagating, once again, to the reads will produce a complete
+            repeat mask on the reads.
+        ".wrap;
     else static if (command == DentistCommand.showMask)
         enum commandSummary = q"{
             Show a short summary of the mask.

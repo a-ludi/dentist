@@ -1530,6 +1530,26 @@ struct FlatLocalAlignment
     Flags flags;
     trace_point_t tracePointDistance;
     TracePoint[] tracePoints;
+
+
+    @property Trace trace() const pure nothrow @safe
+    {
+        return Trace(
+            contigA.locus,
+            contigB.locus,
+            tracePointDistance,
+            tracePoints,
+        );
+    }
+
+
+    TranslatedTracePoint translateTracePoint(string contig = "contigA")(
+        coord_t contigPos,
+        RoundingMode roundingMode,
+    ) const pure if (contig.among("contigA", "contigB"))
+    {
+        return trace.translateTracePoint!contig(contigPos, roundingMode);
+    }
 }
 
 
