@@ -173,7 +173,6 @@ private struct PileUpCropper
         auto contigSequences = getFastaSequences(
             options.refDb,
             croppingRefPositions.map!"a.contigId",
-            null,
         ).map!idup.array;
 
         foreach (i, ref contigSequence; contigSequences)
@@ -216,7 +215,7 @@ private struct PileUpCropper
         return zip(
             iota(pileUp.length),
             pileUp,
-            getFastaSequences(options.readsDb, readIds, null),
+            getFastaSequences(options.readsDb, readIds),
         );
     }
 

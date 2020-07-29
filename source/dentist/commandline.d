@@ -456,7 +456,7 @@ struct OptionsFor(DentistCommand _command)
             static id_t _numReferenceContigs;
 
             if (_numReferenceContigs == 0)
-                _numReferenceContigs = getNumContigs(refDb, null);
+                _numReferenceContigs = getNumContigs(refDb);
 
             return _numReferenceContigs;
         }

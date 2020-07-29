@@ -90,7 +90,6 @@ private struct PartialAssemblyBuilder
         mask = ReferenceRegion(readMask!ReferenceInterval(
             options.refDb,
             options.inMask,
-            null,
         ));
     }
 
@@ -110,7 +109,6 @@ private struct PartialAssemblyBuilder
             options.refDb,
             options.outMask,
             mask.intervals,
-            null,
         );
     }
 

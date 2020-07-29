@@ -61,7 +61,6 @@ private struct GapTranslocator
             options.trueAssemblyDb,
             options.mappedRegionsMask,
             mappedRegions.intervals,
-            null,
         );
     }
 

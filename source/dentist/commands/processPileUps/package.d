@@ -170,7 +170,6 @@ class PileUpsProcessor
             repeatMask |= ReferenceRegion(readMask!ReferenceInterval(
                 options.refDb,
                 mask,
-                null,
             ));
     }
 
@@ -592,7 +591,7 @@ protected class PileUpProcessor
         );
 
         dentistEnforce(
-            !dbEmpty(consensusDb, null),
+            !dbEmpty(consensusDb),
             "consensus could not be computed",
             [
                 "consensusDb": consensusDb.toJson,
@@ -629,7 +628,6 @@ protected class PileUpProcessor
             flankingContigsDb,
             options.flankingContigsRepeatMaskName,
             flankingContigsRepeatMask,
-            null,
         );
         dbdust(flankingContigsDb, options.consensusOptions.dbdustOptions);
 
@@ -754,13 +752,12 @@ protected class PileUpProcessor
             auto fastaSequence = getFastaSequence(
                 options.readsDb,
                 pileUp[0][0].contigB.id,
-                null,
             );
             insertionSequence = CompressedSequence.from(fastaSequence);
         }
         else
         {
-            auto fastaSequence = getFastaSequence(consensusDb, 1, null);
+            auto fastaSequence = getFastaSequence(consensusDb, 1);
             insertionSequence = CompressedSequence.from(fastaSequence);
         }
     }

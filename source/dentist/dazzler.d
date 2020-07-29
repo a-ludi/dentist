@@ -204,9 +204,9 @@ bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir
 
 
 /// Returns the number of records in dbFile.
-id_t numDbRecords(in string dbFile, in string workdir)
+id_t numDbRecords(in string dbFile)
 {
-    auto dbdumpLines = dbdump(dbFile, [], workdir);
+    auto dbdumpLines = dbdump(dbFile, []);
     scope (exit) dbdumpLines.destroy();
     auto recordNumberLine = dbdumpLines.find!(l => l.startsWith("+ R")).front;
     id_t numRecords;
@@ -218,9 +218,9 @@ id_t numDbRecords(in string dbFile, in string workdir)
 }
 
 /// Returns true iff dbFile is empty.
-bool dbEmpty(in string dbFile, in string workdir)
+bool dbEmpty(in string dbFile)
 {
-    return numDbRecords(dbFile, workdir) == 0;
+    return numDbRecords(dbFile) == 0;
 }
 
 /**
@@ -263,8 +263,8 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
         ? outputDb
         : outputDb ~ inDbFile.extension;
 
-    buildSubsetDb(inDbFile, _outputDb, readIds, options.tmpdir, append);
-    dbsplit(_outputDb, options.dbsplitOptions, options.tmpdir);
+    buildSubsetDb(inDbFile, _outputDb, readIds, append);
+    dbsplit(_outputDb, options.dbsplitOptions);
 
     return outputDb;
 }
@@ -371,7 +371,6 @@ AlignmentChain[] getAlignments(
         dbA,
         dbB,
         ladumpOptions,
-        null,
     ), tracePointDistance);
     scope (exit) lasdumpReader.closePipe();
     auto alignmentChains = lasdumpReader.array;
@@ -1128,7 +1127,6 @@ auto getFlatLocalAlignments(
         dbA,
         dbB,
         ladumpOptions,
-        null,
     ), tracePointDistance);
 }
 
@@ -1787,7 +1785,6 @@ auto getExactAlignment(
     in string dbA,
     in string dbB,
     in AlignmentChain ac,
-    in string workdir,
     in size_t memoryLimit = 2^^20,
 )
 {
@@ -1797,7 +1794,6 @@ auto getExactAlignment(
         ac,
         ac.first.contigA.begin,
         ac.last.contigA.end,
-        workdir,
         memoryLimit,
     );
 }
@@ -1808,7 +1804,6 @@ auto getExactAlignment(
     in AlignmentChain ac,
     in coord_t beginA,
     in coord_t endA,
-    in string workdir,
     in size_t memoryLimit = 2^^20,
 )
 {
@@ -1824,8 +1819,8 @@ auto getExactAlignment(
     auto end = ac.translateTracePoint(endA, RoundingMode.ceil);
 
     // Fetch relevant sequences from DBs
-    auto aSequence = getFastaSequence(dbA, ac.contigA.id, workdir);
-    auto bSequence = getFastaSequence(dbB, ac.contigB.id, workdir);
+    auto aSequence = getFastaSequence(dbA, ac.contigA.id);
+    auto bSequence = getFastaSequence(dbB, ac.contigB.id);
 
     // Slice sequences to translated coordinates
     aSequence = aSequence[begin.contigA .. end.contigA];
@@ -2366,11 +2361,11 @@ unittest
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getDbRecords(in string dbFile, in DBdumpOptions[] dbdumpOptions = [], in string workdir = null)
+auto getDbRecords(in string dbFile, in DBdumpOptions[] dbdumpOptions = [])
 {
     enum size_t[] allRecords = [];
 
-    return getDbRecords(dbFile, allRecords, dbdumpOptions, workdir);
+    return getDbRecords(dbFile, allRecords, dbdumpOptions);
 }
 
 /// ditto
@@ -2378,11 +2373,10 @@ auto getDbRecords(Range)(
     in string dbFile,
     Range recordNumbers,
     in DBdumpOptions[] dbdumpOptions = [],
-    in string workdir = null,
 )
         if (isForwardRange!Range && is(ElementType!Range : size_t))
 {
-    return readDbDump(dbdump(dbFile, recordNumbers, cast(string[]) dbdumpOptions, workdir));
+    return readDbDump(dbdump(dbFile, recordNumbers, cast(string[]) dbdumpOptions));
 }
 
 
@@ -2922,24 +2916,24 @@ EOF".outdent;
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-auto getFastaSequences(in string dbFile, in string workdir = null)
+auto getFastaSequences(in string dbFile)
 {
     enum size_t[] allRecords = [];
 
-    return getFastaSequences(dbFile, allRecords, workdir);
+    return getFastaSequences(dbFile, allRecords);
 }
 
 /// ditto
-auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string workdir = null)
+auto getFastaSequences(Range)(in string dbFile, Range recordNumbers)
         if (isForwardRange!Range && is(ElementType!Range : size_t))
 {
     string[] dbdumpOptions = [DBdumpOptions.sequenceString];
     auto numRecords = recordNumbers.save.walkLength;
 
     if (numRecords == 0)
-        numRecords = getNumContigs(dbFile, workdir);
+        numRecords = getNumContigs(dbFile);
 
-    auto sequences = readSequences(dbdump(dbFile, recordNumbers, dbdumpOptions, workdir));
+    auto sequences = readSequences(dbdump(dbFile, recordNumbers, dbdumpOptions));
     size_t numFoundSequences;
 
     string countedSequences()
@@ -2970,7 +2964,7 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers, in string w
 
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
-string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir = null, in id_t cacheSize = 1024)
+string getFastaSequence(in string dbFile, id_t recordNumber, in id_t cacheSize = 1024)
 {
     // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
     // requirements of this function
@@ -2986,7 +2980,7 @@ string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir =
         _dbIdx = 1 - _dbIdx;
         _firstRecord[_dbIdx] = 0;
         _dbFile[_dbIdx] = dbFile;
-        _numRecords[_dbIdx] = cast(id_t) getNumContigs(dbFile, workdir);
+        _numRecords[_dbIdx] = cast(id_t) getNumContigs(dbFile);
         _cache[_dbIdx].length = 0;
     }
 
@@ -3005,7 +2999,6 @@ string getFastaSequence(in string dbFile, id_t recordNumber, in string workdir =
             recordNumber,
             min(recordNumber + cacheSize - 1, _numRecords[_dbIdx]),
             dbdumpOptions,
-            workdir,
         );
         scope (exit) dbdumpLines.destroy();
         auto bufferRest = readSequences(dbdumpLines).copy(_cache[_dbIdx]);
@@ -3063,8 +3056,11 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
         DBdumpOptions.sequenceString,
     ];
 
-    return readDbDumpForFastaEntries(dbdump(dbFile, recordNumbers, dbdumpOptions,
-            options.tmpdir), recordNumbers, options.fastaLineWidth);
+    return readDbDumpForFastaEntries(
+        dbdump(dbFile, recordNumbers, dbdumpOptions),
+        recordNumbers,
+        options.fastaLineWidth,
+    );
 }
 
 private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
@@ -3214,7 +3210,7 @@ string buildDamFile(Range)(string outputDb, Range fastaRecords, in string[] dbsp
 {
     assert(outputDb.endsWith(damFileExtension), "outputDb must end with " ~ damFileExtension);
 
-    fasta2dam(outputDb, fastaRecords, null, append);
+    fasta2dam(outputDb, fastaRecords, append);
     dbsplit(outputDb, dbsplitOptions);
 
     return outputDb;
@@ -3278,7 +3274,7 @@ string buildDbFile(Range)(string outputDb, Range fastaRecords, in string[] dbspl
 {
     assert(outputDb.endsWith(dbFileExtension), "outputDb must end with " ~ dbFileExtension);
 
-    fasta2db(outputDb, fastaRecords, null, append);
+    fasta2db(outputDb, fastaRecords, append);
     dbsplit(outputDb, dbsplitOptions);
 
     return outputDb;
@@ -3361,19 +3357,19 @@ void dbdust(in string dbFile, in string[] dbdustOptions)
 
     Returns: path to las-file.
 */
-string getDalignment(in string dbFile, in string[] dalignerOptions, in string workdir)
+string getDalignment(in string dbFile, in string[] dalignerOptions, in string outdir)
 {
-    dalign(dbFile, dalignerOptions, workdir);
-    auto lasFile = getLasFile(dbFile, workdir);
+    dalign(dbFile, dalignerOptions, outdir);
+    auto lasFile = getLasFile(dbFile, outdir);
 
     return lasFile;
 }
 
 /// ditto
-string getDalignment(in string referenceDb, in string queryDb, in string[] dalignerOptions, in string workdir)
+string getDalignment(in string referenceDb, in string queryDb, in string[] dalignerOptions, in string outdir)
 {
-    dalign(referenceDb, queryDb, dalignerOptions, workdir);
-    auto lasFile = getLasFile(referenceDb, queryDb, workdir);
+    dalign(referenceDb, queryDb, dalignerOptions, outdir);
+    auto lasFile = getLasFile(referenceDb, queryDb, outdir);
 
     return lasFile;
 }
@@ -3387,11 +3383,11 @@ string getDamapping(
     in string refDb,
     in string queryDb,
     in string[] damapperOptions,
-    in string workdir,
+    in string outdir,
 )
 {
-    damapper(refDb, queryDb, damapperOptions, workdir);
-    auto lasFile = getLasFile(refDb, queryDb, workdir);
+    damapper(refDb, queryDb, damapperOptions, outdir);
+    auto lasFile = getLasFile(refDb, queryDb, outdir);
 
     return lasFile;
 }
@@ -3568,17 +3564,17 @@ string getConsensus(Options)(in string dbFile, in string filteredLasFile, in Opt
     enforce!DazzlerCommandException(!lasEmpty(filteredLasFile), "empty pre-consensus alignment");
 
     computeErrorProfile(dbFile, filteredLasFile, options);
-    auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.tmpdir);
-    dbsplit(consensusDb, options.dbsplitOptions, options.tmpdir);
+    auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions);
+    dbsplit(consensusDb, options.dbsplitOptions);
 
     return consensusDb;
 }
 
 private void computeIntrinsticQualityValuesForConsensus(in string dbFile, in string lasFile)
 {
-    auto readDepth = getNumContigs(dbFile, null);
+    auto readDepth = getNumContigs(dbFile);
 
-    computeIntrinsicQV(dbFile, lasFile, readDepth, null);
+    computeIntrinsicQV(dbFile, lasFile, readDepth);
 }
 
 private void computeErrorProfile(Options)(in string dbFile, in string lasFile, in Options options)
@@ -3595,7 +3591,7 @@ private void computeErrorProfile(Options)(in string dbFile, in string lasFile, i
         .array;
 
     // Produce error profile
-    silentDaccord(dbFile, lasFile, eProfOptions, null);
+    silentDaccord(dbFile, lasFile, eProfOptions);
 }
 
 
@@ -3730,19 +3726,19 @@ coord_t getContigCutoff(in string dbFile)
     return contigCutoff;
 }
 
-id_t getNumContigs(in string damFile, in string workdir)
+id_t getNumContigs(in string damFile)
 {
-    return getNumContigs(damFile, No.untrimmedDb, workdir);
+    return getNumContigs(damFile, No.untrimmedDb);
 }
 
-id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb, in string workdir = null)
+id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb)
 {
     enum contigNumFormat = "+ R %d";
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
     string[] options = untrimmedDb ? [DBdumpOptions.untrimmedDatabase] : [];
-    auto dbdumpLines = dbdump(damFile, empty, options, workdir);
+    auto dbdumpLines = dbdump(damFile, empty, options);
     scope (exit) dbdumpLines.destroy();
     auto matchingLine = dbdumpLines
         .filter!(line => line.startsWith(contigNumFormatStart))
@@ -4027,7 +4023,7 @@ private
     Throws: MaskReaderException
     See_Also: `writeMask`, `getMaskFiles`
 */
-Region[] readMask(Region)(in string dbFile, in string maskName, in string workdir)
+Region[] readMask(Region)(in string dbFile, in string maskName)
 {
     alias _enforce = enforce!MaskReaderException;
 
@@ -4039,7 +4035,7 @@ Region[] readMask(Region)(in string dbFile, in string maskName, in string workdi
     alias RegionContigId = typeof(maskRegions.data[0].tag);
     alias RegionBegin = typeof(maskRegions.data[0].begin);
     alias RegionEnd = typeof(maskRegions.data[0].end);
-    auto numReads = getNumContigs(dbFile, No.untrimmedDb, workdir).to!int;
+    auto numReads = getNumContigs(dbFile, No.untrimmedDb).to!int;
     id_t[] trimmedDbTranslateTable;
 
     size_t currentContig = 1;
@@ -4051,7 +4047,7 @@ Region[] readMask(Region)(in string dbFile, in string maskName, in string workdi
             "dbFile", dbFile,
             "maskName", maskName,
         );
-        numReads = getNumContigs(dbFile, Yes.untrimmedDb, workdir).to!int;
+        numReads = getNumContigs(dbFile, Yes.untrimmedDb).to!int;
         trimmedDbTranslateTable = getTrimmedDbTranslateTable(dbFile);
     }
 
@@ -4157,12 +4153,7 @@ private id_t[] getTrimmedDbTranslateTable(in string dbFile)
 
     See_Also: `readMask`, `getMaskFiles`
 */
-void writeMask(Region)(
-    in string dbFile,
-    in string maskName,
-    in Region[] regions,
-    in string workdir,
-)
+void writeMask(Region)(in string dbFile, in string maskName, in Region[] regions)
 {
     alias MaskRegion = Tuple!(
         MaskHeaderEntry, "tag",
@@ -4183,7 +4174,7 @@ void writeMask(Region)(
         .array;
     maskRegions.sort();
 
-    auto numReads = getNumContigs(dbFile, No.untrimmedDb, workdir).to!MaskHeaderEntry;
+    auto numReads = getNumContigs(dbFile, No.untrimmedDb).to!MaskHeaderEntry;
     MaskHeaderEntry size = 0; // Mark the DAZZ_TRACK as a mask (see DAZZ_DB/DB.c:1183)
     MaskHeaderEntry currentContig = 1;
     MaskDataPointer dataPointer = 0;
@@ -4568,26 +4559,25 @@ private
             handleExistingDb(dbFile);
     }
 
-    void dalign(in string refDam, in string[] dalignerOpts, in string workdir)
+    void dalign(in string refDam, in string[] dalignerOpts, in string outdir)
     {
-        dalign([refDam], dalignerOpts, workdir);
+        dalign([refDam], dalignerOpts, outdir);
     }
 
-    void dalign(in string refDam, in string readsDam, in string[] dalignerOpts, in string workdir)
+    void dalign(in string refDam, in string readsDam, in string[] dalignerOpts, in string outdir)
     {
-        dalign([refDam, readsDam], dalignerOpts, workdir);
+        dalign([refDam, readsDam], dalignerOpts, outdir);
     }
 
     @ExternalDependency("daligner", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
-    void dalign(in string[] dbList, in string[] dalignerOpts, in string workdir)
+    void dalign(in string[] dbList, in string[] dalignerOpts, in string outdir)
     {
         assert(dbList.length >= 1);
         auto isSelfAlignment = dbList.length == 1;
         auto inputFiles = isSelfAlignment ? [dbList[0], dbList[0]] : dbList;
-        const(string[]) inputFilesRelativeToWorkDir = inputFiles.map!(
-                f => f.relativeToWorkdir(workdir)).array;
+        const(string[]) absInputFiles = inputFiles.map!absolutePath.array;
 
-        executeCommand(chain(only("daligner"), dalignerOpts, inputFilesRelativeToWorkDir), workdir);
+        executeCommand(chain(only("daligner"), dalignerOpts, absInputFiles), outdir);
     }
 
     @ExternalDependency("DAScover", "DASCRUBBER", "https://github.com/thegenemyers/DASCRUBBER")
@@ -4606,38 +4596,35 @@ private
         executeCommand(only("DASqv", "-v", coverageArg, dbFile, lasFile), null);
     }
 
-    void damapper(in string refDam, in string readsDam, in string[] damapperOpts, in string workdir)
+    void damapper(in string refDam, in string readsDam, in string[] damapperOpts, in string outdir)
     {
-        damapper([refDam, readsDam], damapperOpts, workdir);
+        damapper([refDam, readsDam], damapperOpts, outdir);
     }
 
     @ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
-    void damapper(in string[] dbList, in string[] damapperOpts, in string workdir)
+    void damapper(in string[] dbList, in string[] damapperOpts, in string outdir)
     {
-        const(string[]) dbListRelativeToWorkDir = dbList.map!(
-                f => f.relativeToWorkdir(workdir)).array;
+        const(string[]) absDbList = dbList.map!absolutePath.array;
 
         executeCommand(chain(only("damapper", DamapperOptions.symmetric),
-                damapperOpts, dbListRelativeToWorkDir), workdir);
+                damapperOpts, absDbList), outdir);
     }
 
     @ExternalDependency("computeintrinsicqv", "daccord", "https://gitlab.com/german.tischler/daccord")
-    void computeIntrinsicQV(in string dbFile, in string lasFile, in size_t readDepth,
-                             in string workdir)
+    void computeIntrinsicQV(in string dbFile, in string lasFile, in size_t readDepth)
     {
         executeCommand(chain(
             only("computeintrinsicqv"),
             only(
                 ComputeIntrinsicQVOptions.readDepth ~ readDepth.to!string,
-                dbFile.stripBlock.relativeToWorkdir(workdir),
-                lasFile.relativeToWorkdir(workdir),
+                dbFile.stripBlock,
+                lasFile[],
             ),
-        ), workdir);
+        ));
     }
 
     @ExternalDependency("lasfilteralignments", "daccord", "https://gitlab.com/german.tischler/daccord")
-    string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options,
-                             in string workdir)
+    string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options)
     {
         string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
 
@@ -4645,18 +4632,18 @@ private
             only("lasfilteralignments"),
             options,
             only(
-                filteredLasFile.relativeToWorkdir(workdir),
-                dbFile.stripBlock.relativeToWorkdir(workdir),
-                lasFile.relativeToWorkdir(workdir),
+                filteredLasFile,
+                dbFile.stripBlock,
+                lasFile[],
             ),
-        ), workdir);
+        ));
 
         return filteredLasFile;
     }
 
     @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    string daccord(in string dbFile, in string lasFile, in string[] daccordOpts, in string workdir)
+    string daccord(in string dbFile, in string lasFile, in string[] daccordOpts)
     {
         alias esc = escapeShellCommand;
 
@@ -4681,32 +4668,31 @@ private
         executeShell(chain(
             only("daccord"),
             only(esc(daccordOpts)),
-            only(esc(lasFile.relativeToWorkdir(workdir))),
-            only(esc(dbFile.stripBlock.relativeToWorkdir(workdir))),
+            only(esc(lasFile)),
+            only(esc(dbFile.stripBlock)),
             only("|"),
             only("fasta2DAM", Fasta2DazzlerOptions.fromStdin),
-            only(esc(daccordedDb.relativeToWorkdir(workdir))),
-        ), workdir);
+            only(esc(daccordedDb)),
+        ));
 
         return daccordedDb;
     }
 
     @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")
-    void silentDaccord(in string dbFile, in string lasFile, in string[] daccordOpts,
-            in string workdir)
+    void silentDaccord(in string dbFile, in string lasFile, in string[] daccordOpts)
     {
         executeCommand(chain(
             only("daccord"),
             daccordOpts,
-            only(lasFile.relativeToWorkdir(workdir)),
-            only(dbFile.stripBlock.relativeToWorkdir(workdir)),
-        ), workdir);
+            only(lasFile),
+            only(dbFile.stripBlock),
+        ));
     }
 
     @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, in string workdir, Append append)
+    void buildSubsetDb(R)(in string inDbFile, in string outDbFile, R readIds, Append append)
     {
         ensureWritableDb(outDbFile, append);
 
@@ -4719,16 +4705,16 @@ private
 
         executeShell(chain(
             only("DBshow"),
-            only(esc(inDbFile.relativeToWorkdir(workdir))),
+            only(esc(inDbFile)),
             escapedReadIds,
             only("|"),
             only(fastaToDbCommand, Fasta2DazzlerOptions.fromStdin),
-            only(esc(outDbFile.relativeToWorkdir(workdir))),
-        ), workdir);
+            only(esc(outDbFile)),
+        ));
     }
 
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(Range)(in string outFile, Range fastaRecords, in string workdir = null, Append append = No.append)
+    void fasta2dam(Range)(in string outFile, Range fastaRecords, Append append = No.append)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : each, joiner;
@@ -4738,8 +4724,7 @@ private
         ensureWritableDb(outFile, append);
 
         enum writeChunkSize = 1024 * 1024;
-        auto outFileArg = outFile.relativeToWorkdir(workdir);
-        auto command = ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFileArg];
+        auto command = ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFile];
 
         if (shouldLog(LogLevel.diagnostic))
         {
@@ -4762,11 +4747,10 @@ private
         }
 
         auto process = pipeProcess(
-            ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFileArg],
+            ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFile],
             Redirect.stdin,
             null, // env
             Config.none,
-            workdir
         );
         fastaRecords
             .filter!(fastaRecord => parseFastaRecord(fastaRecord).length >= minSequenceLength)
@@ -4786,15 +4770,15 @@ private
     }
 
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2dam(in string inFile, in string outFile, in string workdir = null, Append append = No.append)
+    void fasta2dam(in string inFile, in string outFile, Append append = No.append)
     {
         ensureWritableDb(outFile, append);
 
-        executeCommand(only("fasta2DAM", outFile.relativeToWorkdir(workdir), inFile), workdir);
+        executeCommand(only("fasta2DAM", outFile, inFile));
     }
 
     @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2db(Range)(in string outFile, Range fastaRecords, in string workdir = null, Append append = No.append)
+    void fasta2db(Range)(in string outFile, Range fastaRecords, Append append = No.append)
             if (isInputRange!(Unqual!Range) && isSomeString!(ElementType!(Unqual!Range)))
     {
         import std.algorithm : each, joiner;
@@ -4804,8 +4788,7 @@ private
         ensureWritableDb(outFile, append);
 
         enum writeChunkSize = 1024 * 1024;
-        auto outFileArg = outFile.relativeToWorkdir(workdir);
-        auto command = ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFileArg];
+        auto command = ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFile];
 
         if (shouldLog(LogLevel.diagnostic))
         {
@@ -4828,11 +4811,10 @@ private
         }
 
         auto process = pipeProcess(
-            ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFileArg],
+            ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFile],
             Redirect.stdin,
             null, // env
             Config.none,
-            workdir
         );
         fastaRecords
             .filter!(fastaRecord => parseFastaRecord(fastaRecord).length >= minSequenceLength)
@@ -4852,55 +4834,58 @@ private
     }
 
     @ExternalDependency("fasta2DB", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void fasta2db(in string inFile, in string outFile, in string workdir = null, Append append = No.append)
+    void fasta2db(in string inFile, in string outFile, Append append = No.append)
     {
         ensureWritableDb(outFile, append);
 
-        executeCommand(only("fasta2DB", outFile.relativeToWorkdir(workdir), inFile), workdir);
+        executeCommand(only("fasta2DB", outFile, inFile));
     }
 
     @ExternalDependency("DBsplit", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    void dbsplit(in string dbFile, in string[] dbsplitOptions, in string workdir = null)
+    void dbsplit(in string dbFile, in string[] dbsplitOptions)
     {
-        executeCommand(chain(only("DBsplit"), dbsplitOptions,
-                only(dbFile.stripBlock.relativeToWorkdir(workdir))), workdir);
+        executeCommand(chain(only("DBsplit"), dbsplitOptions, only(dbFile.stripBlock)));
     }
 
-    auto ladump(in string lasFile, in string dbA, in string dbB,
-            in string[] ladumpOpts, in string workdir)
+    auto ladump(in string lasFile, in string dbA, in string dbB, in string[] ladumpOpts)
     {
-        return ladump(lasFile, dbA, dbB, [], ladumpOpts, workdir);
+        return ladump(lasFile, dbA, dbB, [], ladumpOpts);
     }
 
     @ExternalDependency("LAdump", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
-    auto ladump(in string lasFile, in string dbA, in string dbB, in id_t[] readIds,
-            in string[] ladumpOpts, in string workdir)
+    auto ladump(
+        in string lasFile,
+        in string dbA,
+        in string dbB,
+        in id_t[] readIds,
+        in string[] ladumpOpts,
+    )
     {
         return executePipe(chain(
             only("LAdump"),
             ladumpOpts,
             only(
-                dbA.stripBlock.relativeToWorkdir(workdir),
-                dbB.stripBlock.relativeToWorkdir(workdir),
-                lasFile.relativeToWorkdir(workdir)
+                dbA.stripBlock,
+                dbB.stripBlock,
+                lasFile[],
             ),
             readIds.map!(to!string),
-        ), workdir);
+        ));
     }
 
     @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    auto dbdump(in string dbFile, in string[] dbdumpOptions, in string workdir = null)
+    auto dbdump(in string dbFile, in string[] dbdumpOptions)
     {
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
-            only(dbFile.relativeToWorkdir(workdir)),
-        ), workdir);
+            only(dbFile),
+        ));
     }
 
     @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     auto dbdump(Range)(in string dbFile, Range recordNumbers,
-            in string[] dbdumpOptions, in string workdir = null)
+            in string[] dbdumpOptions)
         if (
             isForwardRange!Range &&
             (
@@ -4911,7 +4896,7 @@ private
     {
         version (assert)
         {
-            auto numRecords = numDbRecords(dbFile, workdir);
+            auto numRecords = numDbRecords(dbFile);
 
             assert(
                 recordNumbers.save.all!(n => 0 < n && n <= numRecords),
@@ -4922,23 +4907,17 @@ private
         return executePipe(chain(
             only("DBdump"),
             dbdumpOptions,
-            only(dbFile.relativeToWorkdir(workdir)),
+            only(dbFile),
             recordNumbers.map!(to!string)
-        ), workdir);
+        ));
     }
 
     @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
-    auto dbdump(
-        in string dbFile,
-        id_t firstRecord,
-        id_t lastRecord,
-        in string[] dbdumpOptions,
-        in string workdir,
-    )
+    auto dbdump(in string dbFile, id_t firstRecord, id_t lastRecord, in string[] dbdumpOptions)
     {
         version (assert)
         {
-            auto numRecords = numDbRecords(dbFile, workdir);
+            auto numRecords = numDbRecords(dbFile);
 
             assert(
                 0 < firstRecord && firstRecord <= lastRecord && lastRecord <= numRecords,
@@ -4950,10 +4929,10 @@ private
             only("DBdump"),
             dbdumpOptions,
             only(
-                dbFile.relativeToWorkdir(workdir),
+                dbFile,
                 format!"%d-%d"(firstRecord, lastRecord),
             ),
-        ), workdir);
+        ));
     }
 
     @ExternalDependency("DBshow", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
@@ -5058,13 +5037,5 @@ private
         assert("foo_bar.1024.db".stripBlock == "foo_bar.db");
         assert("foo_bar.dam".stripBlock == "foo_bar.dam");
         assert("foo_bar.db".stripBlock == "foo_bar.db");
-    }
-
-    string relativeToWorkdir(in string fileName, in string workdir = null)
-    {
-        if (workdir is null)
-            return fileName;
-        else
-            return relativePath(absolutePath(fileName), absolutePath(workdir));
     }
 }

@@ -329,7 +329,6 @@ private struct ResultAnalyzer
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
-            null,
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
 
@@ -337,7 +336,6 @@ private struct ResultAnalyzer
             dustMask = ReferenceRegion(readMask!ReferenceInterval(
                 options.trueAssemblyDb,
                 options.dustMask,
-                null,
             ).array);
 
         auto contigAlignmentsCache = ContigAlignmentsCache(
@@ -1277,7 +1275,6 @@ private struct ResultAnalyzer
         );
         auto subSequence = options.trueAssemblyDb.getFastaSequence(
             cast(id_t) interval.contigId,
-            null,
         )[interval.begin .. interval.end];
 
         chain(
@@ -1322,18 +1319,15 @@ private struct ResultAnalyzer
         {
             subSequence = options.resultDb.getFastaSequence(
                 cast(id_t) begin.contigId,
-                null,
             )[begin.value .. end.value];
         }
         else
         {
             auto leftFlank = options.resultDb.getFastaSequence(
                 cast(id_t) begin.contigId,
-                null,
             )[begin.value .. $];
             auto rightFlank = options.resultDb.getFastaSequence(
                 cast(id_t) end.contigId,
-                null,
             )[0 .. end.value];
             auto gapSize = resultGapSize(cast(id_t) begin.contigId);
 

@@ -73,7 +73,6 @@ private struct Translocator
         mappedRegions = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
-            null,
         ));
         writeOutputAssembly();
     }
@@ -83,7 +82,7 @@ private struct Translocator
         mixin(traceExecution);
 
         enum dchar unknownBase = 'n';
-        auto numRefContigs = getNumContigs(options.trueAssemblyDb, null);
+        auto numRefContigs = getNumContigs(options.trueAssemblyDb);
         auto mappedRegions = mappedRegions.intervals.assumeSorted!"a.contigId < b.contigId";
         ReferenceInterval needle;
 
@@ -98,7 +97,6 @@ private struct Translocator
             auto contigSequence = getFastaSequence(
                 options.trueAssemblyDb,
                 contigId,
-                null,
             );
             // Prepend needle to produce the first contig.
             auto mappedRegionsPairs = chain(only(needle), contigMappedRegions)
