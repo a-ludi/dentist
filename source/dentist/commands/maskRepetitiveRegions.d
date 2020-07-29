@@ -163,7 +163,7 @@ class RepeatMaskAssessor
             options.refDb,
             options.repeatMask,
             mergedMask.intervals,
-            options.workdir,
+            null,
         );
 
         if (alignmentType == AlignmentType.reads && options.debugRepeatMasks)
@@ -172,13 +172,13 @@ class RepeatMaskAssessor
                 options.refDb,
                 options.repeatMask ~ "-all",
                 repetitiveRegions.intervals,
-                options.workdir,
+                null,
             );
             writeMask(
                 options.refDb,
                 options.repeatMask ~ "-improper",
                 repetitiveRegionsImproper.intervals,
-                options.workdir,
+                null,
             );
         }
     }

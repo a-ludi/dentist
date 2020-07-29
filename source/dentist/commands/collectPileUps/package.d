@@ -86,8 +86,8 @@ class PileUpCollector
     {
         mixin(traceExecution);
 
-        numReferenceContigs = getNumContigs(options.refDb, options.workdir);
-        numReads = getNumContigs(options.readsDb, options.workdir);
+        numReferenceContigs = getNumContigs(options.refDb, null);
+        numReads = getNumContigs(options.readsDb, null);
         unusedReads = NaturalNumberSet(numReads, Yes.addAll);
         inputGaps = getScaffoldStructure(options.refDb)
             .filter!(part => part.peek!GapSegment !is null)
@@ -109,7 +109,7 @@ class PileUpCollector
             repetitiveRegions |= ReferenceRegion(readMask!ReferenceInterval(
                 options.refDb,
                 mask,
-                options.workdir,
+                null,
             ));
 
         enforce!DentistException(readsAlignment.length > 0, "empty ref vs. reads alignment");

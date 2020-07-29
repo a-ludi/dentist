@@ -37,7 +37,7 @@ void execute(Options)(in Options options)
         auto maskRegion = ReferenceRegion(readMask!ReferenceInterval(
             options.refDb,
             mask,
-            options.workdir,
+            null,
         ));
 
         if (shouldLog(LogLevel.debug_))

@@ -64,7 +64,7 @@ struct CropOptions
     string refDb;
     string readsDb;
     coord_t minAnchorLength;
-    string workdir;
+    string tmpdir;
 }
 
 auto cropPileUp(PileUp pileUp, in ReferenceRegion mask, in CropOptions options)
@@ -115,7 +115,7 @@ private struct PileUpCropper
                 croppingRefPositions[0].contigId,
                 croppingRefPositions[1].contigId,
             );
-        croppedDb = buildPath(options.workdir, croppedDb);
+        croppedDb = buildPath(options.tmpdir, croppedDb);
 
         buildDbFile(
             croppedDb,
@@ -173,7 +173,7 @@ private struct PileUpCropper
         auto contigSequences = getFastaSequences(
             options.refDb,
             croppingRefPositions.map!"a.contigId",
-            options.workdir,
+            null,
         ).map!idup.array;
 
         foreach (i, ref contigSequence; contigSequences)
@@ -216,7 +216,7 @@ private struct PileUpCropper
         return zip(
             iota(pileUp.length),
             pileUp,
-            getFastaSequences(options.readsDb, readIds, options.workdir),
+            getFastaSequences(options.readsDb, readIds, null),
         );
     }
 

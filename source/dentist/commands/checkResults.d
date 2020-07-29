@@ -329,7 +329,7 @@ private struct ResultAnalyzer
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
-            options.workdir,
+            null,
         ).filter!(interval => interval.size >= contigCutoff).array);
         referenceOffset = cast(coord_t) mappedRegionsMask.intervals[0].begin;
 
@@ -337,7 +337,7 @@ private struct ResultAnalyzer
             dustMask = ReferenceRegion(readMask!ReferenceInterval(
                 options.trueAssemblyDb,
                 options.dustMask,
-                options.workdir,
+                null,
             ).array);
 
         auto contigAlignmentsCache = ContigAlignmentsCache(
@@ -576,13 +576,13 @@ private struct ResultAnalyzer
             options.refDb,
             options.cropAlignment,
             queryChunk,
-            options.workdir,
+            options.tmpdir,
         );
         auto croppedContigMappingFile = getDamapping(
             options.resultDb,
             croppedContigDb,
             options.recoverImperfectContigsAlignmentOptions,
-            options.workdir,
+            options.tmpdir,
         );
         auto croppedContigAlignments = getAlignments(
             options.resultDb,
@@ -626,7 +626,7 @@ private struct ResultAnalyzer
 
         enum commandTemplate = `DBdump -s %s | grep -E '^S' | cut -d' ' -f3 > %2$s && fm-index %s < /dev/null`;
 
-        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir);
+        auto sequenceListFile = getSequenceListFile(dbFile, options.tmpdir);
 
         if (!exists(sequenceListFile))
         {
@@ -680,7 +680,7 @@ private struct ResultAnalyzer
             format!"DB cutoff must be greater than 2*--crop == %d: %s"(minCutoff, dbFile),
         );
 
-        auto sequenceListFile = getSequenceListFile(dbFile, options.workdir, crop);
+        auto sequenceListFile = getSequenceListFile(dbFile, options.tmpdir, crop);
 
         if (!exists(sequenceListFile))
         {
@@ -1266,7 +1266,7 @@ private struct ResultAnalyzer
     string trueAssemblySubseqFasta(in ReferenceInterval interval, in string gapId)
     {
         enum origin = "true";
-        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaFile = format!subseqFastaFileFormat(options.tmpdir, gapId, origin);
         auto fastaHeader = format!subseqFastaHeaderFormat(
             origin,
             gapId,
@@ -1277,7 +1277,7 @@ private struct ResultAnalyzer
         );
         auto subSequence = options.trueAssemblyDb.getFastaSequence(
             cast(id_t) interval.contigId,
-            options.workdir,
+            null,
         )[interval.begin .. interval.end];
 
         chain(
@@ -1293,7 +1293,7 @@ private struct ResultAnalyzer
     string resultSubseqFasta(in ReferencePoint begin, in ReferencePoint end, in string gapId)
     {
         enum origin = "inserted";
-        auto fastaFile = format!subseqFastaFileFormat(options.workdir, gapId, origin);
+        auto fastaFile = format!subseqFastaFileFormat(options.tmpdir, gapId, origin);
         auto fastaHeader = format!subseqFastaHeaderFormat(
             origin,
             gapId,
@@ -1322,18 +1322,18 @@ private struct ResultAnalyzer
         {
             subSequence = options.resultDb.getFastaSequence(
                 cast(id_t) begin.contigId,
-                options.workdir,
+                null,
             )[begin.value .. end.value];
         }
         else
         {
             auto leftFlank = options.resultDb.getFastaSequence(
                 cast(id_t) begin.contigId,
-                options.workdir,
+                null,
             )[begin.value .. $];
             auto rightFlank = options.resultDb.getFastaSequence(
                 cast(id_t) end.contigId,
-                options.workdir,
+                null,
             )[0 .. end.value];
             auto gapSize = resultGapSize(cast(id_t) begin.contigId);
 

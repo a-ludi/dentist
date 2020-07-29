@@ -1212,7 +1212,7 @@ private class BubbleResolver
             intermediateContigsDb,
             skippingPileUpDb,
             options.anchorSkippingPileUpsOptions.damapperOptions,
-            options.workdir,
+            options.tmpdir,
         );
         auto intermediateAlignments = getAlignments(
             intermediateContigsDb,
@@ -1235,7 +1235,7 @@ private class BubbleResolver
     string getSkippingPileUpDb(in id_t[] involvedContigs)
     {
         auto targetFilename = buildPath(
-            options.workdir,
+            options.tmpdir,
             format!"skipper_%(%d-%)_pile-up-XXXXXX"(involvedContigs),
         );
         auto targetExtension = options.readsDb.extension;
@@ -1252,7 +1252,7 @@ private class BubbleResolver
         auto dbExtension = options.refDb.extension;
 
         return buildPath(
-            options.workdir,
+            options.tmpdir,
             format!"skipper_%(%d-%)_intermediate-contigs%s"(involvedContigs, dbExtension),
         );
     }

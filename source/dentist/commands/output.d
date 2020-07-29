@@ -259,7 +259,7 @@ class AssemblyWriter
     {
         mixin(traceExecution);
 
-        numReferenceContigs = getNumContigs(options.refDb, options.workdir);
+        numReferenceContigs = getNumContigs(options.refDb, null);
         scaffoldStructure = getScaffoldStructure(options.refDb).array;
         contigLengths = scaffoldStructure
             .filter!(part => part.peek!ContigSegment !is null)
@@ -643,7 +643,7 @@ class AssemblyWriter
     )
     {
         auto insertionInfo = getInfoForExistingContig(begin, insertion, globalComplement);
-        auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, options.workdir);
+        auto contigSequence = getFastaSequence(options.refDb, insertionInfo.contigId, null);
         auto croppedContigSequence = contigSequence[insertionInfo.cropping.begin .. insertionInfo.cropping.end];
         nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
         nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;

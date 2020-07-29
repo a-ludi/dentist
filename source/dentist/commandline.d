@@ -356,14 +356,9 @@ struct OptionsFor(DentistCommand _command)
     enum command = _command;
     enum commandName = dentistCommands[_command];
 
-    static enum needWorkdir = command.among(
-        TestingCommand.translocateGaps,
-        TestingCommand.findClosableGaps,
-        DentistCommand.maskRepetitiveRegions,
-        DentistCommand.showMask,
+    static enum needTmpdir = command.among(
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
-        DentistCommand.output,
         TestingCommand.checkResults,
     );
 
@@ -1326,7 +1321,7 @@ struct OptionsFor(DentistCommand _command)
         OptionFlag useJson;
     }
 
-    static if (needWorkdir)
+    static if (needTmpdir)
     {
         @Option("keep-temp", "k")
         @Help("keep the temporary files; outputs the exact location")
@@ -1950,41 +1945,41 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    static if (needWorkdir)
+    static if (needTmpdir)
     {
         /**
             Last part of the working directory name. A directory in the temp
             directory as returned by `std.file.tmpDir` with the naming scheme will
             be created to hold all data for the computation.
         */
-        enum workdirTemplate = format!"dentist-%s-XXXXXX"(command);
+        enum tmpdirTemplate = format!"dentist-%s-XXXXXX"(command);
 
         /// This is a temporary directory to store all working data.
-        @Option("workdir", "P")
+        @Option("tmpdir", "P")
         @Help("use <string> as a working directory")
-        string workdir;
+        string tmpdir;
 
         @PostValidate(Priority.high)
-        void hookCreateWorkDir()
+        void hookCreateTmpdir()
         {
-            if (workdir is null)
+            if (tmpdir is null)
             {
-                auto workdirTemplate = buildPath(tempDir(), workdirTemplate);
+                auto tmpdirTemplate = buildPath(tempDir(), tmpdirTemplate);
 
-                workdir = mkdtemp(workdirTemplate);
+                tmpdir = mkdtemp(tmpdirTemplate);
             }
             else
             {
                 try
                 {
                     enforce!CLIException(
-                        isDir(workdir),
-                        "--workdir is not a directory",
+                        isDir(tmpdir),
+                        "--tmpdir is not a directory",
                     );
 
                     logJsonInfo(
-                        "info", "using existing workdir",
-                        "workdir", workdir,
+                        "info", "using existing --tmpdir",
+                        "tmpdir", tmpdir,
                     );
                 }
                 catch (FileException e)
@@ -1994,29 +1989,29 @@ struct OptionsFor(DentistCommand _command)
 
                 try
                 {
-                    mkdirRecurse(workdir);
+                    mkdirRecurse(tmpdir);
                 }
                 catch(Exception e)
                 {
-                    throw new CLIException("could not create workdir: " ~ e.msg, e);
+                    throw new CLIException("could not create --tmpdir: " ~ e.msg, e);
                 }
 
                 logJsonInfo(
-                    "info", "recursively created workdir",
-                    "workdir", workdir,
+                    "info", "recursively created tmpdir",
+                    "tmpdir", tmpdir,
                 );
             }
         }
 
         @CleanUp(Priority.low)
-        void hookCleanWorkDir() const
+        void hookCleanTmpdir() const
         {
             if (keepTemp)
                 return;
 
             try
             {
-                rmdirRecurse(workdir);
+                rmdirRecurse(tmpdir);
             }
             catch (Exception e)
             {
@@ -2128,7 +2123,7 @@ struct OptionsFor(DentistCommand _command)
     static if (
         is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
         is(typeof(OptionsFor!command().tracePointDistance)) &&
-        is(typeof(OptionsFor!command().workdir))
+        is(typeof(OptionsFor!command().tmpdir))
     ) {
         enum flankingContigsRepeatMaskName = "rep";
         enum postConsensusAlignmentOptionsAverageCorrelationRate = 0.7;
@@ -2156,7 +2151,7 @@ struct OptionsFor(DentistCommand _command)
         {
             string[] damapperOptions;
             string[] dbsplitOptions;
-            string workdir;
+            string tmpdir;
         }
 
         @property string[] intermediateContigsAlignmentOptions() const
@@ -2178,8 +2173,8 @@ struct OptionsFor(DentistCommand _command)
                 intermediateContigsAlignmentOptions,
                 // dbsplitOptions
                 [],
-                // workdir
-                workdir,
+                // tmpdir
+                tmpdir,
             );
         }
     }
@@ -2195,7 +2190,7 @@ struct OptionsFor(DentistCommand _command)
             string[] dbsplitOptions;
             string[] lasFilterAlignmentsOptions;
             string[] dbdustOptions;
-            string workdir;
+            string tmpdir;
             coord_t properAlignmentAllowance;
         }
 
@@ -2217,8 +2212,8 @@ struct OptionsFor(DentistCommand _command)
                 ],
                 // dbdustOptions
                 [],
-                // workdir
-                workdir,
+                // tmpdir
+                tmpdir,
                 // properAlignmentAllowance
                 properAlignmentAllowance,
             );

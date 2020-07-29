@@ -75,7 +75,7 @@ struct ClosableGapsFinder
         mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
-            options.workdir,
+            null,
         ));
         trueAlignments = readTrueAlignments(options.readsMap);
 

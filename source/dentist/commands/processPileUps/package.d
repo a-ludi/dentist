@@ -170,7 +170,7 @@ class PileUpsProcessor
             repeatMask |= ReferenceRegion(readMask!ReferenceInterval(
                 options.refDb,
                 mask,
-                options.workdir,
+                null,
             ));
     }
 
@@ -400,7 +400,7 @@ protected class PileUpProcessor
             options.refDb,
             options.readsDb,
             options.minAnchorLength,
-            options.workdir,
+            options.tmpdir,
         ));
 
         croppedDb = croppingResult.db;
@@ -466,7 +466,7 @@ protected class PileUpProcessor
         auto rawPileUpAlignment = getDalignment(
             croppedDb,
             options.pileUpAlignmentOptions,
-            options.workdir,
+            options.tmpdir,
         );
 
         dentistEnforce(
@@ -592,7 +592,7 @@ protected class PileUpProcessor
         );
 
         dentistEnforce(
-            !dbEmpty(consensusDb, options.workdir),
+            !dbEmpty(consensusDb, null),
             "consensus could not be computed",
             [
                 "consensusDb": consensusDb.toJson,
@@ -607,7 +607,7 @@ protected class PileUpProcessor
 
         auto flankingContigIds = croppingPositions.map!"a.contigId".array;
         auto flankingContigsDbName = buildPath(
-            options.workdir,
+            options.tmpdir,
             format!"contigs-%-(%d-%).dam"(flankingContigIds),
         );
         auto flankingContigsDb = dbSubset(
@@ -629,7 +629,7 @@ protected class PileUpProcessor
             flankingContigsDb,
             options.flankingContigsRepeatMaskName,
             flankingContigsRepeatMask,
-            options.workdir,
+            null,
         );
         dbdust(flankingContigsDb, options.consensusOptions.dbdustOptions);
 
@@ -640,7 +640,7 @@ protected class PileUpProcessor
                 flankingContigsDb,
                 consensusDb,
                 options.postConsensusAlignmentOptions,
-                options.workdir,
+                options.tmpdir,
             ),
             Yes.includeTracePoints,
         );
@@ -754,13 +754,13 @@ protected class PileUpProcessor
             auto fastaSequence = getFastaSequence(
                 options.readsDb,
                 pileUp[0][0].contigB.id,
-                options.workdir,
+                null,
             );
             insertionSequence = CompressedSequence.from(fastaSequence);
         }
         else
         {
-            auto fastaSequence = getFastaSequence(consensusDb, 1, options.workdir);
+            auto fastaSequence = getFastaSequence(consensusDb, 1, null);
             insertionSequence = CompressedSequence.from(fastaSequence);
         }
     }

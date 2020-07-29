@@ -234,12 +234,12 @@ void removeDB(in string dbFile)
 
 /// Build outputDb file by using the given subset of reads in inDbFile.
 string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options, Append append = No.append)
-        if (isSomeString!(typeof(options.workdir)) &&
+        if (isSomeString!(typeof(options.tmpdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
     enum outDbNameTemplate = "subset-XXXXXX";
 
-    auto outDbTemplate = buildPath(options.workdir, outDbNameTemplate);
+    auto outDbTemplate = buildPath(options.tmpdir, outDbNameTemplate);
     auto outDb = mkstemp(outDbTemplate, inDbFile.extension);
 
     outDb.file.close();
@@ -256,15 +256,15 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options, A
     Returns: DB file name
 */
 string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options, Append append = No.append)
-        if (isSomeString!(typeof(options.workdir)) &&
+        if (isSomeString!(typeof(options.tmpdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
 {
     auto _outputDb = outputDb.extension == inDbFile.extension
         ? outputDb
         : outputDb ~ inDbFile.extension;
 
-    buildSubsetDb(inDbFile, _outputDb, readIds, options.workdir, append);
-    dbsplit(_outputDb, options.dbsplitOptions, options.workdir);
+    buildSubsetDb(inDbFile, _outputDb, readIds, options.tmpdir, append);
+    dbsplit(_outputDb, options.dbsplitOptions, options.tmpdir);
 
     return outputDb;
 }
@@ -273,11 +273,11 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    if (!lasFileGenerated(dbA, options.workdir))
+    if (!lasFileGenerated(dbA, options.tmpdir))
     {
-        dalign(dbA, options.dalignerOptions, options.workdir);
+        dalign(dbA, options.dalignerOptions, options.tmpdir);
     }
 
     return getGeneratedAlignments(dbA, null, options);
@@ -286,11 +286,11 @@ AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    if (!lasFileGenerated(dbA, dbB, options.workdir))
+    if (!lasFileGenerated(dbA, dbB, options.tmpdir))
     {
-        dalign(dbA, dbB, options.dalignerOptions, options.workdir);
+        dalign(dbA, dbB, options.dalignerOptions, options.tmpdir);
     }
 
     return getGeneratedAlignments(dbA, dbB, options);
@@ -298,19 +298,19 @@ AlignmentChain[] getLocalAlignments(Options)(in string dbA, in string dbB, in Op
 
 void computeLocalAlignments(Options)(in string[] dbList, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    dalign(dbList, options.dalignerOptions, options.workdir);
+    dalign(dbList, options.dalignerOptions, options.tmpdir);
 }
 
 AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    if (!lasFileGenerated(dbA, dbB, options.workdir))
+    if (!lasFileGenerated(dbA, dbB, options.tmpdir))
     {
-        damapper(dbA, dbB, options.damapperOptions, options.workdir);
+        damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
     }
 
     return getGeneratedAlignments(dbA, dbB, options);
@@ -319,9 +319,9 @@ AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options o
 void computeMappings(Options)(in string[] dbList, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
             isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    damapper(dbList, options.damapperOptions, options.workdir);
+    damapper(dbList, options.damapperOptions, options.tmpdir);
 }
 
 private AlignmentChain[] getGeneratedAlignments(Options)(
@@ -330,9 +330,9 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
     in Options options
 )
         if (isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    auto lasFile = getLasFile(dbA, dbB, options.workdir);
+    auto lasFile = getLasFile(dbA, dbB, options.tmpdir);
 
     return getAlignments(dbA, dbB, lasFile, options);
 }
@@ -3054,7 +3054,7 @@ EOF".outdent;
 */
 auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in Options options)
         if (isIntegral!(typeof(options.fastaLineWidth)) &&
-            isSomeString!(typeof(options.workdir)) &&
+            isSomeString!(typeof(options.tmpdir)) &&
             isInputRange!Range && is(ElementType!Range : size_t))
 {
     string[] dbdumpOptions = [
@@ -3064,7 +3064,7 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
     ];
 
     return readDbDumpForFastaEntries(dbdump(dbFile, recordNumbers, dbdumpOptions,
-            options.workdir), recordNumbers, options.fastaLineWidth);
+            options.tmpdir), recordNumbers, options.fastaLineWidth);
 }
 
 private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
@@ -3481,7 +3481,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
     static struct ModifiedOptions
     {
@@ -3489,7 +3489,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         string[] dalignerOptions;
         string[] dbsplitOptions;
         string[] lasFilterAlignmentsOptions;
-        string workdir;
+        string tmpdir;
         coord_t properAlignmentAllowance;
     }
 
@@ -3499,7 +3499,7 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         options.dalignerOptions,
         options.dbsplitOptions,
         options.lasFilterAlignmentsOptions,
-        options.workdir,
+        options.tmpdir,
         options.properAlignmentAllowance,
     ));
 
@@ -3518,10 +3518,10 @@ string getConsensus(Options)(in string dbFile, in Options options)
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
-    dalign(dbFile, options.dalignerOptions, options.workdir);
-    auto lasFile = getLasFile(dbFile, options.workdir);
+    dalign(dbFile, options.dalignerOptions, options.tmpdir);
+    auto lasFile = getLasFile(dbFile, options.tmpdir);
     enforce!DazzlerCommandException(!lasEmpty(lasFile), "empty pre-consensus alignment");
 
     auto filteredLasFile = filterPileUpAlignments(dbFile, lasFile, options.properAlignmentAllowance);
@@ -3533,20 +3533,20 @@ string getConsensus(Options)(in string dbFile, in Options options)
 string getConsensus(Options)(in string dbFile, in string filteredLasFile, in size_t readId, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
     static struct ModifiedOptions
     {
         string[] daccordOptions;
         string[] dbsplitOptions;
-        string workdir;
+        string tmpdir;
     }
 
     auto readIdx = readId - 1;
     auto consensusDb = getConsensus(dbFile, filteredLasFile, const(ModifiedOptions)(
         options.daccordOptions ~ format!"%s%d,%d"(cast(string) DaccordOptions.readInterval, readIdx, readIdx),
         options.dbsplitOptions,
-        options.workdir,
+        options.tmpdir,
     ));
 
     if (consensusDb is null)
@@ -3561,15 +3561,15 @@ string getConsensus(Options)(in string dbFile, in string filteredLasFile, in siz
 string getConsensus(Options)(in string dbFile, in string filteredLasFile, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
-            isSomeString!(typeof(options.workdir)))
+            isSomeString!(typeof(options.tmpdir)))
 {
     computeIntrinsticQualityValuesForConsensus(dbFile, filteredLasFile);
 
     enforce!DazzlerCommandException(!lasEmpty(filteredLasFile), "empty pre-consensus alignment");
 
     computeErrorProfile(dbFile, filteredLasFile, options);
-    auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.workdir);
-    dbsplit(consensusDb, options.dbsplitOptions, options.workdir);
+    auto consensusDb = daccord(dbFile, filteredLasFile, options.daccordOptions, options.tmpdir);
+    dbsplit(consensusDb, options.dbsplitOptions, options.tmpdir);
 
     return consensusDb;
 }
@@ -3617,7 +3617,7 @@ unittest
         string[] daccordOptions;
         string[] lasFilterAlignmentsOptions;
         size_t fastaLineWidth;
-        string workdir;
+        string tmpdir;
         coord_t properAlignmentAllowance;
     }
 
