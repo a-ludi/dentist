@@ -438,8 +438,8 @@ private enum LasDumpLineFormat : LasDumpLineFormatTuple
 {
     totalChainPartsCount = LasDumpLineFormatTuple('+', 'P', "+ P %d"),
     totalTracePointsCount = LasDumpLineFormatTuple('+', 'T', "+ T %d"),
-    maxChainPartsCountPerPile = LasDumpLineFormatTuple('%', 'P', "% P %d"),
-    maxTracePointsCountPerPile = LasDumpLineFormatTuple('%', 'T', "% T %d"),
+    maxChainPartsCountPerPile = LasDumpLineFormatTuple('%', 'P', "%% P %d"),
+    maxTracePointsCountPerPile = LasDumpLineFormatTuple('%', 'T', "%% T %d"),
     maxTracePointCount = LasDumpLineFormatTuple('@', 'T', "@ T %d"),
     tracePointDistance = LasDumpLineFormatTuple('X', '\0', "X %d"),
     chainPart = LasDumpLineFormatTuple('P', '\0', "P %d %d %c %c"),
@@ -1149,6 +1149,7 @@ private:
     dchar currentLineType;
     dchar currentLineSubType;
     size_t numLocalAlignments;
+    public size_t maxLocalAlignmentsPerContig;
     public size_t maxTracePointCount;
     size_t numTracePointsLeft;
     TracePoint[] tracePointsAcc;
@@ -1241,7 +1242,14 @@ private:
                     }
                     break;
                 case maxChainPartsCountPerPile.indicator:
-                    static assert(maxTracePointsCountPerPile.indicator == maxChainPartsCountPerPile.indicator);
+                    switch (currentLineSubType)
+                    {
+                        case maxChainPartsCountPerPile.subIndicator:
+                            readMaxLocalAlignmentsPerContig();
+                            break;
+                        default:
+                            break;
+                    }
                     break; // ignore
                 case maxTracePointCount.indicator:
                     switch (currentLineSubType)
@@ -1341,6 +1349,13 @@ private:
         currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
 
         return totalChainPartsCount;
+    }
+
+    void readMaxLocalAlignmentsPerContig()
+    {
+        enum maxChainPartsCountPerPile = LasDumpLineFormat.maxChainPartsCountPerPile.format;
+
+        currentDumpLine[].formattedRead!maxChainPartsCountPerPile(maxLocalAlignmentsPerContig);
     }
 
     void readMaxTracePointCount()
