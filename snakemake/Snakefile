@@ -322,7 +322,7 @@ def docstring(string):
     return "\n\n".join(paragraphs)
 
 
-def replace_env(string):
+def replace_env(string, envdict=environ):
     import re
 
     env_re = re.compile(r"\$(?P<var>\$|[a-zA-Z_][a-zA-Z0-9_]*|\{[a-zA-Z_][a-zA-Z0-9_]*\})")
@@ -333,18 +333,22 @@ def replace_env(string):
         if varname == "$":
             return "$"
         elif varname.startswith("{"):
-            return environ[varname[1:-1]]
+            return envdict[varname[1:-1]]
         else:
-            return environ[varname]
+            return envdict[varname]
 
-    return env_re.sub(fetch_env, string)
+    fullmatch = env_re.fullmatch(string)
+    if fullmatch:
+        return fetch_env(fullmatch)
+    else:
+        return env_re.sub(fetch_env, string)
 
 
-def replace_env_rec(obj):
+def replace_env_rec(obj, envdict=environ):
     iterable = None
 
     if isinstance(obj, str):
-        return replace_env(obj)
+        return replace_env(obj, envdict)
     elif isinstance(obj, list):
         iterable = enumerate(obj)
     elif isinstance(obj, dict):
@@ -353,7 +357,7 @@ def replace_env_rec(obj):
         return obj
 
     for k, v in iterable:
-        obj[k] = replace_env_rec(v)
+        obj[k] = replace_env_rec(v, envdict)
 
     return obj
 
@@ -367,16 +371,15 @@ def replace_env_rec(obj):
 # Variables for rules
 #-----------------------------------------------------------------------------
 
-env_config = replace_env_rec(config.pop("env", dict()))
+augmented_env = replace_env_rec(config.pop("env", dict()))
 
-if isinstance(env_config, dict):
-    for k, v in env_config.items():
-        if not k in environ:
-            environ[k] = v
+if isinstance(augmented_env, dict):
+    for k, v in environ.items():
+        augmented_env[k] = v
 else:
-    raise Exception("expected dictionary for config[env] but got: " + type(env_config))
+    raise Exception("expected dictionary for config[env] but got: " + type(augmented_env))
 
-config = replace_env_rec(config)
+config = replace_env_rec(config, augmented_env)
 
 # config shortcuts
 inputs = config["inputs"]
