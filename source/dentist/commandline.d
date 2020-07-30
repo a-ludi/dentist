@@ -2094,7 +2094,6 @@ struct OptionsFor(DentistCommand _command)
         {
             return [
                 DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
                 DamapperOptions.bestMatches ~ ".7",
                 format!(DamapperOptions.averageCorrelationRate ~ "%f")(
                     refVsReadsAlignmentOptionsAverageCorrelationRate,
