@@ -20,7 +20,6 @@ dentist_config:
         fasta-line-width:   80
 
 # Directories for intermediate and log files.
-# NOTE: this is NOT `--workdir` of `dentist`
 workdir:            workdir
 logdir:             logs
 
