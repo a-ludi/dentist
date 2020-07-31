@@ -8,10 +8,6 @@
 */
 module dentist.commands.filterMask;
 
-import dentist.common : isTesting;
-
-static if (isTesting):
-
 import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
@@ -20,7 +16,7 @@ import dentist.common :
 import dentist.common.alignments :
     AlignmentChain,
     id_t;
-import dentist.common.commands : TestingCommand;
+import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     readMask,
     writeMask;
@@ -52,7 +48,7 @@ import vibe.data.json : toJson = serializeToJson;
 
 
 /// Options for the `filterMask` command.
-alias Options = OptionsFor!(TestingCommand.filterMask);
+alias Options = OptionsFor!(DentistCommand.filterMask);
 
 /// Execute the `filterMask` command with `options`.
 void execute(in Options options)

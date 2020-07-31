@@ -437,7 +437,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.filterMask,
+        DentistCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.propagateMask,
         DentistCommand.mergeMasks,
@@ -563,7 +563,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.filterMask,
+        DentistCommand.filterMask,
     ))
     {
         @Argument("<in:input-mask>")
@@ -669,7 +669,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.filterMask,
+        DentistCommand.filterMask,
     ))
     {
         @Argument("<out:filtered-mask>")
@@ -1597,7 +1597,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.filterMask,
+        DentistCommand.filterMask,
     ))
     {
         @Option("min-interval-size")
@@ -1620,7 +1620,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.filterMask,
+        DentistCommand.filterMask,
     ))
     {
         @Option("min-gap-size")
@@ -2326,7 +2326,7 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Translocate gaps from first assembly to second assembly.
         }".wrap;
-    else static if (command == TestingCommand.filterMask)
+    else static if (command == DentistCommand.filterMask)
         enum commandSummary = q"{
             Filter a Dazzler mask.
         }".wrap;
