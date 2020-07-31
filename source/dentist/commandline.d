@@ -441,6 +441,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.filterMask,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.propagateMask,
+        DentistCommand.mergeMasks,
         DentistCommand.chainLocalAlignments,
         DentistCommand.showMask,
         DentistCommand.collectPileUps,
@@ -733,6 +734,21 @@ struct OptionsFor(DentistCommand _command)
         @Validate!validateFilesExist
         @Validate!(value => value.length >= 2)
         string[] insertionsFiles;
+    }
+
+    static if (command.among(
+        DentistCommand.mergeMasks,
+    ))
+    {
+        @Argument("<out:merged-mask>")
+        @Help("name of merged mask")
+        @(Validate!((value, options) => validateOutputMask(options.refDb, value)))
+        string outMask;
+
+        @Argument("<in:input-masks>", Multiplicity.oneOrMore)
+        @Help("merge these Dazzler masks")
+        @(Validate!((value, options) => validateInputMasks(options.refDb, value, Yes.allowBlock)))
+        string[] inMasks;
     }
 
     static if (command.among(
@@ -2348,6 +2364,10 @@ template commandSummary(DentistCommand command)
             assembly to the reads and then back again to the reference.
             Propagating, once again, to the reads will produce a complete
             repeat mask on the reads.
+        ".wrap;
+    else static if (command == DentistCommand.mergeMasks)
+        enum commandSummary = "
+            Merge several masks into a single one
         ".wrap;
     else static if (command == DentistCommand.showMask)
         enum commandSummary = q"{

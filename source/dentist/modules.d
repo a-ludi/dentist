@@ -24,6 +24,7 @@ static import dentist.commands.findClosableGaps;
 static import dentist.commands.generateDazzlerOptions;
 static import dentist.commands.maskRepetitiveRegions;
 static import dentist.commands.mergeInsertions;
+static import dentist.commands.mergeMasks;
 static import dentist.commands.output;
 static import dentist.commands.processPileUps;
 static import dentist.commands.processPileUps.cropper;
@@ -78,6 +79,7 @@ alias modules = AliasSeq!(
     dentist.commands.generateDazzlerOptions,
     dentist.commands.maskRepetitiveRegions,
     dentist.commands.mergeInsertions,
+    dentist.commands.mergeMasks,
     dentist.commands.output,
     dentist.commands.processPileUps,
     dentist.commands.processPileUps.cropper,
