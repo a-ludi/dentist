@@ -85,9 +85,10 @@ class MaskPropagator
 
         init();
 
-        getLocalAlignmentsByContig()
+        auto bufferRest = getLocalAlignmentsByContig()
             .map!(localAlignments => propagateMaskPerContig(inputMask.intervals, localAlignments))
             .copy(outputMaskByContigs);
+        outputMaskByContigs.length -= bufferRest.length;
 
         mergeMasks();
         writeMask(destinationDb, options.repeatMask, outputMask.intervals);
