@@ -264,6 +264,14 @@ def block_masks(mask, db):
     return [block_mask(mask, b + 1)  for b in range(get_num_blocks(db))]
 
 
+def pseudo_block_mask(mask, block):
+    return "{}-{}B".format(mask, block)
+
+
+def pseudo_block_masks(mask, db):
+    return [pseudo_block_mask(mask, b + 1)  for b in range(get_num_blocks(db))]
+
+
 def mask_files(db, mask):
     from os.path import dirname
 
@@ -465,6 +473,7 @@ localrules:
     reads2db,
     ref_vs_reads_alignment,
     reads_vs_ref_alignment,
+    propagate_mask_back_to_reference,
     extend_dentist_config_for_merge,
     merge
 
@@ -682,8 +691,8 @@ rule ref_vs_reads_alignment_block:
         mask_files(reference, self_mask),
         mask_files(reference, tandem_mask)
     output:
-        temp(alignment_file(reference, reads, block_b='{block_reads}')),
-        temp(alignment_file(reads, reference, block_a='{block_reads}'))
+        alignment_file(reference, reads, block_b='{block_reads}'),
+        alignment_file(reads, reference, block_a='{block_reads}')
     params:
         aligncmd = lambda _: generate_options_for("reads", dentist_config_file),
         reference_stub = db_stub(rel_to_workdir(reference)),
@@ -747,34 +756,68 @@ rule mask_reads:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
 
 
-rule propagate_mask_to_reads:
+rule propagate_mask_to_reads_block:
     input:
         dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
-        ref_vs_reads_alignment,
-        mask_files(reference, "{mask}")
+        mask_files(reference, "{mask}"),
+        alignment = alignment_file(reference, reads, block_b='{block_reads}')
     output:
-        mask_files(reads, "{mask}")
-    log: log_file("propagate-draft-mask-to-reads.{mask}")
+        mask_files(reads, block_mask("{mask}", "{block_reads}"))
+    params:
+        inmask = "{mask}",
+        outmask = block_mask("{mask}", "{block_reads}")
+    log: log_file("propagate-mask-to-reads.{mask}.{block_reads}")
     shell:
-        "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {wildcards.mask} {reference} {reads} {ref_vs_reads_alignment} {wildcards.mask} 2> {log}"
+        "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
+
+
+# rule propagate_mask_to_reads:
+#     input:
+#         dentist_config_file,
+#         await_db_files(reads),
+#         *[mask_files(reads, m) for m in block_masks("{mask}", reads)]
+#     output:
+#         mask_files(reads, "{mask}")
+#     params:
+#         merged_mask = "{mask}",
+#         block_masks = block_masks("{mask}", reads)
+#     log: log_file("propagate-mask-to-reads.{mask}")
+#     shell:
+#         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reads} {params[merged_mask]} {params[block_masks]} 2> {log}"
+
+
+rule propagate_mask_back_to_reference_block:
+    input:
+        dentist_config_file,
+        await_db_files(reference),
+        await_db_files(reads),
+        mask_files(reads, block_mask("{mask}", "{block_reads}")),
+        alignment = alignment_file(reads, reference, block_a='{block_reads}')
+    output:
+        temp(mask_files(reference, pseudo_block_mask(homogenized_mask("{mask}"), "{block_reads}")))
+    params:
+        inmask = block_mask("{mask}", "{block_reads}"),
+        outmask = pseudo_block_mask(homogenized_mask("{mask}"), "{block_reads}")
+    log: log_file("propagate-mask-back-to-reference.{mask}.{block_reads}")
+    shell:
+        "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reads} {reference} {input[alignment]} {params[outmask]} 2> {log}"
 
 
 rule propagate_mask_back_to_reference:
     input:
         dentist_config_file,
         await_db_files(reference),
-        await_db_files(reads),
-        reads_vs_ref_alignment,
-        mask_files(reads, "{mask}")
+        *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads)]
     output:
         mask_files(reference, homogenized_mask("{mask}"))
     params:
-        out_mask = homogenized_mask("{mask}")
-    log: log_file("propagate-draft-mask-back-to-reference.{mask}")
+        merged_mask = homogenized_mask("{mask}"),
+        block_masks = pseudo_block_masks(homogenized_mask("{mask}"), reads)
+    log: log_file("propagate-mask-back-to-reference.{mask}")
     shell:
-        "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {wildcards.mask} {reads} {reference} {reads_vs_ref_alignment} {params[out_mask]} 2> {log}"
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
 checkpoint collect:

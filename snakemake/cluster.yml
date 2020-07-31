@@ -41,11 +41,11 @@ mask_reads:
     memory:     16384
     time:       "00:15"
 
-propagate_mask_to_reads:
+propagate_mask_to_reads_block:
     memory:     16384
     time:       "00:15"
 
-propagate_mask_back_to_reference:
+propagate_mask_back_to_reference_block:
     memory:     16384
     time:       "00:15"
 
