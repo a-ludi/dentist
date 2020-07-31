@@ -75,7 +75,9 @@ import std.array :
     replace,
     split,
     uninitializedArray;
-import std.conv : to;
+import std.conv :
+    ConvException,
+    to;
 import std.exception : enforce;
 import std.file : exists, remove;
 import std.format : format, formattedRead;
@@ -3995,10 +3997,38 @@ EOS";
 /**
     Get the hidden files comprising the designated mask.
 */
-auto getMaskFiles(in string dbFile, in string maskName)
+auto getMaskFiles(in string dbFile, in string maskName, Flag!"allowBlock" allowBlock = No.allowBlock)
 {
+    enum errorDotNotAllowed = "mask name must not contain dots `.`";
+
     enforce!DazzlerCommandException(!maskName.canFind("/"), "mask name must not contain slashes `/`");
-    enforce!DazzlerCommandException(!maskName.canFind("."), "mask name must not contain dots `.`");
+
+    auto maskNameParts = maskName.split(".");
+
+    enforce!DazzlerCommandException(maskNameParts.length <= 2, errorDotNotAllowed);
+
+    id_t block;
+    if (maskNameParts.length == 2)
+    {
+        try
+        {
+            block = maskNameParts[0].to!id_t;
+        }
+        catch (ConvException e)
+        {
+            throw new DazzlerCommandException(allowBlock
+                ? "ill-formed block mask name: block part must be integral"
+                : errorDotNotAllowed
+            );
+        }
+
+        enforce!DazzlerCommandException(block > 0, allowBlock
+            ? "ill-formed block mask name: block part must be positive"
+            : errorDotNotAllowed
+        );
+
+        enforce!DazzlerCommandException(allowBlock, "block mask not allowed");
+    }
 
     auto destinationDir = dbFile.dirName;
     auto dbName = dbFile.baseName.stripExtension;
@@ -4037,7 +4067,7 @@ Region[] readMask(Region)(in string dbFile, in string maskName)
 {
     alias _enforce = enforce!MaskReaderException;
 
-    auto maskFileNames = getMaskFiles(dbFile, maskName);
+    auto maskFileNames = getMaskFiles(dbFile, maskName, Yes.allowBlock);
     auto maskHeader = readMaskHeader(maskFileNames.header);
     auto maskData = getBinaryFile!MaskDataEntry(maskFileNames.data);
 
@@ -4171,7 +4201,7 @@ void writeMask(Region)(in string dbFile, in string maskName, in Region[] regions
         MaskDataEntry, "end",
     );
 
-    auto maskFileNames = getMaskFiles(dbFile, maskName);
+    auto maskFileNames = getMaskFiles(dbFile, maskName, Yes.allowBlock);
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
 

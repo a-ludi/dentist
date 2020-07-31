@@ -155,6 +155,8 @@ import std.traits :
     ReturnType;
 import std.typecons :
     BitFlags,
+    Flag,
+    No,
     tuple,
     Yes;
 import transforms : camelCase;
@@ -576,7 +578,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:repeat-mask>", Multiplicity.oneOrMore)
         @Help("read Dazzler mask <repeat-mask>")
-        @Validate!((values, options) => validateInputMasks(options.refDb, values))
+        @Validate!((values, options) => validateInputMasks(options.refDb, values, Yes.allowBlock))
         string[] masks;
     }
 
@@ -693,7 +695,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<out:repeat-mask>")
         @Help("write inferred repeat mask into a Dazzler mask.")
-        @Validate!((value, options) => validateOutputMask(options.refDb, value))
+        @Validate!((value, options) => validateOutputMask(options.refDb, value, Yes.allowBlock))
         string repeatMask;
     }
 
@@ -1352,8 +1354,12 @@ struct OptionsFor(DentistCommand _command)
         }
 
         @Option()
-        @Validate!((values, options) => validateInputMasks(options.refDb, values))
-        @Validate!(value => value.length > 0)
+        @Validate!((values, options) => validateInputMasks(
+            options.refDb,
+            values,
+            cast(Flag!"allowBlock") (command == DentistCommand.propagateMask),
+        ))
+        @Validate!(value => validate(value.length > 0, "at least one repeat mask required"))
         string[] repeatMasks;
     }
 
@@ -2496,13 +2502,20 @@ private
 
     enum getUDA(alias symbol, T) = getUDAs!(symbol, T)[0];
 
-    struct Validate(alias _validate, bool isEnabled = true) {
+    struct Validate(
+        alias _validate,
+        bool isEnabled = true,
+        string file = __FILE__,
+        size_t line = __LINE__,
+    ) {
         static if (isEnabled)
             alias validate = _validate;
         else
             alias validate = __truth;
 
         static bool __truth(T)(T) { return true; }
+
+        enum sourceLocation = format!"%s:%d"(file, line);
     }
 
     enum Priority
@@ -2590,10 +2603,10 @@ private
                         cast(void) validate(value, options);
                     else
                         static assert(0, format!q"{
-                            validator for %s.%s should have a signature of
+                            validator for %s.%s at %s should have a signature of
                             `void (T value);` or `void (T value, Options options);` -
                             maybe the validator does not compile?
-                        }"(Options.stringof, symbol.stringof).wrap(size_t.max));
+                        }"(Options.stringof, symbol.stringof, validateUDA.sourceLocation).wrap(size_t.max));
                 }
                 catch (Exception cause)
                 {
@@ -2759,6 +2772,8 @@ private
         }
     }
 
+    alias validate = enforce!CLIException;
+
     void validatePositive(string option, V)(V value)
     {
         enforce!CLIException(
@@ -2851,23 +2866,35 @@ private
         );
     }
 
-    void validateInputMasks(in string dbFile, in string[] maskDestinations)
+    void validateInputMasks(
+        in string dbFile,
+        in string[] maskDestinations,
+        Flag!"allowBlock" allowBlock = No.allowBlock,
+    )
     {
         foreach (maskDestination; maskDestinations)
             validateInputMask(dbFile, maskDestination);
     }
 
-    void validateInputMask(in string dbFile, in string maskDestination)
+    void validateInputMask(
+        in string dbFile,
+        in string maskDestination,
+        Flag!"allowBlock" allowBlock = No.allowBlock,
+    )
     {
-        foreach (maskFile; getMaskFiles(dbFile, maskDestination))
+        foreach (maskFile; getMaskFiles(dbFile, maskDestination, allowBlock))
         {
             validateFileExists!"cannot open hidden mask file `%s`"(maskFile);
         }
     }
 
-    void validateOutputMask(in string dbFile, in string maskDestination)
+    void validateOutputMask(
+        in string dbFile,
+        in string maskDestination,
+        Flag!"allowBlock" allowBlock = No.allowBlock,
+    )
     {
-        foreach (maskFile; getMaskFiles(dbFile, maskDestination))
+        foreach (maskFile; getMaskFiles(dbFile, maskDestination, allowBlock))
         {
             validateFileWritable!"cannot write hidden mask file `%s`: %s"(maskFile);
         }
