@@ -419,7 +419,7 @@ reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
 dentist_config_file = join(workdir_, workflow_["config"])
-dentist_merge_config_file = prepend_ext(dentist_config_file, ".merge")
+dentist_merge_insertions_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
@@ -474,8 +474,8 @@ localrules:
     ref_vs_reads_alignment,
     reads_vs_ref_alignment,
     propagate_mask_back_to_reference,
-    extend_dentist_config_for_merge,
-    merge
+    extend_dentist_config_for_merge_insertions,
+    merge_insertions
 
 
 rule ALL:
@@ -857,12 +857,12 @@ rule process:
     shell:
         "dentist process --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
 
-rule extend_dentist_config_for_merge:
+rule extend_dentist_config_for_merge_insertions:
     input:
         dentist_config_file,
         await_pile_ups()
     output:
-        temp(dentist_merge_config_file)
+        temp(dentist_merge_insertions_config_file)
     run:
         merge_config = None
         with open(dentist_config_file, 'r') as base_config:
@@ -879,18 +879,18 @@ rule extend_dentist_config_for_merge:
         validate_dentist_config(output[0])
 
 
-rule merge:
+rule merge_insertions:
     input:
-        dentist_merge_config_file,
+        dentist_merge_insertions_config_file,
         await_db_files(reference),
         await_db_files(reads),
         await_pile_ups(),
         insertions_batches = lambda _: insertions_batches()
     output:
         protected(insertions)
-    log: log_file("merge")
+    log: log_file("merge-insertions")
     shell:
-        "dentist merge --config={dentist_merge_config_file} {dentist_flags} - - 2> {log}"
+        "dentist merge-insertions --config={dentist_merge_insertions_config_file} {dentist_flags} - - 2> {log}"
 
 rule output:
     input:
