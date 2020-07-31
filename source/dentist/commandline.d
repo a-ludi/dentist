@@ -2893,7 +2893,7 @@ private
     )
     {
         foreach (maskDestination; maskDestinations)
-            validateInputMask(dbFile, maskDestination);
+            validateInputMask(dbFile, maskDestination, allowBlock);
     }
 
     void validateInputMask(
