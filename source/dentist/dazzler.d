@@ -3485,7 +3485,6 @@ void filterPileUpAlignments(
 */
 string getConsensus(Options)(in string dbFile, in size_t readId, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
-            isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
@@ -3496,7 +3495,6 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         string[] daccordOptions;
         string[] dalignerOptions;
         string[] dbsplitOptions;
-        string[] lasFilterAlignmentsOptions;
         string tmpdir;
         coord_t properAlignmentAllowance;
     }
@@ -3506,7 +3504,6 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
         options.daccordOptions ~ format!"%s%d,%d"(cast(string) DaccordOptions.readInterval, readIdx, readIdx),
         options.dalignerOptions,
         options.dbsplitOptions,
-        options.lasFilterAlignmentsOptions,
         options.tmpdir,
         options.properAlignmentAllowance,
     ));
@@ -3522,7 +3519,6 @@ string getConsensus(Options)(in string dbFile, in size_t readId, in Options opti
 /// ditto
 string getConsensus(Options)(in string dbFile, in Options options)
         if (isOptionsList!(typeof(options.daccordOptions)) &&
-            isOptionsList!(typeof(options.lasFilterAlignmentsOptions)) &&
             isOptionsList!(typeof(options.dalignerOptions)) &&
             isOptionsList!(typeof(options.dbsplitOptions)) &&
             is(typeof(options.properAlignmentAllowance) == const(coord_t)) &&
@@ -3623,7 +3619,6 @@ unittest
         string[] dbsplitOptions;
         string[] dalignerOptions;
         string[] daccordOptions;
-        string[] lasFilterAlignmentsOptions;
         size_t fastaLineWidth;
         string tmpdir;
         coord_t properAlignmentAllowance;
@@ -3634,9 +3629,6 @@ unittest
         [],
         [DalignerOptions.minAlignmentLength ~ "15"],
         [],
-        [
-            LasFilterAlignmentsOptions.errorThresold ~ (0.05).to!string,
-        ],
         74,
         tmpDir,
         100,
@@ -4489,13 +4481,6 @@ enum ComputeIntrinsicQVOptions : string
     readDepth = "-d",
 }
 
-/// Options for `lasfilteralignments`.
-enum LasFilterAlignmentsOptions : string
-{
-    /// Error threshold for proper alignment termination (default: 0.35)
-    errorThresold = "-e",
-}
-
 private
 {
     auto readLasHeader(in string lasFile)
@@ -4657,24 +4642,6 @@ private
                 lasFile[],
             ),
         ));
-    }
-
-    @ExternalDependency("lasfilteralignments", "daccord", "https://gitlab.com/german.tischler/daccord")
-    string lasFilterAlignments(in string dbFile, in string lasFile, in string[] options)
-    {
-        string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
-
-        executeCommand(chain(
-            only("lasfilteralignments"),
-            options,
-            only(
-                filteredLasFile,
-                dbFile.stripBlock,
-                lasFile[],
-            ),
-        ));
-
-        return filteredLasFile;
     }
 
     @ExternalDependency("daccord", "daccord", "https://gitlab.com/german.tischler/daccord")

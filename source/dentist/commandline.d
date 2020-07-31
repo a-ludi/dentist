@@ -54,8 +54,7 @@ import dentist.dazzler :
     getMaskFiles,
     getNumContigs,
     getTracePointDistance,
-    lasEmpty,
-    LasFilterAlignmentsOptions;
+    lasEmpty;
 import dentist.util.process : isExecutable;
 import dentist.swinfo :
     copyright,
@@ -2224,7 +2223,6 @@ struct OptionsFor(DentistCommand _command)
             string[] daccordOptions;
             string[] dalignerOptions;
             string[] dbsplitOptions;
-            string[] lasFilterAlignmentsOptions;
             string[] dbdustOptions;
             string tmpdir;
             coord_t properAlignmentAllowance;
@@ -2242,10 +2240,6 @@ struct OptionsFor(DentistCommand _command)
                 pileUpAlignmentOptions,
                 // dbsplitOptions
                 [],
-                // lasFilterAlignmentsOptions
-                [
-                    LasFilterAlignmentsOptions.errorThresold ~ (2.0 * readsErrorRate).to!string,
-                ],
                 // dbdustOptions
                 [],
                 // tmpdir
