@@ -13,17 +13,8 @@ import dentist.common.external : ExternalDependency;
 import std.stdio : writefln, writeln;
 
 /// Execute the `generateDazzlerOptions` command with `options`.
-@ExternalDependency("daligner", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
-@ExternalDependency("datander", "DAMASKER", "https://github.com/thegenemyers/DAMASKER")
-@ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
 void execute(Options)(in Options options)
 {
-    static if (isTesting)
-    {
-        writeln("# short vs true assembly alignment options (consider using `HPC.daligner`)");
-        writefln!"damapper %-(%s %) <true-assembly> <short-read-assembly>"(options.shortVsTrueAssemblyAlignmentOptions);
-    }
-
     writeln("# self alignment options (consider using `HPC.daligner`)");
     writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
     writeln("# tandem alignment options (consider using `HPC.daligner`)");

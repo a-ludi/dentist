@@ -50,11 +50,17 @@ import dentist.dazzler :
     DamapperOptions,
     DatanderOptions,
     dbdustMaskName,
+    DbSplitOptions,
+    forceLargeTracePointType,
     getHiddenDbFiles,
     getMaskFiles,
     getNumContigs,
     getTracePointDistance,
-    lasEmpty;
+    lasEmpty,
+    minAverageCorrelationRate,
+    minBestMatches,
+    OptionModifier,
+    withOption;
 import dentist.util.process : isExecutable;
 import dentist.swinfo :
     copyright,
@@ -119,6 +125,7 @@ import std.path :
     buildPath;
 import std.process :
     Config,
+    environment,
     execute;
 import std.range :
     ElementType,
@@ -1222,6 +1229,13 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+    ))
+    {
+        string numAuxiliaryThreads = "{threads}";
+    }
+
+    static if (command.among(
         TestingCommand.checkResults,
     ))
     {
@@ -1249,6 +1263,121 @@ struct OptionsFor(DentistCommand _command)
                 dustMask = null;
             }
         }
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daccord")
+        @MetaVar("<daccord-option>...")
+        @Help("Provide additional options to `daccord`")
+        void addAdditionalDaccordOptions(string option)
+        {
+            additionalDaccordOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalDaccordOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daligner-consensus")
+        @MetaVar("<daligner-option>...")
+        @Help("Provide additional options to `daligner`")
+        void addAdditionalConsensusAlignmentOptions(string option)
+        {
+            additionalConsensusAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalConsensusAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daligner-reads-vs-reads")
+        @MetaVar("<daligner-option>...")
+        @Help("Provide additional options to `daligner`")
+        void addAdditionalReadsVsReadsAlignmentOptions(string option)
+        {
+            additionalReadsVsReadsAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalReadsVsReadsAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("daligner-self")
+        @MetaVar("<daligner-option>...")
+        @Help("Provide additional options to `daligner`")
+        void addAdditionalSelfAlignmentOptions(string option)
+        {
+            additionalSelfAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalSelfAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("damapper-ref-vs-reads")
+        @MetaVar("<damapper-option>...")
+        @Help("Provide additional options to `damapper`")
+        void addAdditionalRefVsReadsAlignmentOptions(string option)
+        {
+            additionalRefVsReadsAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalRefVsReadsAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("datander-ref")
+        @MetaVar("<datander-option>...")
+        @Help("Provide additional options to `datander`")
+        void addAdditionalTandemAlignmentOptions(string option)
+        {
+            additionalTandemAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalTandemAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("dust-reads")
+        @MetaVar("<dust-option>...")
+        @Help("Provide additional options to `dust`")
+        void addAdditionalReadsDustOptions(string option)
+        {
+            additionalReadsDustOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalReadsDustOptions;
     }
 
     static if (command.among(
@@ -1804,23 +1933,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("reads-error")
-        @Help(format!"
-            estimated error rate in reads (default: %s)
-        "(defaultValue!readsErrorRate))
-        @(Validate!(value => enforce!CLIException(
-            0.0 < value && value <= 0.3,
-            "reads error rate must be in (0, 0.3]"
-        )))
-        double readsErrorRate = .15;
-    }
-
-    static if (command.among(
         TestingCommand.checkResults,
     ))
     {
@@ -1843,23 +1955,6 @@ struct OptionsFor(DentistCommand _command)
                 ),
             ];
         }
-    }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("reference-error")
-        @Help(format!"
-            estimated error rate in reference (default: %s)
-        "(defaultValue!referenceErrorRate))
-        @(Validate!(value => enforce!CLIException(
-            0.0 < value && value <= 0.3,
-            "reference error rate must be in (0, 0.3]"
-        )))
-        double referenceErrorRate = .01;
     }
 
     static if (command.among(
@@ -2056,163 +2151,154 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    static if (is(typeof(OptionsFor!command().referenceErrorRate))) {
-        @(Validate!validateAverageCorrelationRate)
-        @property auto selfAlignmentOptionsAverageCorrelationRate() const
-        {
-            return (1 - referenceErrorRate)^^2;
-        }
-
-        @property string[] shortVsTrueAssemblyAlignmentOptions() const
-        {
-            return [
-                DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
-                    selfAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
-        }
-    }
-
     static if (
+        is(typeof(OptionsFor!command().additionalSelfAlignmentOptions)) &&
         is(typeof(OptionsFor!command().minAnchorLength)) &&
-        is(typeof(OptionsFor!command().referenceErrorRate))
-    ) {
+        is(typeof(OptionsFor!command().numAuxiliaryThreads))
+    )
+    {
         @property string[] selfAlignmentOptions() const
         {
-            return [
-                DalignerOptions.identity,
-                format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
-                    selfAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
+            with (DalignerOptions) with (OptionModifier)
+                return additionalSelfAlignmentOptions
+                    .dup
+                    .withOption(cast(string) identity, ensurePresent)
+                    .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) bridge, ensurePresent)
+                    .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
+                    .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) masks, "dust", ensurePresent)
+                    .withOption(cast(string) asymmetric, remove)
+                    .withOption(cast(string) minAReadLength, remove)
+                    .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
+                    .array;
         }
+    }
 
+
+    static if (
+        is(typeof(OptionsFor!command().additionalTandemAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().minAnchorLength)) &&
+        is(typeof(OptionsFor!command().numAuxiliaryThreads))
+    )
+    {
         @property string[] tandemAlignmentOptions() const
         {
-            return [
-                format!(DatanderOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                format!(DatanderOptions.averageCorrelationRate ~ "%f")(
-                    selfAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
+            with (DatanderOptions) with (OptionModifier)
+                return additionalTandemAlignmentOptions
+                    .dup
+                    .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
+                    .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
+                    .array;
         }
     }
 
     static if (
-        is(typeof(OptionsFor!command().referenceErrorRate)) &&
-        is(typeof(OptionsFor!command().readsErrorRate))
-    ) {
-        @(Validate!validateAverageCorrelationRate)
-        @property auto refVsReadsAlignmentOptionsAverageCorrelationRate() const
-        {
-            return (1 - referenceErrorRate) * (1 - readsErrorRate);
-        }
-
-        @property string[] refVsReadsAlignmentOptions() const
-        {
-            return [
-                DamapperOptions.symmetric,
-                DamapperOptions.bestMatches ~ ".7",
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
-                    refVsReadsAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
-        }
-    }
-
-    static if (
-        is(typeof(OptionsFor!command().readsErrorRate)) &&
+        is(typeof(OptionsFor!command().additionalReadsVsReadsAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
-    ) {
-        enum forceLargeTracePointType = 200;
-
-        @(Validate!validateAverageCorrelationRate)
-        @property auto pileUpAlignmentOptionsAverageCorrelationRate() const
-        {
-            return (1 - readsErrorRate)^^2;
-        }
-
+    )
+    {
         @property string[] pileUpAlignmentOptions() const
         {
-            return [
-                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                DalignerOptions.bridge,
-                format!(DalignerOptions.tracePointDistance ~ "%d")(forceLargeTracePointType),
-                format!(DalignerOptions.minAlignmentLength ~ "%d")(minAnchorLength),
-                DalignerOptions.masks ~ "dust",
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
-                    pileUpAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
+            with (DalignerOptions) with (OptionModifier)
+                return additionalReadsVsReadsAlignmentOptions
+                    .dup
+                    .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) bridge, ensurePresent)
+                    .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
+                    .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) masks, "dust", ensurePresent)
+                    .withOption(cast(string) identity, remove)
+                    .withOption(cast(string) asymmetric, remove)
+                    .withOption(cast(string) minAReadLength, remove)
+                    .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
+                    .array;
         }
 
         @property string[] pileUpDustOptions() const
         {
-            return [];
+            return additionalReadsDustOptions.dup;
         }
     }
 
     static if (
+        is(typeof(OptionsFor!command().additionalConsensusAlignmentOptions)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads)) &&
-        is(typeof(OptionsFor!command().tracePointDistance)) &&
-        is(typeof(OptionsFor!command().tmpdir))
-    ) {
+        is(typeof(OptionsFor!command().minAnchorLength))
+    )
+    {
         enum flankingContigsRepeatMaskName = "rep";
-        enum postConsensusAlignmentOptionsAverageCorrelationRate = 0.7;
 
         @property string[] postConsensusAlignmentOptions() const
         {
-            return [
-                DalignerOptions.asymmetric,
-                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                DalignerOptions.masks ~ dbdustMaskName,
-                DalignerOptions.masks ~ flankingContigsRepeatMaskName,
-                format!(DalignerOptions.minAlignmentLength ~ "%d")(tracePointDistance),
-                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
-                    postConsensusAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
+            with (DalignerOptions) with (OptionModifier)
+                return additionalConsensusAlignmentOptions
+                    .dup
+                    .withOption(cast(string) asymmetric, ensurePresent)
+                    .withOption(cast(string) bridge, ensurePresent)
+                    .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
+                    .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) masks, dbdustMaskName, ensurePresent)
+                    .withOption(cast(string) masks, flankingContigsRepeatMaskName, ensurePresent)
+                    .withOption(cast(string) minAlignmentLength, forceLargeTracePointType.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) identity, remove)
+                    .withOption(cast(string) minAReadLength, remove)
+                    .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
+                    .array;
         }
     }
 
-    static if (command.among(
-        DentistCommand.collectPileUps,
-    ))
-    {
-        static struct AnchorSkippingPileUpsOptions
+    static if (
+        is(typeof(OptionsFor!command().additionalRefVsReadsAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().numAuxiliaryThreads))
+    ) {
+        @property string[] refVsReadsAlignmentOptions() const
         {
-            string[] damapperOptions;
-            string[] dbsplitOptions;
-            string tmpdir;
+            with (DamapperOptions) with (OptionModifier)
+                return additionalRefVsReadsAlignmentOptions
+                    .dup
+                    .withOption(cast(string) symmetric, ensurePresent)
+                    .withOption(cast(string) oneDirection, ensurePresent)
+                    .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) bestMatches, minBestMatches.to!string, replaceOrAdd)
+                    .withOption(cast(string) sortPileOrder, remove)
+                    .withOption(cast(string) oneDirection, remove)
+                    .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
+                    .array;
         }
 
-        @property string[] intermediateContigsAlignmentOptions() const
-        {
-            return [
-                DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
-                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
-                    refVsReadsAlignmentOptionsAverageCorrelationRate,
-                ),
-            ];
-        }
+        static if (
+            is(typeof(OptionsFor!command().tmpdir))
+        ) {
+            static struct AnchorSkippingPileUpsOptions
+            {
+                string[] damapperOptions;
+                string[] dbsplitOptions;
+                string tmpdir;
+            }
 
-        @property auto anchorSkippingPileUpsOptions() const
-        {
-            return const(AnchorSkippingPileUpsOptions)(
-                // dalignerOptions
-                intermediateContigsAlignmentOptions,
-                // dbsplitOptions
-                [],
-                // tmpdir
-                tmpdir,
-            );
+            @property auto anchorSkippingPileUpsOptions() const
+            {
+                return const(AnchorSkippingPileUpsOptions)(
+                    // dalignerOptions
+                    refVsReadsAlignmentOptions,
+                    // dbsplitOptions
+                    [DbSplitOptions.allReads],
+                    // tmpdir
+                    tmpdir,
+                );
+            }
         }
     }
+
 
     static if (command.among(
         DentistCommand.processPileUps,
@@ -2228,20 +2314,35 @@ struct OptionsFor(DentistCommand _command)
             coord_t properAlignmentAllowance;
         }
 
+        @property auto daccordOptions() const
+        {
+            with (DaccordOptions) with (OptionModifier)
+                return additionalDaccordOptions
+                    .dup
+                    .withOption(cast(string) produceFullSequences, ensurePresent)
+                    .withOption(cast(string) numberOfThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
+                    .withOption(cast(string) maxDepth, remove)
+                    .withOption(cast(string) readInterval, remove)
+                    .withOption(cast(string) readsPart, remove)
+                    .withOption(cast(string) computeErrorProfileOnly, remove)
+                    .withOption(cast(string) computeErrorDistributionEstimate, remove)
+                    .array;
+        }
+
+
         @property auto consensusOptions() const
         {
             return const(ConsensusOptions)(
                 // daccordOptions
-                [
-                    DaccordOptions.produceFullSequences,
-                    DaccordOptions.numberOfThreads ~ numAuxiliaryThreads.to!string,
-                ],
+                daccordOptions,
                 // dalignerOptions
                 pileUpAlignmentOptions,
                 // dbsplitOptions
-                [],
+                [
+                    DbSplitOptions.allReads,
+                ],
                 // dbdustOptions
-                [],
+                additionalReadsDustOptions,
                 // tmpdir
                 tmpdir,
                 // properAlignmentAllowance

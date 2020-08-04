@@ -141,6 +141,15 @@ enum damFileExtension = ".dam";
 /// The Dazzler tools require sequence of a least minSequenceLength base pairs.
 enum minSequenceLength = 14;
 
+/// This trace point distance enforces the use of ushort for trace point encoding.
+enum forceLargeTracePointType = 126;
+
+/// Minimum allowed value for `-e` option of `daligner`/`damapper`
+enum minAverageCorrelationRate = 0.7;
+
+/// Minimum allowed value for `-n` option of `damapper`
+enum minBestMatches = 0.7;
+
 enum isOptionsList(T) = isArray!T && isSomeString!(ElementType!T);
 
 /**
@@ -4236,6 +4245,368 @@ void writeMask(Region)(in string dbFile, in string maskName, in Region[] regions
     }
 }
 
+
+/// Specifies the type of action `withOption` should take.
+enum OptionModifier : ubyte
+{
+    /// Replace existing option or add as new option.
+    replaceOrAdd,
+    /// Make sure option is present, e.i. option name and value must match.
+    ensurePresent,
+    /// Make sure option is present, e.i. an option with the given name exists.
+    /// Does not modify existing options. This does nothing if no option value
+    /// is given.
+    defaultValue,
+    /// Append new option.
+    add,
+    /// Remove existing options.
+    remove,
+    /// Replace existing options. Does not add new option.
+    replace,
+}
+
+
+/// Lazily modifies `dazzlerOptions` as specified.
+auto withOption(R)(R dazzlerOptions, string optionName, OptionModifier mod)
+    if (isInputRange!R && is(ElementType!R == string))
+{
+    return dazzlerOptions.withOption(optionName, null, mod);
+}
+
+auto withOption(R)(
+    R dazzlerOptions,
+    string optionName,
+    string value,
+    OptionModifier mod,
+) if (isInputRange!R && is(ElementType!R == string))
+{
+    return WithOptionsImpl!R(
+        dazzlerOptions,
+        optionName,
+        value,
+        mod,
+    );
+}
+
+/// `replaceOrAdd`
+unittest
+{
+    import std.algorithm : equal;
+
+    enum dazzlerOptions = [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+    ];
+
+    auto modifiedDazzlerOptions = dazzlerOptions
+        .withOption("-T", "16", OptionModifier.replaceOrAdd)
+        .withOption("-k", "20", OptionModifier.replaceOrAdd);
+
+    assert(equal(modifiedDazzlerOptions, [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T16",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+        "-k20",
+    ]));
+}
+
+/// `ensurePresent`
+unittest
+{
+    import std.algorithm : equal;
+
+    enum dazzlerOptions = [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+    ];
+
+    auto modifiedDazzlerOptions = dazzlerOptions
+        .withOption("-C", OptionModifier.ensurePresent)
+        .withOption("-e", "0.841500", OptionModifier.ensurePresent)
+        .withOption("-m", "dust", OptionModifier.ensurePresent)
+        .withOption("-m", "dentist-reads", OptionModifier.ensurePresent);
+
+    assert(equal(modifiedDazzlerOptions, [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+        "-mdentist-reads",
+    ]));
+}
+
+/// `defaultValue`
+unittest
+{
+    import std.algorithm : equal;
+
+    enum dazzlerOptions = [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+    ];
+
+    auto modifiedDazzlerOptions = dazzlerOptions
+        .withOption("-e", "0.7", OptionModifier.defaultValue)
+        .withOption("-s", "126", OptionModifier.defaultValue)
+        .withOption("-P", null, OptionModifier.defaultValue);
+
+    assert(equal(modifiedDazzlerOptions, [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+        "-s126",
+    ]));
+}
+
+/// `add` and `remove`
+unittest
+{
+    import std.algorithm : equal;
+
+    enum dazzlerOptions = [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-T8",
+        "-P/tmp",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+    ];
+
+    auto modifiedDazzlerOptions = dazzlerOptions
+        .withOption("-T", OptionModifier.remove)
+        .withOption("-M", "128", OptionModifier.remove)
+        .withOption("-P", "/tmp", OptionModifier.remove)
+        .withOption("-m", "dentist-reads", OptionModifier.add);
+
+    assert(equal(modifiedDazzlerOptions, [
+        "-C",
+        "-n.7",
+        "-e0.841500",
+        "-M25",
+        "-mdust",
+        "-mdentist-self",
+        "-mtan",
+        "-mdentist-reads",
+    ]));
+}
+
+// empty input range
+unittest
+{
+    import std.algorithm : equal;
+
+    enum dazzlerOptions = new string[0];
+
+    assert(equal(
+        dazzlerOptions.withOption("-I", OptionModifier.ensurePresent),
+        ["-I"],
+    ));
+    assert(equal(
+        dazzlerOptions.withOption("-T", "8", OptionModifier.replaceOrAdd),
+        ["-T8", ],
+    ));
+    assert(equal(
+        dazzlerOptions.withOption("-m", "dentist-reads", OptionModifier.add),
+        ["-mdentist-reads", ],
+    ));
+}
+
+
+struct WithOptionsImpl(R) if (isInputRange!R && is(ElementType!R == string))
+{
+    private R options;
+    private string optionName;
+    private string value;
+    private OptionModifier mod;
+    private string currentOption;
+    private bool optionPresent;
+
+
+    this(R options, string optionName, string value, OptionModifier mod)
+    {
+        assert(
+            optionName.length > 0 && optionName[0] == '-',
+            "optionName must start with a dash `-`",
+        );
+
+        this.options = options;
+        this.optionName = optionName;
+        this.value = value;
+        this.mod = mod;
+
+        if (!empty)
+            popFront();
+    }
+
+
+    this(this)
+    {
+        static if (isForwardRange!R)
+            options = options.save;
+    }
+
+
+    @property string newOption() const pure nothrow @safe
+    {
+        return optionName ~ value;
+    }
+
+
+    @property bool empty() const
+    {
+        return options.empty &&
+               currentOption is null &&
+               (!isAdditiveModifier || optionPresent);
+    }
+
+
+    @property string front() const pure nothrow @safe
+    {
+        assert(!empty, "Attempting to fetch the front of an empty WithOptionsImpl");
+
+        return currentOption;
+    }
+
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty WithOptionsImpl");
+
+        if (!options.empty)
+        {
+            auto option = options.front;
+
+            final switch (mod)
+            {
+                case OptionModifier.replaceOrAdd:
+                    if (option.startsWith(optionName))
+                    {
+                        optionPresent = true;
+
+                        return emitOption(newOption);
+                    }
+                    else
+                    {
+                        return emitOption(option);
+                    }
+                case OptionModifier.remove:
+                    while (shouldRemove(option))
+                    {
+                        options.popFront();
+                        option = options.front;
+                    }
+
+                    return emitOption(option);
+                case OptionModifier.replace:
+                    if (option.startsWith(optionName))
+                        return emitOption(newOption);
+                    else
+                        return emitOption(option);
+                case OptionModifier.ensurePresent:
+                    optionPresent |= (option == newOption);
+
+                    return emitOption(option);
+                case OptionModifier.defaultValue:
+                    optionPresent |= value is null || option.startsWith(optionName);
+
+                    return emitOption(option);
+                case OptionModifier.add:
+                    return emitOption(option);
+            }
+        }
+
+        if (!isAdditiveModifier || optionPresent)
+        {
+            return emitOption(null);
+        }
+        else
+        {
+            optionPresent = true;
+
+            return emitOption(newOption);
+        }
+    }
+
+
+    private void emitOption(string option)
+    {
+        if (!options.empty)
+            options.popFront();
+
+        this.currentOption = option;
+    }
+
+
+    private bool shouldRemove(string option) const pure nothrow @safe
+    {
+        return value is null
+            ? option.startsWith(optionName)
+            : option == newOption;
+    }
+
+
+    private bool isAdditiveModifier() const pure nothrow @safe
+    {
+        return 0 < mod.among(
+            OptionModifier.replaceOrAdd,
+            OptionModifier.ensurePresent,
+            OptionModifier.defaultValue,
+            OptionModifier.add,
+        );
+    }
+
+
+    static if (isForwardRange!R)
+        @property auto save()
+        {
+            // Postblit constructor does the actual work
+
+            return this;
+        }
+}
+
+
 /// Options for `daccord`.
 enum DaccordOptions : string
 {
@@ -4306,6 +4677,8 @@ enum DalignerOptions : string
     bandWidth = "-w",
     /// ditto
     hitBaseCoverage = "-h",
+    /// Modimer percentage (take % of the k-mers)
+    modimerPercentage = "-%",
     /// Suppresses the use of any k-mer that occurs more than t times in
     /// either the subject or target block.
     maxKmerOccurence = "-t",
@@ -4397,6 +4770,7 @@ enum DamapperOptions : string
     /// The program runs with 4 threads by default, but this may be set to
     /// any power of 2 with the -T option.
     numThreads = "-T",
+    tempDir = "-P",
     /// If there are one or more interval tracks specified with the -m option
     /// (m for mask), then the reads of the DB or DB’s to which the track
     /// applies are soft masked with the union of the intervals of all the
@@ -4479,6 +4853,23 @@ enum ComputeIntrinsicQVOptions : string
 {
     /// Read depth aka. read coverage. (mandatory)
     readDepth = "-d",
+}
+
+/// Options for `DBsplit`.
+enum DbSplitOptions : string
+{
+    /// Target size of blocks (in Mbp).
+    blockSize = "-s",
+    /// Trimmed DB has reads >= this threshold.
+    minReadLength = "-x",
+    /// Trimmed DB contains all reads from a well (not just longest).
+    allReads = "-a",
+    /// Force the split to occur even if already split.
+    force = "-f",
+    /// Set primary read for a well to be the longest.
+    onlyLongest = "-l",
+    /// Set primary read for a well to be the median.
+    onlyMedian = "-m",
 }
 
 private

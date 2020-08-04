@@ -4,6 +4,7 @@ from math import *
 from os import environ
 from os.path import basename, join
 import re
+import shlex
 import subprocess
 
 
@@ -176,6 +177,27 @@ def ensure_flags(flags, flags_with_values):
             flags.append(flag + str(value))
 
     return make_flags(flags)
+
+
+def assert_flag(flags, required_flag, message="required flag is missing: {missing_flags}"):
+    assert_flags(flags, [required_flag], message)
+
+
+def assert_flags(flags, required_flags, message="required flag(s) are missing: {missing_flags}"):
+    from shlex import split
+
+    present_flags = dict(((f[0:2], True)  for f in split(flags)))
+
+    missing_flags = list()
+    for required_flag in required_flags:
+        if not present_flags.get(required_flag, False):
+            missing_flags.append(required_flag)
+
+    if len(missing_flags) > 0:
+        e = AssertionError(message.format(missing_flags=", ".join(missing_flags)))
+        e.missing_flags = missing_flags
+
+        raise e
 
 
 def log_file(step):
@@ -437,17 +459,43 @@ insertions = join(workdir_, workflow_["insertions"])
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
-dbsplit_flags = make_flags(config.get("dbsplit_flags", []))
-dbdust_flags = make_flags(config.get("dbdust_flags", []))
-dalign_flags = ensure_threads_flag(make_flags(config.get("dalign_flags", [])))
-datander_flags = ensure_threads_flag(make_flags(config.get("datander_flags", [])))
-tanmask_flags = make_flags(config.get("tanmask_flags", []))
+
+additional_options = config.get("additional_options", {})
+additional_reference_dbsplit_options = make_flags(additional_options.get("reference_dbsplit", []))
+assert_flag(
+    additional_reference_dbsplit_options,
+    "-x",
+    "DBsplit should have a -x flag; provide at minimum -x20 to avoid errors",
+)
+additional_reads_dbsplit_options = make_flags(additional_options.get("reads_dbsplit", []))
+assert_flag(
+    additional_reads_dbsplit_options,
+    "-x",
+    "DBsplit should have a -x flag; provide at minimum -x20 to avoid errors",
+)
+additional_tanmask_options = make_flags(config.get("tanmask", []))
+additional_tanmask_options = ensure_flags(additional_tanmask_options, {
+    "-v": True,
+    "-n": tandem_mask,
+})
+
+additional_self_alignment_options = make_flags(additional_options.get("self_alignment", []))
+additional_tandem_alignment_options = make_flags(additional_options.get("tandem_alignment", []))
+additional_ref_vs_reads_alignment_options = make_flags(additional_options.get("ref_vs_reads_alignment", []))
+additional_reads_vs_reads_alignment_options = make_flags(additional_options.get("reads_vs_reads_alignment", []))
+additional_consensus_alignment_options = make_flags(additional_options.get("consensus_alignment", []))
+additional_consensus_options = make_flags(additional_options.get("consensus", []))
+additional_reference_dust_options = make_flags(additional_options.get("reference_dust", []))
+additional_reads_dust_options = make_flags(additional_options.get("reads_dust", []))
 
 if "TMPDIR" in environ:
     tmpdir_flag = { "-P": environ["TMPDIR"] }
 
-    dalign_flags = ensure_flags(dalign_flags, tmpdir_flag)
-    datander_flags = ensure_flags(datander_flags, tmpdir_flag)
+    additional_self_alignment_options = ensure_flags(additional_self_alignment_options, tmpdir_flag)
+    additional_tandem_alignment_options = ensure_flags(additional_tandem_alignment_options, tmpdir_flag)
+    additional_ref_vs_reads_alignment_options = ensure_flags(additional_ref_vs_reads_alignment_options, tmpdir_flag)
+    additional_reads_vs_reads_alignment_options = ensure_flags(additional_reads_vs_reads_alignment_options, tmpdir_flag)
+    additional_consensus_alignment_options = ensure_flags(additional_consensus_alignment_options, tmpdir_flag)
 
 lacheck_failed_notice = shell_esc(docstring("""
     Check failed. Possible solutions:
@@ -496,6 +544,14 @@ rule extend_dentist_config:
         dentist_config["__default__"]["mask"] = masks
         dentist_config["__default__"]["pile-ups"] = pile_ups
         dentist_config["__default__"]["insertions"] = insertions
+        dentist_config["__default__"]["daccord"] = shlex.split(additional_consensus_options)
+        dentist_config["__default__"]["daligner-consensus"] = shlex.split(additional_consensus_alignment_options)
+        dentist_config["__default__"]["daligner-reads-vs-reads"] = shlex.split(additional_reads_vs_reads_alignment_options)
+        dentist_config["__default__"]["daligner-self"] = shlex.split(additional_self_alignment_options)
+        dentist_config["__default__"]["damapper-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
+        dentist_config["__default__"]["datander-ref"] = shlex.split(additional_tandem_alignment_options)
+        dentist_config["__default__"]["dust-reads"] = shlex.split(additional_reads_dust_options)
+
 
         if "mask-repetitive-regions" not in dentist_config:
             dentist_config["mask-repetitive-regions"] = dict()
@@ -516,7 +572,7 @@ checkpoint reference2dam:
     input: reference_fasta
     output: *db_files(reference)
     shell:
-        "fasta2DAM {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
+        "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
 rule mask_dust:
@@ -528,7 +584,7 @@ rule mask_dust:
     params:
         reference_stub = db_stub(reference),
     shell:
-        "DBdust {dbdust_flags} {params.reference_stub}"
+        "DBdust {additional_reference_dust_options} {params.reference_stub}"
 
 
 rule self_alignment_block:
@@ -540,20 +596,17 @@ rule self_alignment_block:
         temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}')),
         temp(alignment_file(reference, block_b='{block_ref}', block_a='{block_reads}'))
     params:
-        aligncmd = lambda _: generate_options_for("self", dentist_config_file),
+        aligncmd = prepare_flags(generate_options_for("self", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
-        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
-        dalign_flags = prepare_flags(ensure_flags(dalign_flags, {
-            "-m": dust_mask,
-        }))
+        alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("self-alignment.{block_ref}.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.dalign_flags} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
+                {params.aligncmd} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
                     LAcheck -v {params.reference_stub} {params.alignment_file_a_vs_b} || echo {lacheck_failed_notice}
@@ -604,17 +657,16 @@ rule tandem_alignment_block:
     output:
         temp(tandem_alignment_block)
     params:
-        aligncmd = lambda _: generate_options_for("tandem", dentist_config_file),
+        aligncmd = prepare_flags(generate_options_for("tandem", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
-        alignment_file = lambda _, output: basename(output[0]),
-        datander_flags = prepare_flags(datander_flags)
+        alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{block}")
     threads: max_threads
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.datander_flags} {params.reference_stub}.{wildcards[block]}
+                {params.aligncmd} {params.reference_stub}.{wildcards[block]}
                 if (( ${{SKIP_LACHECK:-0}} == 0 ))
                 then
                     LAcheck -v {params.reference_stub} {params.alignment_file} || echo {lacheck_failed_notice}
@@ -654,10 +706,10 @@ rule mask_tandem_block:
         temp(mask_files(reference, block_mask(tandem_mask, "{block}")))
     params:
         reference_stub = db_stub(reference),
-        tanmask_flags = prepare_flags(ensure_flags(tanmask_flags, { "-v": True, "-n": tandem_mask }))
+        tanmask_options = prepare_flags(additional_tanmask_options)
     log: log_file("mask-tandem.{block}")
     shell:
-        "TANmask {params[tanmask_flags]} {params.reference_stub} {input[alignment]} &> {log}"
+        "TANmask {params[tanmask_options]} {params.reference_stub} {input[alignment]} &> {log}"
 
 
 rule mask_tandem:
@@ -679,7 +731,7 @@ checkpoint reads2db:
     params:
         fasta2dazz = fasta2dazz_command(reads)
     shell:
-        "{params.fasta2dazz} {output[0]} {input} && DBsplit {dbsplit_flags} {output[0]}"
+        "{params.fasta2dazz} {output[0]} {input} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
 
 
 rule ref_vs_reads_alignment_block:
@@ -694,16 +746,11 @@ rule ref_vs_reads_alignment_block:
         alignment_file(reference, reads, block_b='{block_reads}'),
         alignment_file(reads, reference, block_a='{block_reads}')
     params:
-        aligncmd = lambda _: generate_options_for("reads", dentist_config_file),
+        aligncmd = prepare_flags(generate_options_for("reads", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file = lambda _, output: basename(output[0]),
-        dalign_flags = prepare_flags(append_flags(
-            dalign_flags,
-            "-m" + dust_mask,
-            "-m" + self_mask,
-            "-m" + tandem_mask,
-        ))
+        dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
     threads: max_threads
     log: log_file("ref-vs-reads-alignment.{block_reads}")
     shell:
