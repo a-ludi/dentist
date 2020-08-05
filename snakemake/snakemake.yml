@@ -1,3 +1,32 @@
+# You may provide default values for environment variable. They will only be
+# used if the variable is undefined in the current environment.
+#default_env:
+#    TMPDIR: /home/user/tmp
+
+# You may also override values in the environment.
+#override_env:
+#    LANG:   C
+
+
+# --- Environment variables substitution ---
+#
+# Environment variables may be referenced in the config via `$VARNAME` or
+# `${VARNAME}`; to get a literal dollar sign use `$$`. Values in `deafult_env`
+# `override_env` are expanded with the unmodified environment.
+#
+# Beware, if using environment variables in `dentist_config` the data type
+# must be correct, e.g. you cannot pass `read-coverage` be environment
+# variable because it will be a string but a float is expected. Still, if you
+# specify values via `env` in the config then they will keep their data type,
+# so the following will work:
+#
+#     override_env:
+#         COV: 30.0
+#     dentist_config:
+#         __default__:
+#             read-coverage: $COV
+
+
 inputs:
     # The reference assembly where gaps should be closed
     reference:          reference.fasta

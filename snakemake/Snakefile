@@ -423,13 +423,23 @@ def replace_env_rec(obj, envdict=environ):
 # Variables for rules
 #-----------------------------------------------------------------------------
 
-augmented_env = replace_env_rec(config.pop("env", dict()))
+augmented_env = replace_env_rec(config.pop("default_env", dict()))
 
 if isinstance(augmented_env, dict):
     for k, v in environ.items():
         augmented_env[k] = v
 else:
-    raise Exception("expected dictionary for config[env] but got: " + type(augmented_env))
+    raise Exception("expected dictionary for config[default_env] but got: " + type(augmented_env))
+
+override_env = replace_env_rec(config.pop("override_env", dict()))
+if isinstance(override_env, dict):
+    for k, v in override_env.items():
+        augmented_env[k] = v
+else:
+    raise Exception("expected dictionary for config[override_env] but got: " + type(override_env))
+
+for k, v in augmented_env.items():
+    environ[k] = str(v)
 
 config = replace_env_rec(config, augmented_env)
 
