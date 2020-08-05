@@ -334,21 +334,6 @@ private void printVersion()
     stderr.write(license);
 }
 
-/// The set of options common to all stages.
-mixin template HelpOption()
-{
-    @Option("help", "h")
-    @Help("Prints this help.")
-    OptionFlag help;
-
-    @Option("usage")
-    @Help("Print a short command summary.")
-    void requestUsage() pure
-    {
-        enforce!UsageRequested(false, "usage requested");
-    }
-}
-
 class UsageRequested : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
@@ -777,7 +762,74 @@ struct OptionsFor(DentistCommand _command)
         string resultFile;
     }
 
-    mixin HelpOption;
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        enum agpVersion = "2.1";
+
+        @Option("agp")
+        @Help(format!"write AGP v%s file that describes the output assembly"(agpVersion))
+        string agpFile;
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("allow-single-reads")
+        @Help("allow using single reads instead of consensus sequence for gap closing")
+        OptionFlag allowSingleReads;
+    }
+
+    static if (command.among(
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("auxiliary-threads", "aux-threads", "A")
+        @MetaVar("num-threads")
+        @Help("
+            use <num-threads> threads for auxiliary tools like `daligner`,
+            `damapper` and `daccord`
+            (defaults to floor(totalCpus / <threads>) )
+        ")
+        uint numAuxiliaryThreads;
+
+        @PostValidate(Priority.low)
+        void hookInitDaccordThreads()
+        {
+            if (numAuxiliaryThreads == 0)
+            {
+                numAuxiliaryThreads = totalCPUs / numThreads;
+            }
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+    ))
+    {
+        string numAuxiliaryThreads = "{threads}";
+    }
+
+    static if (command.among(
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("bad-fraction")
+        @MetaVar("<frac>")
+        @Help("
+            Intrinsic QVs are categorized as \"bad\" if they are greater or equal to the best QV
+            of the worst <frac> trace point intervals.
+        ")
+        @(Validate!(value => enforce!CLIException(
+            0.0 <= value && value < 0.5,
+            "--bad-fraction must be within [1, 0.5)")
+        ))
+        double badFraction = 0.08;
+    }
 
     static if (command.among(
         TestingCommand.checkResults,
@@ -841,43 +893,6 @@ struct OptionsFor(DentistCommand _command)
         {
             return referenceContigBatch[1] - referenceContigBatch[0];
         }
-    }
-
-    static if (command.among(
-        DentistCommand.output,
-    ))
-    {
-        enum agpVersion = "2.1";
-
-        @Option("agp")
-        @Help(format!"write AGP v%s file that describes the output assembly"(agpVersion))
-        string agpFile;
-    }
-
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("allow-single-reads")
-        @Help("allow using single reads instead of consensus sequence for gap closing")
-        OptionFlag allowSingleReads;
-    }
-
-    static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Option("bad-fraction")
-        @MetaVar("<frac>")
-        @Help("
-            Intrinsic QVs are categorized as \"bad\" if they are greater or equal to the best QV
-            of the worst <frac> trace point intervals.
-        ")
-        @(Validate!(value => enforce!CLIException(
-            0.0 <= value && value < 0.5,
-            "--bad-fraction must be within [1, 0.5)")
-        ))
-        double badFraction = 0.08;
     }
 
     static if (command.among(
@@ -1016,77 +1031,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.output,
-    ))
-    {
-        @Option("skip-gaps")
-        @MetaVar("<gap-spec>[,<gap-spec>...]")
-        @Help(q"{
-            Do not close the specified gaps. Each <gap-spec> is a pair
-            of contig IDs <contigA>-<contigA> meaning that the specified
-            contigs should not be closed. They will still be joined by a
-            prexisting gap.
-        }")
-        void parseSkipGaps(string skipGapsString) pure
-        {
-            foreach (gapSpec; skipGapsString.split(","))
-                try
-                    skipGaps ~= parseGapSpec(gapSpec);
-                catch (Exception e)
-                    throw new CLIException("ill-formatted <gap-spec>; should be <contigA>-<contigA>");
-        }
-
-        static id_t[2] parseGapSpec(string gapSpec) pure
-        {
-            id_t[2] gap;
-
-            gapSpec.formattedRead!"%d-%d"(gap[0], gap[1]);
-
-            return gap;
-        }
-
-        @Option()
-        @(Validate!validateSkipGaps)
-        id_t[2][] skipGaps;
-
-        static void validateSkipGaps(id_t[2][] skipGaps, OptionsFor!command options)
-        {
-            foreach (skipGap; skipGaps)
-                validatePileUpSkipGap(skipGap, options);
-        }
-
-        static void validatePileUpSkipGap(id_t[2] skipGap, OptionsFor!command options)
-        {
-            auto numReferenceContigs = options.numReferenceContigs;
-            auto contigA = skipGap[0];
-            auto contigB = skipGap[1];
-
-            enforce!CLIException(
-                0 < contigA && contigA <= numReferenceContigs,
-                format!"invalid <gap-spec>: <contigA> == %d is out of bounds [1, %d]"(contigA, numReferenceContigs),
-            );
-            enforce!CLIException(
-                0 < contigB && contigB <= numReferenceContigs,
-                format!"invalid <gap-spec>: <contigB> == %d is out of bounds [1, %d]"(contigB, numReferenceContigs),
-            );
-            enforce!CLIException(
-                contigA != contigB,
-                "invalid <gap-spec>: <contigA> mut not be equal to <contigB>",
-            );
-        }
-
-        @PostValidate()
-        void hookSortSkipGaps()
-        {
-            foreach (ref skipGap; skipGaps)
-                if (skipGap[0] > skipGap[1])
-                    swap(skipGap[0], skipGap[1]);
-
-            sort(skipGaps);
-        }
-    }
-
-    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {
@@ -1142,6 +1086,11 @@ struct OptionsFor(DentistCommand _command)
         OptionFlag cacheOnly;
     }
 
+    enum configHelpString = "
+        provide configuration values in a JSON file. See README.md for
+        usage and examples.
+    ";
+
     static if (command == DentistCommand.validateConfig)
     {
         @Argument("<in:config>")
@@ -1171,21 +1120,6 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.checkResults,
     ))
     {
-        @Option("crop-ambiguous")
-        @MetaVar("<num>")
-        @Help(format!q"{
-            crop <num> bp from both ends of each reference contig when searching for exact copies
-            in the reference itself in order to identify ambiguous contigs. If comparing different
-            gap closing tools use the same value for all tools. (default: %d)
-        }"(defaultValue!cropAmbiguous))
-        // This is the amount PBJelly may modify
-        coord_t cropAmbiguous = 100;
-    }
-
-    static if (command.among(
-        TestingCommand.checkResults,
-    ))
-    {
         @Option("crop-alignment")
         @MetaVar("<num>")
         @Help(format!q"{
@@ -1198,71 +1132,19 @@ struct OptionsFor(DentistCommand _command)
         coord_t cropAlignment = 0;
     }
 
-    enum configHelpString = "
-        provide configuration values in a JSON file. See README.md for
-        usage and examples.
-    ";
-
-    static if (command.among(
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-        TestingCommand.checkResults,
-    ))
-    {
-        @Option("auxiliary-threads", "aux-threads")
-        @MetaVar("num-threads")
-        @Help("
-            use <num-threads> threads for auxiliary tools like `daligner`,
-            `damapper` and `daccord`
-            (defaults to floor(totalCpus / <threads>) )
-        ")
-        uint numAuxiliaryThreads;
-
-        @PostValidate(Priority.low)
-        void hookInitDaccordThreads()
-        {
-            if (numAuxiliaryThreads == 0)
-            {
-                numAuxiliaryThreads = totalCPUs / numThreads;
-            }
-        }
-    }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-    ))
-    {
-        string numAuxiliaryThreads = "{threads}";
-    }
-
     static if (command.among(
         TestingCommand.checkResults,
     ))
     {
-        @Option("dust", "d")
-        @MetaVar("<string>")
-        @Help("
-            Dazzler mask for low complexity regions. Uses " ~ defaultValue!dustMask ~ "
-            by default but only if present.
-        ")
-        @(Validate!((value, options) => value == defaultValue!dustMask || validateInputMask(options.trueAssemblyDb, value)))
-        string dustMask = "dust";
-
-        @PostValidate(Priority.medium)
-        void fixDefaultDustMask()
-        {
-            if (dustMask != defaultValue!dustMask)
-                return;
-
-            try
-            {
-                validateInputMask(trueAssemblyDb, dustMask);
-            }
-            catch(CLIException e)
-            {
-                dustMask = null;
-            }
-        }
+        @Option("crop-ambiguous")
+        @MetaVar("<num>")
+        @Help(format!q"{
+            crop <num> bp from both ends of each reference contig when searching for exact copies
+            in the reference itself in order to identify ambiguous contigs. If comparing different
+            gap closing tools use the same value for all tools. (default: %d)
+        }"(defaultValue!cropAmbiguous))
+        // This is the amount PBJelly may modify
+        coord_t cropAmbiguous = 100;
     }
 
     static if (command.among(
@@ -1365,6 +1247,56 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("debug-pile-ups")
+        @MetaVar("<db-stem>")
+        @Help("write pile ups of intermediate steps to `<db-stem>.<state>.db`")
+        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        string intermediatePileUpsStem;
+    }
+
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("debug-repeat-masks")
+        @Help("(only for reads-mask) write mask components into additional masks `<repeat-mask>-<component-type>`")
+        OptionFlag debugRepeatMasks;
+    }
+
+    static if (command.among(
+        TestingCommand.checkResults,
+    ))
+    {
+        @Option("dust", "d")
+        @MetaVar("<string>")
+        @Help("
+            Dazzler mask for low complexity regions. Uses " ~ defaultValue!dustMask ~ "
+            by default but only if present.
+        ")
+        @(Validate!((value, options) => value == defaultValue!dustMask || validateInputMask(options.trueAssemblyDb, value)))
+        string dustMask = "dust";
+
+        @PostValidate(Priority.medium)
+        void fixDefaultDustMask()
+        {
+            if (dustMask != defaultValue!dustMask)
+                return;
+
+            try
+            {
+                validateInputMask(trueAssemblyDb, dustMask);
+            }
+            catch(CLIException e)
+            {
+                dustMask = null;
+            }
+        }
+    }
+
+    static if (command.among(
         DentistCommand.processPileUps,
     ))
     {
@@ -1381,14 +1313,28 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("existing-gap-bonus")
+        @Help(format!q"{
+            if a candidate would close an existing gap its size is multipled
+            by <double> before conflict resolution
+            (see --best-pile-up-margin). (default: %s)
+        }"(defaultValue!existingGapBonus))
+        @(Validate!(value => enforce!CLIException(1.0 <= value, "--existing-gap-bonus must be at least 1.0")))
+        double existingGapBonus = 6.0;
+    }
+
+    static if (command.among(
+        TestingCommand.buildPartialAssembly,
         DentistCommand.output,
     ))
     {
-        @Option("scaffolding")
-        @MetaVar("<insertions-db>")
-        @Help("write the assembly scaffold to <insertions-db>; use `show-insertions` to inspect the result")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
-        string assemblyGraphFile;
+        @Option("fasta-line-width", "w")
+        @Help(format!"line width for ouput FASTA (default: %d)"(defaultValue!fastaLineWidth))
+        @(Validate!(value => enforce!CLIException(value > 0, "fasta line width must be greater than zero")))
+        size_t fastaLineWidth = 50;
     }
 
     static if (command.among(
@@ -1412,36 +1358,9 @@ struct OptionsFor(DentistCommand _command)
         coord_t gapDetailsContext;
     }
 
-    static if (command.among(
-        DentistCommand.collectPileUps,
-    ))
-    {
-        @Option("debug-pile-ups")
-        @MetaVar("<db-stem>")
-        @Help("write pile ups of intermediate steps to `<db-stem>.<state>.db`")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
-        string intermediatePileUpsStem;
-    }
-
-    static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("debug-repeat-masks")
-        @Help("(only for reads-mask) write mask components into additional masks `<repeat-mask>-<component-type>`")
-        OptionFlag debugRepeatMasks;
-    }
-
-    static if (command.among(
-        TestingCommand.buildPartialAssembly,
-        DentistCommand.output,
-    ))
-    {
-        @Option("fasta-line-width", "w")
-        @Help(format!"line width for ouput FASTA (default: %d)"(defaultValue!fastaLineWidth))
-        @(Validate!(value => enforce!CLIException(value > 0, "fasta line width must be greater than zero")))
-        size_t fastaLineWidth = 50;
-    }
+    @Option("help", "h")
+    @Help("Prints this help.")
+    OptionFlag help;
 
     static if (command.among(
         DentistCommand.output,
@@ -1575,6 +1494,32 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
+    static if (command.among(
+        DentistCommand.maskRepetitiveRegions,
+    ))
+    {
+        @Option("max-coverage-self")
+        @MetaVar("<uint>")
+        @Help(format!q"{
+            this is used to derive a repeat mask from the self alignment;
+            if the alignment coverage larger than <uint> it will be
+            considered repetitive (default: %d)
+        }"(defaultValue!maxCoverageSelf))
+        @(Validate!(validatePositive!("max-coverage-self", id_t)))
+        id_t maxCoverageSelf = 4;
+
+        @Option()
+        id_t[2] coverageBoundsSelf;
+
+        @PostValidate(Priority.medium)
+        void setCoverageBoundsSelf()
+        {
+            if (hasReadsDb)
+                return;
+
+            coverageBoundsSelf = [0, maxCoverageSelf];
+        }
+    }
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
@@ -1624,33 +1569,6 @@ struct OptionsFor(DentistCommand _command)
                 maxImproperCoverageReads = upperBound(readCoverage);
 
             improperCoverageBoundsReads = [0, maxImproperCoverageReads];
-        }
-    }
-
-    static if (command.among(
-        DentistCommand.maskRepetitiveRegions,
-    ))
-    {
-        @Option("max-coverage-self")
-        @MetaVar("<uint>")
-        @Help(format!q"{
-            this is used to derive a repeat mask from the self alignment;
-            if the alignment coverage larger than <uint> it will be
-            considered repetitive (default: %d)
-        }"(defaultValue!maxCoverageSelf))
-        @(Validate!(validatePositive!("max-coverage-self", id_t)))
-        id_t maxCoverageSelf = 4;
-
-        @Option()
-        id_t[2] coverageBoundsSelf;
-
-        @PostValidate(Priority.medium)
-        void setCoverageBoundsSelf()
-        {
-            if (hasReadsDb)
-                return;
-
-            coverageBoundsSelf = [0, maxCoverageSelf];
         }
     }
 
@@ -1726,17 +1644,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.filterMask,
-    ))
-    {
-        @Option("min-interval-size")
-        @Help(format!"
-            minimum size for mask intervals (default: %d)
-        "(defaultValue!minIntervalSize))
-        coord_t minIntervalSize;
-    }
-
-    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1757,6 +1664,17 @@ struct OptionsFor(DentistCommand _command)
             minimum size for gaps between mask intervals (default: %d)
         "(defaultValue!minGapSize))
         coord_t minGapSize;
+    }
+
+    static if (command.among(
+        DentistCommand.filterMask,
+    ))
+    {
+        @Option("min-interval-size")
+        @Help(format!"
+            minimum size for mask intervals (default: %d)
+        "(defaultValue!minIntervalSize))
+        coord_t minIntervalSize;
     }
 
     static enum defaultMinSpanningReads = 3;
@@ -1786,6 +1704,18 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("no-highlight-insertions", "H")
+        @Help("
+            turn off highlighting (upper case) of inserted sequences in the
+            FASTA output
+        ")
+        OptionFlag noHighlightInsertions;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {
@@ -1797,18 +1727,6 @@ struct OptionsFor(DentistCommand _command)
         {
             return !noMergeExtensions;
         }
-    }
-
-    static if (command.among(
-        DentistCommand.output,
-    ))
-    {
-        @Option("no-highlight-insertions", "H")
-        @Help("
-            turn off highlighting (upper case) of inserted sequences in the
-            FASTA output
-        ")
-        OptionFlag noHighlightInsertions;
     }
 
     static if (command.among(
@@ -1911,6 +1829,12 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
+    @Option("quiet", "q")
+    @Help("
+        reduce output as much as possible reporting only fatal errors. If
+        given this option overrides --verbose.
+    ")
+    OptionFlag quiet;
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
@@ -1958,36 +1882,84 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.collectPileUps,
+        DentistCommand.output,
     ))
     {
-        @Option("existing-gap-bonus")
-        @Help(format!q"{
-            if a candidate would close an existing gap its size is multipled
-            by <double> before conflict resolution
-            (see --best-pile-up-margin). (default: %s)
-        }"(defaultValue!existingGapBonus))
-        @(Validate!(value => enforce!CLIException(1.0 <= value, "--existing-gap-bonus must be at least 1.0")))
-        double existingGapBonus = 6.0;
+        @Option("scaffolding")
+        @MetaVar("<insertions-db>")
+        @Help("write the assembly scaffold to <insertions-db>; use `show-insertions` to inspect the result")
+        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        string assemblyGraphFile;
     }
 
     static if (command.among(
-        DentistCommand.collectPileUps,
-        DentistCommand.processPileUps,
-        TestingCommand.checkResults,
+        DentistCommand.output,
     ))
     {
-        @Option("threads", "T")
-        @Help("use <uint> threads (defaults to the number of cores)")
-        uint numThreads;
-
-        @PostValidate(Priority.high)
-        void hookInitThreads()
+        @Option("skip-gaps")
+        @MetaVar("<gap-spec>[,<gap-spec>...]")
+        @Help(q"{
+            Do not close the specified gaps. Each <gap-spec> is a pair
+            of contig IDs <contigA>-<contigA> meaning that the specified
+            contigs should not be closed. They will still be joined by a
+            prexisting gap.
+        }")
+        void parseSkipGaps(string skipGapsString) pure
         {
-            if (numThreads > 0)
-                defaultPoolThreads = numThreads - 1;
+            foreach (gapSpec; skipGapsString.split(","))
+                try
+                    skipGaps ~= parseGapSpec(gapSpec);
+                catch (Exception e)
+                    throw new CLIException("ill-formatted <gap-spec>; should be <contigA>-<contigA>");
+        }
 
-            numThreads = defaultPoolThreads + 1;
+        static id_t[2] parseGapSpec(string gapSpec) pure
+        {
+            id_t[2] gap;
+
+            gapSpec.formattedRead!"%d-%d"(gap[0], gap[1]);
+
+            return gap;
+        }
+
+        @Option()
+        @(Validate!validateSkipGaps)
+        id_t[2][] skipGaps;
+
+        static void validateSkipGaps(id_t[2][] skipGaps, OptionsFor!command options)
+        {
+            foreach (skipGap; skipGaps)
+                validatePileUpSkipGap(skipGap, options);
+        }
+
+        static void validatePileUpSkipGap(id_t[2] skipGap, OptionsFor!command options)
+        {
+            auto numReferenceContigs = options.numReferenceContigs;
+            auto contigA = skipGap[0];
+            auto contigB = skipGap[1];
+
+            enforce!CLIException(
+                0 < contigA && contigA <= numReferenceContigs,
+                format!"invalid <gap-spec>: <contigA> == %d is out of bounds [1, %d]"(contigA, numReferenceContigs),
+            );
+            enforce!CLIException(
+                0 < contigB && contigB <= numReferenceContigs,
+                format!"invalid <gap-spec>: <contigB> == %d is out of bounds [1, %d]"(contigB, numReferenceContigs),
+            );
+            enforce!CLIException(
+                contigA != contigB,
+                "invalid <gap-spec>: <contigA> mut not be equal to <contigB>",
+            );
+        }
+
+        @PostValidate()
+        void hookSortSkipGaps()
+        {
+            foreach (ref skipGap; skipGaps)
+                if (skipGap[0] > skipGap[1])
+                    swap(skipGap[0], skipGap[1]);
+
+            sort(skipGaps);
         }
     }
 
@@ -1998,6 +1970,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.processPileUps,
     ))
     {
+        @Option()
         @(Validate!(validatePositive!("trace-point-distance", trace_point_t)))
         trace_point_t tracePointDistance;
 
@@ -2025,54 +1998,23 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    @Option("quiet", "q")
-    @Help("
-        reduce output as much as possible reporting only fatal errors. If
-        given this option overrides --verbose.
-    ")
-    OptionFlag quiet;
-
-    @Option("verbose", "v")
-    @Help("
-        increase output to help identify problems; use up to three times.
-        Warning: performance may be drastically reduced if using three times.
-    ")
-    void increaseVerbosity() pure
+    static if (command.among(
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+        TestingCommand.checkResults,
+    ))
     {
-        ++verbosity;
-    }
+        @Option("threads", "T")
+        @Help("use <uint> threads (defaults to the number of cores)")
+        uint numThreads;
 
-    @Option()
-    @(Validate!(value => enforce!CLIException(
-        0 <= value && value <= 3,
-        "verbosity must used 0-3 times"
-    )))
-    size_t verbosity = 0;
-
-    @PostValidate(Priority.high)
-    void hookInitLogLevel()
-    {
-        if (quiet)
-            verbosity = 0;
-
-        if (verbosity >= 3)
-            logJsonWarn("info", "high level of verbosity may drastically reduce performance");
-
-        switch (verbosity)
+        @PostValidate(Priority.high)
+        void hookInitThreads()
         {
-        case 3:
-            setLogLevel(LogLevel.debug_);
-            break;
-        case 2:
-            setLogLevel(LogLevel.diagnostic);
-            break;
-        case 1:
-            setLogLevel(LogLevel.info);
-            break;
-        case 0:
-        default:
-            setLogLevel(LogLevel.error);
-            break;
+            if (numThreads > 0)
+                defaultPoolThreads = numThreads - 1;
+
+            numThreads = defaultPoolThreads + 1;
         }
     }
 
@@ -2148,6 +2090,57 @@ struct OptionsFor(DentistCommand _command)
             {
                 log(LogLevel.fatal, "Fatal: " ~ e.msg);
             }
+        }
+    }
+
+    @Option("usage")
+    @Help("Print a short command summary.")
+    void requestUsage() pure
+    {
+        enforce!UsageRequested(false, "usage requested");
+    }
+
+    @Option("verbose", "v")
+    @Help("
+        increase output to help identify problems; use up to three times.
+        Warning: performance may be drastically reduced if using three times.
+    ")
+    void increaseVerbosity() pure
+    {
+        ++verbosity;
+    }
+
+    @Option()
+    @(Validate!(value => enforce!CLIException(
+        0 <= value && value <= 3,
+        "verbosity must used 0-3 times"
+    )))
+    size_t verbosity = 0;
+
+    @PostValidate(Priority.high)
+    void hookInitLogLevel()
+    {
+        if (quiet)
+            verbosity = 0;
+
+        if (verbosity >= 3)
+            logJsonWarn("info", "high level of verbosity may drastically reduce performance");
+
+        switch (verbosity)
+        {
+        case 3:
+            setLogLevel(LogLevel.debug_);
+            break;
+        case 2:
+            setLogLevel(LogLevel.diagnostic);
+            break;
+        case 1:
+            setLogLevel(LogLevel.info);
+            break;
+        case 0:
+        default:
+            setLogLevel(LogLevel.error);
+            break;
         }
     }
 
@@ -2525,7 +2518,16 @@ struct BaseOptions
     @Help("Print a list of external binaries that must be available on PATH.")
     OptionFlag listDependencies;
 
-    mixin HelpOption;
+    @Option("help", "h")
+    @Help("Prints this help.")
+    OptionFlag help;
+
+    @Option("usage")
+    @Help("Print a short command summary.")
+    void requestUsage() pure
+    {
+        enforce!UsageRequested(false, "usage requested");
+    }
 
     @Option("version")
     @Help("Print software version.")
