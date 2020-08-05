@@ -8,6 +8,15 @@ import shlex
 import subprocess
 
 
+# Declare variables so they are available in functions
+# They get populated with proper values later on
+workdir_ = None
+logdir = None
+insertions_batch = None
+custom_auxiliary_threads = None
+batch_size = None
+
+
 #-----------------------------------------------------------------------------
 # BEGIN functions
 #-----------------------------------------------------------------------------
@@ -15,7 +24,7 @@ import subprocess
 def rel_to_workdir(path):
     from os.path import relpath
 
-    return relpath(path, config["workdir"])
+    return relpath(path, workdir_)
 
 
 def db_stub(db_file):
@@ -39,7 +48,7 @@ def prepend_ext(filename, ext):
 
 
 def fasta_to_workdb(fasta_file, ext):
-    return join(config["workdir"], "{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
+    return join(workdir_, "{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
 
 
 def fasta2dazz_command(target_db):
@@ -107,7 +116,7 @@ def alignment_file(db_a, db_b=None, block_a=None, block_b=None):
     else:
         filename = "{}.{}.{}.{}.las".format(db_a, block_a, db_b, block_b)
 
-    return join(config["workdir"], filename)
+    return join(workdir_, filename)
 
 
 def shell_esc(string):
@@ -201,12 +210,12 @@ def assert_flags(flags, required_flags, message="required flag(s) are missing: {
 
 
 def log_file(step):
-    return join(config["logdir"], "{}.log".format(step))
+    return join(logdir, "{}.log".format(step))
 
 
 def auxiliary_threads(wildcards, threads):
-    if "auxiliary_threads" in config:
-        return int(config["auxiliary_threads"])
+    if not custom_auxiliary_threads is None:
+        return custom_auxiliary_threads
     else:
         return max(1, threads // 4)
 
@@ -318,7 +327,7 @@ def batch_range(wildcards, batch_size, num_elements):
 
 
 def insertion_batch_range(wildcards):
-    return batch_range(wildcards, config["batch_size"], get_num_pile_ups())
+    return batch_range(wildcards, batch_size, get_num_pile_ups())
 
 
 def get_num_pile_ups():
@@ -343,13 +352,11 @@ def ceildiv(n, d):
 
 def insertions_batches():
     num_pile_ups = get_num_pile_ups()
-    num_batches = ceildiv(num_pile_ups, config["batch_size"])
+    num_batches = ceildiv(num_pile_ups, batch_size)
     num_digits = int(ceil(log10(num_batches)))
     batch_id_format = "{{:0{}d}}".format(num_digits)
 
     def get_insertions_batch(batch_id):
-        workdir_ = config["workdir"]
-        insertions_batch = config["workflow"]["insertions_batch"]
         batch_id = batch_id_format.format(batch_id)
 
         return join(workdir_, insertions_batch.format(batch_id=batch_id))
@@ -430,8 +437,11 @@ config = replace_env_rec(config, augmented_env)
 inputs = config["inputs"]
 outputs = config["outputs"]
 workdir_ = config["workdir"]
-workflow_ = config["workflow"]
+logdir = config["logdir"]
+workflow_ = config.get("workflow", {})
 max_threads = config["max_threads"]
+custom_auxiliary_threads = config.get("auxiliary_threads", None)
+batch_size = config["batch_size"]
 
 # workflow files
 reference_fasta = inputs["reference"]
@@ -440,21 +450,21 @@ output_assembly = outputs["output_assembly"]
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
-dentist_config_file = join(workdir_, workflow_["config"])
+dentist_config_file = join(workdir_, workflow_.get("config", "dentist.json"))
 dentist_merge_insertions_config_file = prepend_ext(dentist_config_file, ".merge")
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 reads_vs_ref_alignment = alignment_file(reads, reference)
-self_mask = workflow_["self_mask"]
+self_mask = workflow_.get("self_mask", "dentist-self")
 dust_mask = "dust"
 tandem_mask = "tan"
-reads_mask = workflow_["reads_mask"]
+reads_mask = workflow_.get("reads_mask", "dentist-reads")
 masks = [self_mask, tandem_mask, reads_mask]
-pile_ups = join(workdir_, workflow_["pile_ups"])
-insertions_batch = join(workdir_, workflow_["insertions_batch"])
-insertions = join(workdir_, workflow_["insertions"])
+pile_ups = join(workdir_, workflow_.get("pile_ups", "pile-ups.db"))
+insertions_batch = join(workdir_, workflow_.get("insertions_batch", "insertions/batch.{batch_id}.db"))
+insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
 
 # command-specific
 from os import environ

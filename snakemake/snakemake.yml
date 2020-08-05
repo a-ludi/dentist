@@ -3,6 +3,8 @@ inputs:
     reference:          reference.fasta
     # The set of long reads used for gap closing
     reads:              reads.fasta
+    # Type of reads. Use `PACBIO_SMRT` or `OXFORD_NANOPORE`. See README for
+    # more details on the subject.
     reads_type:         PACBIO_SMRT
 
 outputs:
@@ -67,17 +69,22 @@ additional_options:
 workdir:            workdir
 logdir:             logs
 
-# Workflow files that are created inside of workdir
-workflow:
-    config:             dentist.json
-    self_mask:          dentist-self
-    reads_mask:         dentist-reads
-    pile_ups:           pile-ups.db
-    insertions_batch:   insertions/batch.{batch_id}.db
-    insertions:         insertions.db
+# Workflow files that are created inside of workdir; uncomment and adjust if
+# you feel the need
+#workflow:
+#    config:             dentist.json
+#    self_mask:          dentist-self
+#    reads_mask:         dentist-reads
+#    pile_ups:           pile-ups.db
+#    insertions_batch:   insertions/batch.{batch_id}.db
+#    insertions:         insertions.db
 
 # Maximum number of threads to use
 max_threads:        8
+
+# Number of threads to use for auxiliary commands such as daligner or daccord.
+# Defaults to max(1, threads // 4)
+#auxiliary_threads: 1
 
 # Insertions are generated in batches of `batch_size`; use lower number to
 # shorten the runtime of each job while increasing the number of jobs.
