@@ -2157,8 +2157,6 @@ struct OptionsFor(DentistCommand _command)
                     .dup
                     .withOption(cast(string) identity, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
-                    .withOption(cast(string) bridge, ensurePresent)
-                    .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
                     .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
                     .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
                     .withOption(cast(string) masks, "dust", ensurePresent)
