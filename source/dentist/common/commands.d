@@ -36,6 +36,7 @@ mixin("enum DentistCommand {" ~
     "mergeInsertions," ~
     "output," ~
     "translateCoords," ~
+    "validateRegions," ~
     testingOnly!"checkResults," ~
 "}");
 

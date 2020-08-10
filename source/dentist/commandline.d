@@ -440,6 +440,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
+        DentistCommand.validateRegions,
         TestingCommand.checkResults,
     ))
     {
@@ -466,6 +467,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        DentistCommand.validateRegions,
     ))
     {
         static if (command.among(
@@ -546,6 +548,19 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Argument("<in:gap-closed-vs-reads-alignment>")
+        @Help("
+            alignments chains of the reads against the gap-closed reference in
+            form of a .las file as produced by `damapper`
+        ")
+        @(Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb)))
+        string readsAlignmentFile;
+    }
+
+    static if (command.among(
         DentistCommand.showPileUps,
         DentistCommand.processPileUps,
     ))
@@ -554,6 +569,16 @@ struct OptionsFor(DentistCommand _command)
         @Help("read pile ups from <pile-ups>")
         @(Validate!validateFileExists)
         string pileUpsFile;
+    }
+
+    static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Argument("<in:regions>")
+        @Help("Dazzler mask marking the regions to be validated")
+        @(Validate!((value, options) => validateInputMask(options.refDb, value, Yes.allowBlock)))
+        string regions;
     }
 
     static if (command.among(
@@ -1674,6 +1699,51 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("min-coverage-reads")
+        @MetaVar("<num>")
+        @Help("
+            validly closed gaps must have a continuous coverage of at least
+            <num> properly aligned reads; see --weak-coverage-mask for more
+            details
+        ")
+        id_t minCoverageReads;
+
+        @Option()
+        id_t[2] coverageBoundsReads;
+
+        @PostValidate(Priority.medium)
+        void setCoverageBoundsReads()
+        {
+            if (!hasReadsDb)
+                return;
+
+            enforce!CLIException(
+                minCoverageReads != minCoverageReads.init ||
+                hasReadCoverage,
+                "must provide either --read-coverage or --min-coverage-reads",
+            );
+            enforce!CLIException(
+                (minCoverageReads != minCoverageReads.init) ^
+                hasReadCoverage,
+                "must not provide both --read-coverage and --min-coverage-reads",
+            );
+
+            id_t lowerBound(double x)
+            {
+                return to!id_t(2f/3f * x / ploidy);
+            }
+
+            if (hasReadCoverage)
+                minCoverageReads = lowerBound(readCoverage);
+
+            coverageBoundsReads = [minCoverageReads, id_t.max];
+        }
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
@@ -1724,6 +1794,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         TestingCommand.findClosableGaps,
         DentistCommand.collectPileUps,
+        DentistCommand.validateRegions,
     ))
     {
         @Option("min-spanning-reads", "s")
@@ -1791,6 +1862,15 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("ploidy", "N")
+        @Help("this is used to derive a lower bound for the read coverage")
+        id_t ploidy;
+    }
+
+    static if (command.among(
         DentistCommand.chainLocalAlignments,
     ))
     {
@@ -1836,17 +1916,18 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        DentistCommand.validateRegions,
     ))
     {
         @Option("proper-alignment-allowance")
         @MetaVar("num")
         @Help("
             An alignment is called proper if it is end-to-end with at most <num> bp allowance.
-            (default: --trace-point-spacing)
+            (default: trace point spacing of alignment)
         ")
         coord_t properAlignmentAllowance;
 
-        @PostValidate(Priority.low)
+        @PreValidate(Priority.low)
         void hookEnsurePresenceOfProperAlignmentAllowance()
         {
             if (properAlignmentAllowance > 0)
@@ -1868,12 +1949,13 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
+        DentistCommand.validateRegions,
     ))
     {
         @Option("read-coverage", "C")
         @Help(q"{
-            this is used to provide good default values for --max-coverage-reads;
-            both options are mutually exclusive
+            this is used to provide good default values for --max-coverage-reads
+            or --min-coverage-reads; both options are mutually exclusive
         }")
         double readCoverage;
 
@@ -1908,6 +1990,43 @@ struct OptionsFor(DentistCommand _command)
                     1.0 - maxImperfectContigError,
                 ),
             ];
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("region-context")
+        @MetaVar("<bps>")
+        @Help(format!"
+            consider <bps> base pairs of context for each region to detect
+            splicing errors (default: %d)"(defaultValue!regionContext)
+        )
+        @(Validate!(validatePositive!("region-context", coord_t)))
+        coord_t regionContext = 1_000;
+    }
+
+    static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("weak-coverage-window")
+        @MetaVar("<bps>")
+        @Help("
+            consider sliding window of <bps> base pairs to identify weak
+            coverage (default: trace point spacing of alignment)
+        ")
+        coord_t weakCoverageWindow;
+
+
+        @PreValidate(Priority.low)
+        void hookEnsurePresenceOfWeakCoverageWindow()
+        {
+            if (weakCoverageWindow > 0)
+                return;
+
+            weakCoverageWindow = tracePointDistance;
         }
     }
 
@@ -1998,6 +2117,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.chainLocalAlignments,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        DentistCommand.validateRegions,
     ))
     {
         @Option()
@@ -2172,6 +2292,22 @@ struct OptionsFor(DentistCommand _command)
             setLogLevel(LogLevel.error);
             break;
         }
+    }
+
+    static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("weak-coverage-mask")
+        @MetaVar("<mask>")
+        @Help("
+            write a Dazzler mask <mask> of weakly covered regions, e.i.
+            sliding windows of --weak-coverage-window base pairs are spanned by less
+            than --min-coverage-reads local alignments
+        ")
+        @(Validate!((value, options) => (value is null).execUnless!(() =>
+            validateOutputMask(options.refDb, value, Yes.allowBlock))))
+        string weakCoverageMask;
     }
 
     static if (
@@ -2527,6 +2663,21 @@ template commandSummary(DentistCommand command)
             Translate coordinates of result assembly to coordinates of
             input assembly.
         }".wrap;
+    else static if (command == DentistCommand.validateRegions)
+        enum commandSummary = "
+            Validates that given regions look proper, in particular, this may
+            be used to validate closed gaps. Any given region is valid if the
+            following criteria apply to the region extended by
+            --region-context on both sides:
+        ".wrap ~ "\n" ~ "
+            a) Every sliding window of  size --weak-coverage-window must be
+               spanned by at least --min-coverage-reads local alignments. This
+               is a stricter definition of alignment coverage that circumvents
+               issues with interleaved improper alignments.
+        ".wrap(80, null, "   ") ~ "
+            b) The region without context must be spanned by at least
+               --min-spanning-reads properly aligned reads.
+        ".wrap(80, null, "   ");
     else static if (command == TestingCommand.checkResults)
         enum commandSummary = q"{
             Check results of some gap closing procedure.

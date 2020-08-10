@@ -354,6 +354,15 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
     return getAlignments(dbA, dbB, lasFile, options);
 }
 
+
+enum AlignmentReaderFlag : uint
+{
+    none = 0,
+    includeTracePoints = 1 << 0,
+    sort = 1 << 1,
+}
+
+
 AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
@@ -370,6 +379,30 @@ AlignmentChain[] getAlignments(
     Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
 )
 {
+    auto flags = AlignmentReaderFlag.sort;
+
+    if (includeTracePoints)
+        flags |= AlignmentReaderFlag.includeTracePoints;
+
+    return getAlignments(dbA, null, lasFile, flags);
+}
+
+AlignmentChain[] getAlignments(
+    in string dbA,
+    in string lasFile,
+    AlignmentReaderFlag flags,
+)
+{
+    return getAlignments(dbA, null, lasFile, flags);
+}
+
+AlignmentChain[] getAlignments(
+    in string dbA,
+    in string dbB,
+    in string lasFile,
+    AlignmentReaderFlag flags,
+)
+{
     string[] ladumpOptions = [
         LAdumpOptions.coordinates,
         LAdumpOptions.numDiffs,
@@ -377,7 +410,7 @@ AlignmentChain[] getAlignments(
     ];
     trace_point_t tracePointDistance;
 
-    if (includeTracePoints)
+    if (flags & AlignmentReaderFlag.includeTracePoints)
     {
         ladumpOptions ~= LAdumpOptions.tracePoints;
         tracePointDistance = getTracePointDistance(lasFile);
@@ -391,7 +424,9 @@ AlignmentChain[] getAlignments(
     ), tracePointDistance);
     scope (exit) lasdumpReader.closePipe();
     auto alignmentChains = lasdumpReader.array;
-    alignmentChains.sort!("a < b", SwapStrategy.stable);
+
+    if (flags & AlignmentReaderFlag.sort)
+        alignmentChains.sort!("a < b", SwapStrategy.stable);
 
     return alignmentChains;
 }

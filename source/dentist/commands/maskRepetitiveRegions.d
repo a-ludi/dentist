@@ -389,14 +389,14 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
     }
 }
 
-private enum CoverageZone
+enum CoverageZone
 {
     low,
     ok,
     high,
 }
 
-private struct Masker
+struct Masker
 {
     private bool _isMasking = false;
     private size_t contigId;
@@ -428,7 +428,7 @@ private struct Masker
 
 /// Transforms a range of alignment chains into a range of coverage
 /// change events.
-private struct CoverageChangeRange
+struct CoverageChangeRange
 {
     static alias AlignmentEvent = Tuple!
     (
@@ -540,6 +540,12 @@ private struct CoverageChangeRange
     @property CoverageChange front()
     {
         return _front;
+    }
+
+    @property CoverageChangeRange save() pure nothrow @safe
+    {
+        // nothing to be done
+        return this;
     }
 }
 

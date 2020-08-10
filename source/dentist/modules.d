@@ -36,6 +36,7 @@ static import dentist.commands.showPileUps;
 static import dentist.commands.translateCoords;
 static import dentist.commands.translocateGaps;
 static import dentist.commands.validateConfig;
+static import dentist.commands.validateRegions;
 static import dentist.common;
 static import dentist.common.alignments;
 static import dentist.common.binio;
@@ -92,6 +93,7 @@ alias modules = AliasSeq!(
     dentist.commands.translateCoords,
     dentist.commands.translocateGaps,
     dentist.commands.validateConfig,
+    dentist.commands.validateRegions,
     dentist.common,
     dentist.common.alignments,
     dentist.common.binio,

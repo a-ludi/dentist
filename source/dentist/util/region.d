@@ -132,6 +132,36 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             mixin("alias " ~ tagAlias ~ " = tag;");
         }
 
+        bool opBinary(string op)(auto ref const TaggedPoint other) const pure nothrow
+                if (op == "==")
+        {
+            return this.tag == other.tag &&
+                   this.value == other.value;
+        }
+
+        int opCmp(in TaggedPoint other) const pure nothrow
+        {
+            return cmp(
+                only(this.tag, this.value),
+                only(other.tag, other.value),
+            );
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TP = R.TaggedPoint;
+
+            assert(TP(0, 10) > TP(0, 0));
+            assert(TP(0, 10) > TP(0, 5));
+            assert(TP(0, 10) < TP(0, 12));
+            assert(TP(0, 10) < TP(0, 15));
+            assert(TP(0, 10) == TP(0, 10));
+            assert(TP(0, 10) < TP(0, 25));
+            assert(TP(0, 10) < TP(1, 25));
+        }
+
         /// Returns true iff `this` is in `interval`.
         bool opBinary(string op)(in TaggedInterval interval) const pure nothrow if (op == "in")
         {
