@@ -2,7 +2,7 @@ import json
 from itertools import chain
 from math import *
 from os import environ
-from os.path import basename, join
+from os.path import basename, exists, join
 import re
 import shlex
 import subprocess
@@ -93,6 +93,13 @@ def await_db_files(db):
     return __await_db_files
 
 
+def await_dentist_config():
+    def __await_dentist_config(wildcards):
+        return checkpoints.extend_dentist_config.get().output
+
+    return __await_dentist_config
+
+
 def await_pile_ups():
     def __await_pile_ups(wildcards):
         return checkpoints.collect.get().output
@@ -161,7 +168,9 @@ def append_flags(flags, *new_flags):
 
 def prepare_flags(flags):
     def secondary_expand(wildcards, input=None, output=None, threads=None, resources=None):
-        return flags.format(wildcards=wildcards,
+        txtflags = flags if not callable(flags) else flags()
+
+        return txtflags.format(wildcards=wildcards,
                             input=input,
                             output=output,
                             threads=threads,
@@ -229,10 +238,34 @@ def validate_dentist_config(config_file):
 
 
 def generate_options_for(alignment_name, config_file):
-    generate_template = "dentist generate --quiet --config={} | sed -nE '/^#.*{}/ {{ n; s/^([^<]+).*/\\1/p }}'"
-    generate_cmd = generate_template.format(config_file, alignment_name)
+    if not exists(config_file):
+        return "false"
 
-    return subprocess.check_output(generate_cmd, shell=True).decode().rstrip()
+    generate_template = "dentist generate --quiet --config={}"
+    generate_cmd = generate_template.format(config_file, shell_esc(alignment_name))
+    generate_proc = subprocess.run(generate_cmd,
+                                   shell=True,
+                                   stderr=subprocess.PIPE,
+                                   stdout=subprocess.PIPE)
+    commands = generate_proc.stdout.decode().splitlines()
+
+    if generate_proc.returncode != 0 or len(commands) == 0:
+        verbose_generate_cmd = generate_cmd.replace("--quiet", "-v -v")
+        error = generate_proc.stderr.decode()
+
+        raise Exception("failed to get alignment commands: " + error)
+
+    while not commands[0].startswith("#"):
+        commands = commands[1:]
+
+    for comment, command in zip(commands[::2], commands[1::2]):
+        if alignment_name in comment:
+            command = re.sub(r"<[^>]+>", "", command)
+            command = command.rstrip()
+
+            return command
+
+    raise Exception("failed to get alignment command: unknown alignment_name `{}`".format(alignment_name))
 
 
 def get_num_blocks(db):
@@ -550,7 +583,7 @@ rule ALL:
     input: output_assembly
 
 
-rule extend_dentist_config:
+checkpoint extend_dentist_config:
     output: dentist_config_file
     run:
         dentist_config = config["dentist_config"]
@@ -597,7 +630,7 @@ checkpoint reference2dam:
 
 rule mask_dust:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference)
     output:
         mask_files(reference, dust_mask)
@@ -609,14 +642,14 @@ rule mask_dust:
 
 rule self_alignment_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         mask_files(reference, dust_mask)
     output:
         temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}')),
         temp(alignment_file(reference, block_b='{block_ref}', block_a='{block_reads}'))
     params:
-        aligncmd = prepare_flags(generate_options_for("self", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
@@ -660,7 +693,7 @@ rule self_alignment:
 
 rule mask_self:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         self_alignment
     output:
@@ -672,12 +705,12 @@ rule mask_self:
 
 rule tandem_alignment_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference)
     output:
         temp(tandem_alignment_block)
     params:
-        aligncmd = prepare_flags(generate_options_for("tandem", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{block}")
@@ -719,7 +752,7 @@ rule tandem_alignment:
 
 rule mask_tandem_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         alignment = tandem_alignment_block
     output:
@@ -734,7 +767,7 @@ rule mask_tandem_block:
 
 rule mask_tandem:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         lambda _: chain(*(mask_files(reference, m)  for m in block_masks(tandem_mask, reference)))
     output:
@@ -756,7 +789,7 @@ checkpoint reads2db:
 
 rule ref_vs_reads_alignment_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reference, dust_mask),
@@ -766,7 +799,7 @@ rule ref_vs_reads_alignment_block:
         alignment_file(reference, reads, block_b='{block_reads}'),
         alignment_file(reads, reference, block_a='{block_reads}')
     params:
-        aligncmd = prepare_flags(generate_options_for("reads", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file = lambda _, output: basename(output[0]),
@@ -812,7 +845,7 @@ rule reads_vs_ref_alignment:
 
 rule mask_reads:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         ref_vs_reads_alignment
@@ -825,7 +858,7 @@ rule mask_reads:
 
 rule propagate_mask_to_reads_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reference, "{mask}"),
@@ -842,7 +875,7 @@ rule propagate_mask_to_reads_block:
 
 # rule propagate_mask_to_reads:
 #     input:
-#         dentist_config_file,
+#         await_dentist_config(),
 #         await_db_files(reads),
 #         *[mask_files(reads, m) for m in block_masks("{mask}", reads)]
 #     output:
@@ -857,7 +890,7 @@ rule propagate_mask_to_reads_block:
 
 rule propagate_mask_back_to_reference_block:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reads, block_mask("{mask}", "{block_reads}")),
@@ -874,7 +907,7 @@ rule propagate_mask_back_to_reference_block:
 
 rule propagate_mask_back_to_reference:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads)]
     output:
@@ -889,7 +922,7 @@ rule propagate_mask_back_to_reference:
 
 checkpoint collect:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         ref_vs_reads_alignment,
@@ -907,7 +940,7 @@ checkpoint collect:
 
 rule process:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
         ref_vs_reads_alignment,
@@ -926,7 +959,7 @@ rule process:
 
 rule extend_dentist_config_for_merge_insertions:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_pile_ups()
     output:
         temp(dentist_merge_insertions_config_file)
@@ -961,7 +994,7 @@ rule merge_insertions:
 
 rule output:
     input:
-        dentist_config_file,
+        await_dentist_config(),
         await_db_files(reference),
         insertions
     output:
