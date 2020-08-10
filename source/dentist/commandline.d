@@ -1141,6 +1141,15 @@ struct OptionsFor(DentistCommand _command)
         OptionFlag cacheOnly;
     }
 
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("closed-gaps-bed")
+        @Help(format!"write BED file with coordinates of closed gaps")
+        string closedGapsBedFile;
+    }
+
     enum configHelpString = "
         provide configuration values in a JSON file. See README.md for
         usage and examples.

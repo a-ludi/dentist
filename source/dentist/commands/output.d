@@ -196,6 +196,7 @@ class AssemblyWriter
     File resultFile;
     FastaWriter writer;
     File agpFile;
+    File closedGapsBedFile;
     string currentScaffold;
     id_t currentScaffoldPartId;
     coord_t currentScaffoldCoord;
@@ -218,6 +219,8 @@ class AssemblyWriter
         this.writer = wrapLines(resultFile.lockingTextWriter, options.fastaLineWidth);
         if (options.agpFile !is null)
             this.agpFile = File(options.agpFile, "w");
+        if (options.closedGapsBedFile !is null)
+            this.closedGapsBedFile = File(options.closedGapsBedFile, "w");
         static if (isTesting)
             if (options.contigAlignmentsCache !is null)
             {
@@ -751,6 +754,14 @@ class AssemblyWriter
                 to!string(insertionInfo.cropping.end),
                 to!string(insertionInfo.complement ? '+' : '-'),
                 cast(string) AGPLinkageEvidence.cloneContig,
+            ).joiner("\t"));
+
+        if (closedGapsBedFile.isOpen)
+            closedGapsBedFile.writeln(only(
+                currentScaffold,
+                to!string(currentScaffoldCoord - 1),
+                to!string(nextScaffoldCoord),
+                format!"reads-%(%d-%)"(insertion.payload.readIds),
             ).joiner("\t"));
 
         logJsonDebug(
