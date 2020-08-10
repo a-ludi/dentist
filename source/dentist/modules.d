@@ -13,6 +13,7 @@ module dentist.modules;
 
 import std.meta : AliasSeq;
 static import dentist.commandline;
+static import dentist.commands.bed2mask;
 static import dentist.commands.buildPartialAssembly;
 static import dentist.commands.chainLocalAlignments;
 static import dentist.commands.checkResults;
@@ -68,6 +69,7 @@ static import dentist.util.tempfile;
 
 alias modules = AliasSeq!(
     dentist.commandline,
+    dentist.commands.bed2mask,
     dentist.commands.buildPartialAssembly,
     dentist.commands.chainLocalAlignments,
     dentist.commands.checkResults,

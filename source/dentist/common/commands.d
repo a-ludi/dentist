@@ -27,6 +27,7 @@ mixin("enum DentistCommand {" ~
     "filterMask," ~
     "mergeMasks," ~
     "showMask," ~
+    "bed2mask," ~
     "chainLocalAlignments," ~
     "collectPileUps," ~
     "showPileUps," ~

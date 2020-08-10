@@ -137,7 +137,8 @@ import std.regex :
     matchFirst;
 import std.stdio :
     File,
-    stderr;
+    stderr,
+    stdin;
 import std.string :
     join,
     lineSplitter,
@@ -435,6 +436,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.mergeMasks,
         DentistCommand.chainLocalAlignments,
         DentistCommand.showMask,
+        DentistCommand.bed2mask,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.output,
@@ -666,6 +668,16 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<out:filtered-mask>")
         @Help("write filtered Dazzler mask to <filtered-mask>")
+        @(Validate!((value, options) => validateOutputMask(options.refDb, value)))
+        string outMask;
+    }
+
+    static if (command.among(
+        DentistCommand.bed2mask,
+    ))
+    {
+        @Argument("<out:mask>")
+        @Help("name of output Dazzler mask")
         @(Validate!((value, options) => validateOutputMask(options.refDb, value)))
         string outMask;
     }
@@ -1027,6 +1039,24 @@ struct OptionsFor(DentistCommand _command)
             return pileUpBatches
                 .map!(pileUpBatch => pileUpBatch[1] - pileUpBatch[0])
                 .sum;
+        }
+    }
+
+    static if (command.among(
+        DentistCommand.bed2mask,
+    ))
+    {
+        @Option("bed")
+        @Help("input BED file; fields must be TAB-delimited (default: standard input)")
+        @(Validate!(value => (value is null).execUnless!(() => validateFileExists(value))))
+        string bedFile;
+
+        File openBedFile() const
+        {
+            if (bedFile is null)
+                return stdin;
+            else
+                return File(bedFile);
         }
     }
 
@@ -2459,6 +2489,10 @@ template commandSummary(DentistCommand command)
         enum commandSummary = q"{
             Show a short summary of the mask.
         }".wrap;
+    else static if (command == DentistCommand.bed2mask)
+        enum commandSummary = "
+            Convert a BED file to a Dazzler mask.
+        ".wrap;
     else static if (command == DentistCommand.chainLocalAlignments)
         enum commandSummary = q"{
             Chain local alignments. Right now this produces just the single
