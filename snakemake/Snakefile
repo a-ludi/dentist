@@ -559,6 +559,7 @@ lacheck_failed_notice = shell_esc(docstring("""
     SKIP_LACHECK=1. Use only if you are positive the files are in fact OK!
 """))
 
+lacheck_handler = "{ echo " + lacheck_failed_notice + "; (( ${SKIP_LACHECK:-0} != 0 )); }"
 
 #-----------------------------------------------------------------------------
 # BEGIN rules
@@ -660,13 +661,9 @@ rule self_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
-                if (( ${{SKIP_LACHECK:-0}} == 0 ))
-                then
-                    LAcheck -v {params.reference_stub} {params.alignment_file_a_vs_b} || echo {lacheck_failed_notice}
-                    LAcheck -v {params.reference_stub} {params.alignment_file_b_vs_a} || echo {lacheck_failed_notice}
-                else
-                    echo "Skipping LAcheck due to user request"
-                fi
+
+                LAcheck -v {params.reference_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -677,17 +674,14 @@ rule self_alignment:
         block_alignments = lambda _: block_alignments(reference)
     output:
         protected(self_alignment)
-    params:
-        alignment_file = lambda _, output: basename(output[0]),
+    log: log_file("self-alignment")
     shell:
         """
-            LAmerge {output} {input[block_alignments]}
-            if (( ${{SKIP_LACHECK:-0}} == 0 ))
-            then
-                LAcheck -v {reference} {params.alignment_file} || echo {lacheck_failed_notice}
-            else
-                echo "Skipping LAcheck due to user request"
-            fi
+            {{
+                LAmerge {output} {input[block_alignments]}
+
+                LAcheck -v {reference} {output} || {lacheck_handler}
+            }} &> {log}
         """
 
 
@@ -720,12 +714,7 @@ rule tandem_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.reference_stub}.{wildcards[block]}
-                if (( ${{SKIP_LACHECK:-0}} == 0 ))
-                then
-                    LAcheck -v {params.reference_stub} {params.alignment_file} || echo {lacheck_failed_notice}
-                else
-                    echo "Skipping LAcheck due to user request"
-                fi
+                LAcheck -v {params.reference_stub} {params.alignment_file} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -736,17 +725,13 @@ rule tandem_alignment:
         block_alignments = lambda _: block_alignments("TAN", reference, damapper="forward")
     output:
         protected(tandem_alignment)
-    params:
-        alignment_file = lambda _, output: basename(output[0])
+    log: log_file("tandem-alignment")
     shell:
         """
-            LAmerge {output} {input[block_alignments]}
-            if (( ${{SKIP_LACHECK:-0}} == 0 ))
-            then
-                LAcheck -v {reference} {params.alignment_file} || echo {lacheck_failed_notice}
-            else
-                echo "Skipping LAcheck due to user request"
-            fi
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {reference} {output} || {lacheck_handler}
+            }} &> {log}
         """
 
 
@@ -802,7 +787,8 @@ rule ref_vs_reads_alignment_block:
         aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
-        alignment_file = lambda _, output: basename(output[0]),
+        alignment_file_a_vs_b = lambda _, output: basename(output[0]),
+        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
         dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
     threads: max_threads
     log: log_file("ref-vs-reads-alignment.{block_reads}")
@@ -811,12 +797,8 @@ rule ref_vs_reads_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.dalign_flags} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
-                if (( ${{SKIP_LACHECK:-0}} == 0 ))
-                then
-                    LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file} || echo {lacheck_failed_notice}
-                else
-                    echo "Skipping LAcheck due to user request"
-                fi
+                LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reads_stub} {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -828,8 +810,14 @@ rule ref_vs_reads_alignment:
         block_alignments = lambda _: block_alignments(reference, reads, damapper="forward")
     output:
         protected(ref_vs_reads_alignment)
+    log: log_file("ref-vs-reads-alignment")
     shell:
-        "LAmerge {output} {input[block_alignments]}"
+        """
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {reference} {reads} {output} || {lacheck_handler}
+            }} &> {log}
+        """
 
 
 rule reads_vs_ref_alignment:
