@@ -17,15 +17,14 @@ import dentist.common :
     ReferencePoint,
     ReferenceRegion;
 import dentist.common.alignments :
-    AlignmentChain,
+    FlatLocalAlignment,
     coord_t,
     id_t,
     Locus;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
-    AlignmentReaderFlag,
     ContigSegment,
-    getAlignments,
+    getFlatLocalAlignments,
     getScaffoldStructure,
     lasEmpty,
     readMask,
@@ -69,16 +68,9 @@ void execute(in Options options)
 }
 
 
-bool byContigAId(const AlignmentChain lhs, const AlignmentChain rhs) pure nothrow @safe
+bool byContigAId(const FlatLocalAlignment lhs, const FlatLocalAlignment rhs) pure nothrow @safe
 {
     return lhs.contigA.id < rhs.contigA.id;
-}
-
-
-bool byContigABegin(const AlignmentChain lhs, const AlignmentChain rhs) pure nothrow @safe
-{
-    return byContigAId(lhs, rhs) ||
-           (lhs.contigA.id == rhs.contigA.id && lhs.first.contigA.begin < rhs.first.contigA.begin);
 }
 
 
@@ -86,7 +78,7 @@ class RegionsValidator
 {
     protected const Options options;
     protected ContigSegment[] contigs;
-    protected AlignmentChain[] alignments;
+    protected FlatLocalAlignment[] alignments;
     protected id_t minContigAId;
     protected id_t maxContigAId;
     protected ReferenceInterval[] regions;
@@ -126,15 +118,14 @@ class RegionsValidator
             return;
         }
 
-        alignments = getAlignments(
+        alignments = getFlatLocalAlignments(
             options.refDb,
             options.readsDb,
             options.readsAlignmentFile,
-            AlignmentReaderFlag.none,
-        );
+        ).array;
         dentistEnforce(
-            alignments.isSorted!byContigABegin,
-            "reads-alignment must be sorted for map usecase; use LAsort -a",
+            alignments.isSorted!byContigAId,
+            "reads-alignment must be sorted at least by a-read ID",
         );
         minContigAId = alignments[0].contigA.id;
         maxContigAId = alignments[$ - 1].contigA.id;
@@ -207,7 +198,7 @@ class RegionsValidator
 struct RegionValidator
 {
     protected const Options options;
-    protected const(AlignmentChain)[] alignments;
+    protected const(FlatLocalAlignment)[] alignments;
     protected ReferenceInterval region;
     protected ReferenceInterval regionWithContext;
 
@@ -216,7 +207,7 @@ struct RegionValidator
 
     this(
         const Options options,
-        const AlignmentChain[] alignments,
+        const FlatLocalAlignment[] alignments,
         ReferenceInterval region,
         ReferenceInterval regionWithContext,
     )
@@ -248,23 +239,19 @@ struct RegionValidator
 
     void reduceAlignments()
     {
-        AlignmentChain mkNeedle(coord_t contigABegin)
+        FlatLocalAlignment mkNeedle()
         {
-            AlignmentChain needle;
+            FlatLocalAlignment needle;
             needle.contigA.id = cast(id_t) region.contigId;
             // avoid validity check
             needle.flags.disabled = true;
-            needle.localAlignments = [AlignmentChain.LocalAlignment(
-                Locus(cast(coord_t) contigABegin)
-            )];
 
             return needle;
         }
 
         alignments = alignments
-            .assumeSorted!byContigABegin
-            .upperBound(mkNeedle(0))
-            .lowerBound(mkNeedle(cast(coord_t) regionWithContext.end))
+            .assumeSorted!byContigAId
+            .equalRange(mkNeedle())
             .release;
     }
 
@@ -274,13 +261,12 @@ struct RegionValidator
         spanningReadIds.length = 0;
         spanningReadIds.reserve(10 * options.minCoverageReads);
 
-        foreach (alignment; alignments)
-            foreach (localAlignment; alignment.localAlignments)
-                if (
-                    localAlignment.contigA.begin < regionWithContext.begin &&
-                    regionWithContext.end < localAlignment.contigA.end
-                )
-                    spanningReadIds ~= alignment.contigB.id;
+        foreach (localAlignment; alignments)
+            if (
+                localAlignment.contigA.begin < regionWithContext.begin &&
+                regionWithContext.end < localAlignment.contigA.end
+            )
+                spanningReadIds ~= localAlignment.contigB.id;
     }
 
 
@@ -299,13 +285,10 @@ struct RegionValidator
         );
 
         auto alignmentBounds = alignments
-            .map!(ac => ac
-                .localAlignments
-                .map!(la => only(
-                    AlignmentBound(la.contigA.begin, Bound.open, ac.contigB.id),
-                    AlignmentBound(la.contigA.end, Bound.close, ac.contigB.id),
-                )))
-            .joiner
+            .map!(fla => only(
+                AlignmentBound(fla.contigA.begin, Bound.open, fla.contigB.id),
+                AlignmentBound(fla.contigA.end, Bound.close, fla.contigB.id),
+            ))
             .joiner
             .array
             .sort
