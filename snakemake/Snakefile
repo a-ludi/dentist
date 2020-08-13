@@ -617,7 +617,8 @@ wildcard_constraints:
 rule ALL:
     input:
         gap_closed_fasta,
-        validation_report
+        validation_report,
+        mask_files(gap_closed, weak_coverage_mask)
 
 
 checkpoint extend_dentist_config:
