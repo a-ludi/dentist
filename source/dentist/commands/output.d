@@ -741,6 +741,8 @@ class AssemblyWriter
         auto insertionInfo = getInfoForNewSequenceInsertion(begin, insertion, globalComplement);
         nextScaffoldCoord = currentScaffoldCoord + cast(coord_t) insertionInfo.length;
         nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
+        auto leftContigId = begin.contigId;
+        auto rightContigId = insertion.target(begin).contigId;
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
@@ -761,7 +763,11 @@ class AssemblyWriter
                 currentScaffold,
                 to!string(currentScaffoldCoord - 1),
                 to!string(nextScaffoldCoord),
-                format!"reads-%(%d-%)"(insertion.payload.readIds),
+                format!"contigs-%d-%d|reads-%(%d-%)"(
+                    leftContigId,
+                    rightContigId,
+                    insertion.payload.readIds,
+                ),
             ).joiner("\t"));
 
         logJsonDebug(
