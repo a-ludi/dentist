@@ -39,6 +39,11 @@ inputs:
 outputs:
     # The gap-closed reference assembly
     output_assembly:    gap-closed.fasta
+    # Name of Dazzler mask of closed gaps; generate from BED file found in
+    # workdir
+    #closed_gaps_mask:   closed-gaps
+    # JSON file with a validation report for each closed gap
+    #validation_report:  $workdir/validation-report.json
 
 # This will be used to generate a config file for dentist. Vital parameters
 # and options are automatically inserted by the workflow.
@@ -107,6 +112,7 @@ logdir:             logs
 #    pile_ups:           pile-ups.db
 #    insertions_batch:   insertions/batch.{batch_id}.db
 #    insertions:         insertions.db
+#    weak_coverage_mask: dentist-weak-coverage
 
 # Maximum number of threads to use
 max_threads:        8
@@ -118,3 +124,9 @@ max_threads:        8
 # Insertions are generated in batches of `batch_size`; use lower number to
 # shorten the runtime of each job while increasing the number of jobs.
 batch_size:         50
+
+# Validation is split into this number of similar-sized parts of the
+# gap-closed vs reads alignment. If the number of blocks is higher than the
+# number of contigs in the gap-closed assembly then some validation runs will
+# do nothing.
+validation_blocks:  32

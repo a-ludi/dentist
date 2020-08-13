@@ -4,11 +4,12 @@ __default__:
     nCPUs:      "{threads}"
 
 self_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.block_reads}
+    jobname:    dentist.{rule}.{wildcards.dam}.{wildcards.block_ref}.{wildcards.block_reads}
     memory:     32768
     time:       "00:30"
 
 mask_dust:
+    jobname:    dentist.{rule}.{wildcards.dam}
     memory:     4096
     time:       "00:30"
 
@@ -17,19 +18,14 @@ mask_self:
     time:       "00:15"
 
 tandem_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block}
+    jobname:    dentist.{rule}.{wildcards.dam}.{wildcards.block}
     memory:     32768
     time:       "00:30"
 
 mask_tandem_block:
-    jobname:    dentist.{rule}.{wildcards.block}
+    jobname:    dentist.{rule}.{wildcards.dam}.{wildcards.block}
     memory:     8192
     memory:     32768
-    time:       "00:30"
-
-dbdust:
-    jobname:    dentist.{rule}.{wildcards.dbstub}
-    memory:     2048
     time:       "00:30"
 
 ref_vs_reads_alignment_block:
@@ -60,4 +56,14 @@ process:
 
 output:
     memory:     16384
+    time:       "00:30"
+
+gap_closed_vs_reads_alignment_block:
+    jobname:    dentist.{rule}.{wildcards.block_reads}
+    memory:     32768
+    time:       "00:30"
+
+validate_regions_block:
+    jobname:    dentist.{rule}.{wildcards.block_ref}
+    memory:     32768
     time:       "00:30"

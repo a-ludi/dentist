@@ -76,6 +76,21 @@ def db_files(db):
     return [db] + [__hidden_file(suffix)  for suffix in suffixes]
 
 
+class IgnoreMissingFormat(dict):
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+def expand_wildcards(string, wildcards, more_attributes={}):
+    format_dict = IgnoreMissingFormat(wildcards)
+
+    for key, value in more_attributes.items():
+        if not key in format_dict:
+            format_dict[key] = value
+
+    return string.format_map(format_dict)
+
+
 _fast2dam_checkpoint = dict()
 
 
@@ -83,12 +98,14 @@ def await_db_files(db):
     from os.path import splitext
 
     def __await_db_files(wildcards):
-        if db in _fast2dam_checkpoint:
-            _checkpoint = getattr(checkpoints, _fast2dam_checkpoint[db])
+        expanded_db = expand_wildcards(db, wildcards)
+
+        if expanded_db in _fast2dam_checkpoint:
+            _checkpoint = getattr(checkpoints, _fast2dam_checkpoint[expanded_db])
 
             return _checkpoint.get(workdir=workdir_).output
         else:
-            raise Exception("unknown db: {}".format(db));
+            raise Exception("unknown db: {}".format(expanded_db));
 
     return __await_db_files
 
@@ -485,11 +502,17 @@ workflow_ = config.get("workflow", {})
 max_threads = config["max_threads"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
 batch_size = config["batch_size"]
+validation_blocks = config["validation_blocks"]
 
 # workflow files
 reference_fasta = inputs["reference"]
 reads_fasta = inputs["reads"]
-output_assembly = outputs["output_assembly"]
+gap_closed_fasta = outputs["output_assembly"]
+validation_report = outputs.get("validation_report", join(workdir_, "validation-report.json"))
+validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
+gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
+closed_gaps_mask = outputs.get("closed_gaps_mask", "closed-gaps")
+closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(gap_closed), closed_gaps_mask))
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
@@ -500,10 +523,12 @@ tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 reads_vs_ref_alignment = alignment_file(reads, reference)
+gap_closed_vs_reads_alignment = alignment_file(gap_closed, reads)
 self_mask = workflow_.get("self_mask", "dentist-self")
 dust_mask = "dust"
 tandem_mask = "tan"
 reads_mask = workflow_.get("reads_mask", "dentist-reads")
+weak_coverage_mask = workflow_.get("weak_coverage_mask", "dentist-weak-coverage")
 masks = [self_mask, tandem_mask, reads_mask]
 pile_ups = join(workdir_, workflow_.get("pile_ups", "pile-ups.db"))
 insertions_batch = join(workdir_, workflow_.get("insertions_batch", "insertions/batch.{batch_id}.db"))
@@ -577,11 +602,22 @@ localrules:
     reads_vs_ref_alignment,
     propagate_mask_back_to_reference,
     extend_dentist_config_for_merge_insertions,
-    merge_insertions
+    merge_insertions,
+    gap_closed_vs_reads_alignment,
+    split_gap_closed_vs_reads_alignment,
+    closed_gaps_bed2mask,
+    validate_regions,
+    weak_coverage_mask
+
+
+wildcard_constraints:
+    dam = r"[^/\.]+"
 
 
 rule ALL:
-    input: output_assembly
+    input:
+        gap_closed_fasta,
+        validation_report
 
 
 checkpoint extend_dentist_config:
@@ -593,7 +629,7 @@ checkpoint extend_dentist_config:
             dentist_config["__default__"] = dict()
         dentist_config["__default__"]["reference"] = reference
         dentist_config["__default__"]["reads"] = reads
-        dentist_config["__default__"]["result"] = output_assembly
+        dentist_config["__default__"]["result"] = gap_closed_fasta
         dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_alignment
         dentist_config["__default__"]["mask"] = masks
         dentist_config["__default__"]["pile-ups"] = pile_ups
@@ -611,9 +647,22 @@ checkpoint extend_dentist_config:
             dentist_config["mask-repetitive-regions"] = dict()
         dentist_config["mask-repetitive-regions"]["reads"] = None
 
+        if "bed2mask" not in dentist_config:
+            dentist_config["bed2mask"] = dict()
+        dentist_config["bed2mask"]["mask"] = None
+
         if "propagate-mask" not in dentist_config:
             dentist_config["propagate-mask"] = dict()
         dentist_config["propagate-mask"]["mask"] = []
+
+        if "output" not in dentist_config:
+            dentist_config["output"] = dict()
+        dentist_config["output"]["closed-gaps-bed"] = closed_gaps_bed
+
+        if "validate-regions" not in dentist_config:
+            dentist_config["validate-regions"] = dict()
+        dentist_config["validate-regions"]["reference"] = gap_closed
+        dentist_config["validate-regions"]["regions"] = closed_gaps_mask
 
         with open(output[0], 'w') as ext_config_file:
             json.dump(dentist_config, ext_config_file)
@@ -629,58 +678,63 @@ checkpoint reference2dam:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
+_fast2dam_checkpoint[gap_closed] = "gap_closed2dam"
+checkpoint gap_closed2dam:
+    input: gap_closed_fasta
+    output: *db_files(gap_closed)
+    shell:
+        "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+
+
 rule mask_dust:
     input:
         await_dentist_config(),
-        await_db_files(reference)
+        await_db_files(join(workdir_, "{dam}.dam"))
     output:
-        mask_files(reference, dust_mask)
-    params:
-        reference_stub = db_stub(reference),
+        mask_files(join(workdir_, "{dam}.dam"), dust_mask)
     shell:
-        "DBdust {additional_reference_dust_options} {params.reference_stub}"
+        "DBdust {additional_reference_dust_options} {workdir_}/{wildcards.dam}"
 
 
 rule self_alignment_block:
     input:
         await_dentist_config(),
-        await_db_files(reference),
-        mask_files(reference, dust_mask)
+        await_db_files(join(workdir_, "{dam}.dam")),
+        mask_files(join(workdir_, "{dam}.dam"), dust_mask)
     output:
-        temp(alignment_file(reference, block_a='{block_ref}', block_b='{block_reads}')),
-        temp(alignment_file(reference, block_b='{block_ref}', block_a='{block_reads}'))
+        temp(alignment_file("{dam}", block_a='{block_ref}', block_b='{block_reads}')),
+        temp(alignment_file("{dam}", block_b='{block_ref}', block_a='{block_reads}'))
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file)),
-        reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
-    log: log_file("self-alignment.{block_ref}.{block_reads}")
+    log: log_file("self-alignment.{dam}.{block_ref}.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.reference_stub}.{wildcards.block_ref} {params.reference_stub}.{wildcards.block_reads}
+                {params.aligncmd} {wildcards.dam}.{wildcards.block_ref} {wildcards.dam}.{wildcards.block_reads}
 
-                LAcheck -v {params.reference_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
-                LAcheck -v {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
+                LAcheck -v {wildcards.dam} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {wildcards.dam} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
 
 rule self_alignment:
     input:
-        await_db_files(reference),
-        block_alignments = lambda _: block_alignments(reference)
+        db = await_db_files(join(workdir_, "{dam}.dam")),
+        block_alignments = block_alignments(join(workdir_, "{dam}.dam"))
     output:
-        protected(self_alignment)
-    log: log_file("self-alignment")
+        protected(alignment_file("{dam}"))
+    log: log_file("self-alignment.{dam}")
     shell:
         """
             {{
                 LAmerge {output} {input[block_alignments]}
 
-                LAcheck -v {reference} {output} || {lacheck_handler}
+                LAcheck -v {input.db[0]} {output} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -688,49 +742,48 @@ rule self_alignment:
 rule mask_self:
     input:
         await_dentist_config(),
-        await_db_files(reference),
-        self_alignment
+        dam = await_db_files(join(workdir_, "{dam}.dam")),
+        alignment = alignment_file("{dam}")
     output:
-        mask_files(reference, self_mask)
-    log: log_file("mask-self")
+        mask_files(join(workdir_, "{dam}.dam"), self_mask)
+    log: log_file("mask-self.{dam}")
     shell:
-        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {self_alignment} {self_mask} 2> {log}"
+        "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {self_mask} 2> {log}"
 
 
 rule tandem_alignment_block:
     input:
         await_dentist_config(),
-        await_db_files(reference)
+        await_db_files(join(workdir_, "{dam}.dam"))
     output:
-        temp(tandem_alignment_block)
+        temp(alignment_file("TAN", "{dam}", block_b="{block}"))
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file)),
-        reference_stub = db_stub(rel_to_workdir(reference)),
         alignment_file = lambda _, output: basename(output[0])
-    log: log_file("tandem-alignment.{block}")
+    log: log_file("tandem-alignment.{dam}.{block}")
     threads: max_threads
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.reference_stub}.{wildcards[block]}
-                LAcheck -v {params.reference_stub} {params.alignment_file} || {lacheck_handler}
+                {params.aligncmd} {wildcards.dam}.{wildcards.block}
+                LAcheck -v {wildcards.dam} {params.alignment_file} || {lacheck_handler}
             }} &> {log}
         """
 
 
 rule tandem_alignment:
     input:
-        await_db_files(reference),
-        block_alignments = lambda _: block_alignments("TAN", reference, damapper="forward")
+        db = await_db_files(join(workdir_, "{dam}.dam")),
+        block_alignments = lambda wildcards: block_alignments("TAN", join(workdir_, wildcards.dam + ".dam"), damapper="forward")
     output:
-        protected(tandem_alignment)
-    log: log_file("tandem-alignment")
+        protected(alignment_file("TAN", "{dam}"))
+    log: log_file("tandem-alignment.{dam}")
     shell:
         """
             {{
                 LAmerge {output} {input[block_alignments]}
-                LAcheck -v {reference} {output} || {lacheck_handler}
+                LAcheck -v {input.db[0]} {output} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -738,14 +791,14 @@ rule tandem_alignment:
 rule mask_tandem_block:
     input:
         await_dentist_config(),
-        await_db_files(reference),
-        alignment = tandem_alignment_block
+        await_db_files(join(workdir_, "{dam}.dam")),
+        alignment = alignment_file("TAN", "{dam}", block_b="{block}")
     output:
-        temp(mask_files(reference, block_mask(tandem_mask, "{block}")))
+        temp(mask_files(join(workdir_, "{dam}.dam"), block_mask(tandem_mask, "{block}")))
     params:
-        reference_stub = db_stub(reference),
+        reference_stub = join(workdir_, "{dam}"),
         tanmask_options = prepare_flags(additional_tanmask_options)
-    log: log_file("mask-tandem.{block}")
+    log: log_file("mask-tandem.{dam}.{block}")
     shell:
         "TANmask {params[tanmask_options]} {params.reference_stub} {input[alignment]} &> {log}"
 
@@ -753,13 +806,13 @@ rule mask_tandem_block:
 rule mask_tandem:
     input:
         await_dentist_config(),
-        await_db_files(reference),
-        lambda _: chain(*(mask_files(reference, m)  for m in block_masks(tandem_mask, reference)))
+        db = await_db_files(join(workdir_, "{dam}.dam")),
+        mask_files = lambda wildcards: chain(*(mask_files(join(workdir_, "{dam}.dam"), m)  for m in block_masks(tandem_mask, join(workdir_, wildcards.dam + ".dam"))))
     output:
-        mask_files(reference, tandem_mask)
-    log: log_file("mask-tandem")
+        mask_files(join(workdir_, "{dam}.dam"), tandem_mask)
+    log: log_file("mask-tandem.{dam}")
     shell:
-        "Catrack -v {reference} {tandem_mask} &> {log}"
+        "Catrack -v {input.db[0]} {tandem_mask} &> {log}"
 
 
 _fast2dam_checkpoint[reads] = "reads2db"
@@ -986,10 +1039,123 @@ rule output:
         await_db_files(reference),
         insertions
     output:
-        output_assembly
+        gap_closed_fasta,
+        closed_gaps_bed
     log: log_file("output")
     shell:
         "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
+
+
+rule gap_closed_vs_reads_alignment_block:
+    input:
+        await_dentist_config(),
+        await_db_files(gap_closed),
+        await_db_files(reads),
+        mask_files(gap_closed, dust_mask),
+        mask_files(gap_closed, self_mask),
+        mask_files(gap_closed, tandem_mask)
+    output:
+        alignment_file(gap_closed, reads, block_b='{block_reads}'),
+        temp(alignment_file(reads, gap_closed, block_a='{block_reads}'))
+    params:
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
+        gap_closed_stub = db_stub(rel_to_workdir(gap_closed)),
+        reads_stub = db_stub(rel_to_workdir(reads)),
+        alignment_file_a_vs_b = lambda _, output: basename(output[0]),
+        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
+        dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
+    threads: max_threads
+    log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
+    shell:
+        """
+            {{
+                cd {workdir_}
+                {params.aligncmd} {params.dalign_flags} {params.gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
+                LAcheck -v {params.gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reads_stub} {params.gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule split_gap_closed_vs_reads_alignment:
+    input: gap_closed_vs_reads_alignment
+    output: expand(alignment_file(gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
+    params:
+        split_alignment = alignment_file(gap_closed, reads, block_a="@")
+    log: log_file("split-gap-closed-vs-reads-alignment")
+    shell:
+        """
+            {{
+                LAsplit {params.split_alignment} {validation_blocks} < {input}
+                LAcheck -v {gap_closed} {reads} {output} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule gap_closed_vs_reads_alignment:
+    input:
+        await_db_files(gap_closed),
+        await_db_files(reads),
+        block_alignments = lambda _: block_alignments(gap_closed, reads, damapper="forward")
+    output:
+        protected(gap_closed_vs_reads_alignment)
+    log: log_file("gap-closed-vs-reads-alignment")
+    shell:
+        """
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {gap_closed} {reads} {output} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule closed_gaps_bed2mask:
+    input:
+        db = await_db_files(gap_closed),
+        bed = closed_gaps_bed
+    output:
+        mask_files(gap_closed, closed_gaps_mask)
+    log: log_file("closed-gaps-bed2mask")
+    shell:
+        "dentist bed2mask --config={dentist_config_file} {dentist_flags} --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
+
+
+rule validate_regions_block:
+    input:
+        await_db_files(gap_closed),
+        await_db_files(reads),
+        mask_files(gap_closed, closed_gaps_mask),
+        alignment = alignment_file(gap_closed, reads, block_a="{block_ref}")
+    output:
+        temp(validation_report_block),
+        temp(mask_files(gap_closed, block_mask(weak_coverage_mask, "{block_ref}")))
+    params:
+        block_mask = block_mask(weak_coverage_mask, "{block_ref}")
+    log: log_file("validate-regions-block.{block_ref}")
+    shell:
+        "dentist validate-regions --config={dentist_config_file} --weak-coverage-mask={params.block_mask} - - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
+
+
+rule validate_regions:
+    input:
+        block_reports = expand(validation_report_block, block_ref=range(1, validation_blocks + 1))
+    output:
+        validation_report
+    shell:
+        "cat {input.block_reports} > {output}"
+
+
+rule weak_coverage_mask:
+    input:
+        *expand(mask_files(gap_closed, block_mask(weak_coverage_mask, "{block_ref}")), block_ref=range(1, validation_blocks + 1)),
+        db = await_db_files(gap_closed)
+    output:
+        mask_files(gap_closed, weak_coverage_mask)
+    params:
+        block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
+    log: log_file("weak-coverage-mask")
+    shell:
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
 #-----------------------------------------------------------------------------
 # END rules
