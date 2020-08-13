@@ -443,7 +443,7 @@ def replace_env(string, envdict=environ):
     if fullmatch:
         return fetch_env(fullmatch)
     else:
-        return env_re.sub(fetch_env, string)
+        return env_re.sub(lambda m: str(fetch_env(m)), string)
 
 
 def replace_env_rec(obj, envdict=environ):
