@@ -384,7 +384,7 @@ AlignmentChain[] getAlignments(
     if (includeTracePoints)
         flags |= AlignmentReaderFlag.includeTracePoints;
 
-    return getAlignments(dbA, null, lasFile, flags);
+    return getAlignments(dbA, dbB, lasFile, flags);
 }
 
 AlignmentChain[] getAlignments(
