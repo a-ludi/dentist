@@ -556,7 +556,7 @@ struct OptionsFor(DentistCommand _command)
             alignments chains of the reads against the gap-closed reference in
             form of a .las file as produced by `damapper`
         ")
-        @(Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb)))
+        @(Validate!((value, options) => validateLasFile(value, Yes.allowEmpty)))
         string readsAlignmentFile;
     }
 
@@ -3160,7 +3160,7 @@ private
         }
     }
 
-    void validateLasFile(in string lasFile, in string dbA=null, in string dbB=null)
+    void validateLasFile(in string lasFile, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
     {
         auto cwd = getcwd.absolutePath;
 
@@ -3170,9 +3170,14 @@ private
         );
         validateFileExists(lasFile);
         enforce!CLIException(
-            !lasEmpty(lasFile),
+            allowEmpty || !lasEmpty(lasFile),
             format!"empty alignment file `%s`"(lasFile),
         );
+    }
+
+    void validateLasFile(in string lasFile, in string dbA, in string dbB=null, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
+    {
+        return validateLasFile(lasFile, allowEmpty);
     }
 
     void validateInputMasks(
