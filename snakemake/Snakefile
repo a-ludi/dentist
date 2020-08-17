@@ -594,6 +594,7 @@ localrules:
     ALL,
     extend_dentist_config,
     reference2dam,
+    gap_closed2dam,
     tandem_alignment,
     mask_tandem,
     self_alignment,
