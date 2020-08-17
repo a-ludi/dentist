@@ -515,7 +515,7 @@ struct OptionsFor(DentistCommand _command)
             locals alignments of the short-read assembly against the 'true'
             assembly in form of a .las file as produced by `daligner`
         }")
-        @(Validate!((value, options) => validateLasFile(value, options.trueAssemblyDb, options.shortReadAssemblyDb)))
+        @(Validate!validateLasFile)
         string shortReadAssemblyAlignmentFile;
     }
 
@@ -527,9 +527,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:alignment>")
         @Help("self-alignment of the reference assembly or reads vs. reference alignment")
-        @(Validate!((value, options) => options.readsDb is null
-            ? validateLasFile(value, options.refDb)
-            : validateLasFile(value, options.refDb, options.readsDb)))
+        @(Validate!validateLasFile)
         string dbAlignmentFile;
     }
 
@@ -543,7 +541,7 @@ struct OptionsFor(DentistCommand _command)
             alignments chains of the reads against the reference in form of a .las
             file as produced by `damapper`
         }")
-        @(Validate!((value, options) => validateLasFile(value, options.refDb, options.readsDb)))
+        @(Validate!validateLasFile)
         string readsAlignmentFile;
     }
 
@@ -556,7 +554,7 @@ struct OptionsFor(DentistCommand _command)
             alignments chains of the reads against the gap-closed reference in
             form of a .las file as produced by `damapper`
         ")
-        @(Validate!((value, options) => validateLasFile(value, Yes.allowEmpty)))
+        @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string readsAlignmentFile;
     }
 
@@ -2145,7 +2143,7 @@ struct OptionsFor(DentistCommand _command)
             {
                 try
                 {
-                    validateLasFile(alignmentFile);
+                    validateLasFile(alignmentFile, Yes.allowEmpty);
                     tracePointDistance = getTracePointDistance(alignmentFile);
                 }
                 catch (Exception e)
@@ -3173,11 +3171,6 @@ private
             allowEmpty || !lasEmpty(lasFile),
             format!"empty alignment file `%s`"(lasFile),
         );
-    }
-
-    void validateLasFile(in string lasFile, in string dbA, in string dbB=null, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
-    {
-        return validateLasFile(lasFile, allowEmpty);
     }
 
     void validateInputMasks(
