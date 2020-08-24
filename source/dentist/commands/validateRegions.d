@@ -51,6 +51,7 @@ import std.array :
 import std.conv : to;
 import std.range :
     assumeSorted,
+    enumerate,
     only,
     StoppingPolicy,
     tee,
@@ -382,12 +383,14 @@ struct RegionValidator
             coord_t, "refPos",
             Bound, "bound",
             id_t, "readId",
+            size_t, "alignmentIdx",
         );
 
         auto alignmentBounds = alignments
-            .map!(fla => only(
-                AlignmentBound(fla.contigA.begin, Bound.open, fla.contigB.id),
-                AlignmentBound(fla.contigA.end, Bound.close, fla.contigB.id),
+            .enumerate
+            .map!(enumLA => only(
+                AlignmentBound(enumLA.value.contigA.begin, Bound.open, enumLA.value.contigB.id, enumLA.index),
+                AlignmentBound(enumLA.value.contigA.end, Bound.close, enumLA.value.contigB.id, enumLA.index),
             ))
             .joiner
             .array
@@ -395,7 +398,7 @@ struct RegionValidator
             .release;
 
         auto weakCoverageMaskAcc = appender!(ReferenceInterval[]);
-        coord_t[id_t] alignmentBegins;
+        coord_t[size_t] alignmentBegins;
         auto window = regionWithContext & ReferenceInterval(
             region.contigId,
             regionWithContext.begin,
@@ -410,10 +413,10 @@ struct RegionValidator
                     final switch (alignmentBound.bound)
                     {
                         case Bound.open:
-                            alignmentBegins[alignmentBound.readId] = alignmentBound.refPos;
+                            alignmentBegins[alignmentBound.alignmentIdx] = alignmentBound.refPos;
                             continue;
                         case Bound.close:
-                            alignmentBegins.remove(alignmentBound.readId);
+                            alignmentBegins.remove(alignmentBound.alignmentIdx);
                             continue;
                     }
                 }
@@ -424,11 +427,11 @@ struct RegionValidator
                 }
             }
 
-            auto numSpanningReads = cast(id_t) alignmentBegins
+            auto numWindowSpanningReads = cast(id_t) alignmentBegins
                 .byValue
                 .count!(openRefPos => openRefPos <= window.begin);
 
-            if (numSpanningReads < options.minCoverageReads)
+            if (numWindowSpanningReads < options.minCoverageReads)
             {
                 if (
                     weakCoverageMaskAcc.data.length == 0 ||
