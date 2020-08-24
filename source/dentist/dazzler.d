@@ -4172,17 +4172,37 @@ Region[] readMask(Region)(in string dbFile, in string maskName)
 private auto readMaskHeader(in string fileName)
 {
     auto headerFile = File(fileName, "rb");
+
+    return readMaskHeader(headerFile);
+}
+
+private auto readMaskHeader(File headerFile, Flag!"readPointers" readPointers = Yes.readPointers)
+{
+    import core.stdc.stdio : SEEK_CUR;
+
     MaskHeaderEntry[2] headerBuffer;
-    auto numPointers = (headerFile.size - headerBuffer.sizeof) / MaskDataPointer.sizeof;
-    auto pointerBuffer = uninitializedArray!(MaskDataPointer[])(numPointers);
 
     enforce!MaskReaderException(headerFile.rawRead(headerBuffer).length == headerBuffer.length,
-            format!"error while reading mask header `%s`: file too short"(fileName));
-    enforce!MaskReaderException(headerFile.rawRead(pointerBuffer).length == numPointers,
-            format!"error while reading mask header `%s`: file too short"(fileName));
+            format!"error while reading mask header `%s`: file too short"(headerFile.name));
+
+    auto numPointers = headerBuffer[0] + 1;
+    auto pointerBuffer = readPointers
+        ? uninitializedArray!(MaskDataPointer[])(numPointers)
+        : [];
+
+    if (readPointers)
+        enforce!MaskReaderException(headerFile.rawRead(pointerBuffer).length == numPointers,
+                format!"error while reading mask header `%s`: file too short"(headerFile.name));
+    else
+        headerFile.seek(MaskDataPointer.sizeof * numPointers, SEEK_CUR);
 
     return tuple!("numReads", "size", "dataPointers")(headerBuffer[0],
             headerBuffer[1], pointerBuffer);
+}
+
+private void skipMaskHeader(File headerFile)
+{
+    cast(void) readMaskHeader(headerFile, No.readPointers);
 }
 
 private T[] getBinaryFile(T)(in string fileName)
@@ -4229,7 +4249,8 @@ private id_t[] getTrimmedDbTranslateTable(in string dbFile)
 
     See_Also: `readMask`, `getMaskFiles`
 */
-void writeMask(Region)(in string dbFile, in string maskName, in Region[] regions)
+void writeMask(Regions)(in string dbFile, in string maskName, Regions regions)
+    if (isInputRange!Regions)
 {
     alias MaskRegion = Tuple!(
         MaskHeaderEntry, "tag",
@@ -4278,6 +4299,188 @@ void writeMask(Region)(in string dbFile, in string maskName, in Region[] regions
     {
         maskHeader.rawWrite([dataPointer]);
     }
+}
+
+
+enum AccumMode : int
+{
+    exact = 0,
+    sum = 1,
+}
+
+
+struct DazzExtra(T) if (is(T == long) || is(T == double))
+{
+    static if (is(T == long))
+        enum int vtype = 0;
+    else static if (is(T == double))
+        enum int vtype = 1;
+    else
+        static assert(0);
+
+    string name;
+    T[] data;
+    alias data this;
+    AccumMode accumMode;
+}
+
+
+DazzExtra!T dazzExtra(T)(string name, T[] data, AccumMode accumMode = AccumMode.init)
+    if (is(T == long) || is(T == double))
+{
+    return DazzExtra!T(name, data, accumMode);
+}
+
+
+/// Thrown on failure while reading a Dazzler mask.
+///
+/// See_Also: `readMask`
+class DazzExtraNotFound : Exception
+{
+    import std.exception : basicExceptionCtors;
+
+    mixin basicExceptionCtors;
+}
+
+
+/**
+    Read an extra from Dazzler mask for `dbFile`.
+
+    Returns:  fully populated DazzExtra!T.
+    Throws:   MaskReaderException on read errors
+              DazzExtraNotFound if no extra with given name exists
+    See_Also: `writeDazzExtra`, `getMaskFiles`
+*/
+DazzExtra!T readDazzExtra(T)(in string dbFile, in string maskName, string extraName)
+    if (is(T == long) || is(T == double))
+{
+    import core.stdc.stdio : SEEK_CUR;
+
+    auto maskFileNames = getMaskFiles(dbFile, maskName, Yes.allowBlock);
+    auto maskHeaderFile = File(maskFileNames.header, "rb");
+
+    skipMaskHeader(maskHeaderFile);
+
+    size_t extraIndex;
+    int vtype;
+    int dataLength;
+    AccumMode accumMode;
+    auto currentExtraName = new char[1024];
+
+    alias _enforce = (cond, lazy err) => enforce!MaskReaderException(
+        cond,
+        format!"error while reading mask extra `%s.%s` (current extra index %d): %s"(
+            maskHeaderFile.name,
+            extraName,
+            extraIndex,
+            err,
+        ),
+    );
+    alias _safeRead = (data, lazy what) => _enforce(
+        maskHeaderFile.rawRead(data).length == data.length,
+        format!"unexpected end of file while reading %s"(what),
+    );
+
+    while (!maskHeaderFile.eof)
+    {
+        int[4] header;
+
+        _safeRead(header[], "header data");
+
+        vtype = header[0];
+        dataLength = header[1];
+        accumMode = header[2].to!AccumMode;
+        auto nameLength = header[3];
+
+        currentExtraName.reserve(nameLength);
+        currentExtraName.length = nameLength;
+
+        if (currentExtraName.length > 0)
+            _safeRead(currentExtraName, "name");
+
+        if (currentExtraName == extraName)
+            break;
+
+        maskHeaderFile.seek(T.sizeof * dataLength, SEEK_CUR);
+        ++extraIndex;
+    }
+
+    enforce!DazzExtraNotFound(currentExtraName == extraName);
+    _enforce(
+        DazzExtra!T.vtype == vtype,
+        format!"vtype does not match: expected %s but got %s"(
+            DazzExtra!T.vtype.to!string,
+            vtype.to!string,
+        ),
+    );
+
+    auto data = uninitializedArray!(T[])(dataLength);
+    _safeRead(data, "data");
+
+    return dazzExtra(
+        extraName,
+        data,
+        accumMode,
+    );
+}
+
+
+/**
+    Write given extras to an existing Dazzler mask for `dbFile`.
+
+    See_Also: `readMask`, `getMaskFiles`
+*/
+void writeDazzExtra(T)(in string dbFile, in string maskName, DazzExtra!T extra)
+    if (is(T == long) || is(T == double))
+{
+    auto maskFileNames = getMaskFiles(dbFile, maskName, Yes.allowBlock);
+    auto maskHeader = File(maskFileNames.header, "ab");
+
+    int[4] header = [
+        extra.vtype,
+        extra.length.to!int,
+        cast(int) extra.accumMode,
+        extra.name.length.to!int,
+    ];
+    maskHeader.rawWrite(header);
+    maskHeader.rawWrite(extra.name);
+    maskHeader.rawWrite(extra.data);
+}
+
+
+unittest
+{
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse;
+    import std.range : iota;
+
+    auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+    scope (exit)
+        rmdirRecurse(tmpDir);
+
+    auto dbFile = tmpDir ~ "/test.db";
+    enum maskName = "test-mask";
+
+    buildDbFile(dbFile, [
+        ">Sim/1/0_14 RQ=0.975\nggcccacccaggcagccc",
+        ">Sim/3/0_11 RQ=0.975\ngagtgcgtgcagtgg",
+    ]);
+
+    alias getData(T) = () => iota(1024)
+        .map!(i => cast(T) i)
+        .array;
+
+    writeMask(dbFile, maskName, ReferenceInterval[].init);
+    auto intExtra = dazzExtra("int-extra", getData!long(), AccumMode.sum);
+    writeDazzExtra(dbFile, maskName, intExtra);
+    auto floatExtra = dazzExtra("float-extra", getData!double());
+    writeDazzExtra(dbFile, maskName, floatExtra);
+
+    auto recoveredIntExtra = readDazzExtra!long(dbFile, maskName, intExtra.name);
+    auto recoveredFloatExtra = readDazzExtra!double(dbFile, maskName, floatExtra.name);
+
+    assert(recoveredIntExtra == intExtra);
+    assert(recoveredFloatExtra == floatExtra);
 }
 
 
