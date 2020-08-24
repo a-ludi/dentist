@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Unofficial Bash Strict Mode (http://redsymbol.net/articles/unofficial-bash-strict-mode/)
-set -euo pipefail
-IFS=$'\n\t'
+set -eu
+IFS="$(printf '\n\t')"
 
 # An example hook script to verify what is about to be pushed.  Called by "git
 # push" after it has checked the remote status, but before anything has been
@@ -25,7 +25,7 @@ IFS=$'\n\t'
 
 remote="$1"
 url="$2"
-num_commits="$(wc -l)"
+num_new_commits="$(grep -E '^refs/' | grep -cvE '^refs/tags/' || true)"
 export git_root
 git_root="$PWD"
 
@@ -53,7 +53,7 @@ locally_checkout_head()
 }
 
 
-if [ "$num_commits" -gt 0 ];
+if [ "$num_new_commits" -gt 0 ];
 then
     create_testdir
     cd "$testdir"
