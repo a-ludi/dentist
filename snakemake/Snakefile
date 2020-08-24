@@ -1205,7 +1205,7 @@ rule validate_regions_block:
         block_mask = block_mask(weak_coverage_mask, "{block_ref}")
     log: log_file("validate-regions-block.{block_ref}")
     shell:
-        "dentist validate-regions --config={dentist_config_file} --weak-coverage-mask={params.block_mask} - - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
+        "dentist validate-regions --config={dentist_config_file} --weak-coverage-mask={params.block_mask} {input[0]} - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
 
 
 rule validate_regions:
