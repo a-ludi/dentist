@@ -94,7 +94,8 @@ working directory:
 - `./snakemake/workflow_helper.py`
 - `./snakemake/snakemake.example.yml` → `./snakemake/snakemake.yml`
 
-Next edit `snakemake.yml` to fit your needs and test your configuration with
+Next edit `snakemake.yml` to fit your needs and optionally test your
+configuration with
 
     snakemake --configfile=snakemake.yml -- extend_dentist_config
 
@@ -103,7 +104,8 @@ If no errors occurred the whole workflow can be executed using
     snakemake --configfile=snakemake.yml
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
-Larger data sets may require a cluster in which case you can use Snakemake's
+One may use snakemakes `--jobs` to run independent jobs in parallel. Larger
+data sets may require a cluster in which case you can use Snakemake's
 [cloud][snakemake-cloud] or [cluster][snakemake-cluster] facilities.
 
 
