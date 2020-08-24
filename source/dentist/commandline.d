@@ -1764,7 +1764,7 @@ struct OptionsFor(DentistCommand _command)
 
             id_t lowerBound(double x)
             {
-                return to!id_t(2f/3f * x / ploidy);
+                return to!id_t(0.5 * x / ploidy);
             }
 
             if (hasReadCoverage)
