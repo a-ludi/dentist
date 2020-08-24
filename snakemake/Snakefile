@@ -472,6 +472,38 @@ def replace_env_rec(obj, envdict=environ):
     return obj
 
 
+def multi_json_loads(s, **kwargs):
+    """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+       containing whitespace-separated JSON documents) to a list of Python
+       objects.
+    """
+
+    decoder = json.JSONDecoder(**kwargs)
+
+    start = len(s) - len(s.lstrip())
+    docs = list()
+    while start < len(s):
+        doc, pos = decoder.raw_decode(s, idx=start)
+        docs.append(doc)
+        lsep = len(s[pos:]) - len(s[pos:].lstrip())
+
+        if lsep == 0:
+            raise json.JSONDecodeError("Extra data", s, pos)
+
+        start = pos + lsep
+
+    return docs
+
+
+def multi_json_load(fp, **kwargs):
+    """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
+       containing whitespace-separated JSON documents) to a list of Python
+       objects.
+    """
+
+    return multi_json_loads(fp.read(), **kwargs)
+
+
 #-----------------------------------------------------------------------------
 # END functions
 #-----------------------------------------------------------------------------
@@ -516,22 +548,26 @@ validation_blocks = config["validation_blocks"]
 reference_fasta = inputs["reference"]
 reads_fasta = inputs["reads"]
 gap_closed_fasta = outputs["output_assembly"]
+preliminary_gap_closed_fasta = join(workdir_, db_name(outputs["output_assembly"]) + "-preliminary.dam")
 validation_report = outputs.get("validation_report", join(workdir_, "validation-report.json"))
 validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
 gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
-closed_gaps_mask = outputs.get("closed_gaps_mask", "closed-gaps")
+preliminary_gap_closed = fasta_to_workdb(preliminary_gap_closed_fasta, "dam")
+closed_gaps_mask = workflow_.get("closed_gaps_mask", "closed-gaps")
+preliminary_closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(preliminary_gap_closed), closed_gaps_mask))
 closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(gap_closed), closed_gaps_mask))
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
 dentist_config_file = join(workdir_, workflow_.get("config", "dentist.json"))
 dentist_merge_insertions_config_file = prepend_ext(dentist_config_file, ".merge")
+skip_gaps = join(workdir_, workflow_.get("skip-gaps", "skip-gaps.txt"))
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 reads_vs_ref_alignment = alignment_file(reads, reference)
-gap_closed_vs_reads_alignment = alignment_file(gap_closed, reads)
+preliminary_gap_closed_vs_reads_alignment = alignment_file(preliminary_gap_closed, reads)
 self_mask = workflow_.get("self_mask", "dentist-self")
 dust_mask = "dust"
 tandem_mask = "tan"
@@ -603,8 +639,8 @@ localrules:
     extend_dentist_config,
     reference2dam,
     mark_assembly_reference,
-    gap_closed2dam,
-    mark_assembly_gap_closed,
+    preliminary_gap_closed2dam,
+    mark_assembly_preliminary_gap_closed,
     tandem_alignment,
     mask_tandem,
     self_alignment,
@@ -615,9 +651,9 @@ localrules:
     propagate_mask_back_to_reference,
     extend_dentist_config_for_merge_insertions,
     merge_insertions,
-    gap_closed_vs_reads_alignment,
-    split_gap_closed_vs_reads_alignment,
-    closed_gaps_bed2mask,
+    preliminary_gap_closed_vs_reads_alignment,
+    split_preliminary_gap_closed_vs_reads_alignment,
+    preliminary_closed_gaps_bed2mask,
     validate_regions,
     weak_coverage_mask
 
@@ -629,8 +665,7 @@ wildcard_constraints:
 rule ALL:
     input:
         gap_closed_fasta,
-        validation_report,
-        mask_files(gap_closed, weak_coverage_mask)
+        closed_gaps_bed
 
 
 checkpoint extend_dentist_config:
@@ -674,7 +709,7 @@ checkpoint extend_dentist_config:
 
         if "validate-regions" not in dentist_config:
             dentist_config["validate-regions"] = dict()
-        dentist_config["validate-regions"]["reference"] = gap_closed
+        dentist_config["validate-regions"]["reference"] = preliminary_gap_closed
         dentist_config["validate-regions"]["regions"] = closed_gaps_mask
 
         with open(output[0], 'w') as ext_config_file:
@@ -696,17 +731,17 @@ rule mark_assembly_reference:
     output: touch(assembly_marker(reference))
 
 
-_fast2dam_checkpoint[gap_closed] = "gap_closed2dam"
-checkpoint gap_closed2dam:
-    input: gap_closed_fasta
-    output: *db_files(gap_closed)
+_fast2dam_checkpoint[preliminary_gap_closed] = "preliminary_gap_closed2dam"
+checkpoint preliminary_gap_closed2dam:
+    input: preliminary_gap_closed_fasta
+    output: *db_files(preliminary_gap_closed)
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
-rule mark_assembly_gap_closed:
-    input: gap_closed_fasta
-    output: touch(assembly_marker(gap_closed))
+rule mark_assembly_preliminary_gap_closed:
+    input: preliminary_gap_closed_fasta
+    output: touch(assembly_marker(preliminary_gap_closed))
 
 
 rule mask_dust:
@@ -1069,33 +1104,34 @@ rule merge_insertions:
     shell:
         "dentist merge-insertions --config={dentist_merge_insertions_config_file} {dentist_flags} - - 2> {log}"
 
-rule output:
+
+rule preliminary_output:
     input:
         await_dentist_config(),
         await_db_files(reference),
         insertions
     output:
-        gap_closed_fasta,
-        closed_gaps_bed
-    log: log_file("output")
+        preliminary_gap_closed_fasta,
+        preliminary_closed_gaps_bed
+    log: log_file("preliminary-output")
     shell:
-        "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
+        "dentist output --config={dentist_config_file} {dentist_flags} --closed-gaps-bed={output[1]} - - {output[0]} 2> {log}"
 
 
-rule gap_closed_vs_reads_alignment_block:
+rule preliminary_gap_closed_vs_reads_alignment_block:
     input:
         await_dentist_config(),
-        await_db_files(gap_closed),
+        await_db_files(preliminary_gap_closed),
         await_db_files(reads),
-        mask_files(gap_closed, dust_mask),
-        mask_files(gap_closed, self_mask),
-        mask_files(gap_closed, tandem_mask)
+        mask_files(preliminary_gap_closed, dust_mask),
+        mask_files(preliminary_gap_closed, self_mask),
+        mask_files(preliminary_gap_closed, tandem_mask)
     output:
-        alignment_file(gap_closed, reads, block_b='{block_reads}'),
-        temp(alignment_file(reads, gap_closed, block_a='{block_reads}'))
+        alignment_file(preliminary_gap_closed, reads, block_b='{block_reads}'),
+        temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}'))
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
-        gap_closed_stub = db_stub(rel_to_workdir(gap_closed)),
+        preliminary_gap_closed_stub = db_stub(rel_to_workdir(preliminary_gap_closed)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1]),
@@ -1106,51 +1142,51 @@ rule gap_closed_vs_reads_alignment_block:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.dalign_flags} {params.gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
-                LAcheck -v {params.gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
-                LAcheck -v {params.reads_stub} {params.gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
+                {params.aligncmd} {params.dalign_flags} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
+                LAcheck -v {params.preliminary_gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reads_stub} {params.preliminary_gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
 
-rule split_gap_closed_vs_reads_alignment:
-    input: gap_closed_vs_reads_alignment
-    output: expand(alignment_file(gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
+rule split_preliminary_gap_closed_vs_reads_alignment:
+    input: preliminary_gap_closed_vs_reads_alignment
+    output: expand(alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
     params:
-        split_alignment = alignment_file(gap_closed, reads, block_a="@")
+        split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
     log: log_file("split-gap-closed-vs-reads-alignment")
     shell:
         """
             {{
                 LAsplit {params.split_alignment} {validation_blocks} < {input}
-                LAcheck -v {gap_closed} {reads} {output} || {lacheck_handler}
+                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
             }} &> {log}
         """
 
 
-rule gap_closed_vs_reads_alignment:
+rule preliminary_gap_closed_vs_reads_alignment:
     input:
-        await_db_files(gap_closed),
+        await_db_files(preliminary_gap_closed),
         await_db_files(reads),
-        block_alignments = lambda _: block_alignments(gap_closed, reads, damapper="forward")
+        block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads, damapper="forward")
     output:
-        protected(gap_closed_vs_reads_alignment)
+        protected(preliminary_gap_closed_vs_reads_alignment)
     log: log_file("gap-closed-vs-reads-alignment")
     shell:
         """
             {{
                 LAmerge {output} {input[block_alignments]}
-                LAcheck -v {gap_closed} {reads} {output} || {lacheck_handler}
+                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
             }} &> {log}
         """
 
 
-rule closed_gaps_bed2mask:
+rule preliminary_closed_gaps_bed2mask:
     input:
-        db = await_db_files(gap_closed),
-        bed = closed_gaps_bed
+        db = await_db_files(preliminary_gap_closed),
+        bed = preliminary_closed_gaps_bed
     output:
-        mask_files(gap_closed, closed_gaps_mask)
+        mask_files(preliminary_gap_closed, closed_gaps_mask)
     log: log_file("closed-gaps-bed2mask")
     shell:
         "dentist bed2mask --config={dentist_config_file} {dentist_flags} --data-comment --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
@@ -1158,13 +1194,13 @@ rule closed_gaps_bed2mask:
 
 rule validate_regions_block:
     input:
-        await_db_files(gap_closed),
+        await_db_files(preliminary_gap_closed),
         await_db_files(reads),
-        mask_files(gap_closed, closed_gaps_mask),
-        alignment = alignment_file(gap_closed, reads, block_a="{block_ref}")
+        mask_files(preliminary_gap_closed, closed_gaps_mask),
+        alignment = alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}")
     output:
         temp(validation_report_block),
-        temp(mask_files(gap_closed, block_mask(weak_coverage_mask, "{block_ref}")))
+        temp(mask_files(preliminary_gap_closed, block_mask(weak_coverage_mask, "{block_ref}")))
     params:
         block_mask = block_mask(weak_coverage_mask, "{block_ref}")
     log: log_file("validate-regions-block.{block_ref}")
@@ -1183,15 +1219,44 @@ rule validate_regions:
 
 rule weak_coverage_mask:
     input:
-        *expand(mask_files(gap_closed, block_mask(weak_coverage_mask, "{block_ref}")), block_ref=range(1, validation_blocks + 1)),
-        db = await_db_files(gap_closed)
+        *expand(mask_files(preliminary_gap_closed, block_mask(weak_coverage_mask, "{block_ref}")), block_ref=range(1, validation_blocks + 1)),
+        db = await_db_files(preliminary_gap_closed)
     output:
-        mask_files(gap_closed, weak_coverage_mask)
+        mask_files(preliminary_gap_closed, weak_coverage_mask)
     params:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
+
+
+rule skip_gaps:
+    input: validation_report
+    output: skip_gaps
+    run:
+        failed_validations = None
+        with open(validation_report, 'r') as validation_report_file:
+            failed_validations = multi_json_load(validation_report_file)
+
+        with open(output[0], 'w') as skip_gaps_file:
+            for invalid in failed_validations:
+                gap_spec = "-".join((str(cid) for cid in invalid["contigIds"]))
+                print(gap_spec, file=skip_gaps_file)
+
+
+rule purged_output:
+    input:
+        await_dentist_config(),
+        await_db_files(reference),
+        insertions,
+        skip_gaps = skip_gaps
+    output:
+        gap_closed_fasta,
+        closed_gaps_bed
+    log: log_file("purged-output")
+    shell:
+        "dentist output --config={dentist_config_file} {dentist_flags} --skip-gaps-file={input[skip_gaps]} - - - 2> {log}"
+
 
 #-----------------------------------------------------------------------------
 # END rules
