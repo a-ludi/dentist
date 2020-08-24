@@ -394,18 +394,15 @@ struct RegionValidator
             .sort
             .release;
 
-        auto firstWindowBegin = cast(coord_t) regionWithContext.begin;
-        auto lastWindowBegin = regionWithContext.end > regionWithContext.begin + options.weakCoverageWindow
-            ? cast(coord_t) regionWithContext.end - options.weakCoverageWindow
-            : cast(coord_t) regionWithContext.begin;
-
         auto weakCoverageMaskAcc = appender!(ReferenceInterval[]);
         coord_t[id_t] alignmentBegins;
-        auto window = ReferenceInterval(region.contigId, firstWindowBegin);
-        while (window.begin < lastWindowBegin && alignmentBounds.length > 0)
+        auto window = regionWithContext & ReferenceInterval(
+            region.contigId,
+            regionWithContext.begin,
+            regionWithContext.begin + options.weakCoverageWindow,
+        );
+        while (window.end <= regionWithContext.end && alignmentBounds.length > 0)
         {
-            window.end = window.begin + options.weakCoverageWindow;
-
             foreach (i, alignmentBound; alignmentBounds)
             {
                 if (alignmentBound.refPos < window.end)
@@ -447,6 +444,7 @@ struct RegionValidator
             }
 
             ++window.begin;
+            ++window.end;
         }
 
         weakCoverageMask = ReferenceRegion(weakCoverageMaskAcc.data);
