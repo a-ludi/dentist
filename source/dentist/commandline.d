@@ -2090,8 +2090,31 @@ struct OptionsFor(DentistCommand _command)
                 try
                     skipGaps ~= parseGapSpec(gapSpec);
                 catch (Exception e)
-                    throw new CLIException("ill-formatted <gap-spec>; should be <contigA>-<contigA>");
+                    throw new CLIException(format!"ill-formatted <gap-spec> (%s): should be <contigA>-<contigB>"(gapSpec));
         }
+
+        @Option("skip-gaps-file")
+        @MetaVar("<file>")
+        @Help("
+            Same as --skip-gaps but <file> contains one <gap-spec> per line.
+            If both options are given the union of all <gap-spec>s will be
+            used. Empty lines and lines starting with `#` will be ignored.
+        ")
+        string skipGapsFile;
+
+        @PreValidate(Priority.medium)
+        void hookReadSkipGapsFile()
+        {
+            auto skipGapsFp = File(skipGapsFile, "r");
+
+            foreach (line, gapSpec; skipGapsFp.byLine.enumerate(1))
+                try
+                    if (gapSpec.length > 0 && gapSpec[0] != '#')
+                        skipGaps ~= parseGapSpec(cast(string) gapSpec);
+                catch (Exception e)
+                    throw new CLIException(format!"ill-formatted <gap-spec> (%s) in %s:%d: should be <contigA>-<contigB>"(gapSpec, skipGapsFile, line));
+        }
+
 
         static id_t[2] parseGapSpec(string gapSpec) pure
         {
