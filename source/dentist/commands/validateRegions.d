@@ -24,13 +24,16 @@ import dentist.common.alignments :
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     ContigSegment,
+    DazzExtraNotFound,
     getFlatLocalAlignments,
     getScaffoldStructure,
     lasEmpty,
+    readDazzExtra,
     readMask,
     writeMask;
 import dentist.util.algorithm : filterInPlace;
 import dentist.util.log;
+import dentist.util.range : arrayChunks;
 import dentist.util.region : empty;
 import std.algorithm :
     count,
@@ -43,10 +46,13 @@ import std.algorithm :
     sort;
 import std.array :
     appender,
-    array;
+    array,
+    uninitializedArray;
+import std.conv : to;
 import std.range :
     assumeSorted,
     only,
+    StoppingPolicy,
     tee,
     zip;
 import std.range.primitives;
@@ -82,6 +88,8 @@ class RegionsValidator
     protected id_t minContigAId;
     protected id_t maxContigAId;
     protected ReferenceInterval[] regions;
+    protected id_t[2][] contigIds;
+    protected id_t[][] readIds;
     protected ReferenceInterval[] regionsWithContext;
     protected ReferenceRegion weakCoverageMask;
 
@@ -131,6 +139,9 @@ class RegionsValidator
         maxContigAId = alignments[$ - 1].contigA.id;
 
         regions = readMask!ReferenceInterval(options.refDb, options.regions);
+        contigIds = readContigIdsFromTrackExtra();
+        readIds = readReadIdsFromTrackExtra();
+
         restrictRegionsToContigBounds(regions);
         regionsWithContext = regions
             .map!(interval => ReferenceInterval(
@@ -151,13 +162,75 @@ class RegionsValidator
     }
 
 
+    id_t[2][] readContigIdsFromTrackExtra()
+    {
+        try
+        {
+            auto contigsExtra = readDazzExtra!long(
+                options.refDb,
+                options.regions,
+                Options.contigsExtraName,
+            );
+
+            return contigsExtra
+                .map!(contigId => contigId.to!id_t)
+                .arrayChunks(2)
+                .map!(idPair => idPair.to!(id_t[2]))
+                .array;
+        }
+        catch (DazzExtraNotFound e) {
+            return [];
+        }
+    }
+
+
+    id_t[][] readReadIdsFromTrackExtra()
+    {
+        try
+        {
+            auto readsExtra = readDazzExtra!long(
+                options.refDb,
+                options.regions,
+                Options.readsExtraName,
+            );
+
+            auto readIdsBuffer = readsExtra
+                .map!(contigId => contigId.to!id_t)
+                .array;
+
+            typeof(return) readIds;
+            readIds.reserve(regions.length);
+            while (readIdsBuffer.length > 0)
+            {
+                auto numIds = readIdsBuffer[0];
+                readIdsBuffer = readIdsBuffer[1 .. $];
+
+                readIds ~= readIdsBuffer[0 .. numIds];
+                readIdsBuffer = readIdsBuffer[numIds .. $];
+            }
+
+            return readIds;
+        }
+        catch (DazzExtraNotFound e) {
+            return [];
+        }
+    }
+
+
     void restrictRegionsToContigBounds(ref ReferenceInterval[] intervals)
     {
-        intervals = intervals
+        auto lowerBoundIntervals = intervals
             .assumeSorted!"a.contigId < b.contigId"
-            .lowerBound(ReferenceInterval(maxContigAId))
+            .lowerBound(ReferenceInterval(maxContigAId));
+        intervals = lowerBoundIntervals
             .upperBound(ReferenceInterval(minContigAId))
             .release;
+
+        auto sliceBegin = lowerBoundIntervals.length - intervals.length;
+        auto sliceEnd = lowerBoundIntervals.length;
+
+        contigIds = contigIds[sliceBegin .. sliceEnd];
+        readIds = readIds[sliceBegin .. sliceEnd];
     }
 
 
@@ -165,13 +238,24 @@ class RegionsValidator
     {
         mixin(traceExecution);
 
-        foreach (region, regionWithContext; zip(regions, regionsWithContext))
+        foreach (
+            region, regionWithContext, regionContigs, consensusReadIds;
+            zip(
+                StoppingPolicy.longest,
+                regions,
+                regionsWithContext,
+                contigIds,
+                readIds,
+            )
+        )
         {
             auto validator = RegionValidator(
                 options,
                 cast(const) alignments,
                 region,
                 regionWithContext,
+                regionContigs,
+                consensusReadIds,
             );
 
             validator.run();
@@ -201,6 +285,8 @@ struct RegionValidator
     protected const(FlatLocalAlignment)[] alignments;
     protected ReferenceInterval region;
     protected ReferenceInterval regionWithContext;
+    protected id_t[2] regionContigs;
+    protected id_t[] consensusReadIds;
 
     id_t[] spanningReadIds;
     ReferenceRegion weakCoverageMask;
@@ -210,12 +296,16 @@ struct RegionValidator
         const FlatLocalAlignment[] alignments,
         ReferenceInterval region,
         ReferenceInterval regionWithContext,
+        id_t[2] regionContigs,
+        id_t[] consensusReadIds,
     )
     {
         this.options = options;
         this.alignments = alignments;
         this.region = region;
         this.regionWithContext = regionWithContext;
+        this.regionContigs = regionContigs;
+        this.consensusReadIds = consensusReadIds;
     }
 
     void run()
@@ -227,13 +317,23 @@ struct RegionValidator
         assessWeaklySpannedWindowStats();
 
         if (numSpanningReads < options.minSpanningReads || !empty(weakCoverageMask))
-            writeln([
+        {
+            auto report = [
                 "region": region.toJson,
                 "regionWithContext": regionWithContext.toJson,
                 "numSpanningReads": numSpanningReads.toJson,
                 "spanningReadIds": spanningReadIds.toJson,
                 "weakCoverageMaskBps": weakCoverageMask.size.toJson,
-            ].toJson);
+            ];
+
+            if (regionContigs[0] > 0)
+            {
+                report["contigIds"] = regionContigs.toJson;
+                report["consensusReadIds"] = consensusReadIds.toJson;
+            }
+
+            writeln(report.toJson);
+        }
     }
 
 

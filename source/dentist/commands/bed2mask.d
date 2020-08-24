@@ -16,7 +16,9 @@ import dentist.common.alignments :
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     ContigSegment,
+    dazzExtra,
     getScaffoldStructure,
+    writeDazzExtra,
     writeMask;
 import dentist.util.log;
 import std.algorithm :
@@ -29,10 +31,22 @@ import std.algorithm :
 import std.array :
     array,
     split;
-import std.conv : to;
-import std.range : tee;
+import std.conv :
+    ConvException,
+    to;
+import std.exception : enforce;
+import std.format : format;
+import std.range :
+    chain,
+    enumerate,
+    only,
+    tee;
 import std.range.primitives;
+import std.regex :
+    ctRegex,
+    matchFirst;
 import std.stdio : File;
+import std.typecons : Tuple;
 import vibe.data.json : toJson = serializeToJson;
 
 
@@ -45,12 +59,18 @@ void execute(Options)(in Options options)
 {
     auto contigsByScaffold = getContigsByScaffold(options.refDb);
     auto bedFile = options.openBedFile;
-    auto mask = readBedFile(bedFile, contigsByScaffold);
+    auto augmentedMask = readBedFile(
+        bedFile,
+        options.bedFileName,
+        contigsByScaffold,
+        cast(bool) options.dataComments,
+    );
 
     writeDazzlerMask(
         options.refDb,
         options.outMask,
-        mask,
+        augmentedMask,
+        cast(bool) options.dataComments,
     );
 }
 
@@ -71,14 +91,29 @@ ContigSegment[][string] getContigsByScaffold(string refDb)
 }
 
 
-ReferenceInterval[] readBedFile(File bedFile, ContigSegment[][string] contigsByScaffold)
+alias AugmentedReferenceInterval = Tuple!(
+    ReferenceInterval, "interval",
+    id_t[], "contigIds",
+    id_t[], "readIds",
+);
+
+
+AugmentedReferenceInterval[] readBedFile(
+    File bedFile,
+    string bedFileName,
+    ContigSegment[][string] contigsByScaffold,
+    bool parseDataComments,
+)
 {
     mixin(traceExecution);
 
     return bedFile
         .byLine
-        .filter!(line => line.length > 0)
-        .map!((line) {
+        .enumerate(1)
+        .filter!(enumLine => enumLine.value.length > 0)
+        .map!((enumLine) {
+            auto lineNumber = enumLine.index;
+            auto line = enumLine.value;
             auto fields = line.split('\t');
             scope scaffoldName = cast(string) fields[0];
             auto begin = fields[1].to!coord_t;
@@ -89,10 +124,20 @@ ReferenceInterval[] readBedFile(File bedFile, ContigSegment[][string] contigsByS
                 end,
             );
 
-            return affectedContigs.map!(affectedContig => ReferenceInterval(
-                affectedContig.globalContigId,
-                max(begin, affectedContig.begin) - affectedContig.begin,
-                min(end, affectedContig.end) - affectedContig.begin,
+            id_t[] contigIds;
+            id_t[] readIds;
+
+            if (parseDataComments && fields.length >= 4)
+                parseDataComment(fields[3], bedFileName, lineNumber, contigIds, readIds);
+
+            return affectedContigs.map!(affectedContig => AugmentedReferenceInterval(
+                ReferenceInterval(
+                    affectedContig.globalContigId,
+                    max(begin, affectedContig.begin) - affectedContig.begin,
+                    min(end, affectedContig.end) - affectedContig.begin,
+                ),
+                contigIds,
+                readIds,
             )).tee!(interval => assert(&interval));
         })
         .joiner
@@ -118,9 +163,95 @@ ContigSegment[] getOverlappingContigs(
 }
 
 
-void writeDazzlerMask(string refDb, string maskName, ReferenceInterval[] mask)
+void parseDataComment(
+    const char[] comment,
+    string filename,
+    size_t lineNumber,
+    ref id_t[] contigIds,
+    ref id_t[] readIds,
+)
+{
+    string[] errors;
+
+    void parseFields(T)(ref T[] dest, const char[][] fields)
+    {
+        try
+        {
+            dest = fields[1 .. $].map!(to!T).array;
+        }
+        catch (ConvException e)
+        {
+            dest = [];
+            errors ~= "could not parse " ~ T.stringof ~ " in " ~ fields[0].idup;
+        }
+    }
+
+    auto parts = comment.split('|');
+
+    foreach (part; parts)
+    {
+        auto partFields = part.split('-');
+        auto partName = partFields[0];
+
+        switch (partName)
+        {
+            case Options.contigsExtraName:
+                if (partFields.length == 3)
+                {
+                    parseFields(contigIds, partFields);
+                }
+                else
+                {
+                    errors ~= Options.contigsExtraName ~ " must have exactly two entries";
+
+                    break;
+                }
+                break;
+            case Options.readsExtraName:
+                parseFields(readIds, partFields);
+                break;
+            default:
+                break;
+        }
+    }
+
+    enforce(
+        errors.length == 0,
+        format!(
+            "ill-formatted data comment in BED file %s:%d:\n%-(  - %s\n%)"
+        )(filename, lineNumber, errors),
+    );
+}
+
+
+void writeDazzlerMask(
+    string refDb,
+    string maskName,
+    AugmentedReferenceInterval[] augmentedMask,
+    bool hasDataComments,
+)
 {
     mixin(traceExecution);
 
-    writeMask(refDb, maskName, mask);
+    writeMask(refDb, maskName, augmentedMask.map!"a.interval");
+
+    if (hasDataComments)
+    {
+        auto contigsExtra = dazzExtra(Options.contigsExtraName, augmentedMask
+            .map!"a.contigIds"
+            .joiner
+            .map!"cast(long) a"
+            .array);
+        writeDazzExtra(refDb, maskName, contigsExtra);
+
+        auto readsExtra = dazzExtra(Options.readsExtraName, augmentedMask
+            .map!(a => chain(
+                only(a.readIds.length.to!id_t),
+                a.readIds,
+            ))
+            .joiner
+            .map!"cast(long) a"
+            .array);
+        writeDazzExtra(refDb, maskName, readsExtra);
+    }
 }

@@ -1153,7 +1153,7 @@ rule closed_gaps_bed2mask:
         mask_files(gap_closed, closed_gaps_mask)
     log: log_file("closed-gaps-bed2mask")
     shell:
-        "dentist bed2mask --config={dentist_config_file} {dentist_flags} --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
+        "dentist bed2mask --config={dentist_config_file} {dentist_flags} --data-comment --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
 
 
 rule validate_regions_block:

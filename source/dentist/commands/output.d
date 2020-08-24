@@ -763,9 +763,11 @@ class AssemblyWriter
                 currentScaffold,
                 to!string(currentScaffoldCoord - 1),
                 to!string(nextScaffoldCoord),
-                format!"contigs-%d-%d|reads-%(%d-%)"(
+                format!("%s-%d-%d|%s-%(%d-%)")(
+                    Options.contigsExtraName,
                     leftContigId,
                     rightContigId,
+                    Options.readsExtraName,
                     insertion.payload.readIds,
                 ),
             ).joiner("\t"));
