@@ -51,6 +51,14 @@ def fasta_to_workdb(fasta_file, ext):
     return join(workdir_, "{db}.{ext}".format(db=db_name(fasta_file), ext=ext))
 
 
+def assembly_marker(db):
+    return join(workdir_, ".assembly.{db}".format(db=db_name(db)))
+
+
+def reads_marker(db):
+    return join(workdir_, ".reads.{db}".format(db=db_name(db)))
+
+
 def fasta2dazz_command(target_db):
     if target_db.endswith(".db"):
         return "fasta2DB"
@@ -594,11 +602,14 @@ localrules:
     ALL,
     extend_dentist_config,
     reference2dam,
+    mark_assembly_reference,
     gap_closed2dam,
+    mark_assembly_gap_closed,
     tandem_alignment,
     mask_tandem,
     self_alignment,
     reads2db,
+    mark_reads,
     ref_vs_reads_alignment,
     reads_vs_ref_alignment,
     propagate_mask_back_to_reference,
@@ -680,6 +691,11 @@ checkpoint reference2dam:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
+rule mark_assembly_reference:
+    input: reference_fasta
+    output: touch(assembly_marker(reference))
+
+
 _fast2dam_checkpoint[gap_closed] = "gap_closed2dam"
 checkpoint gap_closed2dam:
     input: gap_closed_fasta
@@ -688,10 +704,16 @@ checkpoint gap_closed2dam:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
+rule mark_assembly_gap_closed:
+    input: gap_closed_fasta
+    output: touch(assembly_marker(gap_closed))
+
+
 rule mask_dust:
     input:
         await_dentist_config(),
-        await_db_files(join(workdir_, "{dam}.dam"))
+        await_db_files(join(workdir_, "{dam}.dam")),
+        assembly_marker("{dam}.dam")
     output:
         mask_files(join(workdir_, "{dam}.dam"), dust_mask)
     shell:
@@ -702,6 +724,7 @@ rule self_alignment_block:
     input:
         await_dentist_config(),
         await_db_files(join(workdir_, "{dam}.dam")),
+        assembly_marker("{dam}.dam"),
         mask_files(join(workdir_, "{dam}.dam"), dust_mask)
     output:
         temp(alignment_file("{dam}", block_a='{block_ref}', block_b='{block_reads}')),
@@ -727,6 +750,7 @@ rule self_alignment_block:
 rule self_alignment:
     input:
         db = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam"),
         block_alignments = block_alignments(join(workdir_, "{dam}.dam"))
     output:
         protected(alignment_file("{dam}"))
@@ -745,6 +769,7 @@ rule mask_self:
     input:
         await_dentist_config(),
         dam = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam"),
         alignment = alignment_file("{dam}")
     output:
         mask_files(join(workdir_, "{dam}.dam"), self_mask)
@@ -756,7 +781,8 @@ rule mask_self:
 rule tandem_alignment_block:
     input:
         await_dentist_config(),
-        await_db_files(join(workdir_, "{dam}.dam"))
+        await_db_files(join(workdir_, "{dam}.dam")),
+        assembly_marker("{dam}.dam")
     output:
         temp(alignment_file("TAN", "{dam}", block_b="{block}"))
     params:
@@ -777,6 +803,7 @@ rule tandem_alignment_block:
 rule tandem_alignment:
     input:
         db = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam"),
         block_alignments = lambda wildcards: block_alignments("TAN", join(workdir_, wildcards.dam + ".dam"), damapper="forward")
     output:
         protected(alignment_file("TAN", "{dam}"))
@@ -794,6 +821,7 @@ rule mask_tandem_block:
     input:
         await_dentist_config(),
         await_db_files(join(workdir_, "{dam}.dam")),
+        assembly_marker("{dam}.dam"),
         alignment = alignment_file("TAN", "{dam}", block_b="{block}")
     output:
         temp(mask_files(join(workdir_, "{dam}.dam"), block_mask(tandem_mask, "{block}")))
@@ -809,6 +837,7 @@ rule mask_tandem:
     input:
         await_dentist_config(),
         db = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam"),
         mask_files = lambda wildcards: chain(*(mask_files(join(workdir_, "{dam}.dam"), m)  for m in block_masks(tandem_mask, join(workdir_, wildcards.dam + ".dam"))))
     output:
         mask_files(join(workdir_, "{dam}.dam"), tandem_mask)
@@ -825,6 +854,11 @@ checkpoint reads2db:
         fasta2dazz = fasta2dazz_command(reads)
     shell:
         "{params.fasta2dazz} {output[0]} {input} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
+
+
+rule mark_reads:
+    input: reads_fasta
+    output: touch(reads_marker(reads))
 
 
 rule ref_vs_reads_alignment_block:
