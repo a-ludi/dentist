@@ -8,10 +8,117 @@
 */
 module dentist.util.graphalgo;
 
+import dentist.util.math :
+    absdiff,
+    NaturalNumberSet;
 import dentist.util.saturationmath;
-import std.array : uninitializedArray;
+import std.algorithm : copy;
+import std.array :
+    appender,
+    uninitializedArray;
 import std.functional : binaryFun;
-import std.typecons : Tuple;
+import std.typecons :
+    Tuple,
+    Yes;
+
+
+/**
+    Calculate connected components of the graph defined by `hasEdge`.
+
+    Params:
+        hasEdge = Binary predicate taking two nodes of type `size_t` which is
+                  true iff the first node is adjacent to the second node.
+        n =       Number of nodes in the graph. `hasEdge` must be defined for
+                  every pair of integer in `0 .. n`.
+    Returns: Array of components represented as arrays of node indices.
+*/
+size_t[][] connectedComponents(alias hasEdge)(size_t n)
+{
+    alias _hasEdge = binaryFun!hasEdge;
+
+    auto unvisitedNodes = NaturalNumberSet(n, Yes.addAll);
+    auto nodesBuffer = new size_t[n];
+    auto components = appender!(size_t[][]);
+
+    while (!unvisitedNodes.empty)
+    {
+        // discover startNode's component by depth-first search
+        auto component = discoverComponent!_hasEdge(unvisitedNodes);
+        // copy component indices to buffer
+        auto restNodesBuffer = component
+            .elements
+            .copy(nodesBuffer);
+        // append component to result
+        components ~= nodesBuffer[0 .. $ - restNodesBuffer.length];
+        // reduce node buffer
+        nodesBuffer = restNodesBuffer;
+
+        // mark components nodes as visited
+        unvisitedNodes = unvisitedNodes - component;
+    }
+
+    return components.data;
+}
+
+///
+unittest
+{
+    import std.algorithm :
+        equal,
+        min;
+
+    //    _____________
+    //   /             \
+    // (0) --- (1) --- (2)     (3) --- (4)
+    enum n = 5;
+    alias hasEdge = (u, v) => (absdiff(u , v) == 1 && min(u, v) != 2) ||
+                              (absdiff(u , v) == 2 && min(u, v) != 2);
+
+    auto components = connectedComponents!hasEdge(n);
+
+    assert(equal(components, [
+        [0, 1, 2],
+        [3, 4],
+    ]));
+}
+
+
+private NaturalNumberSet discoverComponent(alias hasEdge)(NaturalNumberSet nodes)
+{
+    assert(!nodes.empty, "cannot discoverComponent of an empty graph");
+
+    // prepare component
+    auto component = NaturalNumberSet(nodes.maxElement);
+    // select start node
+    auto currentNode = nodes.minElement;
+
+    walk: while (true)
+    {
+        // move currentNode from available nodes to the component
+        component.add(currentNode);
+        nodes.remove(currentNode);
+
+        // try to find successor of current node
+        foreach (nextNode; nodes.elements)
+        {
+            if (hasEdge(currentNode, nextNode))
+            {
+                assert(
+                    hasEdge(nextNode, currentNode),
+                    "connectedComponents may be called only on an undirected graph",
+                );
+                // found succssor; select it as currentNode and repeat
+                currentNode = nextNode;
+                continue walk;
+            }
+        }
+
+        // no succssor found; component is finished
+        return component;
+    }
+
+    assert(0);
+}
 
 
 struct FloydWarshallMatrix(weight_t)
