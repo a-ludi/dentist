@@ -138,7 +138,7 @@ struct FloydWarshallMatrix(weight_t)
 
 
     private size_t idx(size_t u, size_t v) const pure nothrow @safe
-    in (u < numNodes && u < numNodes, "index out of bounds")
+    in (u < numNodes && v < numNodes, "index out of bounds")
     {
         return u * numNodes + v;
     }
@@ -357,7 +357,7 @@ auto shortestPathsFloydWarshall(alias hasEdge, alias weight)(
 {
     alias _hasEdge = binaryFun!hasEdge;
     alias _weight = binaryFun!weight;
-    alias weight_t = typeof(weight(size_t.init, size_t.init));
+    alias weight_t = typeof(_weight(size_t.init, size_t.init));
 
     auto bestDists = uninitializedArray!(weight_t[])(bestConnections.length);
     auto matrix = floydWarshallMatrix!(_hasEdge, _weight)(
