@@ -1656,18 +1656,31 @@ struct NaturalNumberSet
         return true;
     }
 
-    NaturalNumberSet opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op.among("|", "^", "&"))
+    NaturalNumberSet opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op.among("|", "^", "&", "-"))
     {
+        enum enlargeResult = op.among("|", "^");
+
+        static if (enlargeResult)
+            alias resultSize = max;
+        else
+            alias resultSize = min;
+
+        static if (op.among("-"))
+            enum partOp = "& ~";
+        else
+            enum partOp = op;
+
         NaturalNumberSet result;
-        result.parts.length = max(this.parts.length, other.parts.length);
-        result.nMax = max(this.nMax, other.nMax);
+
+        result.parts.length = resultSize(this.parts.length, other.parts.length);
+        result.nMax = resultSize(this.nMax, other.nMax);
 
         auto numCommonParts = min(this.parts.length, other.parts.length);
 
         foreach (i; 0 .. numCommonParts)
-            result.parts[i] = mixin("this.parts[i] " ~ op ~ " other.parts[i]");
+            result.parts[i] = mixin("this.parts[i] " ~ partOp ~ " other.parts[i]");
 
-        static if (op.among("|", "^"))
+        static if (enlargeResult)
         {
             if (this.parts.length > numCommonParts)
                 result.parts[numCommonParts .. $] = this.parts[numCommonParts .. $];
