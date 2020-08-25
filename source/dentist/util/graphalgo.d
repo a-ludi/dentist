@@ -12,11 +12,16 @@ import dentist.util.math :
     absdiff,
     NaturalNumberSet;
 import dentist.util.saturationmath;
-import std.algorithm : copy;
+import std.algorithm :
+    copy,
+    countUntil,
+    sort;
 import std.array :
     appender,
+    array,
     uninitializedArray;
 import std.functional : binaryFun;
+import std.range : iota;
 import std.typecons :
     Tuple,
     Yes;
@@ -506,4 +511,217 @@ private version (unittest)
             );
         writefln!"--- END connections"();
     }
+}
+
+
+struct SingleSourceShortestPathsSolution(weight_t)
+{
+    enum unconnectedWeight = saturatedInfinity!weight_t;
+    enum noPredecessor = size_t.max;
+
+    size_t startNode;
+    size_t[] topologicalOrder;
+    private weight_t[] _distance;
+    private size_t[] _predecessor;
+
+
+    @property size_t numNodes() const pure nothrow @safe
+    {
+        return topologicalOrder.length;
+    }
+
+
+    private size_t originalNode(size_t u) const pure nothrow @safe
+    {
+        return topologicalOrder[u];
+    }
+
+
+    @property ref weight_t distance(size_t u) pure nothrow @safe
+    {
+        return _distance[u];
+    }
+
+
+    @property weight_t distance(size_t u) const pure nothrow @safe
+    {
+        return _distance[u];
+    }
+
+
+    @property bool isConnected(size_t u) const pure nothrow @safe
+    {
+        return distance(u) < unconnectedWeight;
+    }
+
+
+    @property ref size_t predecessor(size_t u) pure nothrow @safe
+    {
+        return _predecessor[u];
+    }
+
+
+    @property size_t predecessor(size_t u) const pure nothrow @safe
+    {
+        return _predecessor[u];
+    }
+
+
+    @property bool hasPredecessor(size_t u) const pure nothrow @safe
+    {
+        return predecessor(u) != noPredecessor;
+    }
+
+
+    static struct ReverseShortestPath
+    {
+        private const(SingleSourceShortestPathsSolution!weight_t)* _solution;
+        private size_t _to;
+        private size_t _current;
+
+
+        private this(const(SingleSourceShortestPathsSolution!weight_t)* solution, size_t to)
+        {
+            this._solution = solution;
+            this._to = to;
+            this._current = solution !is null && solution.isConnected(to)
+                ? to
+                : noPredecessor;
+        }
+
+
+        @property const(SingleSourceShortestPathsSolution!weight_t) solution() pure nothrow @safe
+        {
+            return *_solution;
+        }
+
+
+        @property size_t from() const pure nothrow @safe
+        {
+            return _solution.startNode;
+        }
+
+
+        @property size_t to() const pure nothrow @safe
+        {
+            return _to;
+        }
+
+
+        @property bool empty() const pure nothrow @safe
+        {
+            return _current == noPredecessor;
+        }
+
+
+        @property size_t front() const pure nothrow @safe
+        {
+            assert(
+                !empty,
+                "Attempting to fetch the front of an empty SingleSourceShortestPathsSolution.ReverseShortestPath",
+            );
+
+            return _current;
+        }
+
+
+        void popFront() pure nothrow @safe
+        {
+            assert(!empty, "Attempting to popFront an empty SingleSourceShortestPathsSolution.ReverseShortestPath");
+
+            this._current = _solution !is null
+                ? solution.predecessor(_current)
+                : noPredecessor;
+        }
+    }
+
+
+    ReverseShortestPath reverseShortestPath(size_t to) const pure nothrow
+    {
+        return ReverseShortestPath(&this, to);
+    }
+}
+
+
+/**
+    Calculate all shortest paths in DAG starting at `start`. The
+    functions `hasEdge` and `weight` define the graphs structure and
+    weights, respectively. Nodes are represented as `size_t` integers.
+    The graph must be directed and acyclic (DAG).
+
+    Params:
+        hasEdge = Binary predicate taking two nodes of type `size_t` which is
+                  true iff the first node is adjacent to the second node.
+        weight =  Binary function taking two nodes of type `size_t` which
+                  returns the weight of the edge between the first and the
+                  second node. The function may be undefined if `hasEdge`
+                  returns false for the given arguments.
+        n =       Number of nodes in the graph. `hasEdge` must be defined for
+                  every pair of integer in `0 .. n`.
+    Returns: SingleSourceShortestPathsSolution
+*/
+auto dagSingleSourceShortestPaths(alias hasEdge, alias weight)(size_t start, size_t n)
+{
+    alias _hasEdge = binaryFun!hasEdge;
+    alias _weight = binaryFun!weight;
+    alias weight_t = typeof(_weight(size_t.init, size_t.init));
+
+    SingleSourceShortestPathsSolution!weight_t result;
+
+    with (result)
+    {
+        // sort topological
+        topologicalOrder = iota(n)
+            .array
+            .sort!_hasEdge
+            .release;
+        alias N = (u) => originalNode(u);
+
+        _distance = uninitializedArray!(weight_t[])(n);
+        _distance[] = saturatedInfinity!weight_t;
+        _distance[start] = 0;
+        _predecessor = uninitializedArray!(size_t[])(n);
+        _predecessor[] = size_t.max;
+
+        foreach (u; topologicalOrder.countUntil(start) .. n)
+            foreach (v; u + 1 .. n)
+                if (_hasEdge(N(u), N(v)))
+                {
+                    auto vDistance = distance(N(v));
+                    auto uDistance = saturatedAdd(distance(N(u)), _weight(N(u), N(v)));
+
+                    if (vDistance > uDistance)
+                    {
+                        distance(N(v)) = uDistance;
+                        predecessor(N(v)) = N(u);
+                    }
+                }
+    }
+
+    return result;
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+
+    //    _____________   _____________
+    //   /             v /             v
+    // (0) --> (1) --> (2)     (3) --> (4)
+    enum n = 5;
+    alias hasEdge = (u, v) => (u + 1 == v && u != 2) ||
+                              (u + 2 == v && u % 2 == 0);
+    alias weight = (u, v) => 1;
+
+    auto shortestPaths = dagSingleSourceShortestPaths!(hasEdge, weight)(0, n);
+
+    assert(equal(shortestPaths.reverseShortestPath(4), [4, 2, 0]));
+    assert(shortestPaths.distance(4) == 2);
+    assert(equal(shortestPaths.reverseShortestPath(2), [2, 0]));
+    assert(shortestPaths.distance(2) == 1);
+    assert(equal(shortestPaths.reverseShortestPath(1), [1, 0]));
+    assert(shortestPaths.distance(1) == 1);
+    assert(equal(shortestPaths.reverseShortestPath(3), size_t[].init));
+    assert(!shortestPaths.isConnected(3));
 }
