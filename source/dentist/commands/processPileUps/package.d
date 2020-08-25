@@ -477,10 +477,7 @@ protected class PileUpProcessor
         auto chainedPileUpAlignment = chainLocalAlignments(
             croppedDb,
             rawPileUpAlignment,
-            ChainingOptions(
-                options.maxIndelBps,
-                options.maxRelativeOverlap,
-            ),
+            options.chainingOptions,
         );
 
         auto coverage = cast(id_t) allowedReferenceReadIds.size;

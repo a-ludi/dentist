@@ -50,10 +50,7 @@ class CLIChainer
     this(const Options options)
     {
         this.options = options;
-        this.chainingOptions = ChainingOptions(
-            options.maxIndelBps,
-            options.maxRelativeOverlap,
-        );
+        this.chainingOptions = options.chainingOptions;
         this.progress = options.createProgressMeter();
     }
 

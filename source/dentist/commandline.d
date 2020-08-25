@@ -27,6 +27,7 @@ import dentist.common :
     OutputCoordinate,
     testingOnly;
 import dentist.common.alignments :
+    ChainingOptions,
     coord_t,
     id_t,
     trace_point_t;
@@ -354,6 +355,11 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         TestingCommand.checkResults,
+    );
+
+    static enum needChainingOptions = command.among(
+        DentistCommand.chainLocalAlignments,
+        DentistCommand.processPileUps,
     );
 
     @Option()
@@ -1658,10 +1664,7 @@ struct OptionsFor(DentistCommand _command)
         }
     }
 
-    static if (command.among(
-        DentistCommand.chainLocalAlignments,
-        DentistCommand.processPileUps,
-    ))
+    static if (needChainingOptions)
     {
         @Option("max-indel")
         @MetaVar("<bps>")
@@ -1687,10 +1690,7 @@ struct OptionsFor(DentistCommand _command)
         double maxInsertionError = 0.1;
     }
 
-    static if (command.among(
-        DentistCommand.chainLocalAlignments,
-        DentistCommand.processPileUps,
-    ))
+    static if (needChainingOptions)
     {
         @Option("max-relative-overlap")
         @MetaVar("<fraction>")
@@ -2363,6 +2363,19 @@ struct OptionsFor(DentistCommand _command)
             validateOutputMask(options.refDb, value, Yes.allowBlock))))
         string weakCoverageMask;
     }
+
+
+    static if (needChainingOptions)
+    {
+        @property ChainingOptions chainingOptions() const
+        {
+            return ChainingOptions(
+                maxIndelBps,
+                maxRelativeOverlap,
+            );
+        }
+    }
+
 
     static if (
         is(typeof(OptionsFor!command().additionalSelfAlignmentOptions)) &&
