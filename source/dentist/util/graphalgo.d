@@ -6,7 +6,7 @@
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
-module dentist.util.floydwarshallalgorithm;
+module dentist.util.graphalgo;
 
 import dentist.util.saturationmath;
 import std.array : uninitializedArray;

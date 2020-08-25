@@ -56,7 +56,7 @@ static import dentist.swinfo;
 static import dentist.util.algorithm;
 static import dentist.util.containers;
 static import dentist.util.fasta;
-static import dentist.util.floydwarshallalgorithm;
+static import dentist.util.graphalgo;
 static import dentist.util.log;
 static import dentist.util.math;
 static import dentist.util.process;
@@ -113,7 +113,7 @@ alias modules = AliasSeq!(
     dentist.util.algorithm,
     dentist.util.containers,
     dentist.util.fasta,
-    dentist.util.floydwarshallalgorithm,
+    dentist.util.graphalgo,
     dentist.util.log,
     dentist.util.math,
     dentist.util.process,

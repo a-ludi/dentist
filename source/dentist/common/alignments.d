@@ -14,7 +14,7 @@ import dentist.common.scaffold :
     ContigPart,
     Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
-import dentist.util.floydwarshallalgorithm : allPairsShortestPaths;
+import dentist.util.graphalgo : allPairsShortestPaths;
 import dentist.util.log;
 import dentist.util.math : absdiff, ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
