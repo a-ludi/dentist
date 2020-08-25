@@ -39,6 +39,8 @@ static import dentist.commands.validateConfig;
 static import dentist.commands.validateRegions;
 static import dentist.common;
 static import dentist.common.alignments;
+static import dentist.common.alignments.base;
+static import dentist.common.alignments.chaining;
 static import dentist.common.binio;
 static import dentist.common.binio._base;
 static import dentist.common.binio.insertiondb;
@@ -96,6 +98,8 @@ alias modules = AliasSeq!(
     dentist.commands.validateRegions,
     dentist.common,
     dentist.common.alignments,
+    dentist.common.alignments.base,
+    dentist.common.alignments.chaining,
     dentist.common.binio,
     dentist.common.binio._base,
     dentist.common.binio.insertiondb,

@@ -27,6 +27,7 @@ import dentist.common :
     OutputCoordinate,
     testingOnly;
 import dentist.common.alignments :
+    arithmetic_t,
     ChainingOptions,
     coord_t,
     id_t,
@@ -1518,6 +1519,17 @@ struct OptionsFor(DentistCommand _command)
         string[] repeatMasks;
     }
 
+    static if (needChainingOptions)
+    {
+        @Option("max-chain-gap")
+        @MetaVar("<bps>")
+        @Help(format!"
+            two local alignments may only be chained if at most <bps> of
+            sequence in the A-read and B-read are unaligned. (default: %s)
+        "(defaultValue!maxChainGapBps))
+        coord_t maxChainGapBps = 10_000;
+    }
+
     static if (command.among(
         DentistCommand.collectPileUps,
     ))
@@ -1820,6 +1832,44 @@ struct OptionsFor(DentistCommand _command)
         }"(defaultValue!minReadsPerPileUp))
         @(Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero")))
         size_t minReadsPerPileUp = defaultMinSpanningReads;
+    }
+
+    static if (needChainingOptions)
+    {
+        @Option("min-relative-score")
+        @MetaVar("<fraction>")
+        @Help(format!"
+            output chains with a score of at least <fraction> of the best
+            chains score. A value of 1.0 means that only chains with the best
+            chains score will be accepted; a value of 0.0 means that all
+            chains will be accepted (default: %s)
+        "(defaultValue!minRelativeScore))
+        @(Validate!(value => enforce!CLIException(
+            0.0 <= value && value <= 1.0,
+            "minimum relative score must be in [0, 1]"
+        )))
+        double minRelativeScore = 1.0;
+    }
+
+    static if (needChainingOptions)
+    {
+        @Option("min-score")
+        @MetaVar("<int>")
+        @Help("
+            output chains with a score of at least <int>
+            (default: trace point spacing of alignment)
+        ")
+        @(Validate!(validatePositive!("min-score", arithmetic_t)))
+        arithmetic_t minScore;
+
+        @PreValidate(Priority.low)
+        void hookEnsurePresenceOfMinScore()
+        {
+            if (minScore > 0)
+                return;
+
+            minScore = cast(arithmetic_t) tracePointDistance;
+        }
     }
 
     static if (command.among(
@@ -2371,7 +2421,10 @@ struct OptionsFor(DentistCommand _command)
         {
             return ChainingOptions(
                 maxIndelBps,
+                maxChainGapBps,
                 maxRelativeOverlap,
+                minRelativeScore,
+                minScore,
             );
         }
     }
