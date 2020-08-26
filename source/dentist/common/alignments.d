@@ -1111,9 +1111,6 @@ struct AlignmentChain
 
         alias getContig = ac => mixin("ac." ~ contig);
         alias getCoords = la => mixin("la." ~ contig);
-        alias getComplementedCoords = la => LocalAlignment.Locus(
-
-        );
 
         auto referenceContig = getContig(alignmentChains[0]);
 
@@ -1549,6 +1546,89 @@ struct FlatLocalAlignment
     ) const pure if (contig.among("contigA", "contigB"))
     {
         return trace.translateTracePoint!contig(contigPos, roundingMode);
+    }
+
+
+    /**
+        Generate a cartoon of this alignment relative to `contig`.
+
+        Params:
+            bpsPerChar =    Number of base pairs that one char represents.
+
+        Returns: a cartoon of this alignment
+    */
+    static string cartoon(string contig)(in coord_t bpsPerChar, in FlatLocalAlignment[] localAlignments...)
+    {
+        if (localAlignments.length == 0)
+            return "";
+
+        alias getContig = fla => mixin("fla." ~ contig ~ ".contig");
+        alias getCoords = fla => mixin("fla." ~ contig ~ ".locus");
+
+        auto referenceContig = getContig(localAlignments[0]);
+
+        enforce!Exception(
+            localAlignments.all!(ac => getContig(ac) == referenceContig),
+            "all alignment chains must share the same reference contig",
+        );
+
+        auto cartoonLine(in FlatLocalAlignment fla)
+        {
+            auto skipBps = contig == "contigA" || !fla.flags.complement
+                ? getCoords(fla).begin
+                : referenceContig.length - getCoords(fla).end;
+
+            return chain(
+                ' '.repeat(skipBps / bpsPerChar),
+                '-'.repeat(ceildiv(getCoords(fla).length, bpsPerChar)),
+            );
+        }
+
+        return chain(
+            '-'.repeat(ceildiv(referenceContig.length, bpsPerChar)),
+            only('\n'),
+            localAlignments.map!cartoonLine.joiner(only('\n')),
+        ).to!string;
+    }
+
+    ///
+    unittest
+    {
+        auto flas = [
+            FlatLocalAlignment(
+                0,
+                FlatLocus(1, 10, 0, 3),
+                FlatLocus(1, 10, 0, 3),
+            ),
+            FlatLocalAlignment(
+                1,
+                FlatLocus(1, 10, 4, 5),
+                FlatLocus(1, 10, 4, 5),
+            ),
+            FlatLocalAlignment(
+                2,
+                FlatLocus(1, 10, 5, 8),
+                FlatLocus(1, 10, 0, 3),
+                Flags(Flag.complement),
+            ),
+            FlatLocalAlignment(
+                3,
+                FlatLocus(1, 10, 9, 10),
+                FlatLocus(1, 10, 4, 5),
+                Flags(Flag.complement),
+            ),
+        ];
+
+        assert(cartoon!"contigA"(1, flas) == "----------\n" ~
+                                             "---\n" ~
+                                             "    -\n" ~
+                                             "     ---\n" ~
+                                             "         -");
+        assert(cartoon!"contigB"(1, flas) == "----------\n" ~
+                                             "---\n" ~
+                                             "    -\n" ~
+                                             "       ---\n" ~
+                                             "     -");
     }
 }
 
