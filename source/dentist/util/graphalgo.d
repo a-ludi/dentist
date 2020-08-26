@@ -13,6 +13,7 @@ import dentist.util.math :
     NaturalNumberSet;
 import dentist.util.saturationmath;
 import std.algorithm :
+    any,
     copy,
     countUntil,
     sort;
@@ -139,6 +140,12 @@ struct FloydWarshallMatrix(weight_t)
     @property size_t numNodes() const pure nothrow @safe
     {
         return _numNodes;
+    }
+
+
+    bool hasNegativeCycles() const pure nothrow @safe
+    {
+        return iota(_numNodes).any!(n => dist(n, n) < 0);
     }
 
 
