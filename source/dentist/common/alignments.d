@@ -1464,7 +1464,7 @@ struct FlatLocalAlignment
 
         @property Contig contig() const pure nothrow @safe
         {
-            return Contig(begin, end);
+            return Contig(id, length);
         }
 
 
