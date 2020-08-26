@@ -16,6 +16,7 @@ import std.algorithm :
     any,
     copy,
     countUntil,
+    map,
     sort;
 import std.array :
     appender,
@@ -340,6 +341,18 @@ private auto floydWarshallMatrix(
 }
 
 
+enum GraphType : ubyte
+{
+    /// Any weighted graph (directed or undirected). Negative cycles are
+    /// allowed and may be detected after the algorithm finished.
+    general,
+    /// Directed acyclic graph. The algorithm can be faster by a constant
+    /// factor by first sorting in topoloigcal order and than skipping
+    /// irrelevant edges.
+    DAG,
+}
+
+
 /**
     Calculate all shortest paths between all pairs of nodes. The functions
     `hasEdge` and `weight` define the graphs structure and weights,
@@ -360,15 +373,23 @@ private auto floydWarshallMatrix(
                   is the pairs of nodes with optimal distances.
     Returns: FloydWarshallMatrix
 */
-auto shortestPathsFloydWarshall(alias hasEdge, alias weight)(size_t n)
+auto shortestPathsFloydWarshall(
+    alias hasEdge,
+    alias weight,
+    GraphType graphType = GraphType.general,
+)(size_t n)
 {
     size_t[2][] bestConnections;
 
-    return shortestPathsFloydWarshall!(hasEdge, weight)(n, bestConnections);
+    return shortestPathsFloydWarshall!(hasEdge, weight, graphType)(n, bestConnections);
 }
 
 /// ditto
-auto shortestPathsFloydWarshall(alias hasEdge, alias weight)(
+auto shortestPathsFloydWarshall(
+    alias hasEdge,
+    alias weight,
+    GraphType graphType = GraphType.general,
+)(
     size_t n,
     ref size_t[2][] bestConnections,
 )
@@ -377,6 +398,26 @@ auto shortestPathsFloydWarshall(alias hasEdge, alias weight)(
     alias _weight = binaryFun!weight;
     alias weight_t = typeof(_weight(size_t.init, size_t.init));
 
+    static if (graphType == GraphType.DAG)
+    {
+        auto topologicalOrder = iota(n)
+            .array
+            .sort!_hasEdge
+            .release;
+
+        alias N = (u) => topologicalOrder[u];
+        alias kRange = () => iota(1, n - 1);
+        alias uRange = (k) => iota(k);
+        alias vRange = (k, u) => iota(k + 1, n);
+    }
+    else
+    {
+        alias N = (u) => u;
+        alias kRange = () => iota(n);
+        alias uRange = (k) => iota(n);
+        alias vRange = (k, u) => iota(n);
+    }
+
     auto bestDists = uninitializedArray!(weight_t[])(bestConnections.length);
     auto matrix = floydWarshallMatrix!(_hasEdge, _weight)(
         n,
@@ -384,9 +425,12 @@ auto shortestPathsFloydWarshall(alias hasEdge, alias weight)(
         bestDists,
     );
 
-    foreach (k; 0 .. n)
-        foreach (u; 0 .. matrix.numNodes)
-            foreach (v; 0 .. matrix.numNodes)
+    if (n == 0)
+        return matrix;
+
+    foreach (k; kRange().map!N)
+        foreach (u; uRange(k).map!N)
+            foreach (v; vRange(k, u).map!N)
             {
                 auto ukDist = matrix.dist(u, k);
                 auto kvDist = matrix.dist(k, v);
@@ -497,6 +541,74 @@ unittest
         -1,
         -1,
     ]));
+}
+
+/// Optimize performance by choosing appropriate `graphType`
+unittest
+{
+    import std.datetime.stopwatch;
+
+    enum n = 5;
+    alias hasEdge = (u, v) => (u + 1 == v && u != 2) ||
+                              (u + 2 == v && u % 2 == 0);
+    alias weight = (u, v) => -(cast(long) u - cast(long) v)^^2;
+
+    alias shortestPathsGeneral = () => shortestPathsFloydWarshall!(
+        hasEdge,
+        weight,
+        GraphType.general,
+    )(n);
+    alias shortestPathsDAG = () => shortestPathsFloydWarshall!(
+        hasEdge,
+        weight,
+        GraphType.DAG,
+    )(n);
+
+    enum numRounds = 10_000;
+    auto result = benchmark!(
+        shortestPathsGeneral,  // => 157.029400ms
+        shortestPathsDAG,      // =>  35.348500ms
+    )(numRounds);
+
+    debug (2)
+    {
+        import std.stdio : writefln;
+
+        writefln!"Computed %d rounds:"(numRounds);
+        writefln!"shortestPathsGeneral:  %fms"(result[0].total!"nsecs"/1e9*1e3);
+        writefln!"shortestPathsDAG:      %fms"(result[1].total!"nsecs"/1e9*1e3);
+    }
+}
+
+// functional test of different graph types
+unittest
+{
+    enum n = 5;
+    alias hasEdge = (u, v) => (u + 1 == v && u != 2) ||
+                              (u + 2 == v && u % 2 == 0);
+    alias weight = (u, v) => -(cast(long) u - cast(long) v)^^2;
+
+    auto shortestPathsGeneral = shortestPathsFloydWarshall!(
+        hasEdge,
+        weight,
+        GraphType.general,
+    )(n);
+    auto shortestPathsDAG = shortestPathsFloydWarshall!(
+        hasEdge,
+        weight,
+        GraphType.DAG,
+    )(n);
+
+    assert(shortestPathsGeneral == shortestPathsDAG);
+}
+
+unittest
+{
+    enum n = 0;
+    alias hasEdge = (u, v) => true;
+    alias weight = (u, v) => 1;
+
+    cast(void) shortestPathsFloydWarshall!(hasEdge, weight)(n);
 }
 
 
