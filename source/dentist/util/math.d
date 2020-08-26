@@ -1778,98 +1778,103 @@ struct NaturalNumberSet
         }
     }
 
+    private static struct ElementsRange(Set)
+    {
+        Set* set;
+        size_t i = 0;
+        size_t j = 0;
+
+        this(Set* set) pure nothrow
+        {
+            this.set = set;
+
+            if (set.empty)
+            {
+                this.forceEmpty();
+            }
+            else
+            {
+                if (!set.has(front))
+                    popFront();
+            }
+        }
+
+        @property ElementsRange save() const pure nothrow
+        {
+            return cast(ElementsRange!Set) this;
+        }
+
+        void popFront() pure nothrow
+        {
+            assert(!empty, "Attempting to popFront an empty elements range");
+            ++j;
+
+            while (shiftedPartEmpty)
+            {
+                nextPart();
+
+                if (empty)
+                {
+                    return;
+                }
+            }
+
+            while (((part >> j) & firstBit) != firstBit && !shiftedPartEmpty)
+            {
+                ++j;
+            }
+
+            if (shiftedPartEmpty)
+            {
+                popFront();
+            }
+        }
+
+        @property size_t front() const pure nothrow
+        {
+            assert(!empty, "Attempting to fetch the front of an empty elements range");
+            return i * partSize + j;
+        }
+
+        @property bool empty() const pure nothrow
+        {
+            return i >= set.parts.length;
+        }
+
+        private void forceEmpty() pure nothrow
+        {
+            i = size_t.max;
+        }
+
+        private @property auto part() const pure nothrow
+        {
+            return set.parts[i];
+        }
+
+        private @property bool shiftedPartEmpty() const pure nothrow
+        {
+            return (part >> j) == emptyPart || j >= partSize;
+        }
+
+        private void nextPart() pure nothrow
+        {
+            // move to start of next part
+            ++i;
+            j = 0;
+        }
+    }
+
     /// Returns a range of the elements in this set. The elements are ordered
     /// ascending.
     @property auto elements() const pure nothrow
     {
-        static struct ElementsRange
-        {
-            const(NaturalNumberSet)* set;
-            bool _empty = false;
-            size_t i = 0;
-            size_t part;
-            size_t j = 0;
+        return ElementsRange!(typeof(this))(&this);
+    }
 
-            this(const(NaturalNumberSet)* set) pure nothrow
-            {
-                this.set = set;
-                this._empty = set.empty;
-
-                if (!this.empty)
-                {
-                    this.part = set.parts[i];
-                    if (!set.has(front))
-                    {
-                        popFront();
-                    }
-                }
-            }
-
-            @property ElementsRange save() const pure nothrow
-            {
-                return this;
-            }
-
-            void popFront() pure nothrow
-            {
-                assert(!empty, "Attempting to popFront an empty elements range");
-                ++j;
-
-                while (shiftedPartEmpty)
-                {
-                    nextPart();
-
-                    if (empty)
-                    {
-                        return;
-                    }
-                }
-
-                while (((part >> j) & firstBit) != firstBit && !shiftedPartEmpty)
-                {
-                    ++j;
-                }
-
-                if (shiftedPartEmpty)
-                {
-                    popFront();
-                }
-            }
-
-            @property size_t front() const pure nothrow
-            {
-                assert(!empty, "Attempting to fetch the front of an empty elements range");
-                return i * partSize + j;
-            }
-
-            @property bool empty() const pure nothrow
-            {
-                return _empty;
-            }
-
-            private @property bool shiftedPartEmpty() const pure nothrow
-            {
-                return (part >> j) == emptyPart || j >= partSize;
-            }
-
-            private void nextPart() pure nothrow
-            {
-                // move to start of next part
-                ++i;
-                j = 0;
-
-                if (i < set.parts.length)
-                {
-                    part = set.parts[i];
-                }
-                else
-                {
-                    _empty = true;
-                }
-            }
-        }
-
-        return ElementsRange(&this);
+    /// ditto
+    @property auto elements() pure nothrow
+    {
+        return ElementsRange!(typeof(this))(&this);
     }
 
     ///
