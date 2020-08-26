@@ -247,6 +247,12 @@ struct FloydWarshallMatrix(weight_t)
                 ? matrix.next(_current, _to)
                 : noNext;
         }
+
+
+        @property ShortestPath save() const pure nothrow @safe
+        {
+            return cast(typeof(return)) this;
+        }
     }
 
 
