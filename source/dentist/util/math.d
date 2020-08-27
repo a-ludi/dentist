@@ -1783,11 +1783,16 @@ struct NaturalNumberSet
         Set* set;
         size_t i = 0;
         size_t j = 0;
+        size_t fromElement;
+        size_t toElement;
 
-        this(Set* set) pure nothrow
+        this(Set* set, size_t fromElement, size_t toElement) pure nothrow
         {
             this.set = set;
+            this.fromElement = fromElement;
+            this.toElement = toElement;
 
+            this.moveTo(fromElement);
             if (set.empty)
             {
                 this.forceEmpty();
@@ -1833,12 +1838,18 @@ struct NaturalNumberSet
         @property size_t front() const pure nothrow
         {
             assert(!empty, "Attempting to fetch the front of an empty elements range");
-            return i * partSize + j;
+
+            return currentElement;
         }
 
         @property bool empty() const pure nothrow
         {
-            return i >= set.parts.length;
+            return i >= set.parts.length || currentElement >= toElement;
+        }
+
+        private @property size_t currentElement() const pure nothrow
+        {
+            return i * partSize + j;
         }
 
         private void forceEmpty() pure nothrow
@@ -1862,19 +1873,29 @@ struct NaturalNumberSet
             ++i;
             j = 0;
         }
+
+        private void moveTo(size_t element) pure nothrow
+        {
+            //return i * partSize + j;
+            i = element / partSize;
+            j = element % partSize;
+        }
     }
 
     /// Returns a range of the elements in this set. The elements are ordered
-    /// ascending.
-    @property auto elements() const pure nothrow
+    /// ascending. The elements are guaranteed to fulfill `fromElement <= front`
+    /// and `front < toElement`.
+    @property auto elements(size_t fromElement = 0, size_t toElement = size_t.max) const pure nothrow
+    in (fromElement <= toElement, "illegal range")
     {
-        return ElementsRange!(typeof(this))(&this);
+        return ElementsRange!(typeof(this))(&this, fromElement, toElement);
     }
 
     /// ditto
-    @property auto elements() pure nothrow
+    @property auto elements(size_t fromElement = 0, size_t toElement = size_t.max) pure nothrow
+    in (fromElement <= toElement, "illegal range")
     {
-        return ElementsRange!(typeof(this))(&this);
+        return ElementsRange!(typeof(this))(&this, fromElement, toElement);
     }
 
     ///
@@ -1911,6 +1932,28 @@ struct NaturalNumberSet
 
         auto expectedNumbers = iota(numElements).filter!"a == 0 || !((a - 1) % 10 == 0)";
         assert(equal(expectedNumbers, set.elements));
+    }
+
+    /// Limits `fromElement .. toElement` may be given
+    unittest
+    {
+        import std.algorithm : equal;
+        import std.range : iota;
+
+        NaturalNumberSet set;
+        auto someNumbers = iota(set.partSize).filter!"a % 3 == 0";
+
+        foreach (i; someNumbers)
+        {
+            set.add(i);
+        }
+
+        enum from = 3;
+        enum to = 16;
+        assert(equal(
+            someNumbers.filter!(n => from <= n && n < to),
+            set.elements(from, to),
+        ));
     }
 
     string toString() const pure
