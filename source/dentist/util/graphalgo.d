@@ -16,14 +16,15 @@ import std.algorithm :
     any,
     copy,
     countUntil,
-    map,
-    sort;
+    map;
 import std.array :
     appender,
     array,
     uninitializedArray;
 import std.functional : binaryFun;
-import std.range : iota;
+import std.range :
+    enumerate,
+    iota;
 import std.typecons :
     Tuple,
     Yes;
@@ -400,22 +401,20 @@ auto shortestPathsFloydWarshall(
 
     static if (graphType == GraphType.DAG)
     {
-        auto topologicalOrder = iota(n)
-            .array
-            .sort!_hasEdge
-            .release;
+        auto nodes = topologicalSort!_hasEdge(n);
 
-        alias N = (u) => topologicalOrder[u];
-        alias kRange = () => iota(1, n - 1);
-        alias uRange = (k) => iota(k);
-        alias vRange = (k, u) => iota(k + 1, n);
+        alias nodesSlice = (from, to) => nodes[from .. to].enumerate(from);
+        alias kRange = () => nodesSlice(1, n - 1);
+        alias uRange = (kIdx) => nodesSlice(0, kIdx);
+        alias vRange = (kIdx, uIdx) => nodesSlice(kIdx + 1, n);
     }
     else
     {
-        alias N = (u) => u;
-        alias kRange = () => iota(n);
-        alias uRange = (k) => iota(n);
-        alias vRange = (k, u) => iota(n);
+        auto nodes = enumerate(iota(n));
+
+        alias kRange = () => nodes;
+        alias uRange = (kIdx) => nodes;
+        alias vRange = (kIdx, uIdx) => nodes;
     }
 
     auto bestDists = uninitializedArray!(weight_t[])(bestConnections.length);
@@ -425,12 +424,12 @@ auto shortestPathsFloydWarshall(
         bestDists,
     );
 
-    if (n == 0)
+    if (n < 2)
         return matrix;
 
-    foreach (k; kRange().map!N)
-        foreach (u; uRange(k).map!N)
-            foreach (v; vRange(k, u).map!N)
+    foreach (kIdx, k; kRange())
+        foreach (uIdx, u; uRange(kIdx))
+            foreach (vIdx, v; vRange(kIdx, uIdx))
             {
                 auto ukDist = matrix.dist(u, k);
                 auto kvDist = matrix.dist(k, v);
@@ -599,6 +598,17 @@ unittest
         GraphType.DAG,
     )(n);
 
+    debug (2)
+    {
+        import std.stdio : writefln;
+
+        size_t[2][] connections = [[0, 4], [1, 4], [2, 4], [1, 3], [3, 4]];
+
+        shortestPathsGeneral.printConnections(connections);
+        writefln!"topologicalOrder: %(%d > %)"(topologicalSort!hasEdge(n));
+        shortestPathsDAG.printConnections(connections);
+    }
+
     assert(shortestPathsGeneral == shortestPathsDAG);
 }
 
@@ -609,6 +619,22 @@ unittest
     alias weight = (u, v) => 1;
 
     cast(void) shortestPathsFloydWarshall!(hasEdge, weight)(n);
+}
+
+unittest
+{
+    import std.algorithm : equal;
+
+    enum n = 1;
+    alias hasEdge = (u, v) => false;
+    alias weight = (u, v) => 0;
+
+    auto bestConnections = new size_t[2][1];
+    auto shortestPaths = shortestPathsFloydWarshall!(hasEdge, weight)(n, bestConnections);
+
+    assert(bestConnections == [[0, 0]]);
+    assert(shortestPaths.dist(0, 0) == 0);
+    assert(equal(shortestPaths.shortestPath(0, 0), [0]));
 }
 
 
@@ -796,10 +822,7 @@ auto dagSingleSourceShortestPaths(alias hasEdge, alias weight)(size_t start, siz
     with (result)
     {
         // sort topological
-        topologicalOrder = iota(n)
-            .array
-            .sort!_hasEdge
-            .release;
+        topologicalOrder = topologicalSort!_hasEdge(n);
         alias N = (u) => originalNode(u);
 
         _distance = uninitializedArray!(weight_t[])(n);
@@ -849,4 +872,94 @@ unittest
     assert(shortestPaths.distance(1) == 1);
     assert(equal(shortestPaths.reverseShortestPath(3), size_t[].init));
     assert(!shortestPaths.isConnected(3));
+}
+
+
+auto topologicalSort(alias hasEdge)(size_t n)
+{
+    alias _hasEdge = binaryFun!hasEdge;
+
+    // list that will contain the sorted nodes
+    auto sortedNodes = new size_t[n];
+
+    auto sortedNodesHead = sortedNodes[];
+    void enqueueNode(size_t node)
+    {
+        sortedNodesHead[$ - 1] = node;
+        --sortedNodesHead.length;
+    }
+
+    // keep track which nodes have been visited
+    auto unvisitedNodes = NaturalNumberSet(n, Yes.addAll);
+    auto temporaryVisitedNodes = NaturalNumberSet(n);
+
+    void visit(size_t node)
+    {
+        if (node !in unvisitedNodes)
+            // already visited
+            return;
+
+        if (node in temporaryVisitedNodes)
+            // cycle detected
+            throw new NoDAG();
+
+        temporaryVisitedNodes.add(node);
+
+        foreach (nextNode; unvisitedNodes.elements)
+            if (_hasEdge(node, nextNode))
+                visit(nextNode);
+
+        temporaryVisitedNodes.remove(node);
+        unvisitedNodes.remove(node);
+        enqueueNode(node);
+    }
+
+    foreach (node; unvisitedNodes.elements)
+        visit(node);
+
+    return sortedNodes;
+}
+
+///
+unittest
+{
+    import std.algorithm : equal;
+
+    //    _____________   _____________
+    //   /             v /             v
+    // (0) --> (1) --> (2)     (3) --> (4)
+    enum n = 5;
+    alias hasEdge = (u, v) => (u + 1 == v && u != 2) ||
+                              (u + 2 == v && u % 2 == 0);
+
+    auto topologicalOrder = topologicalSort!hasEdge(n);
+
+    assert(equal(topologicalOrder, [3, 0, 1, 2, 4]));
+}
+
+///
+unittest
+{
+    import std.exception : assertThrown;
+
+    //    _____________   _____________
+    //   /             v /             v
+    // (0) --> (1) --> (2)     (3) --> (4)
+    //   ^_____________________________/
+    enum n = 5;
+    alias hasEdge = (u, v) => (u + 1 == v && u != 2) ||
+                              (u + 2 == v && u % 2 == 0) ||
+                              u == 4 && v == 0;
+
+    assertThrown!NoDAG(topologicalSort!hasEdge(n));
+}
+
+
+/// Thrown if a cycle was detected.
+class NoDAG : Exception
+{
+    this(string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+    {
+        super("not a DAG: graph has cycles", file, line, next);
+    }
 }
