@@ -1704,7 +1704,7 @@ struct OptionsFor(DentistCommand _command)
             0.0 < value && value < 1.0,
             "maximum relative overlap must be in (0, 1)"
         )))
-        double maxRelativeOverlap = 1e-2;
+        double maxRelativeOverlap = 0.3;
     }
 
     static if (command.among(
