@@ -688,6 +688,12 @@ struct SingleSourceShortestPathsSolution(weight_t)
     }
 
 
+    @property const(weight_t)[] distances() const pure nothrow @safe
+    {
+        return _distance[];
+    }
+
+
     @property ref weight_t distance(size_t u) pure nothrow @safe
     {
         return _distance[u];
