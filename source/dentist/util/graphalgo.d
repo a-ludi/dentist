@@ -61,8 +61,6 @@ size_t[][] connectedComponents(alias hasEdge)(size_t n)
         // reduce node buffer
         nodesBuffer = restNodesBuffer;
 
-        // mark components nodes as visited
-        unvisitedNodes = unvisitedNodes - component;
     }
 
     return components.data;
@@ -79,8 +77,11 @@ unittest
     //   /             \
     // (0) --- (1) --- (2)     (3) --- (4)
     enum n = 5;
-    alias hasEdge = (u, v) => (absdiff(u , v) == 1 && min(u, v) != 2) ||
-                              (absdiff(u , v) == 2 && min(u, v) != 2);
+    alias connect = (u, v, x, y) => (u == x && v == y) || (u == y && v == x);
+    alias hasEdge = (u, v) => connect(u, v, 0, 1) ||
+                              connect(u, v, 1, 2) ||
+                              connect(u, v, 2, 0) ||
+                              connect(u, v, 3, 4);
 
     auto components = connectedComponents!hasEdge(n);
 
@@ -90,8 +91,35 @@ unittest
     ]));
 }
 
+unittest
+{
+    import std.algorithm :
+        equal,
+        min;
 
-private NaturalNumberSet discoverComponent(alias hasEdge)(NaturalNumberSet nodes)
+    //    _____________
+    //   /             \
+    // (0) --- (1) --- (2)     (3) --- (4)
+    //   \_____________________/
+    enum n = 5;
+    alias connect = (u, v, x, y) => (u == x && v == y) || (u == y && v == x);
+    alias hasEdge = (u, v) => connect(u, v, 0, 1) ||
+                              connect(u, v, 1, 2) ||
+                              connect(u, v, 2, 0) ||
+                              connect(u, v, 0, 3) ||
+                              connect(u, v, 3, 4);
+
+    auto components = connectedComponents!hasEdge(n);
+
+    import std.stdio;
+    writeln(components);
+    assert(equal(components, [
+        [0, 1, 2, 3, 4],
+    ]));
+}
+
+
+private NaturalNumberSet discoverComponent(alias hasEdge)(ref NaturalNumberSet nodes)
 {
     assert(!nodes.empty, "cannot discoverComponent of an empty graph");
 
@@ -100,33 +128,34 @@ private NaturalNumberSet discoverComponent(alias hasEdge)(NaturalNumberSet nodes
     // select start node
     auto currentNode = nodes.minElement;
 
-    walk: while (true)
-    {
-        // move currentNode from available nodes to the component
-        component.add(currentNode);
-        nodes.remove(currentNode);
+    discoverComponent!hasEdge(nodes, currentNode, component);
 
-        // try to find successor of current node
-        foreach (nextNode; nodes.elements)
-        {
-            if (hasEdge(currentNode, nextNode))
-            {
-                assert(
-                    hasEdge(nextNode, currentNode),
-                    "connectedComponents may be called only on an undirected graph",
-                );
-                // found succssor; select it as currentNode and repeat
-                currentNode = nextNode;
-                continue walk;
-            }
-        }
-
-        // no succssor found; component is finished
-        return component;
-    }
-
-    assert(0);
+    return component;
 }
+
+
+private void discoverComponent(alias hasEdge)(ref NaturalNumberSet nodes, size_t currentNode, ref NaturalNumberSet component)
+{
+    // move currentNode from available nodes to the component
+    component.add(currentNode);
+    nodes.remove(currentNode);
+
+    // try to find successor of current node
+    foreach (nextNode; nodes.elements)
+    {
+        if (hasEdge(currentNode, nextNode))
+        {
+            assert(
+                hasEdge(nextNode, currentNode),
+                "connectedComponents may be called only on an undirected graph",
+            );
+            // found successor -> recurse
+
+            discoverComponent!hasEdge(nodes, nextNode, component);
+        }
+    }
+}
+
 
 
 struct FloydWarshallMatrix(weight_t)
