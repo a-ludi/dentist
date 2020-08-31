@@ -2155,6 +2155,9 @@ struct OptionsFor(DentistCommand _command)
         @PreValidate(Priority.medium)
         void hookReadSkipGapsFile()
         {
+            if (skipGapsFile is null)
+                return;
+
             auto skipGapsFp = File(skipGapsFile, "r");
 
             foreach (line, gapSpec; skipGapsFp.byLine.enumerate(1))
