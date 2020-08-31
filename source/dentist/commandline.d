@@ -2248,6 +2248,7 @@ struct OptionsFor(DentistCommand _command)
     static if (command.among(
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        DentistCommand.validateRegions,
         TestingCommand.checkResults,
     ))
     {

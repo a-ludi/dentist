@@ -49,6 +49,7 @@ import std.array :
     array,
     uninitializedArray;
 import std.conv : to;
+import std.parallelism : parallel;
 import std.range :
     assumeSorted,
     enumerate,
@@ -240,16 +241,21 @@ class RegionsValidator
         mixin(traceExecution);
 
         foreach (
-            region, regionWithContext, regionContigs, consensusReadIds;
-            zip(
+            data;
+            parallel(zip(
                 StoppingPolicy.longest,
                 regions,
                 regionsWithContext,
                 contigIds,
                 readIds,
-            )
+            ))
         )
         {
+            auto region = data[0];
+            auto regionWithContext = data[1];
+            auto regionContigs = data[2];
+            auto consensusReadIds = data[3];
+
             auto validator = RegionValidator(
                 options,
                 cast(const) alignments,
@@ -261,7 +267,8 @@ class RegionsValidator
 
             validator.run();
 
-            weakCoverageMask |= validator.weakCoverageMask;
+            synchronized (this)
+                weakCoverageMask |= validator.weakCoverageMask;
         }
 
         if (options.weakCoverageMask !is null)
@@ -388,6 +395,8 @@ struct RegionValidator
 
         auto alignmentBounds = alignments
             .enumerate
+            .filter!(enumLA => enumLA.value.contigA.begin < regionWithContext.end &&
+                               regionWithContext.begin < enumLA.value.contigA.end)
             .map!(enumLA => only(
                 AlignmentBound(enumLA.value.contigA.begin, Bound.open, enumLA.value.contigB.id, enumLA.index),
                 AlignmentBound(enumLA.value.contigA.end, Bound.close, enumLA.value.contigB.id, enumLA.index),
