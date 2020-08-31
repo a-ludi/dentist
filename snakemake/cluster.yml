@@ -33,6 +33,11 @@ ref_vs_reads_alignment_block:
     memory:     32768
     time:       "00:30"
 
+ref_vs_reads_chained_alignment_block:
+    jobname:    dentist.{rule}.{wildcards.block_reads}
+    memory:     32768
+    time:       "00:30"
+
 mask_reads:
     memory:     16384
     time:       "00:15"
@@ -59,7 +64,7 @@ preliminary_output:
     time:       "00:30"
 
 preliminary_gap_closed_vs_reads_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block_reads}
+    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.block_reads}
     memory:     32768
     time:       "00:30"
 

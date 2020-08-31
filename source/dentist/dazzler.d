@@ -148,7 +148,7 @@ enum forceLargeTracePointType = 126;
 enum minAverageCorrelationRate = 0.7;
 
 /// Minimum allowed value for `-n` option of `damapper`
-enum minBestMatches = 0.7;
+version (damapper) enum minBestMatches = 0.7;
 
 enum isOptionsList(T) = isArray!T && isSomeString!(ElementType!T);
 
@@ -320,25 +320,28 @@ void computeLocalAlignments(Options)(in string[] dbList, in Options options)
     dalign(dbList, options.dalignerOptions, options.tmpdir);
 }
 
-AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
-        if (isOptionsList!(typeof(options.damapperOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.tmpdir)))
+version (damapper)
 {
-    if (!lasFileGenerated(dbA, dbB, options.tmpdir))
+    AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
+            if (isOptionsList!(typeof(options.damapperOptions)) &&
+                isOptionsList!(typeof(options.ladumpOptions)) &&
+                isSomeString!(typeof(options.tmpdir)))
     {
-        damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
+        if (!lasFileGenerated(dbA, dbB, options.tmpdir))
+        {
+            damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
+        }
+
+        return getGeneratedAlignments(dbA, dbB, options);
     }
 
-    return getGeneratedAlignments(dbA, dbB, options);
-}
-
-void computeMappings(Options)(in string[] dbList, in Options options)
-        if (isOptionsList!(typeof(options.damapperOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.tmpdir)))
-{
-    damapper(dbList, options.damapperOptions, options.tmpdir);
+    void computeMappings(Options)(in string[] dbList, in Options options)
+            if (isOptionsList!(typeof(options.damapperOptions)) &&
+                isOptionsList!(typeof(options.ladumpOptions)) &&
+                isSomeString!(typeof(options.tmpdir)))
+    {
+        damapper(dbList, options.damapperOptions, options.tmpdir);
+    }
 }
 
 private AlignmentChain[] getGeneratedAlignments(Options)(
@@ -991,6 +994,7 @@ unittest
 
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias complement = AlignmentFlag.complement;
+    alias alternateChain = AlignmentFlag.alternateChain;
 
     auto alignmentChains = readLasDump(testLasDump, 0).array;
     auto expectedResult = [
@@ -1016,7 +1020,7 @@ unittest
             1,
             Contig(19, 31),
             Contig(20, 33),
-            AlignmentFlags(complement),
+            AlignmentFlags(complement, alternateChain),
             [
                 LocalAlignment(
                     Locus(21, 22),
@@ -3439,7 +3443,7 @@ string getDalignment(in string referenceDb, in string queryDb, in string[] dalig
 
     Returns: path to las-file.
 */
-string getDamapping(
+version(damapper) string getDamapping(
     in string refDb,
     in string queryDb,
     in string[] damapperOptions,
@@ -4953,6 +4957,9 @@ enum DalignerOptions : string
     /// in any of the masked intervals are ignored for the purposes of seeding
     /// a match.
     masks = "-m",
+    /// sort .las by A-read,A-position pairs for map usecase;
+    /// off => sort .las by A,B-read pairs for overlap piles
+    sortMap = "-a",
 }
 
 
@@ -4986,7 +4993,7 @@ enum DatanderOptions : string
 }
 
 /// Options for `damapper`.
-enum DamapperOptions : string
+version (damapper) enum DamapperOptions : string
 {
     verbose = "-v",
     /// If the -b option is set, then the daligner assumes the data has a
@@ -5250,11 +5257,13 @@ private
         executeCommand(only("DASqv", "-v", coverageArg, dbFile, lasFile), null);
     }
 
+    version (damapper)
     void damapper(in string refDam, in string readsDam, in string[] damapperOpts, in string outdir)
     {
         damapper([refDam, readsDam], damapperOpts, outdir);
     }
 
+    version (damapper)
     @ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
     void damapper(in string[] dbList, in string[] damapperOpts, in string outdir)
     {

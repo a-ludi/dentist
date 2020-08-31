@@ -19,6 +19,7 @@ import dentist.common.alignments :
     AlignmentFlags = Flags,
     AlignmentLocationSeed,
     arithmetic_t,
+    chainLocalAlignments,
     Contig,
     coord_t,
     getType,
@@ -47,8 +48,8 @@ import dentist.common.scaffold :
     Scaffold;
 import dentist.dazzler :
     dbSubset,
-    getAlignments,
-    getDamapping,
+    getFlatLocalAlignments,
+    getDalignment,
     GapSegment;
 import dentist.util.algorithm :
     backtracking,
@@ -1211,18 +1212,18 @@ private class BubbleResolver
             );
 
         // Align without any mask
-        auto intermediateAlignmentsFile = getDamapping(
+        auto intermediateAlignmentsFile = getDalignment(
             intermediateContigsDb,
             skippingPileUpDb,
-            options.anchorSkippingPileUpsOptions.damapperOptions,
+            options.anchorSkippingPileUpsOptions.dalignerOptions,
             options.tmpdir,
         );
-        auto intermediateAlignments = getAlignments(
+        auto intermediateAlignments = getFlatLocalAlignments(
             intermediateContigsDb,
             skippingPileUpDb,
             intermediateAlignmentsFile,
             Yes.includeTracePoints,
-        );
+        ).chainLocalAlignments(options.chainingOptions).array;
         foreach (ref ac; intermediateAlignments)
         {
             // Filter alignments covering the whole intermediate contig

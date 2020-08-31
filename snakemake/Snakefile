@@ -567,6 +567,8 @@ tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 reads_vs_ref_alignment = alignment_file(reads, reference)
+chained_ext = ".chained"
+ref_vs_reads_chained_alignment = prepend_ext(ref_vs_reads_alignment, chained_ext)
 preliminary_gap_closed_vs_reads_alignment = alignment_file(preliminary_gap_closed, reads)
 self_mask = workflow_.get("self_mask", "dentist-self")
 dust_mask = "dust"
@@ -652,6 +654,7 @@ localrules:
     mark_reads,
     ref_vs_reads_alignment,
     reads_vs_ref_alignment,
+    ref_vs_reads_chained_alignment,
     propagate_mask_back_to_reference,
     extend_dentist_config_for_merge_insertions,
     merge_insertions,
@@ -677,14 +680,13 @@ default_targets = [
 
 if config.get("debug", False):
     default_targets.append([
-        preliminary_closed_gaps,
-        rules.validate_regions.output,
-        rules.weak_coverage_mask.output,
+        validation_report,
+        mask_files(preliminary_gap_closed, weak_coverage_mask),
     ])
 
 
 rule ALL:
-    input: *default_targets
+    input: default_targets
 
 
 checkpoint extend_dentist_config:
@@ -697,15 +699,15 @@ checkpoint extend_dentist_config:
         dentist_config["__default__"]["reference"] = reference
         dentist_config["__default__"]["reads"] = reads
         dentist_config["__default__"]["result"] = gap_closed_fasta
-        dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_alignment
+        dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_chained_alignment
         dentist_config["__default__"]["mask"] = [homogenized_mask(m)  for m in masks]
         dentist_config["__default__"]["pile-ups"] = pile_ups
         dentist_config["__default__"]["insertions"] = insertions
         dentist_config["__default__"]["daccord"] = shlex.split(additional_consensus_options)
         dentist_config["__default__"]["daligner-consensus"] = shlex.split(additional_consensus_alignment_options)
         dentist_config["__default__"]["daligner-reads-vs-reads"] = shlex.split(additional_reads_vs_reads_alignment_options)
+        dentist_config["__default__"]["daligner-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
         dentist_config["__default__"]["daligner-self"] = shlex.split(additional_self_alignment_options)
-        dentist_config["__default__"]["damapper-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
         dentist_config["__default__"]["datander-ref"] = shlex.split(additional_tandem_alignment_options)
         dentist_config["__default__"]["dust-reads"] = shlex.split(additional_reads_dust_options)
 
@@ -974,6 +976,45 @@ rule reads_vs_ref_alignment:
         "LAmerge {output} {input[block_alignments]}"
 
 
+rule ref_vs_reads_chained_alignment_block:
+    input:
+        config = await_dentist_config(),
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
+        alignment = alignment_file(reference, reads, block_b='{block_reads}')
+    output:
+        prepend_ext(alignment_file(reference, reads, block_b='{block_reads}'), chained_ext)
+    params:
+        reference_stub = db_stub(reference),
+        reads_stub = db_stub(reads)
+    threads: max_threads
+    log: log_file("ref-vs-reads-chained-alignment.{block_reads}")
+    shell:
+        """
+            {{
+                dentist chain-local-alignments --config={input.config} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {output}
+                LAcheck -v {input.refdb[0]} {input.readsdb[0]} {output} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule ref_vs_reads_chained_alignment:
+    input:
+        await_db_files(reference),
+        await_db_files(reads),
+        block_alignments = lambda _: [prepend_ext(blas, chained_ext)  for blas in block_alignments(reference, reads, damapper="forward")]
+    output:
+        protected(ref_vs_reads_chained_alignment)
+    log: log_file("ref-vs-reads-chained-alignment")
+    shell:
+        """
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {reference} {reads} {output} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
 rule mask_reads:
     input:
         await_dentist_config(),
@@ -1146,8 +1187,8 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         mask_files(preliminary_gap_closed, self_mask),
         mask_files(preliminary_gap_closed, tandem_mask)
     output:
-        alignment_file(preliminary_gap_closed, reads, block_b='{block_reads}'),
-        temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}'))
+        alignment_file(preliminary_gap_closed, reads, block_a='{block_ref}', block_b='{block_reads}'),
+        temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}', block_b='{block_ref}'))
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
         preliminary_gap_closed_stub = db_stub(rel_to_workdir(preliminary_gap_closed)),
@@ -1156,14 +1197,31 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         alignment_file_b_vs_a = lambda _, output: basename(output[1]),
         dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
     threads: max_threads
-    log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
+    log: log_file("gap-closed-vs-reads-alignment.{block_ref}.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.dalign_flags} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
+                {params.aligncmd} {params.dalign_flags} {params.preliminary_gap_closed_stub}.{wildcards.block_ref} {params.reads_stub}.{wildcards.block_reads}
                 LAcheck -v {params.preliminary_gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
                 LAcheck -v {params.reads_stub} {params.preliminary_gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule preliminary_gap_closed_vs_reads_alignment:
+    input:
+        await_db_files(preliminary_gap_closed),
+        await_db_files(reads),
+        block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads)
+    output:
+        protected(preliminary_gap_closed_vs_reads_alignment)
+    log: log_file("gap-closed-vs-reads-alignment")
+    shell:
+        """
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1178,23 +1236,6 @@ rule split_preliminary_gap_closed_vs_reads_alignment:
         """
             {{
                 LAsplit {params.split_alignment} {validation_blocks} < {input}
-                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
-            }} &> {log}
-        """
-
-
-rule preliminary_gap_closed_vs_reads_alignment:
-    input:
-        await_db_files(preliminary_gap_closed),
-        await_db_files(reads),
-        block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads, damapper="forward")
-    output:
-        protected(preliminary_gap_closed_vs_reads_alignment)
-    log: log_file("gap-closed-vs-reads-alignment")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
                 LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
             }} &> {log}
         """
@@ -1247,7 +1288,7 @@ rule weak_coverage_mask:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
     shell:
-        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db} {weak_coverage_mask} {params.block_masks} 2> {log}"
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
 
 rule skip_gaps:

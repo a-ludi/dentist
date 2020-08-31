@@ -49,7 +49,6 @@ import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DaccordOptions,
     DalignerOptions,
-    DamapperOptions,
     DatanderOptions,
     dbdustMaskName,
     DbSplitOptions,
@@ -60,7 +59,6 @@ import dentist.dazzler :
     getTracePointDistance,
     lasEmpty,
     minAverageCorrelationRate,
-    minBestMatches,
     OptionModifier,
     withOption;
 import dentist.util.process : isExecutable;
@@ -360,7 +358,9 @@ struct OptionsFor(DentistCommand _command)
 
     static enum needChainingOptions = command.among(
         DentistCommand.chainLocalAlignments,
+        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
+        TestingCommand.checkResults,
     );
 
     @Option()
@@ -550,7 +550,7 @@ struct OptionsFor(DentistCommand _command)
         @Argument("<in:ref-vs-reads-alignment>")
         @Help(q"{
             alignments chains of the reads against the reference in form of a .las
-            file as produced by `damapper`
+            file as produced by `daligner` and `dentist chain-local-alignments`.
         }")
         @(Validate!validateLasFile)
         string readsAlignmentFile;
@@ -562,8 +562,8 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:gap-closed-vs-reads-alignment>")
         @Help("
-            alignments chains of the reads against the gap-closed reference in
-            form of a .las file as produced by `damapper`
+            local alignments of the reads against the gap-closed reference in
+            form of a .las file as produced by `daligner`
         ")
         @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string readsAlignmentFile;
@@ -837,9 +837,8 @@ struct OptionsFor(DentistCommand _command)
         @Option("auxiliary-threads", "aux-threads", "A")
         @MetaVar("num-threads")
         @Help("
-            use <num-threads> threads for auxiliary tools like `daligner`,
-            `damapper` and `daccord`
-            (defaults to floor(totalCpus / <threads>) )
+            use <num-threads> threads for auxiliary tools like `daligner` and
+            `daccord` (defaults to floor(totalCpus / <threads>) )
         ")
         uint numAuxiliaryThreads;
 
@@ -1278,6 +1277,23 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("daligner-ref-vs-reads")
+        @MetaVar("<daligner-option>...")
+        @Help("Provide additional options to `daligner`")
+        void addAdditionalRefVsReadsAlignmentOptions(string option)
+        {
+            additionalRefVsReadsAlignmentOptions ~= option;
+        }
+
+        @Option()
+        string[] additionalRefVsReadsAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
         DentistCommand.processPileUps,
     ))
     {
@@ -1291,23 +1307,6 @@ struct OptionsFor(DentistCommand _command)
 
         @Option()
         string[] additionalSelfAlignmentOptions;
-    }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-    ))
-    {
-        @Option("damapper-ref-vs-reads")
-        @MetaVar("<damapper-option>...")
-        @Help("Provide additional options to `damapper`")
-        void addAdditionalRefVsReadsAlignmentOptions(string option)
-        {
-            additionalRefVsReadsAlignmentOptions ~= option;
-        }
-
-        @Option()
-        string[] additionalRefVsReadsAlignmentOptions;
     }
 
     static if (command.among(
@@ -2063,13 +2062,13 @@ struct OptionsFor(DentistCommand _command)
         @property string[] recoverImperfectContigsAlignmentOptions() const
         {
             return [
-                DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
-                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                DamapperOptions.kMerSize ~ "32",
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                DalignerOptions.asymmetric,
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DalignerOptions.kMerSize ~ "32",
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     1.0 - maxImperfectContigError,
                 ),
+                format!(DalignerOptions.tracePointDistance ~ "%d")(tracePointDistance),
             ];
         }
     }
@@ -2215,6 +2214,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.validateRegions,
+        TestingCommand.checkResults,
     ))
     {
         @Option()
@@ -2228,6 +2228,8 @@ struct OptionsFor(DentistCommand _command)
                 auto alignmentFile = readsAlignmentFile;
             else static if (is(typeof(dbAlignmentFile)))
                 auto alignmentFile = dbAlignmentFile;
+            else
+                tracePointDistance = 100;
 
             static if (is(typeof(alignmentFile)))
             {
@@ -2532,16 +2534,14 @@ struct OptionsFor(DentistCommand _command)
     ) {
         @property string[] refVsReadsAlignmentOptions() const
         {
-            with (DamapperOptions) with (OptionModifier)
+            with (DalignerOptions) with (OptionModifier)
                 return additionalRefVsReadsAlignmentOptions
                     .dup
-                    .withOption(cast(string) symmetric, ensurePresent)
-                    .withOption(cast(string) oneDirection, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
                     .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
-                    .withOption(cast(string) bestMatches, minBestMatches.to!string, replaceOrAdd)
-                    .withOption(cast(string) sortPileOrder, remove)
-                    .withOption(cast(string) oneDirection, remove)
+                    .withOption(cast(string) asymmetric, remove)
+                    .withOption(cast(string) sortMap, remove)
+                    .withOption(cast(string) identity, remove)
                     .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
                     .array;
         }
@@ -2551,7 +2551,7 @@ struct OptionsFor(DentistCommand _command)
         ) {
             static struct AnchorSkippingPileUpsOptions
             {
-                string[] damapperOptions;
+                string[] dalignerOptions;
                 string[] dbsplitOptions;
                 string tmpdir;
             }
@@ -2713,8 +2713,7 @@ template commandSummary(DentistCommand command)
         }".wrap;
     else static if (command == DentistCommand.generateDazzlerOptions)
         enum commandSummary = q"{
-            Generate a set of options to pass to `daligner` and `damapper`
-            needed for the input alignments.
+            Outputs advice on how to produce the required alignments.
         }".wrap;
     else static if (command == DentistCommand.maskRepetitiveRegions)
         enum commandSummary = q"{
@@ -3193,14 +3192,6 @@ private
         enforce!CLIException(
             0 < value,
             option ~ " must be greater than zero",
-        );
-    }
-
-    void validateAverageCorrelationRate(V)(V value)
-    {
-        enforce!CLIException(
-            0.7 <= value && value < 1.0,
-            "-e option of daligner/damapper must be in [0.7, 1) - some error rate(s) are too high",
         );
     }
 
