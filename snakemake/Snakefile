@@ -663,10 +663,21 @@ wildcard_constraints:
     dam = r"[^/\.]+"
 
 
+default_targets = [
+    gap_closed_fasta,
+    closed_gaps_bed,
+]
+
+if config.get("debug", False):
+    default_targets.append([
+        preliminary_closed_gaps,
+        rules.validate_regions.output,
+        rules.weak_coverage_mask.output,
+    ])
+
+
 rule ALL:
-    input:
-        gap_closed_fasta,
-        closed_gaps_bed
+    input: *default_targets
 
 
 checkpoint extend_dentist_config:
