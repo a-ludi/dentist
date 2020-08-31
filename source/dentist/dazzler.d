@@ -754,8 +754,6 @@ private:
     Flag!"wasDumpPartConsumed" readChainPart()
     {
         enum chainPartFormat = LasDumpLineFormat.chainPart.format;
-        enum yesComplement = AlignmentFlags(AlignmentFlag.complement);
-        enum noComplement = AlignmentFlags();
         id_t contigAID;
         id_t contigBID;
         char rawComplement;
@@ -768,11 +766,10 @@ private:
             rawChainPartType,
         );
 
-        auto flags = rawComplement == 'c' ? yesComplement : noComplement;
         auto chainPartType = rawChainPartType.to!ChainPartType;
-        flags |= chainPartType == ChainPartType.alternateStart
-            ? AlignmentFlags(AlignmentFlag.alternateChain)
-            : AlignmentFlags();
+        AlignmentFlags flags;
+        flags.complement = (rawComplement == 'c');
+        flags.alternateChain = (chainPartType == ChainPartType.alternateStart);
 
         auto startingNewChain = currentAC == AlignmentChain.init;
 
@@ -787,7 +784,10 @@ private:
         }
         else if (isChainContinuation(contigAID, contigBID, chainPartType))
         {
-            _enforce(currentAC.flags == flags, "matching both strands in one alignment chain");
+            _enforce(
+                currentAC.flags.complement == flags.complement,
+                "matching both strands in one alignment chain",
+            );
             finishCurrentLA();
 
             return Yes.wasDumpPartConsumed;
