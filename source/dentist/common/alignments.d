@@ -105,6 +105,7 @@ enum Flag : ubyte
 {
     complement = 1 << 0,
     disabled = 1 << 1,
+    alternateChain = 1 << 2,
 }
 
 

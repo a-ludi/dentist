@@ -770,6 +770,10 @@ private:
 
         auto flags = rawComplement == 'c' ? yesComplement : noComplement;
         auto chainPartType = rawChainPartType.to!ChainPartType;
+        flags |= chainPartType == ChainPartType.alternateStart
+            ? AlignmentFlags(AlignmentFlag.alternateChain)
+            : AlignmentFlags();
+
         auto startingNewChain = currentAC == AlignmentChain.init;
 
         if (startingNewChain)
@@ -1802,7 +1806,9 @@ private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
             alignmentChain.flags.complement ? 'c' : 'n',
             isChain
                 ? (i == 0
-                    ? ChainPartType.start
+                    ? (alignmentChain.flags.alternateChain
+                        ? ChainPartType.alternateStart
+                        : ChainPartType.start)
                     : ChainPartType.continuation)
                 : ChainPartType.noChainInFile,
         );
