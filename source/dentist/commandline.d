@@ -2094,21 +2094,11 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("weak-coverage-window")
         @MetaVar("<bps>")
-        @Help("
+        @Help(format!"
             consider sliding window of <bps> base pairs to identify weak
-            coverage (default: trace point spacing of alignment)
-        ")
-        coord_t weakCoverageWindow;
-
-
-        @PreValidate(Priority.low)
-        void hookEnsurePresenceOfWeakCoverageWindow()
-        {
-            if (weakCoverageWindow > 0)
-                return;
-
-            weakCoverageWindow = tracePointDistance;
-        }
+            coverage (default: %d)
+        "(defaultValue!weakCoverageWindow))
+        coord_t weakCoverageWindow = 500;
     }
 
     static if (command.among(
