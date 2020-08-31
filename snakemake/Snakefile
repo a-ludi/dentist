@@ -548,7 +548,7 @@ validation_blocks = config["validation_blocks"]
 reference_fasta = inputs["reference"]
 reads_fasta = inputs["reads"]
 gap_closed_fasta = outputs["output_assembly"]
-preliminary_gap_closed_fasta = join(workdir_, db_name(outputs["output_assembly"]) + "-preliminary.dam")
+preliminary_gap_closed_fasta = join(workdir_, db_name(outputs["output_assembly"]) + "-preliminary.fasta")
 validation_report = outputs.get("validation_report", join(workdir_, "validation-report.json"))
 validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
 gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
@@ -655,7 +655,8 @@ localrules:
     split_preliminary_gap_closed_vs_reads_alignment,
     preliminary_closed_gaps_bed2mask,
     validate_regions,
-    weak_coverage_mask
+    weak_coverage_mask,
+    skip_gaps
 
 
 wildcard_constraints:
@@ -1194,9 +1195,9 @@ rule preliminary_closed_gaps_bed2mask:
 
 rule validate_regions_block:
     input:
-        await_db_files(preliminary_gap_closed),
-        await_db_files(reads),
-        mask_files(preliminary_gap_closed, closed_gaps_mask),
+        refdb = await_db_files(preliminary_gap_closed),
+        reads = await_db_files(reads),
+        mask_files = mask_files(preliminary_gap_closed, closed_gaps_mask),
         alignment = alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}")
     output:
         temp(validation_report_block),
@@ -1205,7 +1206,7 @@ rule validate_regions_block:
         block_mask = block_mask(weak_coverage_mask, "{block_ref}")
     log: log_file("validate-regions-block.{block_ref}")
     shell:
-        "dentist validate-regions --config={dentist_config_file} --weak-coverage-mask={params.block_mask} {input[0]} - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
+        "dentist validate-regions --config={dentist_config_file} --weak-coverage-mask={params.block_mask} {input.refdb[0]} - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
 
 
 rule validate_regions:
@@ -1227,7 +1228,7 @@ rule weak_coverage_mask:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
     shell:
-        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
 
 rule skip_gaps:

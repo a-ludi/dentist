@@ -54,11 +54,11 @@ process:
     memory:     16384
     time:       "02:00"
 
-output:
+preliminary_output:
     memory:     16384
     time:       "00:30"
 
-gap_closed_vs_reads_alignment_block:
+preliminary_gap_closed_vs_reads_alignment_block:
     jobname:    dentist.{rule}.{wildcards.block_reads}
     memory:     32768
     time:       "00:30"
@@ -67,3 +67,8 @@ validate_regions_block:
     jobname:    dentist.{rule}.{wildcards.block_ref}
     memory:     32768
     time:       "00:30"
+
+purged_output:
+    memory:     16384
+    time:       "00:30"
+
