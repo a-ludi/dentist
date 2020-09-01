@@ -1796,21 +1796,19 @@ private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
         return;
 
 
-    auto isChain = alignmentChain.localAlignments.length > 1;
-
     foreach (i, localAlignment; alignmentChain.localAlignments)
     {
+        auto chainPartType = i == 0
+            ? (alignmentChain.flags.alternateChain
+                ? ChainPartType.alternateStart
+                : ChainPartType.start)
+            : ChainPartType.continuation;
+
         writer.writefln!"P %d %d %c %c"(
             alignmentChain.contigA.id,
             alignmentChain.contigB.id,
             alignmentChain.flags.complement ? 'c' : 'n',
-            isChain
-                ? (i == 0
-                    ? (alignmentChain.flags.alternateChain
-                        ? ChainPartType.alternateStart
-                        : ChainPartType.start)
-                    : ChainPartType.continuation)
-                : ChainPartType.noChainInFile,
+            chainPartType,
         );
         writer.writefln!"C %d %d %d %d"(
             localAlignment.contigA.begin,
