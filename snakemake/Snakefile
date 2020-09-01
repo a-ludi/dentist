@@ -573,7 +573,11 @@ dust_mask = "dust"
 tandem_mask = "tan"
 reads_mask = workflow_.get("reads_mask", "dentist-reads")
 weak_coverage_mask = workflow_.get("weak_coverage_mask", "dentist-weak-coverage")
-masks = [self_mask, tandem_mask, reads_mask]
+masks = [
+    self_mask,
+    tandem_mask,
+    reads_mask,
+]
 pile_ups = join(workdir_, workflow_.get("pile_ups", "pile-ups.db"))
 insertions_batch = join(workdir_, workflow_.get("insertions_batch", "insertions/batch.{batch_id}.db"))
 insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
@@ -660,7 +664,10 @@ localrules:
 
 
 wildcard_constraints:
-    dam = r"[^/\.]+"
+    dam = r"[^/\.]+",
+    block_reads = r"[0-9]+",
+    block_ref = r"[0-9]+",
+    block = r"[0-9]+"
 
 
 default_targets = [
@@ -691,7 +698,7 @@ checkpoint extend_dentist_config:
         dentist_config["__default__"]["reads"] = reads
         dentist_config["__default__"]["result"] = gap_closed_fasta
         dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_alignment
-        dentist_config["__default__"]["mask"] = masks
+        dentist_config["__default__"]["mask"] = [homogenized_mask(m)  for m in masks]
         dentist_config["__default__"]["pile-ups"] = pile_ups
         dentist_config["__default__"]["insertions"] = insertions
         dentist_config["__default__"]["daccord"] = shlex.split(additional_consensus_options)
@@ -1049,7 +1056,7 @@ checkpoint collect:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        ref_vs_reads_alignment,
+        ref_vs_reads_chained_alignment,
         *[mask_files(reference, homogenized_mask(m))  for m in masks]
     output:
         protected(pile_ups)
