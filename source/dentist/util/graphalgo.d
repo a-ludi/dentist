@@ -112,7 +112,6 @@ unittest
     auto components = connectedComponents!hasEdge(n);
 
     import std.stdio;
-    writeln(components);
     assert(equal(components, [
         [0, 1, 2, 3, 4],
     ]));
