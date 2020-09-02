@@ -14,9 +14,6 @@ import dentist.common.scaffold :
     ContigPart,
     Join;
 import dentist.util.algorithm : cmpLexicographically, orderLexicographically;
-import dentist.util.graphalgo :
-    dagSingleSourceShortestPaths,
-    connectedComponents;
 import dentist.util.log;
 import dentist.util.math : absdiff, ceildiv, floor, RoundingMode;
 import core.exception : AssertError;
