@@ -28,17 +28,17 @@ import std.typecons : Flag, No, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
-auto pipeLines(Range)(Range command, in string workdir = null)
+auto pipeLines(Flag!"isBuffered" isBuffered = No.isBuffered, Range)(Range command, in string workdir = null)
         if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     auto sanitizedCommand = command.filter!"a != null".array;
 
-    return new LinesPipe!ProcessInfo(ProcessInfo(sanitizedCommand, workdir));
+    return new LinesPipe!(ProcessInfo, isBuffered)(ProcessInfo(sanitizedCommand, workdir));
 }
 
-auto pipeLines(in string shellCommand, in string workdir = null)
+auto pipeLines(Flag!"isBuffered" isBuffered = No.isBuffered)(in string shellCommand, in string workdir = null)
 {
-    return new LinesPipe!ShellInfo(ShellInfo(shellCommand, workdir));
+    return new LinesPipe!(ShellInfo, isBuffered)(ShellInfo(shellCommand, workdir));
 }
 
 unittest
@@ -71,13 +71,19 @@ private struct ShellInfo
     const(string) workdir;
 }
 
-static final class LinesPipe(CommandInfo)
+static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
 {
     static enum lineTerminator = "\n";
 
+    static if (isBuffered)
+        alias line_t = char[];
+    else
+        alias line_t = string;
+
     private CommandInfo processInfo;
     private ProcessPipes process;
-    private string currentLine;
+    private line_t currentLine;
+
 
     this(CommandInfo processInfo)
     {
@@ -156,9 +162,17 @@ static final class LinesPipe(CommandInfo)
     {
         ensureInitialized();
         assert(!empty, "Attempting to popFront an empty LinesPipe");
-        currentLine = process.stdout.readln();
 
-        if (currentLine.empty)
+        static if (isBuffered)
+        {
+            process.stdout.readln(currentLine);
+        }
+        else
+        {
+            currentLine = process.stdout.readln();
+        }
+
+        if (currentLine.length == 0)
         {
             currentLine = null;
             releaseProcess();
@@ -168,7 +182,7 @@ static final class LinesPipe(CommandInfo)
             currentLine = currentLine[0 .. $ - lineTerminator.length];
     }
 
-    @property string front()
+    @property line_t front()
     {
         ensureInitialized();
         assert(!empty, "Attempting to fetch the front of an empty LinesPipe");
