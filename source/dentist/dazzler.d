@@ -416,19 +416,23 @@ AlignmentChain[] getAlignments(
         tracePointDistance = getTracePointDistance(lasFile);
     }
 
-    auto lasdumpReader = readLasDump(ladump(
+    auto lasDumpReader = readLasDump(ladump(
         lasFile,
         dbA,
         dbB,
         ladumpOptions,
     ), tracePointDistance);
-    scope (exit) lasdumpReader.closePipe();
-    auto alignmentChains = lasdumpReader.array;
+    scope (exit) lasDumpReader.closePipe();
+    auto alignmentChainsBuffer = uninitializedArray!(AlignmentChain[])(
+        lasDumpReader.numLocalAlignments,
+    );
+    auto bufferRest = lasDumpReader.copy(alignmentChainsBuffer);
+    alignmentChainsBuffer.length -= bufferRest.length;
 
     if (flags & AlignmentReaderFlag.sort)
-        alignmentChains.sort!("a < b", SwapStrategy.stable);
+        alignmentChainsBuffer.sort!("a < b", SwapStrategy.stable);
 
-    return alignmentChains;
+    return alignmentChainsBuffer;
 }
 
 deprecated("use version without arguments workdir and tracePointDistance 1")
@@ -512,7 +516,6 @@ private enum ChainPartType : char
 
 private struct LasDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
 {
-    static alias dstring = immutable(dchar)[];
     static alias LasDump = ReturnType!getDumpLines;
     static alias LocalAlignment = AlignmentChain.LocalAlignment;
     static alias TracePoint = LocalAlignment.TracePoint;
@@ -522,12 +525,16 @@ private:
     bool _empty;
     AlignmentChain currentAC;
     id_t currentACID;
-    Appender!(LocalAlignment[]) localAlignmentsAcc;
-    Appender!(TracePoint[]) tracePointsAcc;
-    dstring currentDumpLine;
+    LocalAlignment[] localAlignmentsBuffer;
+    LocalAlignment[] localAlignmentsAcc;
+    TracePoint[] tracePointsBuffer;
+    TracePoint[] tracePointsAcc;
+    char[] currentDumpLine;
     size_t currentDumpLineNumber;
     dchar currentLineType;
     dchar currentLineSubType;
+    size_t numLocalAlignments;
+    size_t numTracePoints;
     size_t maxTracePointCount;
     trace_point_t tracePointDistance;
     debug dchar[] allowedLineTypes;
@@ -593,11 +600,23 @@ private:
         return lasDump.enumerate(1).filter!"!a[1].empty";
     }
 
+    private void nextLocalAlignmentsBuffer()
+    {
+        localAlignmentsBuffer = localAlignmentsBuffer[localAlignmentsAcc.length .. $];
+        localAlignmentsAcc = localAlignmentsBuffer[0 .. 0];
+    }
+
+    private void nextTracePointsBuffer()
+    {
+        tracePointsBuffer = tracePointsBuffer[tracePointsAcc.length .. $];
+        tracePointsAcc = tracePointsBuffer[0 .. 0];
+    }
+
     void readNextAlignmentChain()
     {
         currentAC = AlignmentChain.init;
-        localAlignmentsAcc.clear();
-        tracePointsAcc.clear();
+        nextLocalAlignmentsBuffer();
+        nextTracePointsBuffer();
         peekDumpLine();
 
         while (true)
@@ -614,12 +633,22 @@ private:
                     switch (currentLineSubType)
                     {
                     case totalChainPartsCount.subIndicator:
-                        if (readTotalChainPartsCount() == 0)
+                        numLocalAlignments = readTotalChainPartsCount();
+                        if (numLocalAlignments == 0)
                             // do not try to read empty dump
                             return setEmpty();
+
+                        localAlignmentsBuffer = uninitializedArray!(typeof(localAlignmentsBuffer))(
+                            numLocalAlignments,
+                        );
                         break;
                     case totalTracePointsCount.subIndicator:
-                        break; // ignore
+                        numTracePoints = readTotalTracePointsCount();
+
+                        tracePointsBuffer = uninitializedArray!(typeof(tracePointsBuffer))(
+                            numTracePoints,
+                        );
+                        break;
                     default:
                         error(format!"unknown line sub-type `%c`"(currentLineSubType));
                     }
@@ -629,7 +658,7 @@ private:
                     break; // ignore
                 case maxTracePointCount.indicator:
                     _enforce(currentLineSubType == maxTracePointCount.subIndicator, "expected `@ T` line");
-                    readMaxTracePointCount();
+                    // ignore
                     debug disallowCurrentLineType();
                     break;
                 case tracePointDistance.indicator:
@@ -698,7 +727,7 @@ private:
         auto currentLine = lasDump.front;
 
         currentDumpLineNumber = currentLine[0];
-        currentDumpLine = currentLine[1].array;
+        currentDumpLine = currentLine[1];
         currentLineType = currentDumpLine[0];
         currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
     }
@@ -725,23 +754,24 @@ private:
         }
     }
 
-    id_t readTotalChainPartsCount()
+    size_t readTotalChainPartsCount()
     {
         enum totalChainPartsCountFormat = LasDumpLineFormat.totalChainPartsCount.format;
 
-        id_t totalChainPartsCount;
+        size_t totalChainPartsCount;
         currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
 
         return totalChainPartsCount;
     }
 
-    void readMaxTracePointCount()
+    size_t readTotalTracePointsCount()
     {
-        enum maxTracePointCountFormat = LasDumpLineFormat.maxTracePointCount.format;
+        enum totalTracePointsCountFormat = LasDumpLineFormat.totalTracePointsCount.format;
 
-        currentDumpLine[].formattedRead!maxTracePointCountFormat(maxTracePointCount);
+        size_t totalTracePointsCount;
+        currentDumpLine[].formattedRead!totalTracePointsCountFormat(totalTracePointsCount);
 
-        tracePointsAcc.reserve(maxTracePointCount);
+        return totalTracePointsCount;
     }
 
     void readTracePointDistance()
@@ -810,19 +840,17 @@ private:
 
     void finishCurrentLA()
     {
-        assert(localAlignmentsAcc.data.length > 0);
+        assert(localAlignmentsAcc.length > 0);
 
-        localAlignmentsAcc.data[$ - 1].tracePoints = tracePointsAcc.data.dup;
+        localAlignmentsAcc[$ - 1].tracePoints = tracePointsAcc;
     }
 
     void finishCurrentLAs()
     {
-        if (localAlignmentsAcc.data.length > 0)
-        {
+        if (localAlignmentsAcc.length > 0)
             finishCurrentLA();
-        }
 
-        currentAC.localAlignments = localAlignmentsAcc.data.dup;
+        currentAC.localAlignments = localAlignmentsAcc;
     }
 
     void finishCurrentAC()
@@ -830,8 +858,8 @@ private:
         finishCurrentLAs();
         currentAC.id = currentACID++;
 
-        // ensure alignment chain is valid by triggering invariant of AlignmentChain
-        cast(void) currentAC.first;
+        // ensure alignment chain is valid
+        assert(&currentAC);
     }
 
     void readLengths()
@@ -863,7 +891,7 @@ private:
         enum numDiffsFormat = LasDumpLineFormat.numDiffs.format;
 
         currentDumpLine[].formattedRead!numDiffsFormat(
-            localAlignmentsAcc.data[$ - 1].numDiffs,
+            localAlignmentsAcc[$ - 1].numDiffs,
         );
     }
 
@@ -874,8 +902,7 @@ private:
 
         currentDumpLine[].formattedRead!tracePointBeginFormat(numTracePoints);
 
-        tracePointsAcc.clear();
-        tracePointsAcc.reserve(numTracePoints);
+        nextTracePointsBuffer();
     }
 
     void readTracePoint()
@@ -920,8 +947,8 @@ unittest
     enum testLasDump = [
         "+ P 9",
         "% P 9",
-        "+ T 12",
-        "% T 12",
+        "+ T 17",
+        "% T 17",
         "@ T 4",
         "P 1 2 n >",
         "L 13 15",
@@ -987,7 +1014,7 @@ unittest
         "   6 105",
         "   9 108",
         "   7 105",
-    ];
+    ].map!(line => cast(char[]) line.dup);
 
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias complement = AlignmentFlag.complement;
@@ -1190,7 +1217,6 @@ auto getFlatLocalAlignments(
 
 private class FlatLasDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
 {
-    static alias dstring = immutable(dchar)[];
     static alias LasDump = ReturnType!getDumpLines;
     static alias FlatLocus = FlatLocalAlignment.FlatLocus;
 
@@ -1200,7 +1226,7 @@ private:
     bool _empty;
     FlatLocalAlignment currentLA;
     id_t currentLAId;
-    dstring currentDumpLine;
+    char[] currentDumpLine;
     size_t currentDumpLineNumber;
     dchar currentLineType;
     dchar currentLineSubType;
@@ -1311,7 +1337,7 @@ private:
                     switch (currentLineSubType)
                     {
                         case maxTracePointCount.subIndicator:
-                            readMaxTracePointCount();
+                            // ignore
                             break;
                         default:
                             break;
@@ -1370,7 +1396,7 @@ private:
         auto currentLine = lasDump.front;
 
         currentDumpLineNumber = currentLine[0];
-        currentDumpLine = currentLine[1].array;
+        currentDumpLine = currentLine[1];
         currentLineType = currentDumpLine[0];
         currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
     }
@@ -1447,13 +1473,10 @@ private:
             rawChainPartType,
         );
 
-        auto flags = rawComplement == 'c' ? yesComplement : noComplement;
-        auto chainPartType = rawChainPartType.to!ChainPartType;
-
         currentLA.id = currentLAId++;
         currentLA.contigA.id = contigAID;
         currentLA.contigB.id = contigBID;
-        currentLA.flags = flags;
+        currentLA.flags.complement = (rawComplement == 'c');
         currentLA.tracePointDistance = tracePointDistance;
     }
 
@@ -1533,7 +1556,7 @@ unittest
         "+ P 11",
         "% P 4",
         "+ T 17",
-        "% T 4",
+        "% T 17",
         "@ T 4",
         "X 100",
         "P 1 2 n >",
@@ -1591,7 +1614,7 @@ unittest
         "   6 105",
         "   9 108",
         "   7 105",
-    ];
+    ].map!(line => cast(char[]) line.dup);
 
     auto flatLocalAlignments = readFlatLasDump(testLasDump, 0)
         .tee!((ref la) { la.tracePoints = la.tracePoints.dup; })
@@ -5501,7 +5524,7 @@ private
         in string[] ladumpOpts,
     )
     {
-        return executePipe(chain(
+        return executePipe!(Yes.isBuffered)(chain(
             only("LAdump"),
             ladumpOpts,
             only(
