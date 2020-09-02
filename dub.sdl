@@ -23,3 +23,7 @@ configuration "default" {
 configuration "testing" {
     versions      "DentistTesting"
 }
+
+configuration "read-las-test" {
+    versions      "NoAppMain" "ReadLasTest"
+}

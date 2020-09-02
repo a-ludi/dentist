@@ -5684,3 +5684,30 @@ private
         assert("foo_bar.db".stripBlock == "foo_bar.db");
     }
 }
+
+
+version (NoAppMain) version (ReadLasTest)
+{
+    void main(string[] args)
+    {
+        import std.datetime.stopwatch;
+        import std.stdio;
+
+        auto db = args[1];
+        auto las = args[2];
+
+        StopWatch timer;
+
+        timer.start();
+        cast(void) getFlatLocalAlignments(db, las, Yes.includeTracePoints).array;
+        timer.stop();
+
+        writefln!"getFlatLocalAlignments took %fs"(timer.peek.total!"usecs" / 1e6);
+
+        timer.start();
+        cast(void) getAlignments(db, las, AlignmentReaderFlag.includeTracePoints);
+        timer.stop();
+
+        writefln!"getAlignments took %fs"(timer.peek.total!"usecs" / 1e6);
+    }
+}

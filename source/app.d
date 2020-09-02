@@ -14,12 +14,15 @@ import std.stdio;
 
 version (Posix)
 {
-    /// Start `dentist` with the given set of arguments.
-    int main(string[] args)
+    version (NoAppMain) { } else
     {
-        import dentist.commandline;
+        /// Start `dentist` with the given set of arguments.
+        int main(string[] args)
+        {
+            import dentist.commandline;
 
-        return run(args);
+            return run(args);
+        }
     }
 }
 else
