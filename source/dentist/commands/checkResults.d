@@ -568,7 +568,7 @@ private struct ResultAnalyzer
     static ContigMapping[] recoverSlightlyImperfectAlignments(ChunkInfo)(ChunkInfo info)
     {
         id_t[] queryChunk = info.queryChunk;
-        Options options = info.options;
+        auto options = cast(Options) info.options;
 
         auto croppedContigDb = makeCroppedSubsetDb(
             options.refDb,

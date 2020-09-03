@@ -888,6 +888,7 @@ struct OptionsFor(DentistCommand _command)
             reference assembly or <to> may be `$` to indicate the end of the
             reference.
         }")
+        @(RevertField!"referenceContigBatch")
         void parseReferenceContigBatch(string batchString) pure
         {
             try
@@ -955,6 +956,7 @@ struct OptionsFor(DentistCommand _command)
             excluded. <to> may be a dollar-sign (`$`) to indicate the end of
             the pile up DB.
         }")
+        @(RevertField!"pileUpBatches")
         void parsePileUpBatch(string batchString) pure
         {
             foreach (idxSpec; batchString.split(","))
@@ -1234,6 +1236,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("daccord")
         @MetaVar("<daccord-option>...")
         @Help("Provide additional options to `daccord`")
+        @(RevertField!"additionalDaccordOptions")
         void addAdditionalDaccordOptions(string option)
         {
             additionalDaccordOptions ~= option;
@@ -1250,6 +1253,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("daligner-consensus")
         @MetaVar("<daligner-option>...")
         @Help("Provide additional options to `daligner`")
+        @(RevertField!"additionalConsensusAlignmentOptions")
         void addAdditionalConsensusAlignmentOptions(string option)
         {
             additionalConsensusAlignmentOptions ~= option;
@@ -1266,6 +1270,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("daligner-reads-vs-reads")
         @MetaVar("<daligner-option>...")
         @Help("Provide additional options to `daligner`")
+        @(RevertField!"additionalReadsVsReadsAlignmentOptions")
         void addAdditionalReadsVsReadsAlignmentOptions(string option)
         {
             additionalReadsVsReadsAlignmentOptions ~= option;
@@ -1283,6 +1288,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("daligner-ref-vs-reads")
         @MetaVar("<daligner-option>...")
         @Help("Provide additional options to `daligner`")
+        @(RevertField!"additionalRefVsReadsAlignmentOptions")
         void addAdditionalRefVsReadsAlignmentOptions(string option)
         {
             additionalRefVsReadsAlignmentOptions ~= option;
@@ -1300,6 +1306,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("daligner-self")
         @MetaVar("<daligner-option>...")
         @Help("Provide additional options to `daligner`")
+        @(RevertField!"additionalSelfAlignmentOptions")
         void addAdditionalSelfAlignmentOptions(string option)
         {
             additionalSelfAlignmentOptions ~= option;
@@ -1329,6 +1336,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("datander-ref")
         @MetaVar("<datander-option>...")
         @Help("Provide additional options to `datander`")
+        @(RevertField!"additionalTandemAlignmentOptions")
         void addAdditionalTandemAlignmentOptions(string option)
         {
             additionalTandemAlignmentOptions ~= option;
@@ -1395,6 +1403,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("dust-reads")
         @MetaVar("<dust-option>...")
         @Help("Provide additional options to `dust`")
+        @(RevertField!"additionalReadsDustOptions")
         void addAdditionalReadsDustOptions(string option)
         {
             additionalReadsDustOptions ~= option;
@@ -1503,6 +1512,7 @@ struct OptionsFor(DentistCommand _command)
             Dazzler masks for repetitive regions (at least one required;
             generate with `mask-repetitive-regions` command)
         ")
+        @(RevertField!"repeatMasks")
         void addMask(string mask) pure
         {
             repeatMasks ~= mask;
@@ -2087,6 +2097,79 @@ struct OptionsFor(DentistCommand _command)
         coord_t regionContext = 1_000;
     }
 
+
+    @Option("revert")
+    @MetaVar("<option>...")
+    @Help("
+        revert named option to default value. This is useful to revert
+        specific options of a config file.
+    ")
+    void addRevertOption(string optionName)
+    {
+        revertOptionNames ~= optionName;
+    }
+
+    string[] revertOptionNames;
+
+    @PreValidate(Priority.medium)
+    void revertOptions()
+    {
+        foreach (optionName; revertOptionNames)
+            revertOption(optionName);
+    }
+
+    void revertOption(string optionName)
+    {
+        auto fullOption = optionName.length > 1
+            ? "--" ~ optionName
+            : "-" ~ optionName;
+
+        static foreach (member; __traits(allMembers, typeof(this)))
+        {{
+            alias symbol = Alias!(__traits(getMember, typeof(this), member));
+            alias optUDAs = getUDAs!(symbol, Option);
+
+            static if (optUDAs.length > 0)
+            {
+                static foreach (optName; optUDAs[0].names)
+                {
+                    if (optName == optionName)
+                    {
+                        static if (
+                            getUDAs!(symbol, RevertWith).length > 0 ||
+                            getUDAs!(symbol, RevertField).length > 0
+                        )
+                        {
+                            static foreach (reverter; getUDAs!(symbol, RevertWith))
+                                reverter.revert();
+                            static foreach (reverter; getUDAs!(symbol, RevertField))
+                            {{
+                                enum revertValue = __traits(getMember, typeof(this).init, reverter.fieldName);
+
+                                mixin("this." ~ reverter.fieldName ~ " = revertValue;");
+                            }}
+
+                            return;
+                        }
+                        else static if (isAssignable!(typeof(symbol)))
+                        {
+                            symbol = __traits(getMember, typeof(this).init, member);
+
+                            return;
+                        }
+                        else
+                        {
+                            throw new CLIException("invalid value for --revert: cannot revert option " ~ fullOption);
+                        }
+                    }
+                }
+            }
+        }}
+
+        throw new CLIException("invalid value for --revert: unkown option " ~ fullOption);
+    }
+
+
     static if (command.among(
         DentistCommand.validateRegions,
     ))
@@ -2123,6 +2206,7 @@ struct OptionsFor(DentistCommand _command)
             contigs should not be closed. They will still be joined by a
             prexisting gap.
         }")
+        @(RevertField!"skipGaps")
         void parseSkipGaps(string skipGapsString) pure
         {
             foreach (gapSpec; skipGapsString.split(","))
@@ -2355,6 +2439,7 @@ struct OptionsFor(DentistCommand _command)
         increase output to help identify problems; use up to three times.
         Warning: performance may be drastically reduced if using three times.
     ")
+    @(RevertField!"verbosity")
     void increaseVerbosity() pure
     {
         ++verbosity;
@@ -2654,6 +2739,18 @@ struct OptionsFor(DentistCommand _command)
 
         return tuple!("lowerBound", "upperBound")(lowerBound, upperBound);
     }
+}
+
+
+private static struct RevertField(string _fieldName)
+{
+    enum fieldName = _fieldName;
+}
+
+
+private static struct RevertWith(alias _revert)
+{
+    alias revert = _revert;
 }
 
 private bool hasValidOptionNames(Options)() pure nothrow
