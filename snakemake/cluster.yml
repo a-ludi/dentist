@@ -68,6 +68,10 @@ validate_regions_block:
     memory:     32768
     time:       "00:30"
 
+unpurged_output:
+    memory:     16384
+    time:       "00:30"
+
 purged_output:
     memory:     16384
     time:       "00:30"

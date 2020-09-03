@@ -110,8 +110,21 @@ def await_db_files(db):
 
         if expanded_db in _fast2dam_checkpoint:
             _checkpoint = getattr(checkpoints, _fast2dam_checkpoint[expanded_db])
+            outputs = _checkpoint.get(workdir=workdir_).output
 
-            return _checkpoint.get(workdir=workdir_).output
+            if not isinstance(outputs, list):
+                raise Exception("checkpoint {} should have a list of string as output, got: {!r}".format(
+                    _fast2dam_checkpoint[expanded_db],
+                    outputs,
+                ))
+            elif outputs[0] != expanded_db:
+                raise Exception("first output of checkpoint {} should be {} but got {}".format(
+                    _fast2dam_checkpoint[expanded_db],
+                    expanded_db,
+                    outputs[0],
+                ))
+
+            return outputs
         else:
             raise Exception("unknown db: {}".format(expanded_db));
 
@@ -543,7 +556,7 @@ max_threads = config["max_threads"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
 batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
-workflow_flags_names = ["debug"]
+workflow_flags_names = ["full_validation", "no_purge_output"]
 workflow_flags = dict(((flag, config.get(flag, False))  for flag in workflow_flags_names))
 
 
@@ -678,7 +691,7 @@ default_targets = [
     closed_gaps_bed,
 ]
 
-if workflow_flags["debug"]:
+if workflow_flags["full_validation"]:
     default_targets.append([
         validation_report,
         mask_files(preliminary_gap_closed, weak_coverage_mask),
@@ -1267,19 +1280,31 @@ rule skip_gaps:
                 gap_spec = "-".join((str(cid) for cid in invalid["contigIds"]))
                 print(gap_spec, file=skip_gaps_file)
 
-
-rule purged_output:
-    input:
-        await_dentist_config(),
-        await_db_files(reference),
-        insertions,
-        skip_gaps = skip_gaps
-    output:
-        gap_closed_fasta,
-        closed_gaps_bed
-    log: log_file("purged-output")
-    shell:
-        "dentist output --config={dentist_config_file} {dentist_flags} --skip-gaps-file={input[skip_gaps]} - - - 2> {log}"
+if workflow_flags["no_purge_output"]:
+    rule unpurged_output:
+        input:
+            await_dentist_config(),
+            await_db_files(reference),
+            insertions
+        output:
+            gap_closed_fasta,
+            closed_gaps_bed
+        log: log_file("unpurged-output")
+        shell:
+            "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
+else:
+    rule purged_output:
+        input:
+            await_dentist_config(),
+            await_db_files(reference),
+            insertions,
+            skip_gaps = skip_gaps
+        output:
+            gap_closed_fasta,
+            closed_gaps_bed
+        log: log_file("purged-output")
+        shell:
+            "dentist output --config={dentist_config_file} {dentist_flags} --skip-gaps-file={input[skip_gaps]} - - - 2> {log}"
 
 
 #-----------------------------------------------------------------------------

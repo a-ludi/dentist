@@ -27,6 +27,19 @@
 #             read-coverage: $COV
 
 
+# Uncomment the follow workflow flags to alter the workflow
+
+# Add the validation report and weak coverage mask to the list of default
+# targets so they will be generated wether or not they are required to build
+# the main target (gap-closed assembly)
+#full_validation: true
+
+# By default the closed gaps will be validated and only valid gaps will be
+# included into the final gap-closed assembly. Give this flag to get the
+# raw gap-closed assembly as final output.
+#no_purge_output: true
+
+
 inputs:
     # The reference assembly where gaps should be closed
     reference:          reference.fasta
