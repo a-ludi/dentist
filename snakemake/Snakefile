@@ -1173,9 +1173,11 @@ rule preliminary_output:
     output:
         preliminary_gap_closed_fasta,
         preliminary_closed_gaps_bed
+    params:
+        revert_options = "--revert=agp,cache-contig-alignments,scaffolding,skip-gaps,skip-gaps-file"
     log: log_file("preliminary-output")
     shell:
-        "dentist output --config={dentist_config_file} {dentist_flags} --closed-gaps-bed={output[1]} - - {output[0]} 2> {log}"
+        "dentist output --config={dentist_config_file} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} - - {output[0]} 2> {log}"
 
 
 rule preliminary_gap_closed_vs_reads_alignment_block:
