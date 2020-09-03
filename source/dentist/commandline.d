@@ -1236,12 +1236,12 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("daccord")
-        @MetaVar("<daccord-option>...")
+        @MetaVar("<daccord-option>[,<daccord-option>...]")
         @Help("Provide additional options to `daccord`")
         @(RevertField!"additionalDaccordOptions")
         void addAdditionalDaccordOptions(string option)
         {
-            additionalDaccordOptions ~= option;
+            additionalDaccordOptions ~= option.split(',');
         }
 
         @Option()
@@ -1253,12 +1253,12 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("daligner-consensus")
-        @MetaVar("<daligner-option>...")
+        @MetaVar("<daligner-option>[,<daligner-option>...]")
         @Help("Provide additional options to `daligner`")
         @(RevertField!"additionalConsensusAlignmentOptions")
         void addAdditionalConsensusAlignmentOptions(string option)
         {
-            additionalConsensusAlignmentOptions ~= option;
+            additionalConsensusAlignmentOptions ~= option.split(',');
         }
 
         @Option()
@@ -1270,12 +1270,12 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("daligner-reads-vs-reads")
-        @MetaVar("<daligner-option>...")
+        @MetaVar("<daligner-option>[,<daligner-option>...]")
         @Help("Provide additional options to `daligner`")
         @(RevertField!"additionalReadsVsReadsAlignmentOptions")
         void addAdditionalReadsVsReadsAlignmentOptions(string option)
         {
-            additionalReadsVsReadsAlignmentOptions ~= option;
+            additionalReadsVsReadsAlignmentOptions ~= option.split(',');
         }
 
         @Option()
@@ -1293,7 +1293,7 @@ struct OptionsFor(DentistCommand _command)
         @(RevertField!"additionalSelfAlignmentOptions")
         void addAdditionalSelfAlignmentOptions(string option)
         {
-            additionalSelfAlignmentOptions ~= option;
+            additionalSelfAlignmentOptions ~= option.split(',');
         }
 
         @Option()
@@ -1311,7 +1311,7 @@ struct OptionsFor(DentistCommand _command)
         @(RevertField!"additionalRefVsReadsAlignmentOptions")
         void addAdditionalRefVsReadsAlignmentOptions(string option)
         {
-            additionalRefVsReadsAlignmentOptions ~= option;
+            additionalRefVsReadsAlignmentOptions ~= option.split(',');
         }
 
         @Option()
@@ -1336,12 +1336,12 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("datander-ref")
-        @MetaVar("<datander-option>...")
+        @MetaVar("<datander-option>[,<datander-option>...]")
         @Help("Provide additional options to `datander`")
         @(RevertField!"additionalTandemAlignmentOptions")
         void addAdditionalTandemAlignmentOptions(string option)
         {
-            additionalTandemAlignmentOptions ~= option;
+            additionalTandemAlignmentOptions ~= option.split(',');
         }
 
         @Option()
@@ -1403,12 +1403,12 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("dust-reads")
-        @MetaVar("<dust-option>...")
+        @MetaVar("<dust-option>[,<dust-option>...]")
         @Help("Provide additional options to `dust`")
         @(RevertField!"additionalReadsDustOptions")
         void addAdditionalReadsDustOptions(string option)
         {
-            additionalReadsDustOptions ~= option;
+            additionalReadsDustOptions ~= option.split(',');
         }
 
         @Option()
@@ -1509,7 +1509,7 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("mask", "m")
-        @MetaVar("<string>...")
+        @MetaVar("<name>[,<name>...]")
         @Help("
             Dazzler masks for repetitive regions (at least one required;
             generate with `mask-repetitive-regions` command)
@@ -1517,7 +1517,7 @@ struct OptionsFor(DentistCommand _command)
         @(RevertField!"repeatMasks")
         void addMask(string mask) pure
         {
-            repeatMasks ~= mask;
+            repeatMasks ~= mask.split(',');
         }
 
         @Option()
@@ -2101,14 +2101,14 @@ struct OptionsFor(DentistCommand _command)
 
 
     @Option("revert")
-    @MetaVar("<option>...")
+    @MetaVar("<option>[,<option>...]")
     @Help("
         revert named option to default value. This is useful to revert
         specific options of a config file.
     ")
     void addRevertOption(string optionName)
     {
-        revertOptionNames ~= optionName;
+        revertOptionNames ~= optionName.split(',');
     }
 
     string[] revertOptionNames;
