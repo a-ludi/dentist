@@ -543,6 +543,9 @@ max_threads = config["max_threads"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
 batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
+workflow_flags_names = ["debug"]
+workflow_flags = dict(((flag, config.get(flag, False))  for flag in workflow_flags_names))
+
 
 # workflow files
 reference_fasta = inputs["reference"]
@@ -675,7 +678,7 @@ default_targets = [
     closed_gaps_bed,
 ]
 
-if config.get("debug", False):
+if workflow_flags["debug"]:
     default_targets.append([
         validation_report,
         mask_files(preliminary_gap_closed, weak_coverage_mask),
