@@ -67,6 +67,8 @@ dentist_config:
 
 additional_options:
     reference_dbsplit:
+        # Adjust `-l` of `ref_vs_reads_alignment` accordinly
+        # if `-x < 1500` (default value of `-l` of `daligner`)
         - -x1000
         - -a
     reads_dbsplit:
@@ -91,7 +93,12 @@ additional_options:
 
     # Alignment of the reads against the reference for identifying reads for
     # gap closing using damapper
-    #ref_vs_reads_alignment: []
+    ref_vs_reads_alignment:
+        # Choose the same value as for `-x` of `reference_dbsplit`
+        # if `-x < 1500` (default value for `-l` of `daligner`);
+        # otherwise some contigs will not be included in the
+        # gap-closed assembly beacause there are no alignments.
+        - -l1000
 
     # Improve alignment performance by masking low complexity regions
     # using DBdust
