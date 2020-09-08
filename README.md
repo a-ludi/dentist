@@ -20,6 +20,7 @@ Table of Contents
 - [Install](#install)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Citation](#citation)
 - [Maintainer](#maintainer)
 - [Contributing](#contributing)
 - [License](#license)
@@ -224,10 +225,18 @@ Further details on the rationale can found in [this issue][issue-nanopore].
 [issue-nanopore]: https://github.com/a-ludi/dentist/issues/1#issuecomment-610764625
 
 
+Citation
+--------
+
+> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – close
+> assembly gaps with high confidence. _In preparation._
+
+
 Maintainer
 ----------
 
-Arne Ludwig &lt;<arne.ludwig@posteo.de>&gt;
+Dentist is being developed by Arne Ludwig &lt;<ludwig@mpi-cbg.de>&gt; at
+the Planck Institute of Molecular Cell Biology and Genetics, Dresden, Germany.
 
 
 Contributing
