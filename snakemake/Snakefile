@@ -207,6 +207,7 @@ def append_flags(flags, *new_flags):
 def prepare_flags(flags):
     def secondary_expand(wildcards, input=None, output=None, threads=None, resources=None):
         txtflags = flags if not callable(flags) else flags()
+        txtflags = deduplicate_flags(txtflags)
 
         return txtflags.format(wildcards=wildcards,
                             input=input,
@@ -221,18 +222,50 @@ def ensure_threads_flag(flags):
     return ensure_flags(flags, { "-T": "{threads}" })
 
 
+def ensure_masks(flags, *masks):
+    return ensure_flags(flags, { "-m": list(masks) })
+
+
 def ensure_flags(flags, flags_with_values):
     from shlex import split
 
-    flags = list(f  for f in split(flags) if not f[0:2] in flags_with_values)
+    def __keep_flag(flag):
+        fname = flag[0:2]
+        fvalue = flag[2:]
+
+        if not fname in flags_with_values:
+            return True
+        elif fname in flags_with_values and not isinstance(flags_with_values[fname], list):
+            return False
+        elif fname in flags_with_values and isinstance(flags_with_values[fname], list):
+            return not fvalue in flags_with_values[fname]
+
+    flags = list(f  for f in split(flags) if __keep_flag(f))
 
     for flag, value in flags_with_values.items():
-        if value == True:
+        if value is True:
             flags.append(flag)
+        elif isinstance(value, list):
+            flags.extend((str(flag) + str(v)  for v in value))
         elif value:
             flags.append(flag + str(value))
 
     return make_flags(flags)
+
+
+def deduplicate_flags(flags):
+    from shlex import split
+
+    present_flags = set()
+    deduplicated = list()
+    for f in split(flags):
+        if not f.startswith("-"):
+            deduplicated.append(f)
+        elif not f in present_flags:
+            present_flags.add(f)
+            deduplicated.append(f)
+
+    return make_flags(deduplicated)
 
 
 def assert_flag(flags, required_flag, message="required flag is missing: {missing_flags}"):
@@ -275,7 +308,7 @@ def validate_dentist_config(config_file):
     subprocess.check_output(["dentist", "validate-config", config_file])
 
 
-def generate_options_for(alignment_name, config_file):
+def generate_options_for(alignment_name, config_file, additional_flags=None):
     if not exists(config_file):
         return "false"
 
@@ -300,6 +333,8 @@ def generate_options_for(alignment_name, config_file):
         if alignment_name in comment:
             command = re.sub(r"<[^>]+>", "", command)
             command = command.rstrip()
+            if not additional_flags is None:
+                command += " " + additional_flags
 
             return command
 
@@ -794,12 +829,13 @@ rule self_alignment_block:
         await_dentist_config(),
         await_db_files(join(workdir_, "{dam}.dam")),
         assembly_marker("{dam}.dam"),
-        mask_files(join(workdir_, "{dam}.dam"), dust_mask)
+        mask_files(join(workdir_, "{dam}.dam"), dust_mask),
+        mask_files(join(workdir_, "{dam}.dam"), tandem_mask)
     output:
         temp(alignment_file("{dam}", block_a='{block_ref}', block_b='{block_reads}')),
         temp(alignment_file("{dam}", block_b='{block_ref}', block_a='{block_reads}'))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file, ensure_masks(additional_self_alignment_options, dust_mask, tandem_mask))),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
@@ -855,7 +891,7 @@ rule tandem_alignment_block:
     output:
         temp(alignment_file("TAN", "{dam}", block_b="{block}"))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file, additional_tandem_alignment_options)),
         alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{dam}.{block}")
     threads: max_threads
@@ -942,19 +978,18 @@ rule ref_vs_reads_alignment_block:
         alignment_file(reference, reads, block_b='{block_reads}'),
         alignment_file(reads, reference, block_a='{block_reads}')
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
-        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
-        dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
+        alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("ref-vs-reads-alignment.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.dalign_flags} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
+                {params.aligncmd} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
                 LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
                 LAcheck -v {params.reads_stub} {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
@@ -1166,19 +1201,18 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         alignment_file(preliminary_gap_closed, reads, block_b='{block_reads}'),
         temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}'))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file)),
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
         preliminary_gap_closed_stub = db_stub(rel_to_workdir(preliminary_gap_closed)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
-        alignment_file_b_vs_a = lambda _, output: basename(output[1]),
-        dalign_flags = prepare_flags(additional_reads_vs_reads_alignment_options)
+        alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                {params.aligncmd} {params.dalign_flags} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
+                {params.aligncmd} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
                 LAcheck -v {params.preliminary_gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
                 LAcheck -v {params.reads_stub} {params.preliminary_gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
