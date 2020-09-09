@@ -1009,6 +1009,9 @@ rule ref_vs_reads_chained_alignment_block:
         """
             {{
                 dentist chain-local-alignments --config={input.config} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {output}
+                SKIP_LACHECK=1  # the interpretation of alternate chains may
+                                # lead to "duplicate LAs" error while the file
+                                # is in fact OK
                 LAcheck -v {input.refdb[0]} {input.readsdb[0]} {output} || {lacheck_handler}
             }} &> {log}
         """
