@@ -815,7 +815,6 @@ rule mark_assembly_preliminary_gap_closed:
 
 rule mask_dust:
     input:
-        await_dentist_config(),
         await_db_files(join(workdir_, "{dam}.dam")),
         assembly_marker("{dam}.dam")
     output:
@@ -924,7 +923,6 @@ rule tandem_alignment:
 
 rule mask_tandem_block:
     input:
-        await_dentist_config(),
         await_db_files(join(workdir_, "{dam}.dam")),
         assembly_marker("{dam}.dam"),
         alignment = alignment_file("TAN", "{dam}", block_b="{block}")
