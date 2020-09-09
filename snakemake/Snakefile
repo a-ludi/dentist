@@ -710,6 +710,8 @@ additional_consensus_alignment_options = make_flags(additional_options.get("cons
 additional_consensus_options = make_flags(additional_options.get("consensus", []))
 additional_reference_dust_options = make_flags(additional_options.get("reference_dust", []))
 additional_reads_dust_options = make_flags(additional_options.get("reads_dust", []))
+additional_lamerge_options = make_flags(["-v"])
+additional_lacheck_options = make_flags(["-v"])
 
 if "TMPDIR" in environ:
     tmpdir_flag = { "-P": environ["TMPDIR"] }
@@ -719,6 +721,7 @@ if "TMPDIR" in environ:
     additional_ref_vs_reads_alignment_options = ensure_flags(additional_ref_vs_reads_alignment_options, tmpdir_flag)
     additional_reads_vs_reads_alignment_options = ensure_flags(additional_reads_vs_reads_alignment_options, tmpdir_flag)
     additional_consensus_alignment_options = ensure_flags(additional_consensus_alignment_options, tmpdir_flag)
+    additional_lamerge_options = ensure_flags(additional_lamerge_options, tmpdir_flag)
 
 lacheck_failed_notice = shell_esc(docstring("""
     Check failed. Possible solutions:
@@ -730,6 +733,29 @@ lacheck_failed_notice = shell_esc(docstring("""
 """))
 
 lacheck_handler = "{ echo " + lacheck_failed_notice + "; (( ${SKIP_LACHECK:-0} != 0 )); }"
+
+
+def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", log="log"):
+    lamerge_cmd = " ".join([
+        "LAmerge",
+        "{additional_lamerge_options}",
+        "{" + merged + ":q}",
+        "{" + parts + ":q}"])
+    lacheck_cmd = " ".join([
+        "LAcheck",
+        "{additional_lacheck_options}",
+        "{" + dbs + ":q}",
+        "{" + merged + ":q}",
+        "||",
+        "{lacheck_handler}"])
+
+    if log:
+        indent = 4 * " "
+        full_cmd = indent + lamerge_cmd + "\n" + indent + lacheck_cmd + "\n"
+        return "{{ " + full_cmd + " }} &> {" + log + ":q}"
+    else:
+        return lamerge_cmd + "\n" + lacheck_cmd
+
 
 #-----------------------------------------------------------------------------
 # BEGIN rules
@@ -907,15 +933,11 @@ rule self_alignment:
         block_alignments = lambda wildcards: block_alignments(join(workdir_, wildcards.dam + ".dam"))
     output:
         protected(alignment_file("{dam}"))
+    params:
+        dbs = lambda _, input: input.db[0]
     log: log_file("self-alignment.{dam}")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
+    shell: LAmerge()
 
-                LAcheck -v {input.db[0]} {output} || {lacheck_handler}
-            }} &> {log}
-        """
 
 
 rule mask_self:
@@ -960,14 +982,10 @@ rule tandem_alignment:
         block_alignments = lambda wildcards: block_alignments("TAN", join(workdir_, wildcards.dam + ".dam"), block_a=FULL_DB)
     output:
         protected(alignment_file("TAN", "{dam}"))
+    params:
+        dbs = lambda _, input: input.db[0]
     log: log_file("tandem-alignment.{dam}")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
-                LAcheck -v {input.db[0]} {output} || {lacheck_handler}
-            }} &> {log}
-        """
+    shell: LAmerge()
 
 
 rule mask_tandem_block:
@@ -1045,36 +1063,28 @@ rule ref_vs_reads_alignment_block:
 
 rule ref_vs_reads_alignment:
     input:
-        await_db_files(reference),
-        await_db_files(reads),
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
         block_alignments = lambda _: block_alignments(reference, reads, block_a=FULL_DB)
     output:
         protected(ref_vs_reads_alignment)
+    params:
+        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("ref-vs-reads-alignment")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
-                LAcheck -v {reference} {reads} {output} || {lacheck_handler}
-            }} &> {log}
-        """
+    shell: LAmerge()
 
 
 rule reads_vs_ref_alignment:
     input:
-        await_db_files(reference),
-        await_db_files(reads),
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
         block_alignments = lambda _: block_alignments(reads, reference, block_b=FULL_DB)
     output:
         protected(reads_vs_ref_alignment)
+    params:
+        dbs = lambda _, input: (input.readsdb[0], input.refdb[0])
     log: log_file("reads-vs-ref-alignment")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
-                LAcheck -v {reads} {reference} {output} || {lacheck_handler}
-            }} &> {log}
-        """
+    shell: LAmerge()
 
 
 rule mask_reads:
@@ -1274,19 +1284,15 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
 
 rule preliminary_gap_closed_vs_reads_alignment:
     input:
-        await_db_files(preliminary_gap_closed),
-        await_db_files(reads),
+        refdb = await_db_files(preliminary_gap_closed),
+        readsdb = await_db_files(reads),
         block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads, block_a=FULL_DB)
     output:
         protected(preliminary_gap_closed_vs_reads_alignment)
+    params:
+        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("gap-closed-vs-reads-alignment")
-    shell:
-        """
-            {{
-                LAmerge {output} {input[block_alignments]}
-                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
-            }} &> {log}
-        """
+    shell: LAmerge()
 
 
 rule split_preliminary_gap_closed_vs_reads_alignment:
