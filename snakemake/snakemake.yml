@@ -139,6 +139,11 @@ max_threads:        8
 # Defaults to max(1, threads // 4)
 #auxiliary_threads: 1
 
+# Align several read DB blocks in a single call to daligner. This reduces the
+# number of jobs and increases the time per job but initial overhead in
+# daligner is computed only once.
+align_batch_size:   10
+
 # Insertions are generated in batches of `batch_size`; use lower number to
 # shorten the runtime of each job while increasing the number of jobs.
 batch_size:         50
