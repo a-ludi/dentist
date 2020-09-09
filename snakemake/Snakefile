@@ -369,24 +369,52 @@ def get_num_contigs(db):
         return 1
 
 
-def block_alignments(db_a, db_b=None, damapper=None):
+FULL_DB = object()
+
+
+def __blocks_for(db, block):
+    def __dbblocks(db):
+        num_blocks = get_num_blocks(db)
+        blocks = range(1, num_blocks + 1)
+
+        return blocks
+
+    def __block_or_range(block):
+        if isinstance(block, str):
+            parts = block.split("-")
+
+            if len(parts) == 1:
+                return [parts[0]]
+            elif len(parts) == 2:
+                return range(int(parts[0]), int(parts[1]) + 1)
+            else:
+                raise ValueError("illegal value for block: " + block)
+        else:
+            return iter(block)
+
+    if block is FULL_DB:
+        return None
+    elif block is None:
+        return __dbblocks(db)
+    else:
+        return __block_or_range(block)
+
+
+def block_alignments(db_a, db_b=None, block_a=None, block_b=None):
     if db_b is None:
         db_b = db_a
 
-    num_blocks_a = get_num_blocks(db_a)
-    num_blocks_b = get_num_blocks(db_b)
+    blocks_a = __blocks_for(db_a, block_a)
+    blocks_b = __blocks_for(db_b, block_b)
 
-    blocks_a = range(1, num_blocks_a + 1)
-    blocks_b = range(1, num_blocks_b + 1)
-
-    if damapper is None:
+    if not blocks_a is None and not blocks_b is None:
         return (alignment_file(db_a, db_b, i, j)  for i in blocks_a for j in blocks_b)
-    elif damapper == "forward":
+    elif not blocks_b is None:
         return (alignment_file(db_a, db_b, block_b=j)  for j in blocks_b)
-    elif damapper == "reverse":
+    elif not blocks_a is None:
         return (alignment_file(db_a, db_b, block_a=i)  for i in blocks_a)
     else:
-        raise Exception("illegal value for damapper: " + repr(damapper))
+        raise Exception("illegal block selection: both block_a and block_b are empty")
 
 
 def homogenized_mask(mask):
@@ -911,7 +939,7 @@ rule tandem_alignment:
     input:
         db = await_db_files(join(workdir_, "{dam}.dam")),
         marker = assembly_marker("{dam}.dam"),
-        block_alignments = lambda wildcards: block_alignments("TAN", join(workdir_, wildcards.dam + ".dam"), damapper="forward")
+        block_alignments = lambda wildcards: block_alignments("TAN", join(workdir_, wildcards.dam + ".dam"), block_a=FULL_DB)
     output:
         protected(alignment_file("TAN", "{dam}"))
     log: log_file("tandem-alignment.{dam}")
@@ -1001,7 +1029,7 @@ rule ref_vs_reads_alignment:
     input:
         await_db_files(reference),
         await_db_files(reads),
-        block_alignments = lambda _: block_alignments(reference, reads, damapper="forward")
+        block_alignments = lambda _: block_alignments(reference, reads, block_a=FULL_DB)
     output:
         protected(ref_vs_reads_alignment)
     log: log_file("ref-vs-reads-alignment")
@@ -1018,7 +1046,7 @@ rule reads_vs_ref_alignment:
     input:
         await_db_files(reference),
         await_db_files(reads),
-        block_alignments = lambda _: block_alignments(reads, reference, damapper="reverse")
+        block_alignments = lambda _: block_alignments(reads, reference, block_b=FULL_DB)
     output:
         protected(reads_vs_ref_alignment)
     shell:
@@ -1054,7 +1082,7 @@ rule ref_vs_reads_chained_alignment:
     input:
         await_db_files(reference),
         await_db_files(reads),
-        block_alignments = lambda _: [prepend_ext(blas, chained_ext)  for blas in block_alignments(reference, reads, damapper="forward")]
+        block_alignments = lambda _: [prepend_ext(blas, chained_ext)  for blas in block_alignments(reference, reads, block_a=FULL_DB)]
     output:
         protected(ref_vs_reads_chained_alignment)
     log: log_file("ref-vs-reads-chained-alignment")
