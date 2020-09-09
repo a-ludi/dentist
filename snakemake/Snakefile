@@ -942,18 +942,44 @@ rule self_alignment:
     shell: LAmerge()
 
 
+rule self_alignment_by_block:
+    input:
+        db = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam"),
+        block_alignments = lambda wildcards: block_alignments(join(workdir_, wildcards.dam + ".dam"), block_a="{block}")
+    output:
+        protected(alignment_file("{dam}", block_a="{block}"))
+    params:
+        dbs = lambda _, input: input.db[0]
+    log: log_file("self-alignment-by-block.{dam}.{block}")
+    shell: LAmerge()
 
-rule mask_self:
+
+rule mask_self_block:
     input:
         await_dentist_config(),
         dam = await_db_files(join(workdir_, "{dam}.dam")),
         marker = assembly_marker("{dam}.dam"),
-        alignment = alignment_file("{dam}")
+        alignment = alignment_file("{dam}", block_a="{block}")
+    output:
+        mask_files(join(workdir_, "{dam}.dam"), block_mask(self_mask, "{block}"))
+    params:
+        outmask = block_mask(self_mask, "{block}")
+    log: log_file("mask-self.{dam}.{block}")
+    shell:
+        "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {params.outmask} 2> {log}"
+
+
+rule mask_self:
+    input:
+        *expand(mask_files(join(workdir_, "{dam}.dam"), "{block_mask}"), dam="{dam}", block_mask=block_masks(self_mask, join(workdir_, "{dam}.dam"))),
+        dam = await_db_files(join(workdir_, "{dam}.dam")),
+        marker = assembly_marker("{dam}.dam")
     output:
         mask_files(join(workdir_, "{dam}.dam"), self_mask)
     log: log_file("mask-self.{dam}")
     shell:
-        "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {self_mask} 2> {log}"
+        "Catrack -v {input.dam[0]} {self_mask} &> {log}"
 
 
 rule tandem_alignment_block:
@@ -1088,6 +1114,19 @@ rule ref_vs_reads_alignment:
     shell: LAmerge()
 
 
+rule ref_vs_reads_alignment_by_ref_block:
+    input:
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
+        block_alignments = lambda _: block_alignments(reference, reads, block_a="{block_ref}", batch_size_b=align_batch_size)
+    output:
+        protected(alignment_file(reference, reads, block_a="{block_ref}"))
+    params:
+        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
+    log: log_file("ref-vs-reads-alignment-by-ref-block.{block_ref}")
+    shell: LAmerge()
+
+
 rule ref_vs_reads_alignment_by_reads_block:
     input:
         refdb = await_db_files(reference),
@@ -1163,17 +1202,30 @@ rule ref_vs_reads_chained_alignment:
     shell: "{skip_lacheck_for_chained}\n" + LAmerge()
 
 
-rule mask_reads:
+rule mask_reads_block:
     input:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        ref_vs_reads_alignment
+        block_alignment = alignment_file(reference, reads, block_a="{block_ref}")
+    output:
+        mask_files(reference, reads_mask, block="{block_ref}")
+    params:
+        outmask = block_mask(reads_mask, block="{block_ref}")
+    log: log_file("mask-reads.{block_ref}")
+    shell:
+        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {input.block_alignment} {params.outmask} 2> {log}"
+
+
+rule mask_reads:
+    input:
+        *(mask_files(reference, m)  for m in block_masks(reads_mask, reference)),
+        refdb = await_db_files(reference)
     output:
         mask_files(reference, reads_mask)
     log: log_file("mask-reads")
     shell:
-        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
+        "Catrack -v {input.refdb[0]} {reads_mask} &> {log}"
 
 
 rule propagate_mask_to_reads_block:
@@ -1191,21 +1243,6 @@ rule propagate_mask_to_reads_block:
     log: log_file("propagate-mask-to-reads.{mask}.{blocks_reads}")
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
-
-
-# rule propagate_mask_to_reads:
-#     input:
-#         await_dentist_config(),
-#         await_db_files(reads),
-#         *[mask_files(reads, m) for m in block_masks("{mask}", reads)]
-#     output:
-#         mask_files(reads, "{mask}")
-#     params:
-#         merged_mask = "{mask}",
-#         block_masks = block_masks("{mask}", reads)
-#     log: log_file("propagate-mask-to-reads.{mask}")
-#     shell:
-#         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reads} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
 rule propagate_mask_back_to_reference_block:
