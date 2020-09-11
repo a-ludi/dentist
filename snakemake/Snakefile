@@ -1209,9 +1209,9 @@ rule mask_reads_block:
         await_db_files(reads),
         block_alignment = alignment_file(reference, reads, block_a="{block_ref}")
     output:
-        mask_files(reference, reads_mask, block="{block_ref}")
+        mask_files(reference, reads_mask, pseudo_block="{block_ref}")
     params:
-        outmask = block_mask(reads_mask, block="{block_ref}")
+        outmask = pseudo_block_mask(reads_mask, block="{block_ref}")
     log: log_file("mask-reads.{block_ref}")
     shell:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {input.block_alignment} {params.outmask} 2> {log}"
@@ -1219,13 +1219,17 @@ rule mask_reads_block:
 
 rule mask_reads:
     input:
-        *(mask_files(reference, m)  for m in block_masks(reads_mask, reference)),
+        await_dentist_config(),
+        *(mask_files(reference, m)  for m in pseudo_block_masks(reads_mask, reference)),
         refdb = await_db_files(reference)
     output:
         mask_files(reference, reads_mask)
+    params:
+        merged_mask = reads_mask,
+        block_masks = pseudo_block_masks(reads_mask, reference)
     log: log_file("mask-reads")
     shell:
-        "Catrack -v {input.refdb[0]} {reads_mask} &> {log}"
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
 rule propagate_mask_to_reads_block:
