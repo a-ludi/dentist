@@ -1340,7 +1340,7 @@ private:
                     switch (currentLineSubType)
                     {
                         case maxTracePointCount.subIndicator:
-                            // ignore
+                            readMaxTracePointCount();
                             break;
                         default:
                             break;
