@@ -511,7 +511,7 @@ def insertions_batches():
     def get_insertions_batch(batch_id):
         batch_id = batch_id_format.format(batch_id)
 
-        return join(workdir_, insertions_batch.format(batch_id=batch_id))
+        return insertions_batch.format(batch_id=batch_id)
 
     return (get_insertions_batch(i)  for i in range(num_batches))
 
