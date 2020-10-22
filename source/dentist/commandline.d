@@ -1782,6 +1782,10 @@ struct OptionsFor(DentistCommand _command)
                 hasReadCoverage,
                 "must not provide both --read-coverage and --min-coverage-reads",
             );
+            enforce!CLIException(
+                !hasReadCoverage || ploidy > 0,
+                "must provide --ploidy with --read-coverage",
+            );
 
             id_t lowerBound(double x)
             {
