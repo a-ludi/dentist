@@ -1492,14 +1492,15 @@ rule skip_gaps:
     input: validation_report
     output: skip_gaps
     run:
-        failed_validations = None
+        validations = None
         with open(validation_report, 'r') as validation_report_file:
-            failed_validations = multi_json_load(validation_report_file)
+            validations = multi_json_load(validation_report_file)
 
         with open(output[0], 'w') as skip_gaps_file:
-            for invalid in failed_validations:
-                gap_spec = "-".join((str(cid) for cid in invalid["contigIds"]))
-                print(gap_spec, file=skip_gaps_file)
+            for validation in validations:
+                if not validation.get("isValid", False):
+                    gap_spec = "-".join((str(cid) for cid in invalid["contigIds"]))
+                    print(gap_spec, file=skip_gaps_file)
 
 if workflow_flags["no_purge_output"]:
     rule unpurged_output:

@@ -324,11 +324,12 @@ struct RegionValidator
         assessSpanningReadsStats();
         assessWeaklySpannedWindowStats();
 
-        if (numSpanningReads < options.minSpanningReads || !empty(weakCoverageMask))
+        if (options.reportAll || isValid)
         {
             auto report = [
                 "region": region.toJson,
                 "regionWithContext": regionWithContext.toJson,
+                "isValid": isValid.toJson,
                 "numSpanningReads": numSpanningReads.toJson,
                 "spanningReadIds": spanningReadIds.toJson,
                 "weakCoverageMaskBps": weakCoverageMask.size.toJson,
@@ -342,6 +343,12 @@ struct RegionValidator
 
             writeln(report.toJson);
         }
+    }
+
+
+    @property bool isValid()
+    {
+        return numSpanningReads >= options.minSpanningReads && empty(weakCoverageMask);
     }
 
 
