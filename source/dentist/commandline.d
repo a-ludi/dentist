@@ -1901,6 +1901,15 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.validateRegions,
+    ))
+    {
+        @Option("report-all")
+        @Help("report all validation results instead of only failed gaps")
+        OptionFlag reportAll;
+    }
+
+    static if (command.among(
         DentistCommand.output,
     ))
     {
