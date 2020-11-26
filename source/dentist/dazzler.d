@@ -4408,7 +4408,7 @@ DazzExtra!T readDazzExtra(T)(in string dbFile, in string maskName, string extraN
         ),
     );
     alias _safeRead = (data, lazy what) => _enforce(
-        maskHeaderFile.rawRead(data).length == data.length,
+        data.length == 0 || maskHeaderFile.rawRead(data).length == data.length,
         format!"unexpected end of file while reading %s"(what),
     );
 
@@ -4425,9 +4425,7 @@ DazzExtra!T readDazzExtra(T)(in string dbFile, in string maskName, string extraN
 
         currentExtraName.reserve(nameLength);
         currentExtraName.length = nameLength;
-
-        if (currentExtraName.length > 0)
-            _safeRead(currentExtraName, "name");
+        _safeRead(currentExtraName, "name");
 
         if (currentExtraName == extraName)
             break;
