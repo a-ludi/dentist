@@ -66,7 +66,6 @@ static import dentist.util.range;
 static import dentist.util.region;
 static import dentist.util.saturationmath;
 static import dentist.util.string;
-static import dentist.util.suffixtree;
 static import dentist.util.tempfile;
 
 
@@ -125,6 +124,5 @@ alias modules = AliasSeq!(
     dentist.util.region,
     dentist.util.saturationmath,
     dentist.util.string,
-    dentist.util.suffixtree,
     dentist.util.tempfile,
 );
