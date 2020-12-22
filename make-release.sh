@@ -118,7 +118,7 @@ function prepare_dist()
 
 function main()
 {
-    DENTIST=dentist
+    DENTIST='./dentist'
 
     parse_args "$@"
 
