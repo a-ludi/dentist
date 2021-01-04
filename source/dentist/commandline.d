@@ -551,7 +551,7 @@ struct OptionsFor(DentistCommand _command)
         @Argument("<in:ref-vs-reads-alignment>")
         @Help(q"{
             alignments chains of the reads against the reference in form of a .las
-            file as produced by `damapper`
+            file, e.g. produced by `damapper`.
         }")
         @(Validate!validateLasFile)
         string readsAlignmentFile;
@@ -563,8 +563,10 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:gap-closed-vs-reads-alignment>")
         @Help("
-            alignments chains of the reads against the gap-closed reference in
-            form of a .las file as produced by `damapper`
+            localalignments of the reads against the gap-closed reference in
+            form of a .las file as produced by `damapper` or `daligner`.
+            Chains are disregarded, e.i. chained alignments are split into
+            local alignments.
         ")
         @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string readsAlignmentFile;
@@ -839,8 +841,7 @@ struct OptionsFor(DentistCommand _command)
         @MetaVar("num-threads")
         @Help("
             use <num-threads> threads for auxiliary tools like `daligner`,
-            `damapper` and `daccord`
-            (defaults to floor(totalCpus / <threads>) )
+            `damapper` and `daccord` (default: floor(totalCpus / <threads>) )
         ")
         uint numAuxiliaryThreads;
 
@@ -2563,7 +2564,7 @@ struct OptionsFor(DentistCommand _command)
             @property auto anchorSkippingPileUpsOptions() const
             {
                 return const(AnchorSkippingPileUpsOptions)(
-                    // dalignerOptions
+                    // damapperOptions
                     refVsReadsAlignmentOptions,
                     // dbsplitOptions
                     [DbSplitOptions.allReads],
@@ -2717,8 +2718,7 @@ template commandSummary(DentistCommand command)
         }".wrap;
     else static if (command == DentistCommand.generateDazzlerOptions)
         enum commandSummary = q"{
-            Generate a set of options to pass to `daligner` and `damapper`
-            needed for the input alignments.
+            Outputs advice on how to produce the required alignments.
         }".wrap;
     else static if (command == DentistCommand.maskRepetitiveRegions)
         enum commandSummary = q"{
@@ -3197,14 +3197,6 @@ private
         enforce!CLIException(
             0 < value,
             option ~ " must be greater than zero",
-        );
-    }
-
-    void validateAverageCorrelationRate(V)(V value)
-    {
-        enforce!CLIException(
-            0.7 <= value && value < 1.0,
-            "-e option of daligner/damapper must be in [0.7, 1) - some error rate(s) are too high",
         );
     }
 
