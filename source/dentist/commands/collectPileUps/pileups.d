@@ -1226,7 +1226,7 @@ private class BubbleResolver
         foreach (ref ac; intermediateAlignments)
         {
             // Filter alignments covering the whole intermediate contig
-            ac.disableIf(!ac.completelyCovers!"contigA");
+            ac.disableIf(!ac.completelyCovers!"contigA"(options.properAlignmentAllowance));
             // Adjust contig/read IDs
             ac.contigA.id = intermediateContigIds[ac.contigA.id - 1];
             ac.contigB.id = skippingReadIds[ac.contigB.id - 1];
