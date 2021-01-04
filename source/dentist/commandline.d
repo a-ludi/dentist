@@ -60,7 +60,6 @@ import dentist.dazzler :
     getTracePointDistance,
     lasEmpty,
     minAverageCorrelationRate,
-    minBestMatches,
     OptionModifier,
     withOption;
 import dentist.util.process : isExecutable;
@@ -2541,10 +2540,8 @@ struct OptionsFor(DentistCommand _command)
                 return additionalRefVsReadsAlignmentOptions
                     .dup
                     .withOption(cast(string) symmetric, ensurePresent)
-                    .withOption(cast(string) oneDirection, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
                     .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
-                    .withOption(cast(string) bestMatches, minBestMatches.to!string, replaceOrAdd)
                     .withOption(cast(string) sortPileOrder, remove)
                     .withOption(cast(string) oneDirection, remove)
                     .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
