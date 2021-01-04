@@ -4954,6 +4954,9 @@ enum DalignerOptions : string
     /// in any of the masked intervals are ignored for the purposes of seeding
     /// a match.
     masks = "-m",
+    /// sort .las by A-read,A-position pairs for map usecase;
+    /// off => sort .las by A,B-read pairs for overlap piles
+    sortMap = "-a",
 }
 
 
