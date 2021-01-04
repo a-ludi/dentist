@@ -20,6 +20,7 @@ import dentist.common :
     ReferencePoint;
 import dentist.common.alignments :
     AlignmentChain,
+    chainLocalAlignments,
     coord_t,
     diff_t,
     id_t;
@@ -28,12 +29,11 @@ import dentist.common.external : ExternalDependency;
 import dentist.dazzler :
     buildDamFile,
     ContigSegment,
-    DamapperOptions,
     DBdumpOptions,
     GapSegment,
-    getAlignments,
+    getFlatLocalAlignments,
     getContigCutoff,
-    getDamapping,
+    getDalignment,
     getFastaSequence,
     getDbRecords,
     getScaffoldStructure,
@@ -576,24 +576,24 @@ private struct ResultAnalyzer
             queryChunk,
             options.tmpdir,
         );
-        auto croppedContigMappingFile = getDamapping(
+        auto croppedContigMappingFile = getDalignment(
             options.resultDb,
             croppedContigDb,
             options.recoverImperfectContigsAlignmentOptions,
             options.tmpdir,
         );
-        auto croppedContigAlignments = getAlignments(
+
+        auto croppedContigAlignments = getFlatLocalAlignments(
             options.resultDb,
             croppedContigDb,
             croppedContigMappingFile,
-        );
+        )
+            .chainLocalAlignments(options.chainingOptions)
+            .filter!(ac => ac.completelyCovers!"contigA")
+            .array;
 
         foreach (ref ac; croppedContigAlignments)
             ac.contigB.id = queryChunk[ac.contigB.id - 1];
-
-        alias wholeContigMaps = (ac) => ac.first.contigB.begin == 0 &&
-                                        ac.last.contigB.end == ac.contigB.length;
-        croppedContigAlignments.filterInPlace!wholeContigMaps;
         croppedContigAlignments.sort!"a.contigB.id < b.contigB.id";
 
         return croppedContigAlignments

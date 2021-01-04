@@ -361,6 +361,7 @@ struct OptionsFor(DentistCommand _command)
     static enum needChainingOptions = command.among(
         DentistCommand.chainLocalAlignments,
         DentistCommand.processPileUps,
+        TestingCommand.checkResults,
     );
 
     @Option()
@@ -2063,13 +2064,13 @@ struct OptionsFor(DentistCommand _command)
         @property string[] recoverImperfectContigsAlignmentOptions() const
         {
             return [
-                DamapperOptions.symmetric,
-                DamapperOptions.oneDirection,
-                DamapperOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                DamapperOptions.kMerSize ~ "32",
-                format!(DamapperOptions.averageCorrelationRate ~ "%f")(
+                DalignerOptions.asymmetric,
+                DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
+                DalignerOptions.kMerSize ~ "32",
+                format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     1.0 - maxImperfectContigError,
                 ),
+                format!(DalignerOptions.tracePointDistance ~ "%d")(tracePointDistance),
             ];
         }
     }
@@ -2215,6 +2216,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.validateRegions,
+        TestingCommand.checkResults,
     ))
     {
         @Option()
@@ -2228,6 +2230,8 @@ struct OptionsFor(DentistCommand _command)
                 auto alignmentFile = readsAlignmentFile;
             else static if (is(typeof(dbAlignmentFile)))
                 auto alignmentFile = dbAlignmentFile;
+            else
+                tracePointDistance = 100;
 
             static if (is(typeof(alignmentFile)))
             {
