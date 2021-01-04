@@ -991,6 +991,7 @@ unittest
 
     alias LocalAlignment = AlignmentChain.LocalAlignment;
     alias complement = AlignmentFlag.complement;
+    alias alternateChain = AlignmentFlag.alternateChain;
 
     auto alignmentChains = readLasDump(testLasDump, 0).array;
     auto expectedResult = [
@@ -1016,7 +1017,7 @@ unittest
             1,
             Contig(19, 31),
             Contig(20, 33),
-            AlignmentFlags(complement),
+            AlignmentFlags(complement, alternateChain),
             [
                 LocalAlignment(
                     Locus(21, 22),
