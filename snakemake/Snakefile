@@ -677,14 +677,13 @@ default_targets = [
 
 if config.get("debug", False):
     default_targets.append([
-        preliminary_closed_gaps,
-        rules.validate_regions.output,
-        rules.weak_coverage_mask.output,
+        validation_report,
+        mask_files(preliminary_gap_closed, weak_coverage_mask),
     ])
 
 
 rule ALL:
-    input: *default_targets
+    input: default_targets
 
 
 checkpoint extend_dentist_config:
@@ -1168,21 +1167,6 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         """
 
 
-rule split_preliminary_gap_closed_vs_reads_alignment:
-    input: preliminary_gap_closed_vs_reads_alignment
-    output: expand(alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
-    params:
-        split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
-    log: log_file("split-gap-closed-vs-reads-alignment")
-    shell:
-        """
-            {{
-                LAsplit {params.split_alignment} {validation_blocks} < {input}
-                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
-            }} &> {log}
-        """
-
-
 rule preliminary_gap_closed_vs_reads_alignment:
     input:
         await_db_files(preliminary_gap_closed),
@@ -1195,6 +1179,21 @@ rule preliminary_gap_closed_vs_reads_alignment:
         """
             {{
                 LAmerge {output} {input[block_alignments]}
+                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
+            }} &> {log}
+        """
+
+
+rule split_preliminary_gap_closed_vs_reads_alignment:
+    input: preliminary_gap_closed_vs_reads_alignment
+    output: expand(alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
+    params:
+        split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
+    log: log_file("split-gap-closed-vs-reads-alignment")
+    shell:
+        """
+            {{
+                LAsplit {params.split_alignment} {validation_blocks} < {input}
                 LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
             }} &> {log}
         """
@@ -1247,7 +1246,7 @@ rule weak_coverage_mask:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
     shell:
-        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db} {weak_coverage_mask} {params.block_masks} 2> {log}"
+        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
 
 rule skip_gaps:
