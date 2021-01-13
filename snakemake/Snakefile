@@ -410,8 +410,8 @@ def block_alignments(db_a, db_b=None, block_a=None, block_b=None):
     if db_b is None:
         db_b = db_a
 
-    blocks_a = __blocks_for(db_a, block_a)
-    blocks_b = __blocks_for(db_b, block_b)
+    blocks_a = __blocks_for(db_a, 1, block_a)
+    blocks_b = __blocks_for(db_b, 1, block_b)
 
     if not blocks_a is None and not blocks_b is None:
         return (alignment_file(db_a, db_b, i, j)  for i in blocks_a for j in blocks_b)
@@ -440,7 +440,7 @@ def pseudo_block_mask(mask, block):
 
 
 def pseudo_block_masks(mask, db):
-    blocks = __blocks_for(db, None)
+    blocks = __blocks_for(db, 1, None)
 
     return [pseudo_block_mask(mask, b)  for b in blocks]
 
