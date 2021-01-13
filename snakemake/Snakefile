@@ -1164,7 +1164,7 @@ checkpoint collect:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        ref_vs_reads_chained_alignment,
+        ref_vs_reads_alignment,
         *[mask_files(reference, homogenized_mask(m))  for m in masks]
     output:
         protected(pile_ups)
