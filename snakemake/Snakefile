@@ -1046,8 +1046,14 @@ rule reads_vs_ref_alignment:
         block_alignments = lambda _: block_alignments(reads, reference, block_b=FULL_DB)
     output:
         protected(reads_vs_ref_alignment)
+    log: log_file("reads-vs-ref-alignment")
     shell:
-        "LAmerge {output} {input[block_alignments]}"
+        """
+            {{
+                LAmerge {output} {input[block_alignments]}
+                LAcheck -v {reads} {reference} {output} || {lacheck_handler}
+            }} &> {log}
+        """
 
 
 rule mask_reads:
