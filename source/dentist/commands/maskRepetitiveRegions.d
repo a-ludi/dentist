@@ -21,7 +21,10 @@ import dentist.common.alignments :
     Locus;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
-    getAlignments,
+    DBdumpOptions,
+    getDbRecords,
+    getFlatLocalAlignments,
+    LocalAlignmentReader,
     writeMask;
 import dentist.util.algorithm : filterInPlace;
 import dentist.util.log;
@@ -38,6 +41,7 @@ import std.range :
     chain,
     only;
 import std.range.primitives :
+    empty,
     ElementType,
     isInputRange;
 import std.typecons : Tuple;
@@ -65,7 +69,7 @@ class RepeatMaskAssessor
 {
     protected const Options options;
     protected AlignmentType alignmentType;
-    protected AlignmentChain[] alignment;
+    protected LocalAlignmentReader alignment;
     protected ReferenceRegion repetitiveRegions;
     protected ReferenceRegion repetitiveRegionsImproper;
 
@@ -94,13 +98,13 @@ class RepeatMaskAssessor
         final switch (alignmentType)
         {
             case AlignmentType.self:
-                alignment = getAlignments(
+                alignment = getFlatLocalAlignments(
                     options.refDb,
                     options.dbAlignmentFile,
                 );
                 break;
             case AlignmentType.reads:
-                alignment = getAlignments(
+                alignment = getFlatLocalAlignments(
                     options.refDb,
                     options.readsDb,
                     options.dbAlignmentFile,
@@ -108,7 +112,7 @@ class RepeatMaskAssessor
                 break;
         }
 
-        if (alignment.length == 0)
+        if (alignment.empty)
             logJsonWarn("info", "empty " ~ alignmentType.to!string ~ "-alignment");
     }
 
@@ -125,7 +129,10 @@ class RepeatMaskAssessor
             coverageBounds[1]
         );
 
-        repetitiveRegions = repeatAssessor(alignment);
+        repetitiveRegions = repeatAssessor(
+            AlignmentIntervals(alignment),
+            contigIntervals(),
+        );
 
         logJsonDiagnostic(
             "alignmentType", alignmentType.to!string,
@@ -142,9 +149,11 @@ class RepeatMaskAssessor
                 options.improperCoverageBoundsReads[1]
             );
 
-            alignment.filterInPlace!(ac => !ac.isProper(options.properAlignmentAllowance));
-
-            repetitiveRegionsImproper = improperRepeatAssessor(alignment);
+            alignment.reset();
+            repetitiveRegionsImproper = improperRepeatAssessor(
+                AlignmentIntervals(alignment, options.properAlignmentAllowance),
+                contigIntervals(),
+            );
 
             logJsonDiagnostic(
                 "alignmentType", alignmentType.to!string,
@@ -154,6 +163,16 @@ class RepeatMaskAssessor
                 "numRepetitiveRegionsImproper", repetitiveRegionsImproper.intervals.length,
             );
         }
+    }
+
+    protected auto contigIntervals()
+    {
+        return getDbRecords(options.refDb, [DBdumpOptions.readNumber, DBdumpOptions.originalHeader])
+            .map!(contig => ReferenceInterval(
+                contig.contigId,
+                0,
+                contig.location.length,
+            ));
     }
 
     protected void writeRepeatMask()
@@ -184,20 +203,108 @@ class RepeatMaskAssessor
     }
 }
 
-/**
-    A `RepeatAssessor` should generate a repeat mask derived from a set of
-    alignment chains.
-*/
-interface RepeatAssessor
+struct AlignmentIntervals
 {
-    ReferenceRegion opCall(in AlignmentChain[] input);
+    LocalAlignmentReader* alignments;
+    coord_t properAlignmentAllowance;
+    ReferenceInterval currentInterval;
+    bool properBegin;
+    bool properEnd;
+
+
+    this(ref LocalAlignmentReader alignments, coord_t properAlignmentAllowance = coord_t.max)
+    {
+        this.alignments = &alignments;
+        this.properAlignmentAllowance = properAlignmentAllowance;
+
+        if (alignments.empty)
+            setEmpty();
+        else
+            popFront();
+    }
+
+
+    @property bool empty() const pure nothrow @safe
+    {
+        return currentInterval.contigId == id_t.max && currentInterval.empty;
+    }
+
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty AlignmentIntervals");
+
+        if (alignments.empty)
+            return setEmpty();
+
+        currentInterval.contigId = currentFLA.contigA.id;
+        updateIntervalBegin();
+        updateIntervalEnd();
+
+        if (!currentFLA.flags.unchained && !currentFLA.flags.chainContinuation)
+        {
+            alignments.popFront();
+            while (!alignments.empty && currentFLA.flags.chainContinuation)
+            {
+                updateIntervalEnd();
+                alignments.popFront();
+            }
+        }
+        else
+        {
+            assert(currentFLA.flags.unchained, "chain is missing a start");
+        }
+
+        if (properAlignmentAllowance < coord_t.max && !(properBegin && properEnd))
+            // skip improper alignment chains
+            return popFront();
+    }
+
+
+    void setEmpty() pure nothrow @safe
+    {
+        currentInterval = ReferenceInterval(id_t.max, 0, 0);
+    }
+
+
+    @property ReferenceInterval front() pure nothrow @safe
+    {
+        return currentInterval;
+    }
+
+
+    protected void updateIntervalBegin() pure nothrow @safe
+    {
+        properBegin = (
+            currentFLA.contigA.beginsWithin(properAlignmentAllowance) ||
+            currentFLA.contigB.beginsWithin(properAlignmentAllowance)
+        );
+        currentInterval.begin = currentFLA.contigA.begin;
+    }
+
+
+    protected void updateIntervalEnd() pure nothrow @safe
+    {
+        properEnd = (
+            currentFLA.contigA.endsWithin(properAlignmentAllowance) ||
+            currentFLA.contigB.endsWithin(properAlignmentAllowance)
+        );
+        currentInterval.end = currentFLA.contigA.end;
+    }
+
+
+    protected @property auto currentFLA() pure nothrow @safe
+    {
+        return alignments.front;
+    }
 }
+
 
 /**
     Mask reference regions where the alignment coverage is not within set
     limits. This helps to identify repetitive or bad quality regions.
 */
-class BadAlignmentCoverageAssessor : RepeatAssessor
+class BadAlignmentCoverageAssessor
 {
     double lowerLimit;
     double upperLimit;
@@ -245,85 +352,69 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
                  0 +----+-----------------------+--------+-------------+--------+-----------+---->
             ```
         */
-        private static AlignmentChain[] getTestAlignments()
+        private static ReferenceInterval[] getTestAlignmentIntervals()
         {
-            alias LocalAlignment = AlignmentChain.LocalAlignment;
-
-            id_t alignmentChainId = 0;
-            id_t contReadId = 0;
-            AlignmentChain getDummyAlignment(id_t contigId,
-                    coord_t contigLength, coord_t beginIdx, coord_t endIdx)
-            {
-                return AlignmentChain(
-                    ++alignmentChainId,
-                    Contig(contigId, contigLength),
-                    Contig(alignmentChainId, endIdx),
-                    AlignmentFlags(),
-                    [
-                        LocalAlignment(
-                            Locus(beginIdx, beginIdx + 1),
-                            Locus(0, 1),
-                            0,
-                        ),
-                        LocalAlignment(
-                            Locus(endIdx - 1, endIdx),
-                            Locus(2, 3),
-                            0,
-                        ),
-                    ],
-                );
-            }
-
             return [
-                getDummyAlignment(1, 30,  5, 18), //  #1
-                getDummyAlignment(1, 30,  5, 18), //  #2
-                getDummyAlignment(1, 30,  5, 20), //  #3
-                getDummyAlignment(1, 30, 10, 20), //  #4
-                getDummyAlignment(1, 30, 10, 30), //  #5
-                getDummyAlignment(1, 30, 10, 30), //  #6
-                getDummyAlignment(1, 30, 13, 30), //  #7
-                getDummyAlignment(1, 30, 20, 30), //  #8
-                getDummyAlignment(1, 30, 20, 30), //  #9
-                getDummyAlignment(1, 30, 20, 30), // #10
-                getDummyAlignment(1, 30, 24, 30), // #11
-                getDummyAlignment(2, 15,  0,  3), // #12
-                getDummyAlignment(2, 15,  0,  3), // #13
-                getDummyAlignment(2, 15,  0,  5), // #14
-                getDummyAlignment(2, 15,  0,  5), // #15
-                getDummyAlignment(2, 15,  0, 15), // #16
-                getDummyAlignment(2, 15,  0, 15), // #17
-                getDummyAlignment(2, 15,  0, 15), // #18
-                getDummyAlignment(2, 15,  5, 15), // #19
-                getDummyAlignment(2, 15,  5, 15), // #20
-                getDummyAlignment(2, 15,  5, 15), // #21
-                getDummyAlignment(2, 15,  9, 15), // #22
-                getDummyAlignment(3, 15,  1,  4), // #23
-                getDummyAlignment(3, 15,  2,  5), // #24
-                getDummyAlignment(3, 15,  3,  6), // #25
-                getDummyAlignment(3, 15,  4,  7), // #26
-                getDummyAlignment(3, 15,  5,  8), // #27
-                getDummyAlignment(3, 15,  6,  9), // #28
-                getDummyAlignment(3, 15,  7, 10), // #29
-                getDummyAlignment(3, 15,  8, 11), // #30
-                getDummyAlignment(3, 15,  9, 12), // #31
-                getDummyAlignment(3, 15, 10, 13), // #32
-                getDummyAlignment(3, 15, 11, 14), // #33
+                ReferenceInterval(1,  5, 18), //  #1
+                ReferenceInterval(1,  5, 18), //  #2
+                ReferenceInterval(1,  5, 20), //  #3
+                ReferenceInterval(1, 10, 20), //  #4
+                ReferenceInterval(1, 10, 30), //  #5
+                ReferenceInterval(1, 10, 30), //  #6
+                ReferenceInterval(1, 13, 30), //  #7
+                ReferenceInterval(1, 20, 30), //  #8
+                ReferenceInterval(1, 20, 30), //  #9
+                ReferenceInterval(1, 20, 30), // #10
+                ReferenceInterval(1, 24, 30), // #11
+                ReferenceInterval(2,  0,  3), // #12
+                ReferenceInterval(2,  0,  3), // #13
+                ReferenceInterval(2,  0,  5), // #14
+                ReferenceInterval(2,  0,  5), // #15
+                ReferenceInterval(2,  0, 15), // #16
+                ReferenceInterval(2,  0, 15), // #17
+                ReferenceInterval(2,  0, 15), // #18
+                ReferenceInterval(2,  5, 15), // #19
+                ReferenceInterval(2,  5, 15), // #20
+                ReferenceInterval(2,  5, 15), // #21
+                ReferenceInterval(2,  9, 15), // #22
+                ReferenceInterval(3,  1,  4), // #23
+                ReferenceInterval(3,  2,  5), // #24
+                ReferenceInterval(3,  3,  6), // #25
+                ReferenceInterval(3,  4,  7), // #26
+                ReferenceInterval(3,  5,  8), // #27
+                ReferenceInterval(3,  6,  9), // #28
+                ReferenceInterval(3,  7, 10), // #29
+                ReferenceInterval(3,  8, 11), // #30
+                ReferenceInterval(3,  9, 12), // #31
+                ReferenceInterval(3, 10, 13), // #32
+                ReferenceInterval(3, 11, 14), // #33
+            ];
+        }
+
+        private static ReferenceInterval[] getTestContigIntervals()
+        {
+            return [
+                ReferenceInterval(1, 0, 30),
+                ReferenceInterval(2, 0, 15),
+                ReferenceInterval(3, 0, 15),
             ];
         }
     }
 
     /// Apply the assessor to the given set of alignment.
-    override ReferenceRegion opCall(const(AlignmentChain[]) alignments)
+    ReferenceRegion opCall(R1, R2)(R1 alignmentIntervals, R2 contigIntervals)
+        if (
+            isInputRange!R1 && is(ElementType!R1 == ReferenceInterval) &&
+            isInputRange!R2 && is(ElementType!R2 == ReferenceInterval)
+        )
     {
-        if (alignments.length == 0)
-        {
+        if (alignmentIntervals.empty)
             return ReferenceRegion();
-        }
 
         static enum OK = CoverageZone.ok;
         auto maskAcc = appender!(ReferenceInterval[]);
         auto masker = Masker();
-        auto changeEvents = coverageChanges(alignments);
+        auto changeEvents = coverageChanges(alignmentIntervals, contigIntervals);
         auto lastEvent = changeEvents.front;
 
         debug logJsonDebug("changeEvents", changeEvents.array.toJson);
@@ -363,12 +454,13 @@ class BadAlignmentCoverageAssessor : RepeatAssessor
     ///
     unittest
     {
-        auto alignments = getTestAlignments();
+        auto alignmentIntervals = getTestAlignmentIntervals();
+        auto contigIntervals = getTestContigIntervals();
         alias CoverageChange = CoverageChangeRange.CoverageChange;
 
         auto assessor = new BadAlignmentCoverageAssessor(3, 5);
 
-        assert(assessor(alignments) == ReferenceRegion([
+        assert(assessor(alignmentIntervals, contigIntervals) == ReferenceRegion([
             ReferenceInterval(1,  0,  5),
             ReferenceInterval(1, 10, 18),
             ReferenceInterval(1, 20, 30),
@@ -464,26 +556,25 @@ struct CoverageChangeRange
         }
     }
 
-    private static CoverageChangeRange create(Range)(Range alignments)
-            if (isInputRange!Range && is(ElementType!Range : const(AlignmentChain)))
+    private static CoverageChangeRange create(R1, R2)(R1 alignmentIntervals, R2 contigIntervals)
+        if (
+            isInputRange!R1 && is(ElementType!R1 == ReferenceInterval) &&
+            isInputRange!R2 && is(ElementType!R2 == ReferenceInterval)
+        )
     {
-        if (alignments.length == 0)
-        {
+        if (alignmentIntervals.empty)
             return CoverageChangeRange();
-        }
 
-        auto alignmentEvents = alignments
-            .map!(alignment => only(
-                AlignmentEvent(alignment.contigA.id, alignment.first.contigA.begin, 1),
-                AlignmentEvent(alignment.contigA.id, alignment.last.contigA.end, -1),
+        auto alignmentEvents = alignmentIntervals
+            .map!(alignmentInterval => only(
+                AlignmentEvent(alignmentInterval.contigId, alignmentInterval.begin, 1),
+                AlignmentEvent(alignmentInterval.contigId, alignmentInterval.end, -1),
             ))
             .joiner;
-        auto contigBoundaryEvents = alignments
-            .map!"a.contigA"
-            .uniq
-            .map!(contig => only(
-                AlignmentEvent(contig.id, 0, 0),
-                AlignmentEvent(contig.id, contig.length, 0),
+        auto contigBoundaryEvents = contigIntervals
+            .map!(contigInterval => only(
+                AlignmentEvent(contigInterval.contigId, 0, 0),
+                AlignmentEvent(contigInterval.contigId, contigInterval.size, 0),
             ))
             .joiner;
         auto changeEvents = chain(alignmentEvents, contigBoundaryEvents).array;
@@ -549,20 +640,25 @@ struct CoverageChangeRange
     }
 }
 
-CoverageChangeRange coverageChanges(Range)(Range alignments)
+CoverageChangeRange coverageChanges(R1, R2)(R1 alignmentIntervals, R2 contigIntervals)
+    if (
+        isInputRange!R1 && is(ElementType!R1 == ReferenceInterval) &&
+        isInputRange!R2 && is(ElementType!R2 == ReferenceInterval)
+    )
 {
-    return CoverageChangeRange.create(alignments);
+    return CoverageChangeRange.create(alignmentIntervals, contigIntervals);
 }
 
 unittest
 {
     import std.algorithm : equal;
 
-    auto alignments = BadAlignmentCoverageAssessor.getTestAlignments();
+    auto alignmentIntervals = BadAlignmentCoverageAssessor.getTestAlignmentIntervals();
+    auto contigIntervals = BadAlignmentCoverageAssessor.getTestContigIntervals();
 
     alias CoverageChange = CoverageChangeRange.CoverageChange;
 
-    assert(coverageChanges(alignments).equal([
+    assert(coverageChanges(alignmentIntervals, contigIntervals).equal([
         CoverageChange(1,  0, 0, 0),
         CoverageChange(1,  5, 0, 3),
         CoverageChange(1, 10, 3, 6),
