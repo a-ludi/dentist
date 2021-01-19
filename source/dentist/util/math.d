@@ -316,8 +316,14 @@ class MissingNodeException : Exception
 /// set of edges is mutable.
 struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, EdgePayload = void)
 {
+    static assert(
+        !is(Node == size_t),
+        "Node must not be size_t as this leads to conflicting overloads"
+    );
+
     static enum isWeighted = !is(Weight == void);
     static enum hasEdgePayload = !is(EdgePayload == void);
+
 
     static struct Edge
     {
@@ -1314,8 +1320,8 @@ unittest
 {
     //     -1     1         1
     // (1)----(2)---(3) (4)---(5) (6)
-    size_t[] contigs = [1, 2, 3, 4, 5, 6];
-    auto contigGraph = Graph!(size_t, int)([1, 2, 3, 4, 5, 6]);
+    uint[] contigs = [1, 2, 3, 4, 5, 6];
+    auto contigGraph = Graph!(uint, int)([1, 2, 3, 4, 5, 6]);
 
     contigGraph.add(contigGraph.edge(1, 2, -1));
     contigGraph.add(contigGraph.edge(2, 3, 1));
