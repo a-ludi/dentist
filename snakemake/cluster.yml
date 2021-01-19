@@ -33,23 +33,13 @@ self_alignment:
     memory:     1024
     time:       "00:30"
 
-self_alignment_by_block:
-    jobname:    dentist.{rule}.{wildcards.dam}.{wildcards.block}
-    memory:     1024
-    time:       "00:30"
-
-mask_self_block:
-    jobname:    dentist.{rule}.{wildcards.dam}.{wildcards.block}
+mask_self:
+    jobname:    dentist.{rule}.{wildcards.dam}
     memory:     8192
     time:       "00:30"
 
-mask_self:
-    jobname:    dentist.{rule}.{wildcards.dam}
-    memory:     1024
-    time:       "00:15"
-
 ref_vs_reads_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.blocks_reads}
+    jobname:    dentist.{rule}.{wildcards.block_reads}
     memory:     32768
     time:       "02:00"
 
@@ -60,35 +50,6 @@ ref_vs_reads_alignment:
 reads_vs_ref_alignment:
     memory:     1024
     time:       "01:00"
-
-ref_vs_reads_alignment_by_ref_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}
-    memory:     1024
-    time:       "00:30"
-
-ref_vs_reads_alignment_by_reads_block:
-    jobname:    dentist.{rule}.{wildcards.blocks_reads}
-    memory:     1024
-    time:       "00:30"
-
-reads_vs_ref_alignment_by_reads_block:
-    jobname:    dentist.{rule}.{wildcards.blocks_reads}
-    memory:     1024
-    time:       "00:30"
-
-ref_vs_reads_chained_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.blocks_reads}
-    memory:     32768
-    time:       "00:30"
-
-ref_vs_reads_chained_alignment:
-    memory:     1024
-    time:       "00:30"
-
-mask_reads_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}
-    memory:     8192
-    time:       "00:30"
 
 mask_reads:
     memory:     1024
@@ -116,7 +77,7 @@ preliminary_output:
     time:       "01:00"
 
 preliminary_gap_closed_vs_reads_alignment_block:
-    jobname:    dentist.{rule}.{wildcards.block_ref}.{wildcards.blocks_reads}
+    jobname:    dentist.{rule}.{wildcards.block_reads}
     memory:     32768
     time:       "00:30"
 

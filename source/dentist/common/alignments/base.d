@@ -493,12 +493,10 @@ struct AlignmentChain
     }
 
     /// Returns true iff this alignment covers `contig` completely.
-    @property bool completelyCovers(string contig)() const pure nothrow
+    @property bool completelyCovers(string contig)(coord_t allowance = 0) const pure nothrow
         if (contig.among("contigA", "contigB"))
     {
-        return mixin(
-            "first." ~ contig ~ ".begin == 0 && last." ~ contig ~ ".end == " ~ contig ~ ".length"
-        );
+        return beginsWith!contig(allowance) && endsWith!contig(allowance);
     }
 
     /**

@@ -43,7 +43,6 @@ class CLIChainer
     const Options options;
     const ChainingOptions chainingOptions;
     FlatLocalAlignments alignments;
-    AlignmentHeader headerData;
     ProgressMeter progress;
 
 
@@ -60,7 +59,6 @@ class CLIChainer
         mixin(traceExecution);
 
         readAlignments();
-        inferHeaderData();
         chainLocalAlignments();
     }
 
@@ -78,15 +76,6 @@ class CLIChainer
     }
 
 
-    void inferHeaderData()
-    {
-        mixin(traceExecution);
-
-        headerData.maxTracePoints = alignments.maxTracePointCount;
-        headerData.tracePointDistance = alignments.tracePointDistance;
-    }
-
-
     void chainLocalAlignments()
     {
         mixin(traceExecution);
@@ -97,7 +86,7 @@ class CLIChainer
             .chainLocalAlignments(chainingOptions)
             .tee!(_ => progress.tick());
 
-        options.chainedAlignments.writeAlignments(chainedAlignments, headerData);
+        options.chainedAlignments.writeAlignments(chainedAlignments);
 
         progress.stop();
     }

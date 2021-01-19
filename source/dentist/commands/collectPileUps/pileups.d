@@ -19,7 +19,6 @@ import dentist.common.alignments :
     AlignmentFlags = Flags,
     AlignmentLocationSeed,
     arithmetic_t,
-    chainLocalAlignments,
     Contig,
     coord_t,
     getType,
@@ -48,8 +47,8 @@ import dentist.common.scaffold :
     Scaffold;
 import dentist.dazzler :
     dbSubset,
-    getFlatLocalAlignments,
-    getDalignment,
+    getAlignments,
+    getDamapping,
     GapSegment;
 import dentist.util.algorithm :
     backtracking,
@@ -1212,22 +1211,22 @@ private class BubbleResolver
             );
 
         // Align without any mask
-        auto intermediateAlignmentsFile = getDalignment(
+        auto intermediateAlignmentsFile = getDamapping(
             intermediateContigsDb,
             skippingPileUpDb,
-            options.anchorSkippingPileUpsOptions.dalignerOptions,
+            options.anchorSkippingPileUpsOptions.damapperOptions,
             options.tmpdir,
         );
-        auto intermediateAlignments = getFlatLocalAlignments(
+        auto intermediateAlignments = getAlignments(
             intermediateContigsDb,
             skippingPileUpDb,
             intermediateAlignmentsFile,
             Yes.includeTracePoints,
-        ).chainLocalAlignments(options.chainingOptions).array;
+        );
         foreach (ref ac; intermediateAlignments)
         {
             // Filter alignments covering the whole intermediate contig
-            ac.disableIf(!ac.completelyCovers!"contigA");
+            ac.disableIf(!ac.completelyCovers!"contigA"(options.properAlignmentAllowance));
             // Adjust contig/read IDs
             ac.contigA.id = intermediateContigIds[ac.contigA.id - 1];
             ac.contigB.id = skippingReadIds[ac.contigB.id - 1];

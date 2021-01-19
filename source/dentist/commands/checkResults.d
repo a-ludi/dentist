@@ -583,16 +583,13 @@ private struct ResultAnalyzer
             options.tmpdir,
         );
 
-        alias wholeContigMaps = (ac) => ac.first.contigB.begin == 0 &&
-                                        ac.last.contigB.end == ac.contigB.length;
-
         auto croppedContigAlignments = getFlatLocalAlignments(
             options.resultDb,
             croppedContigDb,
             croppedContigMappingFile,
         )
             .chainLocalAlignments(options.chainingOptions)
-            .filter!wholeContigMaps
+            .filter!(ac => ac.completelyCovers!"contigA")
             .array;
 
         foreach (ref ac; croppedContigAlignments)

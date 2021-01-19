@@ -406,12 +406,12 @@ def __blocks_for(db, batch_size, block):
         return __block_or_range(block)
 
 
-def block_alignments(db_a, db_b=None, block_a=None, block_b=None, batch_size_a=1, batch_size_b=1):
+def block_alignments(db_a, db_b=None, block_a=None, block_b=None):
     if db_b is None:
         db_b = db_a
 
-    blocks_a = __blocks_for(db_a, batch_size_a, block_a)
-    blocks_b = __blocks_for(db_b, batch_size_b, block_b)
+    blocks_a = __blocks_for(db_a, 1, block_a)
+    blocks_b = __blocks_for(db_b, 1, block_b)
 
     if not blocks_a is None and not blocks_b is None:
         return (alignment_file(db_a, db_b, i, j)  for i in blocks_a for j in blocks_b)
@@ -439,8 +439,8 @@ def pseudo_block_mask(mask, block):
     return "{}-{}B".format(mask, block)
 
 
-def pseudo_block_masks(mask, db, batch_size=1):
-    blocks = __blocks_for(db, batch_size, None)
+def pseudo_block_masks(mask, db):
+    blocks = __blocks_for(db, 1, None)
 
     return [pseudo_block_mask(mask, b)  for b in blocks]
 
@@ -635,7 +635,6 @@ logdir = config["logdir"]
 workflow_ = config.get("workflow", {})
 max_threads = config["max_threads"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
-align_batch_size = config["align_batch_size"]
 batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
 workflow_flags_names = ["full_validation", "no_purge_output"]
@@ -665,8 +664,6 @@ tandem_alignment = alignment_file("TAN", reference)
 tandem_alignment_block = alignment_file("TAN", reference, block_b="{block}")
 ref_vs_reads_alignment = alignment_file(reference, reads)
 reads_vs_ref_alignment = alignment_file(reads, reference)
-chained_ext = ".chained"
-ref_vs_reads_chained_alignment = prepend_ext(ref_vs_reads_alignment, chained_ext)
 preliminary_gap_closed_vs_reads_alignment = alignment_file(preliminary_gap_closed, reads)
 self_mask = workflow_.get("self_mask", "dentist-self")
 dust_mask = "dust"
@@ -736,11 +733,6 @@ lacheck_failed_notice = shell_esc(docstring("""
 """))
 
 lacheck_handler = "{ echo " + lacheck_failed_notice + "; (( ${SKIP_LACHECK:-0} != 0 )); }"
-
-# Note: the definition of alternate chains by DENTIST may lead to
-# "duplicate LAs" error the file is in fact OK; as long as there is no better
-# solution, the checks are just disabled for chained alignments
-skip_lacheck_for_chained = "SKIP_LACHECK=1"
 
 
 def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", log="log"):
@@ -825,15 +817,15 @@ checkpoint extend_dentist_config:
         dentist_config["__default__"]["reference"] = reference
         dentist_config["__default__"]["reads"] = reads
         dentist_config["__default__"]["result"] = gap_closed_fasta
-        dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_chained_alignment
+        dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_alignment
         dentist_config["__default__"]["mask"] = [homogenized_mask(m)  for m in masks]
         dentist_config["__default__"]["pile-ups"] = pile_ups
         dentist_config["__default__"]["insertions"] = insertions
         dentist_config["__default__"]["daccord"] = shlex.split(additional_consensus_options)
         dentist_config["__default__"]["daligner-consensus"] = shlex.split(additional_consensus_alignment_options)
         dentist_config["__default__"]["daligner-reads-vs-reads"] = shlex.split(additional_reads_vs_reads_alignment_options)
-        dentist_config["__default__"]["daligner-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
         dentist_config["__default__"]["daligner-self"] = shlex.split(additional_self_alignment_options)
+        dentist_config["__default__"]["damapper-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
         dentist_config["__default__"]["datander-ref"] = shlex.split(additional_tandem_alignment_options)
         dentist_config["__default__"]["dust-reads"] = shlex.split(additional_reads_dust_options)
 
@@ -942,44 +934,18 @@ rule self_alignment:
     shell: LAmerge()
 
 
-rule self_alignment_by_block:
-    input:
-        db = await_db_files(join(workdir_, "{dam}.dam")),
-        marker = assembly_marker("{dam}.dam"),
-        block_alignments = lambda wildcards: block_alignments(join(workdir_, wildcards.dam + ".dam"), block_a="{block}")
-    output:
-        protected(alignment_file("{dam}", block_a="{block}"))
-    params:
-        dbs = lambda _, input: input.db[0]
-    log: log_file("self-alignment-by-block.{dam}.{block}")
-    shell: LAmerge()
 
-
-rule mask_self_block:
+rule mask_self:
     input:
         await_dentist_config(),
         dam = await_db_files(join(workdir_, "{dam}.dam")),
         marker = assembly_marker("{dam}.dam"),
-        alignment = alignment_file("{dam}", block_a="{block}")
-    output:
-        mask_files(join(workdir_, "{dam}.dam"), block_mask(self_mask, "{block}"))
-    params:
-        outmask = block_mask(self_mask, "{block}")
-    log: log_file("mask-self.{dam}.{block}")
-    shell:
-        "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {params.outmask} 2> {log}"
-
-
-rule mask_self:
-    input:
-        *expand(mask_files(join(workdir_, "{dam}.dam"), "{block_mask}"), dam="{dam}", block_mask=block_masks(self_mask, join(workdir_, "{dam}.dam"))),
-        dam = await_db_files(join(workdir_, "{dam}.dam")),
-        marker = assembly_marker("{dam}.dam")
+        alignment = alignment_file("{dam}")
     output:
         mask_files(join(workdir_, "{dam}.dam"), self_mask)
     log: log_file("mask-self.{dam}")
     shell:
-        "Catrack -v {input.dam[0]} {self_mask} &> {log}"
+        "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {self_mask} 2> {log}"
 
 
 rule tandem_alignment_block:
@@ -1069,34 +1035,23 @@ rule ref_vs_reads_alignment_block:
         mask_files(reference, self_mask),
         mask_files(reference, tandem_mask)
     output:
-        alignment_file(reference, reads, block_a="{block_ref}", block_b="{blocks_reads}"),
-        alignment_file(reads, reference, block_a="{blocks_reads}", block_b="{block_ref}")
+        alignment_file(reference, reads, block_b='{block_reads}'),
+        alignment_file(reads, reference, block_a='{block_reads}')
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
-        input_alignments_a_vs_b = lambda wildcards: [basename(las) for las in block_alignments(reference, reads, block_a=wildcards.block_ref, block_b=wildcards.blocks_reads)],
-        output_a_vs_b = lambda _, output: basename(output[0]),
-        db_stubs_a_vs_b = [db_stub(rel_to_workdir(reference)), db_stub(rel_to_workdir(reads))],
-        input_alignments_b_vs_a = lambda wildcards: [basename(las) for las in block_alignments(reads, reference, block_a=wildcards.blocks_reads, block_b=wildcards.block_ref)],
-        output_b_vs_a = lambda _, output: basename(output[1]),
-        db_stubs_b_vs_a = [db_stub(rel_to_workdir(reads)), db_stub(rel_to_workdir(reference))]
+        alignment_file_a_vs_b = lambda _, output: basename(output[0]),
+        alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
-    log: log_file("ref-vs-reads-alignment.{block_ref}.{blocks_reads}")
+    log: log_file("ref-vs-reads-alignment.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                __cleanup() {{
-                    rm -f {params.input_alignments_a_vs_b:q}
-                    rm -f {params.input_alignments_b_vs_a:q}
-                }}
-                trap __cleanup exit
-                {params.aligncmd} {params.reference_stub}.{wildcards.block_ref} {params.reads_stub}.@{wildcards.blocks_reads}
-                """ + LAmerge("params.output_a_vs_b", "params.input_alignments_a_vs_b", "params.db_stubs_a_vs_b", log=False) + """ &
-                (( {threads} > 1 )) || wait
-                """ + LAmerge("params.output_b_vs_a", "params.input_alignments_b_vs_a", "params.db_stubs_b_vs_a", log=False) + """ &
-                wait
+                {params.aligncmd} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
+                LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reads_stub} {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1105,7 +1060,7 @@ rule ref_vs_reads_alignment:
     input:
         refdb = await_db_files(reference),
         readsdb = await_db_files(reads),
-        block_alignments = lambda _: block_alignments(reference, reads, batch_size_b=align_batch_size)
+        block_alignments = lambda _: block_alignments(reference, reads, block_a=FULL_DB)
     output:
         protected(ref_vs_reads_alignment)
     params:
@@ -1114,37 +1069,11 @@ rule ref_vs_reads_alignment:
     shell: LAmerge()
 
 
-rule ref_vs_reads_alignment_by_ref_block:
-    input:
-        refdb = await_db_files(reference),
-        readsdb = await_db_files(reads),
-        block_alignments = lambda _: block_alignments(reference, reads, block_a="{block_ref}", batch_size_b=align_batch_size)
-    output:
-        protected(alignment_file(reference, reads, block_a="{block_ref}"))
-    params:
-        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
-    log: log_file("ref-vs-reads-alignment-by-ref-block.{block_ref}")
-    shell: LAmerge()
-
-
-rule ref_vs_reads_alignment_by_reads_block:
-    input:
-        refdb = await_db_files(reference),
-        readsdb = await_db_files(reads),
-        block_alignments = lambda _: block_alignments(reference, reads, block_b="{blocks_reads}")
-    output:
-        protected(alignment_file(reference, reads, block_b="{blocks_reads}"))
-    params:
-        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
-    log: log_file("ref-vs-reads-alignment-by-reads-block.{blocks_reads}")
-    shell: LAmerge()
-
-
 rule reads_vs_ref_alignment:
     input:
-        readsdb = await_db_files(reads),
         refdb = await_db_files(reference),
-        block_alignments = lambda _: block_alignments(reads, reference, batch_size_a=align_batch_size)
+        readsdb = await_db_files(reads),
+        block_alignments = lambda _: block_alignments(reads, reference, block_b=FULL_DB)
     output:
         protected(reads_vs_ref_alignment)
     params:
@@ -1153,83 +1082,17 @@ rule reads_vs_ref_alignment:
     shell: LAmerge()
 
 
-rule reads_vs_ref_alignment_by_reads_block:
-    input:
-        readsdb = await_db_files(reads),
-        refdb = await_db_files(reference),
-        block_alignments = lambda _: block_alignments(reads, reference, block_a="{blocks_reads}")
-    output:
-        protected(alignment_file(reads, reference, block_a="{blocks_reads}"))
-    params:
-        dbs = lambda _, input: (input.readsdb[0], input.refdb[0])
-    log: log_file("reads-vs-ref-alignment-by-reads-block.{blocks_reads}")
-    shell: LAmerge()
-
-
-rule ref_vs_reads_chained_alignment_block:
-    input:
-        config = await_dentist_config(),
-        refdb = await_db_files(reference),
-        readsdb = await_db_files(reads),
-        alignment = alignment_file(reference, reads, block_a='{block_ref}', block_b='{blocks_reads}')
-    output:
-        prepend_ext(alignment_file(reference, reads, block_a='{block_ref}', block_b='{blocks_reads}'), chained_ext)
-    params:
-        reference_stub = db_stub(reference),
-        reads_stub = db_stub(reads)
-    threads: max_threads
-    log: log_file("ref-vs-reads-chained-alignment.{block_ref}.{blocks_reads}")
-    shell:
-        """
-            {{
-                dentist chain-local-alignments --config={input.config} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {output}
-                {skip_lacheck_for_chained}
-                LAcheck -v {input.refdb[0]} {input.readsdb[0]} {output} || {lacheck_handler}
-            }} &> {log}
-        """
-
-
-rule ref_vs_reads_chained_alignment:
-    input:
-        refdb = await_db_files(reference),
-        readsdb = await_db_files(reads),
-        block_alignments = lambda _: [prepend_ext(las, chained_ext)  for las in block_alignments(reference, reads, batch_size_b=align_batch_size)]
-    output:
-        protected(ref_vs_reads_chained_alignment)
-    params:
-        dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
-    log: log_file("ref-vs-reads-chained-alignment")
-    shell: "{skip_lacheck_for_chained}\n" + LAmerge()
-
-
-rule mask_reads_block:
+rule mask_reads:
     input:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        block_alignment = alignment_file(reference, reads, block_a="{block_ref}")
-    output:
-        mask_files(reference, reads_mask, pseudo_block="{block_ref}")
-    params:
-        outmask = pseudo_block_mask(reads_mask, block="{block_ref}")
-    log: log_file("mask-reads.{block_ref}")
-    shell:
-        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {input.block_alignment} {params.outmask} 2> {log}"
-
-
-rule mask_reads:
-    input:
-        await_dentist_config(),
-        *(mask_files(reference, m)  for m in pseudo_block_masks(reads_mask, reference)),
-        refdb = await_db_files(reference)
+        ref_vs_reads_alignment
     output:
         mask_files(reference, reads_mask)
-    params:
-        merged_mask = reads_mask,
-        block_masks = pseudo_block_masks(reads_mask, reference)
     log: log_file("mask-reads")
     shell:
-        "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
+        "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
 
 
 rule propagate_mask_to_reads_block:
@@ -1238,15 +1101,30 @@ rule propagate_mask_to_reads_block:
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reference, "{mask}"),
-        alignment = alignment_file(reference, reads, block_b='{blocks_reads}')
+        alignment = alignment_file(reference, reads, block_b='{block_reads}')
     output:
-        mask_files(reads, "{mask}", pseudo_block="{blocks_reads}")
+        mask_files(reads, "{mask}", pseudo_block="{block_reads}")
     params:
         inmask = "{mask}",
-        outmask = pseudo_block_mask("{mask}", "{blocks_reads}")
-    log: log_file("propagate-mask-to-reads.{mask}.{blocks_reads}")
+        outmask = pseudo_block_mask("{mask}", "{block_reads}")
+    log: log_file("propagate-mask-to-reads.{mask}.{block_reads}")
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
+
+
+# rule propagate_mask_to_reads:
+#     input:
+#         await_dentist_config(),
+#         await_db_files(reads),
+#         *[mask_files(reads, m) for m in block_masks("{mask}", reads)]
+#     output:
+#         mask_files(reads, "{mask}")
+#     params:
+#         merged_mask = "{mask}",
+#         block_masks = block_masks("{mask}", reads)
+#     log: log_file("propagate-mask-to-reads.{mask}")
+#     shell:
+#         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reads} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
 rule propagate_mask_back_to_reference_block:
@@ -1254,14 +1132,14 @@ rule propagate_mask_back_to_reference_block:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        mask_files(reads, "{mask}", pseudo_block="{blocks_reads}"),
-        alignment = alignment_file(reads, reference, block_a='{blocks_reads}')
+        mask_files(reads, "{mask}", pseudo_block="{block_reads}"),
+        alignment = alignment_file(reads, reference, block_a='{block_reads}')
     output:
-        temp(mask_files(reference, homogenized_mask("{mask}"), pseudo_block="{blocks_reads}"))
+        temp(mask_files(reference, homogenized_mask("{mask}"), pseudo_block="{block_reads}"))
     params:
-        inmask = pseudo_block_mask("{mask}", "{blocks_reads}"),
-        outmask = pseudo_block_mask(homogenized_mask("{mask}"), "{blocks_reads}")
-    log: log_file("propagate-mask-back-to-reference.{mask}.{blocks_reads}")
+        inmask = pseudo_block_mask("{mask}", "{block_reads}"),
+        outmask = pseudo_block_mask(homogenized_mask("{mask}"), "{block_reads}")
+    log: log_file("propagate-mask-back-to-reference.{mask}.{block_reads}")
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reads} {reference} {input[alignment]} {params[outmask]} 2> {log}"
 
@@ -1270,12 +1148,12 @@ rule propagate_mask_back_to_reference:
     input:
         await_dentist_config(),
         await_db_files(reference),
-        *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads, align_batch_size)]
+        *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads)]
     output:
         mask_files(reference, homogenized_mask("{mask}"))
     params:
         merged_mask = homogenized_mask("{mask}"),
-        block_masks = pseudo_block_masks(homogenized_mask("{mask}"), reads, align_batch_size)
+        block_masks = pseudo_block_masks(homogenized_mask("{mask}"), reads)
     log: log_file("propagate-mask-back-to-reference.{mask}")
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
@@ -1286,7 +1164,7 @@ checkpoint collect:
         await_dentist_config(),
         await_db_files(reference),
         await_db_files(reads),
-        ref_vs_reads_chained_alignment,
+        ref_vs_reads_alignment,
         *[mask_files(reference, homogenized_mask(m))  for m in masks]
     output:
         protected(pile_ups)
@@ -1378,34 +1256,23 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         mask_files(preliminary_gap_closed, self_mask),
         mask_files(preliminary_gap_closed, tandem_mask)
     output:
-        alignment_file(preliminary_gap_closed, reads, block_a='{block_ref}', block_b='{blocks_reads}'),
-        temp(alignment_file(reads, preliminary_gap_closed, block_a='{blocks_reads}', block_b='{block_ref}'))
+        alignment_file(preliminary_gap_closed, reads, block_b='{block_reads}'),
+        temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}'))
     params:
         aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
         preliminary_gap_closed_stub = db_stub(rel_to_workdir(preliminary_gap_closed)),
         reads_stub = db_stub(rel_to_workdir(reads)),
-        input_alignments_a_vs_b = lambda wildcards: [basename(las) for las in block_alignments(preliminary_gap_closed, reads, block_a=wildcards.block_ref, block_b=wildcards.blocks_reads)],
-        output_a_vs_b = lambda _, output: basename(output[0]),
-        db_stubs_a_vs_b = [db_stub(rel_to_workdir(preliminary_gap_closed)), db_stub(rel_to_workdir(reads))],
-        input_alignments_b_vs_a = lambda wildcards: [basename(las) for las in block_alignments(reads, preliminary_gap_closed, block_a=wildcards.blocks_reads, block_b=wildcards.block_ref)],
-        output_b_vs_a = lambda _, output: basename(output[1]),
-        db_stubs_b_vs_a = [db_stub(rel_to_workdir(reads)), db_stub(rel_to_workdir(preliminary_gap_closed))]
+        alignment_file_a_vs_b = lambda _, output: basename(output[0]),
+        alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
-    log: log_file("gap-closed-vs-reads-alignment.{block_ref}.{blocks_reads}")
+    log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
     shell:
         """
             {{
                 cd {workdir_}
-                __cleanup() {{
-                    rm -f {params.input_alignments_a_vs_b:q}
-                    rm -f {params.input_alignments_b_vs_a:q}
-                }}
-                trap __cleanup exit
-                {params.aligncmd} {params.preliminary_gap_closed_stub}.{wildcards.block_ref} {params.reads_stub}.@{wildcards.blocks_reads}
-                """ + LAmerge("params.output_a_vs_b", "params.input_alignments_a_vs_b", "params.db_stubs_a_vs_b", log=False) + """ &
-                (( {threads} > 1 )) || wait
-                """ + LAmerge("params.output_b_vs_a", "params.input_alignments_b_vs_a", "params.db_stubs_b_vs_a", log=False) + """ &
-                wait
+                {params.aligncmd} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
+                LAcheck -v {params.preliminary_gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
+                LAcheck -v {params.reads_stub} {params.preliminary_gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1414,7 +1281,7 @@ rule preliminary_gap_closed_vs_reads_alignment:
     input:
         refdb = await_db_files(preliminary_gap_closed),
         readsdb = await_db_files(reads),
-        block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads, batch_size_b=align_batch_size)
+        block_alignments = lambda _: block_alignments(preliminary_gap_closed, reads, block_a=FULL_DB)
     output:
         protected(preliminary_gap_closed_vs_reads_alignment)
     params:
@@ -1425,7 +1292,7 @@ rule preliminary_gap_closed_vs_reads_alignment:
 
 rule split_preliminary_gap_closed_vs_reads_alignment:
     input: preliminary_gap_closed_vs_reads_alignment
-    output: block_alignments(preliminary_gap_closed, reads, block_a=range(1, validation_blocks + 1), block_b=FULL_DB)
+    output: expand(alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}"), block_ref=range(1, validation_blocks + 1))
     params:
         split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
     log: log_file("split-gap-closed-vs-reads-alignment")

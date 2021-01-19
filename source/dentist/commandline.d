@@ -49,6 +49,7 @@ import dentist.common.scaffold : JoinPolicy;
 import dentist.dazzler :
     DaccordOptions,
     DalignerOptions,
+    DamapperOptions,
     DatanderOptions,
     dbdustMaskName,
     DbSplitOptions,
@@ -358,7 +359,6 @@ struct OptionsFor(DentistCommand _command)
 
     static enum needChainingOptions = command.among(
         DentistCommand.chainLocalAlignments,
-        DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         TestingCommand.checkResults,
     );
@@ -550,7 +550,7 @@ struct OptionsFor(DentistCommand _command)
         @Argument("<in:ref-vs-reads-alignment>")
         @Help(q"{
             alignments chains of the reads against the reference in form of a .las
-            file as produced by `daligner` and `dentist chain-local-alignments`.
+            file, e.g. produced by `damapper`.
         }")
         @(Validate!validateLasFile)
         string readsAlignmentFile;
@@ -562,8 +562,10 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:gap-closed-vs-reads-alignment>")
         @Help("
-            local alignments of the reads against the gap-closed reference in
-            form of a .las file as produced by `daligner`
+            localalignments of the reads against the gap-closed reference in
+            form of a .las file as produced by `damapper` or `daligner`.
+            Chains are disregarded, e.i. chained alignments are split into
+            local alignments.
         ")
         @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string readsAlignmentFile;
@@ -837,8 +839,8 @@ struct OptionsFor(DentistCommand _command)
         @Option("auxiliary-threads", "aux-threads", "A")
         @MetaVar("num-threads")
         @Help("
-            use <num-threads> threads for auxiliary tools like `daligner` and
-            `daccord` (defaults to floor(totalCpus / <threads>) )
+            use <num-threads> threads for auxiliary tools like `daligner`,
+            `damapper` and `daccord` (default: floor(totalCpus / <threads>) )
         ")
         uint numAuxiliaryThreads;
 
@@ -1282,29 +1284,11 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.generateDazzlerOptions,
-        DentistCommand.collectPileUps,
-    ))
-    {
-        @Option("daligner-ref-vs-reads")
-        @MetaVar("<daligner-option>[,<daligner-option>...]")
-        @Help("Provide additional options to `daligner`")
-        @(RevertField!"additionalRefVsReadsAlignmentOptions")
-        void addAdditionalRefVsReadsAlignmentOptions(string option)
-        {
-            additionalRefVsReadsAlignmentOptions ~= option.split(',');
-        }
-
-        @Option()
-        string[] additionalRefVsReadsAlignmentOptions;
-    }
-
-    static if (command.among(
-        DentistCommand.generateDazzlerOptions,
         DentistCommand.processPileUps,
     ))
     {
         @Option("daligner-self")
-        @MetaVar("<daligner-option>[,<daligner-option>...]")
+        @MetaVar("<daligner-option>...")
         @Help("Provide additional options to `daligner`")
         @(RevertField!"additionalSelfAlignmentOptions")
         void addAdditionalSelfAlignmentOptions(string option)
@@ -1314,6 +1298,24 @@ struct OptionsFor(DentistCommand _command)
 
         @Option()
         string[] additionalSelfAlignmentOptions;
+    }
+
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+    ))
+    {
+        @Option("damapper-ref-vs-reads")
+        @MetaVar("<damapper-option>...")
+        @Help("Provide additional options to `damapper`")
+        @(RevertField!"additionalRefVsReadsAlignmentOptions")
+        void addAdditionalRefVsReadsAlignmentOptions(string option)
+        {
+            additionalRefVsReadsAlignmentOptions ~= option.split(',');
+        }
+
+        @Option()
+        string[] additionalRefVsReadsAlignmentOptions;
     }
 
     static if (command.among(
@@ -2632,14 +2634,14 @@ struct OptionsFor(DentistCommand _command)
     ) {
         @property string[] refVsReadsAlignmentOptions() const
         {
-            with (DalignerOptions) with (OptionModifier)
+            with (DamapperOptions) with (OptionModifier)
                 return additionalRefVsReadsAlignmentOptions
                     .dup
+                    .withOption(cast(string) symmetric, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
                     .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
-                    .withOption(cast(string) asymmetric, remove)
-                    .withOption(cast(string) sortMap, remove)
-                    .withOption(cast(string) identity, remove)
+                    .withOption(cast(string) sortPileOrder, remove)
+                    .withOption(cast(string) oneDirection, remove)
                     .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
                     .array;
         }
@@ -2649,7 +2651,7 @@ struct OptionsFor(DentistCommand _command)
         ) {
             static struct AnchorSkippingPileUpsOptions
             {
-                string[] dalignerOptions;
+                string[] damapperOptions;
                 string[] dbsplitOptions;
                 string tmpdir;
             }
@@ -2657,7 +2659,7 @@ struct OptionsFor(DentistCommand _command)
             @property auto anchorSkippingPileUpsOptions() const
             {
                 return const(AnchorSkippingPileUpsOptions)(
-                    // dalignerOptions
+                    // damapperOptions
                     refVsReadsAlignmentOptions,
                     // dbsplitOptions
                     [DbSplitOptions.allReads],

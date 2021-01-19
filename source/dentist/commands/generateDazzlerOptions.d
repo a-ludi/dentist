@@ -19,6 +19,6 @@ void execute(Options)(in Options options)
     writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
     writeln("# tandem alignment options (consider using `HPC.daligner`)");
     writefln!"datander %-(%s %) <reference>"(options.tandemAlignmentOptions);
-    writeln("# ref vs reads alignment options (consider using `HPC.daligner`)");
-    writefln!"daligner %-(%s %) <reference> <reads>"(options.refVsReadsAlignmentOptions);
+    writeln("# ref vs reads alignment options (consider using `HPC.damapper`)");
+    writefln!"damapper %-(%s %) <reference> <reads>"(options.refVsReadsAlignmentOptions);
 }

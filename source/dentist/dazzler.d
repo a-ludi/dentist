@@ -100,6 +100,7 @@ import std.range :
     drop,
     enumerate,
     generate,
+    iota,
     only,
     repeat,
     slide,
@@ -148,7 +149,7 @@ enum forceLargeTracePointType = 126;
 enum minAverageCorrelationRate = 0.7;
 
 /// Minimum allowed value for `-n` option of `damapper`
-version (damapper) enum minBestMatches = 0.7;
+enum minBestMatches = 0.7;
 
 enum isOptionsList(T) = isArray!T && isSomeString!(ElementType!T);
 
@@ -320,28 +321,25 @@ void computeLocalAlignments(Options)(in string[] dbList, in Options options)
     dalign(dbList, options.dalignerOptions, options.tmpdir);
 }
 
-version (damapper)
+AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
+        if (isOptionsList!(typeof(options.damapperOptions)) &&
+            isOptionsList!(typeof(options.ladumpOptions)) &&
+            isSomeString!(typeof(options.tmpdir)))
 {
-    AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
-            if (isOptionsList!(typeof(options.damapperOptions)) &&
-                isOptionsList!(typeof(options.ladumpOptions)) &&
-                isSomeString!(typeof(options.tmpdir)))
+    if (!lasFileGenerated(dbA, dbB, options.tmpdir))
     {
-        if (!lasFileGenerated(dbA, dbB, options.tmpdir))
-        {
-            damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
-        }
-
-        return getGeneratedAlignments(dbA, dbB, options);
+        damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
     }
 
-    void computeMappings(Options)(in string[] dbList, in Options options)
-            if (isOptionsList!(typeof(options.damapperOptions)) &&
-                isOptionsList!(typeof(options.ladumpOptions)) &&
-                isSomeString!(typeof(options.tmpdir)))
-    {
-        damapper(dbList, options.damapperOptions, options.tmpdir);
-    }
+    return getGeneratedAlignments(dbA, dbB, options);
+}
+
+void computeMappings(Options)(in string[] dbList, in Options options)
+        if (isOptionsList!(typeof(options.damapperOptions)) &&
+            isOptionsList!(typeof(options.ladumpOptions)) &&
+            isSomeString!(typeof(options.tmpdir)))
+{
+    damapper(dbList, options.damapperOptions, options.tmpdir);
 }
 
 private AlignmentChain[] getGeneratedAlignments(Options)(
@@ -1751,10 +1749,7 @@ struct AlignmentHeader
     {
         AlignmentHeader headerData;
 
-        if (alignmentChains.empty)
-            headerData.tracePointDistance = 100;
-        else
-            headerData.tracePointDistance = alignmentChains.front.tracePointDistance;
+        headerData.tracePointDistance = inferTracePointDistanceFrom(alignmentChains);
 
         foreach (alignmentChain; alignmentChains)
         {
@@ -1777,82 +1772,267 @@ struct AlignmentHeader
 
         return headerData;
     }
+
+
+    static size_t inferTracePointDistanceFrom(R)(R alignmentChains) if (isInputRange!R)
+    {
+        if (alignmentChains.empty)
+            return 100;
+        else
+            return alignmentChains.front.tracePointDistance;
+    }
 }
 
-AlignmentHeader writeAlignments(R)(const string lasFile, R alignmentChains)
-    if (isForwardRange!R)
-{
-    auto headerData = AlignmentHeader.inferFrom(alignmentChains.save);
 
-    return lasFile.writeAlignments(alignmentChains, headerData);
+version (unittest)
+{
+    private AlignmentChain[] getTestAlignmentChains(trace_point_t tracePointSpacing)
+    {
+        alias LocalAlignment = AlignmentChain.LocalAlignment;
+        alias TracePoint = LocalAlignment.TracePoint;
+        enum complement = AlignmentFlag.complement;
+        enum alternateChain = AlignmentFlag.alternateChain;
+
+        return [
+            AlignmentChain(
+                0,
+                Contig(1, 15),
+                Contig(2, 16),
+                AlignmentFlags(),
+                [
+                    LocalAlignment(
+                        Locus(3, 4),
+                        Locus(5, 6),
+                        7,
+                        [TracePoint(7, 1)],
+                    ),
+                    LocalAlignment(
+                        Locus(12, 13),
+                        Locus(14, 15),
+                        16,
+                        [TracePoint(16, 1)],
+                    ),
+                ],
+                tracePointSpacing,
+            ),
+            AlignmentChain(
+                1,
+                Contig(19, 31),
+                Contig(20, 33),
+                AlignmentFlags(complement, alternateChain),
+                [
+                    LocalAlignment(
+                        Locus(21, 22),
+                        Locus(23, 24),
+                        25,
+                        [TracePoint(25, 1)],
+                    ),
+                    LocalAlignment(
+                        Locus(30, 31),
+                        Locus(32, 33),
+                        0,
+                        [TracePoint(0, 1)],
+                    ),
+                ],
+                tracePointSpacing,
+            ),
+        ];
+    }
+
+    private string[] getTestFastaRecords()
+    {
+        auto fakeSeq = (coord_t length) => iota(length).map!"'a'".array.to!string;
+        auto fakeRead = (id_t id, coord_t length) => format!">faked/%d/0_%d RQ=0.85\n%s"(
+            id,
+            id,
+            fakeSeq(length),
+        );
+
+        return [
+            fakeRead(1, 15),
+            fakeRead(2, 16),
+            fakeRead(3, 42),
+            fakeRead(4, 42),
+            fakeRead(5, 42),
+            fakeRead(6, 42),
+            fakeRead(7, 42),
+            fakeRead(8, 42),
+            fakeRead(9, 42),
+            fakeRead(10, 42),
+            fakeRead(11, 42),
+            fakeRead(12, 42),
+            fakeRead(13, 42),
+            fakeRead(14, 42),
+            fakeRead(15, 42),
+            fakeRead(16, 42),
+            fakeRead(17, 42),
+            fakeRead(18, 42),
+            fakeRead(19, 31),
+            fakeRead(20, 33),
+            fakeRead(21, 42),
+            fakeRead(22, 42),
+            fakeRead(23, 42),
+            fakeRead(24, 42),
+            fakeRead(25, 42),
+            fakeRead(26, 42),
+        ];
+    }
 }
 
-@ExternalDependency("dumpLA", null, "https://github.com/thegenemyers/DALIGNER")
-AlignmentHeader writeAlignments(R)(
-    const string lasFile,
-    R alignmentChains,
-    AlignmentHeader headerData,
-) if (isInputRange!R)
+
+void writeAlignments(R)(const string lasFile, R alignmentChains) if (isInputRange!R)
 {
-    auto dumpCommand = ["dumpLA", lasFile];
-    auto converter = pipeProcess(dumpCommand, Redirect.stdin);
-    auto writer = converter.stdin;
+    auto las = File(lasFile, "wb");
 
-    logJsonDiagnostic(
-        "action", "execute",
-        "type", "pipe",
-        "command", dumpCommand.toJson,
-        "state", "pre",
-    );
-
-    writer.writefln!"@ T %d"(2 * headerData.maxTracePoints);
-    writer.writefln!"X %d"(headerData.tracePointDistance);
+    long numLocalAlignments = 0; // will be overwritten at the end
+    auto tracePointDistance = AlignmentHeader
+        .inferTracePointDistanceFrom(alignmentChains)
+        .to!int;
+    las.rawWrite([numLocalAlignments]);
+    las.rawWrite([tracePointDistance]);
 
     foreach (alignmentChain; alignmentChains)
-        writer.dumpAlignment(alignmentChain);
+    {
+        las.writeAlignmentChain(alignmentChain, tracePointDistance);
+        numLocalAlignments += alignmentChain.localAlignments.length;
+    }
 
-    writer.close();
-    wait(converter.pid());
+    las.rewind();
+    las.rawWrite([numLocalAlignments]);
 
-    return headerData;
+    las.close();
 }
 
-private auto dumpAlignment(File writer, const AlignmentChain alignmentChain)
+unittest
 {
-    if (alignmentChain.flags.disabled || alignmentChain.localAlignments.length == 0)
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse;
+
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
+    enum complement = AlignmentFlag.complement;
+
+    auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+    scope (exit)
+        rmdirRecurse(tmpDir);
+
+    auto dbFile = buildPath(tmpDir, "test.db");
+    buildDbFile(dbFile, getTestFastaRecords());
+
+    auto lasFile = buildPath(tmpDir, "test.las");
+    const alignmentChains = getTestAlignmentChains(100);
+
+    lasFile.writeAlignments(alignmentChains);
+    auto recoveredAlignmentChains = getAlignments(dbFile, lasFile, Yes.includeTracePoints);
+
+    assert(alignmentChains == recoveredAlignmentChains);
+}
+
+
+private struct DazzlerOverlap
+{
+    static enum Flag : uint
+    {
+        complement = 0x1,
+        alternateChain = 0x4,
+        chainContinuation = 0x8,
+        bestChain = 0x10,
+        disabled = 0x20,
+    }
+
+    static struct Path
+    {
+        void* trace;
+        int tlen;
+        int diffs;
+        int abpos;
+        int bbpos;
+        int aepos;
+        int bepos;
+    }
+
+    Path path;
+    uint flags;
+    int aread;
+    int bread;
+}
+
+private auto writeAlignmentChain(
+    File las,
+    const AlignmentChain alignmentChain,
+    const int tracePointDistance,
+)
+{
+    if (alignmentChain.localAlignments.length == 0)
         return;
 
+    DazzlerOverlap dazzlerOverlap;
+
+    // set read IDs
+    dazzlerOverlap.aread = alignmentChain.contigA.id - 1;
+    dazzlerOverlap.bread = alignmentChain.contigB.id - 1;
+    // set initial flags
+    if (alignmentChain.flags.disabled)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.disabled;
+    if (alignmentChain.flags.complement)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.complement;
+
+    // store initial flags
+    const initialFlags = dazzlerOverlap.flags;
+
+    // select appropriate type for trace
+    enum TRACE_XOVR = 125u;
+    auto largeTraceType = tracePointDistance > TRACE_XOVR;
 
     foreach (i, localAlignment; alignmentChain.localAlignments)
     {
-        auto chainPartType = i == 0
-            ? (alignmentChain.flags.alternateChain
-                ? ChainPartType.alternateStart
-                : ChainPartType.start)
-            : ChainPartType.continuation;
+        // set flags for this local alignment
+        dazzlerOverlap.flags = initialFlags;
+        if (i == 0)
+            dazzlerOverlap.flags |= alignmentChain.flags.alternateChain
+                ? DazzlerOverlap.Flag.alternateChain
+                : DazzlerOverlap.Flag.bestChain;
+        else
+            dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainContinuation;
 
-        writer.writefln!"P %d %d %c %c"(
-            alignmentChain.contigA.id,
-            alignmentChain.contigB.id,
-            alignmentChain.flags.complement ? 'c' : 'n',
-            chainPartType,
-        );
-        writer.writefln!"C %d %d %d %d"(
-            localAlignment.contigA.begin,
-            localAlignment.contigA.end,
-            localAlignment.contigB.begin,
-            localAlignment.contigB.end,
-        );
+        // set trace vector length
+        dazzlerOverlap.path.tlen = to!int(2*localAlignment.tracePoints.length);
+        // set diffs
+        dazzlerOverlap.path.diffs = localAlignment
+            .tracePoints
+            .map!"a.numDiffs"
+            .sum;
+        // set coordinates
+        dazzlerOverlap.path.abpos = localAlignment.contigA.begin;
+        dazzlerOverlap.path.aepos = localAlignment.contigA.end;
+        dazzlerOverlap.path.bbpos = localAlignment.contigB.begin;
+        dazzlerOverlap.path.bepos = localAlignment.contigB.end;
 
-        size_t totalDiffs;
-        writer.writefln!"T %d"(localAlignment.tracePoints.length);
-        foreach (tracePoint; localAlignment.tracePoints)
+        // write overlap "header"
+        auto overlapBytes = (cast(void*) &dazzlerOverlap)[
+            typeof(dazzlerOverlap.path.trace).sizeof ..
+            DazzlerOverlap.sizeof
+        ];
+        las.rawWrite(overlapBytes);
+
+        // write trace vector
+        if (localAlignment.tracePoints.length > 0)
         {
-            totalDiffs += tracePoint.numDiffs;
-            writer.writefln!"  %d %d"(tracePoint.numDiffs, tracePoint.numBasePairs);
+            if (largeTraceType)
+                las.rawWrite(localAlignment.tracePoints);
+            else
+                // rewrite trace to use `ubyte`s
+                las.rawWrite(
+                    localAlignment
+                        .tracePoints
+                        .map!(tp => [
+                            tp.numDiffs.to!ubyte,
+                            tp.numBasePairs.to!ubyte,
+                        ])
+                        .joiner
+                        .takeExactly(2*localAlignment.tracePoints.length)
+                        .array
+                );
         }
-
-        writer.writefln!"D %d"(totalDiffs);
     }
 }
 
@@ -3466,7 +3646,7 @@ string getDalignment(in string referenceDb, in string queryDb, in string[] dalig
 
     Returns: path to las-file.
 */
-version(damapper) string getDamapping(
+string getDamapping(
     in string refDb,
     in string queryDb,
     in string[] damapperOptions,
@@ -3493,16 +3673,12 @@ string chainLocalAlignments(
         Yes.includeTracePoints,
     );
 
-    AlignmentHeader headerData;
-    headerData.maxTracePoints = flatLocalAlignments.maxTracePointCount;
-    headerData.tracePointDistance = flatLocalAlignments.tracePointDistance;
-
     auto chainedAlignments = chainLocalAlignmentsAlgo(
         flatLocalAlignments,
         options,
     );
 
-    chainedLasFile.writeAlignments(chainedAlignments, headerData);
+    chainedLasFile.writeAlignments(chainedAlignments);
 
     return chainedLasFile;
 }
@@ -5014,7 +5190,7 @@ enum DatanderOptions : string
 }
 
 /// Options for `damapper`.
-version (damapper) enum DamapperOptions : string
+enum DamapperOptions : string
 {
     verbose = "-v",
     /// If the -b option is set, then the daligner assumes the data has a
@@ -5278,13 +5454,11 @@ private
         executeCommand(only("DASqv", "-v", coverageArg, dbFile, lasFile), null);
     }
 
-    version (damapper)
     void damapper(in string refDam, in string readsDam, in string[] damapperOpts, in string outdir)
     {
         damapper([refDam, readsDam], damapperOpts, outdir);
     }
 
-    version (damapper)
     @ExternalDependency("damapper", "DAMAPPER", "https://github.com/thegenemyers/DAMAPPER")
     void damapper(in string[] dbList, in string[] damapperOpts, in string outdir)
     {
