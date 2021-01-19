@@ -109,6 +109,8 @@ enum Flag : ubyte
     complement = 1 << 0,
     disabled = 1 << 1,
     alternateChain = 1 << 2,
+    chainContinuation = 1 << 3,
+    unchained = 1 << 4,
 }
 
 
@@ -1209,6 +1211,34 @@ struct AlignmentChain
         assert(cartoon!"contigB"(1, acs) == "----------\n" ~
                                             "---=-\n" ~
                                             "     -=---");
+    }
+
+
+    auto toFlatLocalAlignments() pure nothrow
+    {
+        return this
+            .localAlignments
+            .enumerate
+            .map!(enumLa => FlatLocalAlignment(
+                id,
+                FlatLocalAlignment.FlatLocus(
+                    contigA.id,
+                    contigA.length,
+                    enumLa.value.contigA.begin,
+                    enumLa.value.contigA.end,
+                ),
+                FlatLocalAlignment.FlatLocus(
+                    contigB.id,
+                    contigB.length,
+                    enumLa.value.contigB.begin,
+                    enumLa.value.contigB.end,
+                ),
+                enumLa.index == 0
+                    ? flags
+                    : (flags & ~Flag.alternateChain) | Flag.chainContinuation,
+                tracePointDistance,
+                enumLa.value.tracePoints,
+            ));
     }
 }
 

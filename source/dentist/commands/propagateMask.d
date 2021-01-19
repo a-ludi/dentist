@@ -22,6 +22,7 @@ import dentist.util.math :
     ceildiv,
     RoundingMode;
 import dentist.dazzler :
+    AlignmentHeader,
     getFlatLocalAlignments,
     getNumContigs,
     readMask,
@@ -114,13 +115,14 @@ class MaskPropagator
 
     auto getLocalAlignmentsByContig()
     {
+        auto alignmentHeader = AlignmentHeader.inferFrom(options.dbAlignmentFile);
         auto localAlignments = getFlatLocalAlignments(
             options.refDb,
             options.readsDb,
             options.dbAlignmentFile,
             Yes.includeTracePoints,
         );
-        auto bufferSize = localAlignments.maxLocalAlignmentsPerContig;
+        auto bufferSize = alignmentHeader.maxLocalAlignmentsPerContig;
 
         static auto bufferChunks(C)(C chunk, size_t bufferSize)
         {
