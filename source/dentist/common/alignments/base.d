@@ -476,8 +476,8 @@ struct AlignmentChain
     /// This alignment is called proper iff it starts and ends at a read boundary.
     @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
-        return (beginsWith!"contigA" || beginsWith!"contigB") &&
-               (endsWith!"contigA" || endsWith!"contigB");
+        return (beginsWith!"contigA"(allowance) || beginsWith!"contigB"(allowance)) &&
+               (endsWith!"contigA"(allowance) || endsWith!"contigB"(allowance));
     }
 
     @property bool beginsWith(string contig)(coord_t allowance = 0) const pure nothrow @safe
