@@ -60,8 +60,16 @@ outputs:
 dentist_config:
     __default__:
         read-coverage:      73.0
+        ploidy:             2
         max-coverage-self:  3
         verbose:            2
+    validate-regions:
+        # Uncomment to following two lines if the default value
+        # (0.5 * --read-coverage/--ploidy) is suboptimal. It is important to
+        # revert --read-coverage and --ploidy because they are
+        # mutually exclusive with --min-coverage-reads.
+        #min-coverage-reads: 5
+        #revert: "read-coverage,ploidy"
     output:
         fasta-line-width:   80
 
