@@ -1561,6 +1561,16 @@ struct FlatLocalAlignment
     TracePoint[] tracePoints;
 
 
+    PhobosFlag!"disabled" disableIf(lazy bool disable) pure
+    {
+        if (!flags.disabled)
+            flags.disabled = disable;
+
+
+        return cast(typeof(return)) flags.disabled;
+    }
+
+
     @property Trace trace() const pure nothrow @safe
     {
         return Trace(

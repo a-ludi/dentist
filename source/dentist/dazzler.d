@@ -404,30 +404,20 @@ AlignmentChain[] getAlignments(
     AlignmentReaderFlag flags,
 )
 {
-    string[] ladumpOptions = [
-        LAdumpOptions.coordinates,
-        LAdumpOptions.numDiffs,
-        LAdumpOptions.lengths,
-    ];
-    trace_point_t tracePointDistance;
-
-    if (flags & AlignmentReaderFlag.includeTracePoints)
-    {
-        ladumpOptions ~= LAdumpOptions.tracePoints;
-        tracePointDistance = getTracePointDistance(lasFile);
-    }
-
-    auto lasDumpReader = readLasDump(ladump(
+    auto alignmentHeader = AlignmentHeader.inferFrom(lasFile);
+    auto localAlignmentReader = LocalAlignmentReader(
         lasFile,
         dbA,
         dbB,
-        ladumpOptions,
-    ), tracePointDistance);
-    scope (exit) lasDumpReader.closePipe();
-    auto alignmentChainsBuffer = uninitializedArray!(AlignmentChain[])(
-        lasDumpReader.numLocalAlignments,
+        flags & AlignmentReaderFlag.includeTracePoints
+            ? No.skipTracePoints
+            : Yes.skipTracePoints,
     );
-    auto bufferRest = lasDumpReader.copy(alignmentChainsBuffer);
+    auto alignmentChainPacker = AlignmentChainPacker!LocalAlignmentReader(localAlignmentReader);
+    auto alignmentChainsBuffer = uninitializedArray!(AlignmentChain[])(
+        alignmentHeader.numAlignmentChains,
+    );
+    auto bufferRest = alignmentChainPacker.copy(alignmentChainsBuffer);
     alignmentChainsBuffer.length -= bufferRest.length;
 
     if (flags & AlignmentReaderFlag.sort)
@@ -470,6 +460,98 @@ AlignmentChain[] getAlignments(
 }
 
 
+struct AlignmentChainPacker(R)
+{
+    // TODO allow user to choose memory strategy for localAlignmentBuffer:
+    // a) dynamically increase size of reused localAlignmentBuffer
+    // b) like a) but let the user provide an initial size
+    // c) allocate localAlignmentBuffer for many trace points at once
+    // d) like c) but let the user provide an initial size
+    // TODO let the user decide whether the tracePoints need `dup`
+    R alignments;
+    AlignmentChain currentChain;
+
+    this(R alignments)
+    {
+        this.alignments = alignments;
+
+        popFront();
+        // make sure ids start at zero
+        --currentChain.id;
+    }
+
+
+    @property bool empty() const pure nothrow @safe
+    {
+        return currentChain.id == id_t.max;
+    }
+
+
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty AlignmentChainPacker");
+
+        if (alignments.empty)
+            return setEmpty();
+
+        auto localAlignmentsAcc = appender!(AlignmentChain.LocalAlignment[]);
+        ++currentChain.id;
+        currentChain.contigA = currentFLA.contigA.contig;
+        currentChain.contigB = currentFLA.contigB.contig;
+        currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
+        currentChain.tracePointDistance = currentFLA.tracePointDistance;
+        localAlignmentsAcc ~= makeCurrentLocalAlignment();
+
+        if (!currentFLA.flags.unchained && !currentFLA.flags.chainContinuation)
+        {
+            alignments.popFront();
+            while (!alignments.empty && currentFLA.flags.chainContinuation)
+            {
+                localAlignmentsAcc ~= makeCurrentLocalAlignment();
+                alignments.popFront();
+            }
+        }
+        else
+        {
+            enforce!DazzlerCommandException(currentFLA.flags.unchained, "chain is missing a start");
+        }
+
+        currentChain.localAlignments = localAlignmentsAcc.data;
+    }
+
+
+    void setEmpty() pure nothrow @safe
+    {
+        currentChain.id = id_t.max;
+    }
+
+
+    @property AlignmentChain front() pure nothrow @safe
+    {
+        assert(!empty, "Attempting to fetch the front of an empty AlignmentChainPacker");
+
+        return currentChain;
+    }
+
+
+    protected AlignmentChain.LocalAlignment makeCurrentLocalAlignment() pure nothrow @safe
+    {
+        return AlignmentChain.LocalAlignment(
+            currentFLA.contigA.locus,
+            currentFLA.contigB.locus,
+            currentFLA.tracePoints.map!"a.numDiffs".sum,
+            currentFLA.tracePoints.dup,
+        );
+    }
+
+
+    protected @property auto currentFLA() pure nothrow @safe
+    {
+        return alignments.front;
+    }
+}
+
+
 /// Returns a tuple of contig IDs and first and last begin/end coords.
 auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
 {
@@ -484,464 +566,7 @@ auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
 }
 
 
-private struct LasDumpLineFormatTuple
-{
-    char indicator;
-    char subIndicator;
-    string format;
-}
-
-private enum LasDumpLineFormat : LasDumpLineFormatTuple
-{
-    totalChainPartsCount = LasDumpLineFormatTuple('+', 'P', "+ P %d"),
-    totalTracePointsCount = LasDumpLineFormatTuple('+', 'T', "+ T %d"),
-    maxChainPartsCountPerPile = LasDumpLineFormatTuple('%', 'P', "%% P %d"),
-    maxTracePointsCountPerPile = LasDumpLineFormatTuple('%', 'T', "%% T %d"),
-    maxTracePointCount = LasDumpLineFormatTuple('@', 'T', "@ T %d"),
-    tracePointDistance = LasDumpLineFormatTuple('X', '\0', "X %d"),
-    chainPart = LasDumpLineFormatTuple('P', '\0', "P %d %d %c %c"),
-    lengths = LasDumpLineFormatTuple('L', '\0', "L %d %d"),
-    coordinates = LasDumpLineFormatTuple('C', '\0', "C %d %d %d %d"),
-    numDiffs = LasDumpLineFormatTuple('D', '\0', "D %d"),
-    tracePointBegin = LasDumpLineFormatTuple('T', '\0', "T %d"),
-    tracePoint = LasDumpLineFormatTuple(' ', '\0', " %d %d"),
-}
-
-private enum ChainPartType : char
-{
-    start = '>',
-    continuation = '-',
-    alternateStart = '+',
-    noChainInFile = '.',
-}
-
-private struct LasDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
-{
-    static alias LasDump = ReturnType!getDumpLines;
-    static alias LocalAlignment = AlignmentChain.LocalAlignment;
-    static alias TracePoint = LocalAlignment.TracePoint;
-
-private:
-    LasDump lasDump;
-    bool _empty;
-    AlignmentChain currentAC;
-    id_t currentACID;
-    LocalAlignment[] localAlignmentsBuffer;
-    LocalAlignment[] localAlignmentsAcc;
-    TracePoint[] tracePointsBuffer;
-    TracePoint[] tracePointsAcc;
-    char[] currentDumpLine;
-    size_t currentDumpLineNumber;
-    dchar currentLineType;
-    dchar currentLineSubType;
-    size_t numLocalAlignments;
-    size_t numTracePoints;
-    size_t maxTracePointCount;
-    trace_point_t tracePointDistance;
-    debug dchar[] allowedLineTypes;
-
-public:
-    this(S lasDump, trace_point_t tracePointDistance)
-    {
-        this.lasDump = getDumpLines(lasDump);
-        this.tracePointDistance = tracePointDistance;
-        debug with (LasDumpLineFormat)
-        {
-            this.allowedLineTypes = [
-                totalChainPartsCount.indicator,
-                totalTracePointsCount.indicator,
-                maxChainPartsCountPerPile.indicator,
-                maxTracePointsCountPerPile.indicator,
-                maxTracePointCount.indicator,
-                tracePointDistance.indicator,
-                chainPart.indicator,
-            ];
-        }
-        this.popFront();
-    }
-
-    void popFront()
-    {
-        assert(!empty, "Attempting to popFront an empty LasDumpReader");
-
-        if (lasDump.empty)
-        {
-            return setEmpty();
-        }
-
-        readNextAlignmentChain();
-    }
-
-    @property bool empty() const pure nothrow
-    {
-        return _empty;
-    }
-
-    @property AlignmentChain front() pure nothrow
-    {
-        assert(!empty, "Attempting to fetch the front of an empty LasDumpReader");
-
-        return currentAC;
-    }
-
-    static if (__traits(hasMember, lasDump, "destroy"))
-        alias closePipe = setEmpty;
-
-    void setEmpty() pure nothrow
-    {
-        static if (__traits(hasMember, lasDump, "destroy"))
-            lasDump.destroy();
-        _empty = true;
-    }
-
-private:
-
-    static auto getDumpLines(S lasDump)
-    {
-        return lasDump.enumerate(1).filter!"!a[1].empty";
-    }
-
-    private void nextLocalAlignmentsBuffer()
-    {
-        localAlignmentsBuffer = localAlignmentsBuffer[localAlignmentsAcc.length .. $];
-        localAlignmentsAcc = localAlignmentsBuffer[0 .. 0];
-    }
-
-    private void nextTracePointsBuffer()
-    {
-        tracePointsBuffer = tracePointsBuffer[tracePointsAcc.length .. $];
-        tracePointsAcc = tracePointsBuffer[0 .. 0];
-    }
-
-    void readNextAlignmentChain()
-    {
-        currentAC = AlignmentChain.init;
-        nextLocalAlignmentsBuffer();
-        nextTracePointsBuffer();
-        peekDumpLine();
-
-        while (true)
-        {
-            debug _enforce(allowedLineTypes.canFind(currentLineType), format!"forbidden line type `%c` (allowed: `%(%c%)`)"(currentLineType, allowedLineTypes));
-
-            with (LasDumpLineFormat)
-            {
-                switch (currentLineType)
-                {
-                case totalChainPartsCount.indicator:
-                    static assert(totalTracePointsCount.indicator == totalChainPartsCount.indicator);
-
-                    switch (currentLineSubType)
-                    {
-                    case totalChainPartsCount.subIndicator:
-                        numLocalAlignments = readTotalChainPartsCount();
-                        if (numLocalAlignments == 0)
-                            // do not try to read empty dump
-                            return setEmpty();
-
-                        localAlignmentsBuffer = uninitializedArray!(typeof(localAlignmentsBuffer))(
-                            numLocalAlignments,
-                        );
-                        break;
-                    case totalTracePointsCount.subIndicator:
-                        numTracePoints = readTotalTracePointsCount();
-
-                        tracePointsBuffer = uninitializedArray!(typeof(tracePointsBuffer))(
-                            numTracePoints,
-                        );
-                        break;
-                    default:
-                        error(format!"unknown line sub-type `%c`"(currentLineSubType));
-                    }
-                    break;
-                case maxChainPartsCountPerPile.indicator:
-                    static assert(maxTracePointsCountPerPile.indicator == maxChainPartsCountPerPile.indicator);
-                    break; // ignore
-                case maxTracePointCount.indicator:
-                    _enforce(currentLineSubType == maxTracePointCount.subIndicator, "expected `@ T` line");
-                    // ignore
-                    debug disallowCurrentLineType();
-                    break;
-                case tracePointDistance.indicator:
-                    readTracePointDistance();
-                    debug disallowCurrentLineType();
-                    break;
-                case chainPart.indicator:
-                    if (readChainPart() == No.wasDumpPartConsumed)
-                    {
-                        debug allowedLineTypes = [chainPart.indicator];
-
-                        return; // chain completed; stay on current dump line
-                    }
-                    else
-                    {
-                        debug allowedLineTypes = [
-                            chainPart.indicator,
-                            lengths.indicator,
-                            coordinates.indicator,
-                        ];
-                        break;
-                    }
-                case lengths.indicator:
-                    readLengths();
-                    debug disallowCurrentLineType();
-                    break;
-                case coordinates.indicator:
-                    readCoordinates();
-                    debug
-                    {
-                        disallowCurrentLineType();
-                        allowedLineTypes ~= [
-                            numDiffs.indicator,
-                            tracePointBegin.indicator,
-                        ];
-                    }
-                    break;
-                case numDiffs.indicator:
-                    readNumDiffs();
-                    debug disallowCurrentLineType();
-                    break;
-                case tracePointBegin.indicator:
-                    readTracePointBegin();
-                    debug allowedLineTypes = [tracePoint.indicator];
-                    break;
-                case tracePoint.indicator:
-                    readTracePoint();
-                    debug allowedLineTypes = [tracePoint.indicator, chainPart.indicator];
-                    break;
-                default:
-                    error(format!"unknown line type `%c`"(currentLineType));
-                }
-            }
-
-            if (popDumpLine() == Yes.empty)
-            {
-                finishCurrentAC();
-
-                return; // EOF reached
-            }
-        }
-    }
-
-    void peekDumpLine()
-    {
-        auto currentLine = lasDump.front;
-
-        currentDumpLineNumber = currentLine[0];
-        currentDumpLine = currentLine[1];
-        currentLineType = currentDumpLine[0];
-        currentLineSubType = currentDumpLine.length >= 3 ? currentDumpLine[2] : '\0';
-    }
-
-    Flag!"empty" popDumpLine()
-    {
-        if (lasDump.empty)
-        {
-            return Yes.empty;
-        }
-
-        lasDump.popFront();
-        ++currentDumpLineNumber;
-
-        if (lasDump.empty)
-        {
-            return Yes.empty;
-        }
-        else
-        {
-            peekDumpLine();
-
-            return No.empty;
-        }
-    }
-
-    size_t readTotalChainPartsCount()
-    {
-        enum totalChainPartsCountFormat = LasDumpLineFormat.totalChainPartsCount.format;
-
-        size_t totalChainPartsCount;
-        currentDumpLine[].formattedRead!totalChainPartsCountFormat(totalChainPartsCount);
-
-        return totalChainPartsCount;
-    }
-
-    size_t readTotalTracePointsCount()
-    {
-        enum totalTracePointsCountFormat = LasDumpLineFormat.totalTracePointsCount.format;
-
-        size_t totalTracePointsCount;
-        currentDumpLine[].formattedRead!totalTracePointsCountFormat(totalTracePointsCount);
-
-        return totalTracePointsCount;
-    }
-
-    void readTracePointDistance()
-    {
-        enum tracePointDistanceFormat = LasDumpLineFormat.tracePointDistance.format;
-
-        currentDumpLine[].formattedRead!tracePointDistanceFormat(tracePointDistance);
-    }
-
-    Flag!"wasDumpPartConsumed" readChainPart()
-    {
-        enum chainPartFormat = LasDumpLineFormat.chainPart.format;
-        id_t contigAID;
-        id_t contigBID;
-        char rawComplement;
-        char rawChainPartType;
-
-        currentDumpLine[].formattedRead!chainPartFormat(
-            contigAID,
-            contigBID,
-            rawComplement,
-            rawChainPartType,
-        );
-
-        auto chainPartType = rawChainPartType.to!ChainPartType;
-        AlignmentFlags flags;
-        flags.complement = (rawComplement == 'c');
-        flags.alternateChain = (chainPartType == ChainPartType.alternateStart);
-
-        auto startingNewChain = currentAC == AlignmentChain.init;
-
-        if (startingNewChain)
-        {
-            currentAC.contigA.id = contigAID;
-            currentAC.contigB.id = contigBID;
-            currentAC.flags = flags;
-            currentAC.tracePointDistance = tracePointDistance;
-
-            return Yes.wasDumpPartConsumed;
-        }
-        else if (isChainContinuation(contigAID, contigBID, chainPartType))
-        {
-            _enforce(
-                currentAC.flags.complement == flags.complement,
-                "matching both strands in one alignment chain",
-            );
-            finishCurrentLA();
-
-            return Yes.wasDumpPartConsumed;
-        }
-        else
-        {
-            finishCurrentAC();
-
-            return No.wasDumpPartConsumed;
-        }
-
-    }
-
-    bool isChainContinuation(in size_t contigAID, in size_t contigBID, in ChainPartType chainPartType)
-    {
-        return currentAC.contigA.id == contigAID &&
-               currentAC.contigB.id == contigBID &&
-               chainPartType == ChainPartType.continuation;
-    }
-
-    void finishCurrentLA()
-    {
-        assert(localAlignmentsAcc.length > 0);
-
-        localAlignmentsAcc[$ - 1].tracePoints = tracePointsAcc;
-    }
-
-    void finishCurrentLAs()
-    {
-        if (localAlignmentsAcc.length > 0)
-            finishCurrentLA();
-
-        currentAC.localAlignments = localAlignmentsAcc;
-    }
-
-    void finishCurrentAC()
-    {
-        finishCurrentLAs();
-        currentAC.id = currentACID++;
-
-        // ensure alignment chain is valid
-        assert(&currentAC);
-    }
-
-    void readLengths()
-    {
-        enum lengthsFormat = LasDumpLineFormat.lengths.format;
-
-        currentDumpLine[].formattedRead!lengthsFormat(
-            currentAC.contigA.length,
-            currentAC.contigB.length,
-        );
-    }
-    void readCoordinates()
-    {
-        enum coordinatesFormat = LasDumpLineFormat.coordinates.format;
-        LocalAlignment currentLA;
-
-        currentDumpLine[].formattedRead!coordinatesFormat(
-            currentLA.contigA.begin,
-            currentLA.contigA.end,
-            currentLA.contigB.begin,
-            currentLA.contigB.end,
-        );
-
-        localAlignmentsAcc ~= currentLA;
-    }
-
-    void readNumDiffs()
-    {
-        enum numDiffsFormat = LasDumpLineFormat.numDiffs.format;
-
-        currentDumpLine[].formattedRead!numDiffsFormat(
-            localAlignmentsAcc[$ - 1].numDiffs,
-        );
-    }
-
-    void readTracePointBegin()
-    {
-        enum tracePointBeginFormat = LasDumpLineFormat.tracePointBegin.format;
-        size_t numTracePoints;
-
-        currentDumpLine[].formattedRead!tracePointBeginFormat(numTracePoints);
-
-        nextTracePointsBuffer();
-    }
-
-    void readTracePoint()
-    {
-        enum tracePointFormat = LasDumpLineFormat.tracePoint.format;
-        TracePoint currentTP;
-
-        currentDumpLine[].formattedRead!tracePointFormat(
-            currentTP.numDiffs,
-            currentTP.numBasePairs,
-        );
-
-        tracePointsAcc ~= currentTP;
-    }
-
-    debug void disallowCurrentLineType() {
-        allowedLineTypes = allowedLineTypes
-            .filter!(type => type != currentLineType)
-            .array;
-    }
-
-    void error(in string reason)
-    {
-        _enforce(false, reason);
-    }
-
-    void _enforce(bool condition, lazy string reason)
-    {
-        enforce!DazzlerCommandException(condition, format!"ill-formatted LAdump output: %s (line %d)"(reason, currentDumpLineNumber));
-    }
-}
-
-private auto readLasDump(S)(S lasDump, trace_point_t tracePointDistance)
-{
-    return LasDumpReader!S(lasDump, tracePointDistance);
-}
-
-unittest
+static if (0) unittest
 {
     import std.algorithm : equal;
 
@@ -1511,12 +1136,16 @@ struct AlignmentHeader
     }
 
 
-    static size_t inferTracePointDistanceFrom(R)(R alignmentChains) if (isInputRange!R)
+    static size_t inferTracePointDistanceFrom(R)(R alignments)
+        if (isInputRange!R && (
+            is(const(ElementType!R) == const(AlignmentChain)) ||
+            is(const(ElementType!R) == const(FlatLocalAlignment))
+        ))
     {
-        if (alignmentChains.empty)
+        if (alignments.empty)
             return 100;
-        else
-            return alignmentChains.front.tracePointDistance;
+
+        return alignments.front.tracePointDistance;
     }
 }
 
@@ -1619,6 +1248,11 @@ version (unittest)
 
 struct LocalAlignmentReader
 {
+    // TODO allow user to choose memory strategy for tracePointBuffer:
+    // a) dynamically increase size of reused tracePointBuffer
+    // b) like a) but let the user provide an initial size
+    // c) allocate tracePointBuffer for many trace points at once
+    // d) like c) but let the user provide an initial size
     File las;
     coord_t[] aLengths;
     coord_t[] bLengths;
@@ -1643,7 +1277,7 @@ struct LocalAlignmentReader
         this(
             lasFile,
             contigLengths(dbA),
-            dbA != dbB
+            dbB !is null && dbA != dbB
                 ? contigLengths(dbB)
                 : contigLengths(dbA),
             skipTracePoints
@@ -1838,17 +1472,23 @@ protected:
 
     void fillInContigLengths() pure @safe
     {
-        enforce!DazzlerCommandException(
-            currentLA.contigA.id - 1 < aLengths.length,
-            format!"contigA.id out of bounds: %d >= %d"(currentLA.contigA.id - 1, aLengths.length),
-        );
-        currentLA.contigA.length = aLengths[currentLA.contigA.id - 1];
+        if (aLengths.length > 0)
+        {
+            enforce!DazzlerCommandException(
+                currentLA.contigA.id - 1 < aLengths.length,
+                format!"contigA.id out of bounds: %d >= %d"(currentLA.contigA.id - 1, aLengths.length),
+            );
+            currentLA.contigA.length = aLengths[currentLA.contigA.id - 1];
+        }
 
-        enforce!DazzlerCommandException(
-            currentLA.contigB.id - 1 < bLengths.length,
-            format!"contigB.id out of bounds: %d >= %d"(currentLA.contigB.id - 1, bLengths.length),
-        );
-        currentLA.contigB.length = bLengths[currentLA.contigB.id - 1];
+        if (bLengths.length)
+        {
+            enforce!DazzlerCommandException(
+                currentLA.contigB.id - 1 < bLengths.length,
+                format!"contigB.id out of bounds: %d >= %d"(currentLA.contigB.id - 1, bLengths.length),
+            );
+            currentLA.contigB.length = bLengths[currentLA.contigB.id - 1];
+        }
     }
 
 
@@ -1957,7 +1597,33 @@ unittest
 }
 
 
-void writeAlignments(R)(const string lasFile, R alignmentChains) if (isInputRange!R)
+void writeAlignments(R)(const string lasFile, R flatLocalAlignments)
+    if (isInputRange!R && is(const(ElementType!R) == const(FlatLocalAlignment)))
+{
+    auto las = File(lasFile, "wb");
+
+    long numLocalAlignments = 0; // will be overwritten at the end
+    auto tracePointDistance = AlignmentHeader
+        .inferTracePointDistanceFrom(flatLocalAlignments)
+        .to!int;
+    las.rawWrite([numLocalAlignments]);
+    las.rawWrite([tracePointDistance]);
+
+    foreach (flatLocalAlignment; flatLocalAlignments)
+    {
+        las.writeFlatLocalAlignment(flatLocalAlignment, tracePointDistance);
+        ++numLocalAlignments;
+    }
+
+    las.rewind();
+    las.rawWrite([numLocalAlignments]);
+
+    las.close();
+}
+
+
+void writeAlignments(R)(const string lasFile, R alignmentChains)
+    if (isInputRange!R && is(const(ElementType!R) == const(AlignmentChain)))
 {
     auto las = File(lasFile, "wb");
 
@@ -2068,9 +1734,6 @@ private auto writeAlignmentChain(
     // store initial flags
     const initialFlags = dazzlerOverlap.flags;
 
-    // select appropriate type for trace
-    auto isLargeTraceType = DazzlerOverlap.isLargeTraceType(tracePointDistance);
-
     foreach (i, localAlignment; alignmentChain.localAlignments)
     {
         // set flags for this local alignment
@@ -2082,45 +1745,89 @@ private auto writeAlignmentChain(
         else
             dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainContinuation;
 
-        // set trace vector length
-        dazzlerOverlap.path.tlen = to!int(2*localAlignment.tracePoints.length);
-        // set diffs
-        dazzlerOverlap.path.diffs = localAlignment
-            .tracePoints
-            .map!"a.numDiffs"
-            .sum;
         // set coordinates
         dazzlerOverlap.path.abpos = localAlignment.contigA.begin;
         dazzlerOverlap.path.aepos = localAlignment.contigA.end;
         dazzlerOverlap.path.bbpos = localAlignment.contigB.begin;
         dazzlerOverlap.path.bepos = localAlignment.contigB.end;
 
-        // write overlap "header"
-        auto overlapBytes = (cast(void*) &dazzlerOverlap)[
-            typeof(dazzlerOverlap.path.trace).sizeof ..
-            DazzlerOverlap.sizeof
-        ];
-        las.rawWrite(overlapBytes);
+        writeDazzlerOverlap(las, dazzlerOverlap, localAlignment.tracePoints, tracePointDistance);
+    }
+}
 
-        // write trace vector
-        if (localAlignment.tracePoints.length > 0)
-        {
-            if (isLargeTraceType)
-                las.rawWrite(localAlignment.tracePoints);
-            else
-                // rewrite trace to use `ubyte`s
-                las.rawWrite(
-                    localAlignment
-                        .tracePoints
-                        .map!(tp => [
-                            tp.numDiffs.to!(DazzlerOverlap.smallTraceType),
-                            tp.numBasePairs.to!(DazzlerOverlap.smallTraceType),
-                        ])
-                        .joiner
-                        .takeExactly(2*localAlignment.tracePoints.length)
-                        .array
-                );
-        }
+
+private auto writeFlatLocalAlignment(
+    File las,
+    const FlatLocalAlignment flatLocalAlignment,
+    const int tracePointDistance,
+)
+{
+    DazzlerOverlap dazzlerOverlap;
+
+    // set read IDs
+    dazzlerOverlap.aread = flatLocalAlignment.contigA.id - 1;
+    dazzlerOverlap.bread = flatLocalAlignment.contigB.id - 1;
+    // set initial flags
+    if (flatLocalAlignment.flags.disabled)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.disabled;
+    if (flatLocalAlignment.flags.complement)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.complement;
+    if (flatLocalAlignment.flags.chainContinuation)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainContinuation;
+    if (flatLocalAlignment.flags.alternateChain)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.alternateChain;
+    else if (!flatLocalAlignment.flags.unchained)
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.bestChain;
+
+    // set coordinates
+    dazzlerOverlap.path.abpos = flatLocalAlignment.contigA.begin;
+    dazzlerOverlap.path.aepos = flatLocalAlignment.contigA.end;
+    dazzlerOverlap.path.bbpos = flatLocalAlignment.contigB.begin;
+    dazzlerOverlap.path.bepos = flatLocalAlignment.contigB.end;
+
+    writeDazzlerOverlap(las, dazzlerOverlap, flatLocalAlignment.tracePoints, tracePointDistance);
+}
+
+
+private void writeDazzlerOverlap(
+    File las,
+    ref DazzlerOverlap dazzlerOverlap,
+    const TracePoint[] tracePoints,
+    const int tracePointDistance,
+)
+{
+    // select appropriate type for trace
+    auto isLargeTraceType = DazzlerOverlap.isLargeTraceType(tracePointDistance);
+
+    // set trace vector length
+    dazzlerOverlap.path.tlen = to!int(2*tracePoints.length);
+    // set diffs
+    dazzlerOverlap.path.diffs = tracePoints.map!"a.numDiffs".sum;
+
+    // write overlap "header"
+    auto overlapBytes = (cast(void*) &dazzlerOverlap)[
+        typeof(dazzlerOverlap.path.trace).sizeof ..
+        DazzlerOverlap.sizeof
+    ];
+    las.rawWrite(overlapBytes);
+
+    // write trace vector
+    if (tracePoints.length > 0)
+    {
+        if (isLargeTraceType)
+            las.rawWrite(tracePoints);
+        else
+            // rewrite trace to use `ubyte`s
+            las.rawWrite(
+                tracePoints
+                    .map!(tp => [
+                        tp.numDiffs.to!(DazzlerOverlap.smallTraceType),
+                        tp.numBasePairs.to!(DazzlerOverlap.smallTraceType),
+                    ])
+                    .joiner
+                    .takeExactly(2*tracePoints.length)
+                    .array
+            );
     }
 }
 
@@ -3778,7 +3485,10 @@ string filterPileUpAlignments(
     in coord_t properAlignmentAllowance,
 )
 {
-    auto alignments = getAlignments(dbFile, lasFile, Yes.includeTracePoints);
+    auto alignments = getFlatLocalAlignments(dbFile, lasFile, Yes.includeTracePoints)
+        .map!(fla => { fla.tracePoints = fla.tracePoints.dup; return fla; })
+        .map!"a()"
+        .array;
 
     filterPileUpAlignments(alignments, properAlignmentAllowance);
 
@@ -3807,6 +3517,35 @@ void filterPileUpAlignments(
             ac.endsWith!"contigA"(allowance) || ac.endsWith!"contigB"(allowance);
 
         return ac.contigA.id != ac.contigB.id && (
+            (isLeftAnchored() && isRightProper()) ||
+            (isRightAnchored() && isLeftProper())
+        );
+    }
+
+    foreach (ref alignment; alignments)
+        alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
+}
+
+
+void filterPileUpAlignments(
+    ref FlatLocalAlignment[] alignments,
+    in coord_t properAlignmentAllowance,
+)
+{
+    /// An alignment in a pile up is valid iff it is proper and the begin/end
+    /// of both reads match.
+    static bool isValidPileUpAlignment(const ref FlatLocalAlignment fla, const coord_t allowance)
+    {
+        alias isLeftAnchored = () =>
+            fla.contigA.beginsWithin(allowance) && fla.contigB.beginsWithin(allowance);
+        alias isLeftProper = () =>
+            fla.contigA.beginsWithin(allowance) || fla.contigB.beginsWithin(allowance);
+        alias isRightAnchored = () =>
+            fla.contigA.endsWithin(allowance) && fla.contigB.endsWithin(allowance);
+        alias isRightProper = () =>
+            fla.contigA.endsWithin(allowance) || fla.contigB.endsWithin(allowance);
+
+        return fla.contigA.id != fla.contigB.id && (
             (isLeftAnchored() && isRightProper()) ||
             (isRightAnchored() && isLeftProper())
         );
