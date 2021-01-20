@@ -414,11 +414,15 @@ AlignmentChain[] getAlignments(
             : Yes.skipTracePoints,
     );
     auto alignmentChainPacker = AlignmentChainPacker!LocalAlignmentReader(localAlignmentReader);
+
     auto alignmentChainsBuffer = uninitializedArray!(AlignmentChain[])(
-        alignmentHeader.numAlignmentChains,
+        alignmentHeader.numAlignments,
     );
-    auto bufferRest = alignmentChainPacker.copy(alignmentChainsBuffer);
-    alignmentChainsBuffer.length -= bufferRest.length;
+    if (alignmentHeader.numAlignments > 0)
+    {
+        auto bufferRest = alignmentChainPacker.copy(alignmentChainsBuffer);
+        alignmentChainsBuffer.length -= bufferRest.length;
+    }
 
     if (flags & AlignmentReaderFlag.sort)
         alignmentChainsBuffer.sort!("a < b", SwapStrategy.stable);
@@ -1043,13 +1047,21 @@ unittest
 
 struct AlignmentHeader
 {
+    /// Sum of number of alignment chains and number of unchained alignments
     size_t numAlignments;
-    alias numAlignmentChains = numAlignments;
+    /// Number of alignment chains (i.e. the unchained flag is unset)
+    size_t numAlignmentChains;
+    /// Total number of local alignments disregarding chaining
     size_t numLocalAlignments;
+    /// Maximum number of local alignments per chain
     size_t maxLocalAlignments;
+    /// Maximum total number of local alignments per contig
     size_t maxLocalAlignmentsPerContig;
+    /// Total number of trace points
     size_t numTracePoints;
+    /// Maximum number of trace points per local alignment
     size_t maxTracePoints;
+    /// Trace point distance
     size_t tracePointDistance;
 
     static AlignmentHeader inferFrom(R)(R alignmentChains) if (isInputRange!R)
@@ -1058,9 +1070,22 @@ struct AlignmentHeader
 
         headerData.tracePointDistance = inferTracePointDistanceFrom(alignmentChains);
 
+        id_t lastContig;
+        id_t numLocalAlignmentsSinceLastContig;
         foreach (alignmentChain; alignmentChains)
         {
+            if (lastContig != alignmentChain.contigA.id)
+            {
+                headerData.maxLocalAlignmentsPerContig = max(
+                    headerData.maxLocalAlignmentsPerContig,
+                    numLocalAlignmentsSinceLastContig,
+                );
+                numLocalAlignmentsSinceLastContig = 0;
+            }
+
             ++headerData.numAlignments;
+            if (!alignmentChain.flags.unchained)
+                ++headerData.numAlignmentChains;
             headerData.numLocalAlignments += alignmentChain.localAlignments.length;
             headerData.maxLocalAlignments = max(
                 headerData.maxLocalAlignments,
@@ -1075,6 +1100,9 @@ struct AlignmentHeader
                     localAlignment.tracePoints.length,
                 );
             }
+
+            numLocalAlignmentsSinceLastContig += alignmentChain.localAlignments.length;
+            lastContig = alignmentChain.contigA.id;
         }
 
         return headerData;
@@ -1105,6 +1133,7 @@ struct AlignmentHeader
             if (flatLocalAlignment.flags.unchained)
             {
                 currentChainLength = 0;
+                ++headerData.numAlignments;
             }
             else if (flatLocalAlignment.flags.chainContinuation)
             {
@@ -1119,6 +1148,7 @@ struct AlignmentHeader
 
                 currentChainLength = 1;
                 ++headerData.numAlignmentChains;
+                ++headerData.numAlignments;
             }
 
             ++headerData.numLocalAlignments;
