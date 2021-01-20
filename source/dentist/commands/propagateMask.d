@@ -136,7 +136,7 @@ class MaskPropagator
         }
 
         return localAlignments
-            .tee!((ref la) { la.tracePoints = la.tracePoints.dup; })
+            .map!((la) { la.tracePoints = la.tracePoints.dup; return la; })
             .chunkBy!((a, b) => a.contigA.id == b.contigA.id)
             .map!(chunk => bufferChunks(chunk, bufferSize));
     }
