@@ -1308,11 +1308,11 @@ struct LocalAlignmentReader
         this.aLengths = aLengths;
         this.bLengths = bLengths;
 
-        init();
+        initialize();
     }
 
 
-    private void init()
+    private void initialize()
     {
         readHeader();
         this.numLocalAlignmentsLeft = this.numLocalAlignments;
@@ -1339,7 +1339,7 @@ struct LocalAlignmentReader
     void reset()
     {
         las.rewind();
-        init();
+        initialize();
     }
 
 
