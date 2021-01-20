@@ -283,7 +283,11 @@ void printExternalDependencies()
 
     static assert(externalDependencies.length > 0);
 
-    writefln!"%-(%s\n%)"(externalDependencies);
+    foreach (extDep; externalDependencies)
+        writefln!"%s [%s]"(
+            extDep,
+            isExecutable(extDep.executable) ? "OK" : "missing"
+        );
 }
 
 void assertExternalToolsAvailable()
