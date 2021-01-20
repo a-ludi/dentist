@@ -111,6 +111,7 @@ import std.range.primitives :
     ElementType,
     empty,
     front,
+    hasLength,
     isForwardRange,
     isInputRange,
     popFront,
@@ -1553,6 +1554,9 @@ protected:
     }
 }
 
+static assert(isInputRange!LocalAlignmentReader);
+static assert(hasLength!LocalAlignmentReader);
+static assert(is(ElementType!LocalAlignmentReader == FlatLocalAlignment));
 
 unittest
 {
