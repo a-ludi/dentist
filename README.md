@@ -60,15 +60,34 @@ dub build
 The following software packages are required to run `dentist`:
 
 - [The Dazzler Data Base][DAZZ_DB] (>=2020-07-27)
-- [`daligner`][daligner] ((>=2019-07-21 && <=2020-01-15) || >=2020-07-27)
-- [`damapper`][damapper] (>=2020-03-10)
-- [`TANmask`][damasker] (>=2020-01-15)
-- [`dascrubber`][dascrubber] (>=2020-07-26)
-- [`daccord`][daccord] (>=v0.0.17)
+  > Manage sequences (reads and assemblies) in 4bit encoding alongside 
+  > auxiliary information such as masks or QV tracks
+- [DALIGNER][daligner] (=2020-01-15)
+  > Find significant local alignments.
+- [DAMAPPER][damapper] (>=2020-03-10)
+  > Find alignment chains, i.e. sequences of significant local alignments
+  > possibly with unaligned gaps.
+- [DAMASKER][damasker] (>=2020-01-15)
+  > Discover tandem repeats.
+- [DASCRUBBER][dascrubber] (>=2020-07-26)
+  > Estimate coverage and compute QVs.
+- [daccord][daccord] (>=v0.0.17)
+  > Compute reference-based consensus sequence for gap filling.
 
-Please see their own documentation for installtion instructions. Note, the
+Please see their own documentation for installation instructions. Note, the
 available packages on Bioconda are outdated and should not be used at the
 moment.
+
+Please use the following versions in your dependencies in case you experience
+troubles:
+
+- [snakemake@5.10.0](https://snakemake.readthedocs.io/en/v5.10.0/getting_started/installation.html)
+- [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
+- [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
+- [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
+- [DAMASKER@22139ff](https://github.com/thegenemyers/DAMASKER/tree/22139ff1c2b2c0ff2589fbc9cc948370be799827)
+- [DASCRUBBER@a53dbe8](https://github.com/thegenemyers/DASCRUBBER/tree/a53dbe879a716e7b08338f397de5a0403637641e)
+- [daccord@0.0.17](https://gitlab.com/german.tischler/daccord/tree/d54b10bb863b14103cf8e03c07efe4f93c5772d8)
 
 
 [DUB]: https://code.dlang.org/download "Download DUB"
