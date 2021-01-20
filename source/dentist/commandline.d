@@ -207,6 +207,14 @@ ReturnCode run(in string[] args)
         goto case;
     case "--dependencies":
         printExternalDependencies();
+        try
+        {
+            assertExternalToolsAvailable();
+        }
+        catch (CLIException e)
+        {
+            return ReturnCode.runtimeError;
+        }
 
         return ReturnCode.ok;
     case "--usage":
@@ -2927,7 +2935,10 @@ unittest
 struct BaseOptions
 {
     @Option("dependencies", "d")
-    @Help("Print a list of external binaries that must be available on PATH.")
+    @Help("
+        Print a list of external binaries and if they are on PATH.
+        Exit non-zero if one or more binaries cannot be found.
+    ")
     OptionFlag listDependencies;
 
     @Option("help", "h")
