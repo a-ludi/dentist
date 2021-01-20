@@ -387,18 +387,7 @@ struct AlignmentChain
                 coord_t traceLength = la.tracePoints.map!(tp => tp.numBasePairs.to!coord_t).sum;
                 coord_t traceDiffs = la.tracePoints.map!(tp => tp.numDiffs.to!coord_t).sum;
 
-                // TODO remove logging if fixed in LAdump (issue #23)
-                if (la.numDiffs != traceDiffs)
-                {
-                    debug logJsonDebug(
-                        "contigA", contigA.id,
-                        "contigB", contigB.id,
-                        "la.numDiffs", la.numDiffs,
-                        "traceDiffs", traceDiffs,
-                    );
-                }
-                // TODO make equality assertion if fixed in LAdump (issue #23)
-                assert(la.numDiffs <= traceDiffs, "missing trace points");
+                assert(la.numDiffs == traceDiffs, "missing trace points");
                 assert(la.contigB.end - la.contigB.begin == traceLength,
                         "trace distance does not match alignment");
             }

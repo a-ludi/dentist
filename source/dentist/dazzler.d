@@ -126,6 +126,11 @@ import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writeln;
 
+version (unittest)
+{
+    version = dumpLA;
+}
+
 
 /// File suffixes of hidden .db files.
 private enum hiddenDbFileSuffixes = [".bps", ".idx"];
@@ -290,7 +295,6 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
 /// ditto
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, options.tmpdir))
@@ -303,7 +307,6 @@ AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
 
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, dbB, options.tmpdir))
@@ -323,7 +326,6 @@ void computeLocalAlignments(Options)(in string[] dbList, in Options options)
 
 AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, dbB, options.tmpdir))
@@ -336,7 +338,6 @@ AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options o
 
 void computeMappings(Options)(in string[] dbList, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
-            isOptionsList!(typeof(options.ladumpOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     damapper(dbList, options.damapperOptions, options.tmpdir);
@@ -346,9 +347,7 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
     in string dbA,
     in string dbB,
     in Options options
-)
-        if (isOptionsList!(typeof(options.ladumpOptions)) &&
-            isSomeString!(typeof(options.tmpdir)))
+) if (isSomeString!(typeof(options.tmpdir)))
 {
     auto lasFile = getLasFile(dbA, dbB, options.tmpdir);
 
@@ -5112,6 +5111,7 @@ enum Fasta2DazzlerOptions : string
 }
 
 /// Options for `LAdump`.
+version (LAdump)
 enum LAdumpOptions : string
 {
     coordinates = "-c",
@@ -5514,11 +5514,13 @@ private
         executeCommand(chain(only("DBsplit"), dbsplitOptions, only(dbFile.stripBlock)));
     }
 
+    version (LAdump)
     auto ladump(in string lasFile, in string dbA, in string dbB, in string[] ladumpOpts)
     {
         return ladump(lasFile, dbA, dbB, [], ladumpOpts);
     }
 
+    version (LAdump)
     @ExternalDependency("LAdump", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     auto ladump(
         in string lasFile,
@@ -5540,7 +5542,7 @@ private
         ));
     }
 
-    version (unittest)
+    version (dumpLA)
     @ExternalDependency("dumpLA", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
     void dumpLA(in string outLas, in string[] dump)
     {
