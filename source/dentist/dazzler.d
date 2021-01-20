@@ -501,12 +501,12 @@ struct AlignmentChainPacker(R)
         currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
         currentChain.tracePointDistance = currentFLA.tracePointDistance;
         localAlignmentsAcc ~= makeCurrentLocalAlignment();
-        auto currentFlags = currentFLA.flags;
+        auto chainStartFlags = currentFLA.flags;
         alignments.popFront();
 
-        if (!currentFlags.unchained && !currentFlags.chainContinuation)
+        if (!chainStartFlags.unchained && !chainStartFlags.chainContinuation)
         {
-            while (!alignments.empty && currentFlags.chainContinuation)
+            while (!alignments.empty && currentFLA.flags.chainContinuation)
             {
                 localAlignmentsAcc ~= makeCurrentLocalAlignment();
                 alignments.popFront();
@@ -514,7 +514,7 @@ struct AlignmentChainPacker(R)
         }
         else
         {
-            enforce!DazzlerCommandException(currentFlags.unchained, "chain is missing a start");
+            enforce!DazzlerCommandException(chainStartFlags.unchained, "chain is missing a start");
         }
 
         currentChain.localAlignments = localAlignmentsAcc.data;

@@ -245,7 +245,7 @@ struct AlignmentIntervals
 
         if (!currentFlags.unchained && !currentFlags.chainContinuation)
         {
-            while (!alignments.empty && currentFlags.chainContinuation)
+            while (!alignments.empty && currentFLA.flags.chainContinuation)
             {
                 updateIntervalEnd();
                 alignments.popFront();
