@@ -240,11 +240,12 @@ struct AlignmentIntervals
         currentInterval.contigId = currentFLA.contigA.id;
         updateIntervalBegin();
         updateIntervalEnd();
+        auto currentFlags = currentFLA.flags;
+        alignments.popFront();
 
-        if (!currentFLA.flags.unchained && !currentFLA.flags.chainContinuation)
+        if (!currentFlags.unchained && !currentFlags.chainContinuation)
         {
-            alignments.popFront();
-            while (!alignments.empty && currentFLA.flags.chainContinuation)
+            while (!alignments.empty && currentFlags.chainContinuation)
             {
                 updateIntervalEnd();
                 alignments.popFront();
@@ -252,7 +253,7 @@ struct AlignmentIntervals
         }
         else
         {
-            assert(currentFLA.flags.unchained, "chain is missing a start");
+            assert(currentFlags.unchained, "chain is missing a start");
         }
 
         if (properAlignmentAllowance < coord_t.max && !(properBegin && properEnd))
