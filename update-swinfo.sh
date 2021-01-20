@@ -8,7 +8,7 @@ function main()
 
     get_updated_swinfo "$SWINFO_FILE" > "$SWINFO_FILE~"
 
-    if ! cmp --quiet "$SWINFO_FILE" "$SWINFO_FILE~";
+    if ! cmp -s "$SWINFO_FILE" "$SWINFO_FILE~";
     then
         mv "$SWINFO_FILE~" "$SWINFO_FILE"
 

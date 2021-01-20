@@ -12,7 +12,7 @@ function main()
 
     get_updated_modules "$EXTERNALDEPS_FILE" > "$EXTERNALDEPS_FILE~"
 
-    if ! cmp --quiet "$EXTERNALDEPS_FILE" "$EXTERNALDEPS_FILE~";
+    if ! cmp -s "$EXTERNALDEPS_FILE" "$EXTERNALDEPS_FILE~";
     then
         mv "$EXTERNALDEPS_FILE~" "$EXTERNALDEPS_FILE"
 
