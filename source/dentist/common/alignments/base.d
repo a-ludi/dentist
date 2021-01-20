@@ -1235,7 +1235,7 @@ struct AlignmentChain
                 ),
                 enumLa.index == 0
                     ? flags
-                    : (flags & ~Flag.alternateChain) | Flag.chainContinuation,
+                    : (flags & ~Flags(Flag.alternateChain)) | Flag.chainContinuation,
                 tracePointDistance,
                 enumLa.value.tracePoints,
             ));
