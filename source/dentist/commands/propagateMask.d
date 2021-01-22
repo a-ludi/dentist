@@ -23,6 +23,7 @@ import dentist.util.math :
     RoundingMode;
 import dentist.dazzler :
     AlignmentHeader,
+    BufferMode,
     getFlatLocalAlignments,
     getNumContigs,
     readMask,
@@ -120,7 +121,7 @@ class MaskPropagator
             options.refDb,
             options.readsDb,
             options.dbAlignmentFile,
-            Yes.includeTracePoints,
+            BufferMode.preallocated,
         );
         auto bufferSize = alignmentHeader.maxLocalAlignmentsPerContig;
 
@@ -136,7 +137,6 @@ class MaskPropagator
         }
 
         return localAlignments
-            .map!((la) { la.tracePoints = la.tracePoints.dup; return la; })
             .chunkBy!((a, b) => a.contigA.id == b.contigA.id)
             .map!(chunk => bufferChunks(chunk, bufferSize));
     }

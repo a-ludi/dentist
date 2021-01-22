@@ -30,6 +30,7 @@ import std.algorithm :
     min,
     minIndex,
     reverse,
+    sum,
     sort;
 import std.array : array;
 import std.conv : to;
@@ -74,10 +75,7 @@ auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
 
     return inputAlignments
         .filter!"!a.flags.disabled"
-        .tee!((ref la) {
-            // duplicate buffer of trace points
-            la.tracePoints = la.tracePoints.dup;
-
+        .map!((la) {
             // make sure local alignments are ordered...
             enforce(
                 lastLA.id == id_t.max || cmpIds(lastLA, la) <= 0,
@@ -85,6 +83,8 @@ auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
             );
 
             lastLA = la;
+
+            return la;
         })
         .chunkBy!sameIds
         .map!(chunk => buildAlignmentChains(chunk.array, options))
@@ -280,7 +280,7 @@ AlignmentChain composeAlignmentChain(R)(R chainedLocalAlignments, Flags addition
             .map!(fla => LocalAlignment(
                 fla.contigA.locus,
                 fla.contigB.locus,
-                0,
+                fla.tracePoints.map!"a.numDiffs".sum,
                 fla.tracePoints,
             ))
             .array,

@@ -16,6 +16,7 @@ import dentist.common.alignments :
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     AlignmentHeader,
+    BufferMode,
     getFlatLocalAlignments,
     writeAlignments;
 import dentist.util.log;
@@ -71,7 +72,7 @@ class CLIChainer
             options.refDb,
             options.readsDb,
             options.dbAlignmentFile,
-            Yes.includeTracePoints
+            BufferMode.preallocated,
         );
     }
 
