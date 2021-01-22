@@ -522,7 +522,8 @@ struct AlignmentChainPacker(R)
         currentChain.contigA = currentFLA.contigA.contig;
         currentChain.contigB = currentFLA.contigB.contig;
         currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
-        currentChain.tracePointDistance = currentFLA.tracePointDistance;
+        if (bufferMode != BufferMode.skip)
+            currentChain.tracePointDistance = currentFLA.tracePointDistance;
         bufferCurrentLocalAlignment();
         const chainStartFlags = currentFLA.flags;
         alignments.popFront();
@@ -569,7 +570,10 @@ struct AlignmentChainPacker(R)
             AlignmentFlag.chainContinuation,
         );
         assert((currentChain.flags & ~ignoredFlags) == (currentFLA.flags & ~ignoredFlags));
-        assert(currentChain.tracePointDistance == currentFLA.tracePointDistance);
+        assert(
+            (bufferMode == BufferMode.skip && currentChain.tracePointDistance == 0) ||
+            currentChain.tracePointDistance == currentFLA.tracePointDistance
+        );
     }
 
 

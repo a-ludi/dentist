@@ -387,7 +387,7 @@ struct AlignmentChain
                 coord_t traceLength = la.tracePoints.map!(tp => tp.numBasePairs.to!coord_t).sum;
                 coord_t traceDiffs = la.tracePoints.map!(tp => tp.numDiffs.to!coord_t).sum;
 
-                assert(la.numDiffs == traceDiffs, "missing trace points");
+                assert(la.numDiffs == traceDiffs, "numDiffs != tracePoint.numDiffs");
                 assert(la.contigB.end - la.contigB.begin == traceLength,
                         "trace distance does not match alignment");
             }

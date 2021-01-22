@@ -30,6 +30,7 @@ import std.algorithm :
     min,
     minIndex,
     reverse,
+    sum,
     sort;
 import std.array : array;
 import std.conv : to;
@@ -279,7 +280,7 @@ AlignmentChain composeAlignmentChain(R)(R chainedLocalAlignments, Flags addition
             .map!(fla => LocalAlignment(
                 fla.contigA.locus,
                 fla.contigB.locus,
-                0,
+                fla.tracePoints.map!"a.numDiffs".sum,
                 fla.tracePoints,
             ))
             .array,
