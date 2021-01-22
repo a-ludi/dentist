@@ -405,6 +405,16 @@ AlignmentChain[] getAlignments(
 )
 {
     auto alignmentHeader = AlignmentHeader.inferFrom(lasFile);
+
+    if (
+        // there is nothing to do
+        alignmentHeader.numAlignments == 0 ||
+        // should be unreachable but is kept to prevent assertion failure in
+        // LocalAlignmentReader
+        alignmentHeader.numTracePoints == 0
+    )
+        return [];
+
     auto localAlignmentReader = new LocalAlignmentReader(
         lasFile,
         dbA,
