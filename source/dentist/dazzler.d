@@ -1725,15 +1725,14 @@ unittest
             .map!"a.toFlatLocalAlignments()"
             .joiner
             .enumerate
-            .map!(enumFla => {
+            .map!((enumFla) {
                 auto fla = enumFla.value;
                 fla.id = enumFla.index.to!id_t;
                 fla.contigA.length = 0;
                 fla.contigB.length = 0;
 
                 return fla;
-            })
-            .map!"a()";
+            });
 
         lasFile.writeAlignments(alignmentChains);
         auto recoveredFlatLocalAlignments = new LocalAlignmentReader(
@@ -3290,7 +3289,7 @@ private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, 
     /// Build chunks of numRecordLines lines.
     alias byRecordSplitter = dbDump => dbDump.drop(6).arrayChunks(numRecordLines);
     /// Parse chunks of numRecordLines lines into FASTA format.
-    alias parseRecord = recordLines => {
+    alias parseRecord = (recordLines) {
         size_t recordNumber;
         size_t headerLineLength;
         string headerLine;
@@ -3337,8 +3336,8 @@ private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, 
         return fastaData.data;
     };
 
-    return byRecordSplitter(dbDump).map!parseRecord
-        .map!"a()"
+    return byRecordSplitter(dbDump)
+        .map!parseRecord
         .cache
         .filter!"a !is null";
 }
