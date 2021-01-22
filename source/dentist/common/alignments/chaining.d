@@ -74,10 +74,7 @@ auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
 
     return inputAlignments
         .filter!"!a.flags.disabled"
-        .tee!((ref la) {
-            // duplicate buffer of trace points
-            la.tracePoints = la.tracePoints.dup;
-
+        .map!((la) {
             // make sure local alignments are ordered...
             enforce(
                 lastLA.id == id_t.max || cmpIds(lastLA, la) <= 0,
@@ -85,6 +82,8 @@ auto chainLocalAlignments(R)(R inputAlignments, const ChainingOptions options)
             );
 
             lastLA = la;
+
+            return la;
         })
         .chunkBy!sameIds
         .map!(chunk => buildAlignmentChains(chunk.array, options))

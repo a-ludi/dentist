@@ -405,20 +405,26 @@ AlignmentChain[] getAlignments(
 )
 {
     auto alignmentHeader = AlignmentHeader.inferFrom(lasFile);
-    auto localAlignmentReader = LocalAlignmentReader(
+    auto localAlignmentReader = new LocalAlignmentReader(
         lasFile,
         dbA,
         dbB,
         flags & AlignmentReaderFlag.includeTracePoints
-            ? No.skipTracePoints
-            : Yes.skipTracePoints,
+            ? BufferMode.preallocated
+            : BufferMode.skip,
+        flags & AlignmentReaderFlag.includeTracePoints
+            ? uninitializedArray!(TracePoint[])(alignmentHeader.numTracePoints)
+            : [],
     );
-    auto alignmentChainPacker = AlignmentChainPacker!LocalAlignmentReader(localAlignmentReader);
-
+    auto alignmentChainPacker = AlignmentChainPacker!LocalAlignmentReader(
+        localAlignmentReader,
+        BufferMode.preallocated,
+        uninitializedArray!(AlignmentChain.LocalAlignment[])(alignmentHeader.numLocalAlignments),
+    );
     auto alignmentChainsBuffer = uninitializedArray!(AlignmentChain[])(
         alignmentHeader.numAlignments,
     );
-    if (alignmentHeader.numAlignments > 0)
+    if (alignmentChainsBuffer.length > 0)
     {
         auto bufferRest = alignmentChainPacker.copy(alignmentChainsBuffer);
         alignmentChainsBuffer.length -= bufferRest.length;
@@ -466,18 +472,22 @@ AlignmentChain[] getAlignments(
 
 struct AlignmentChainPacker(R)
 {
-    // TODO allow user to choose memory strategy for localAlignmentBuffer:
-    // a) dynamically increase size of reused localAlignmentBuffer
-    // b) like a) but let the user provide an initial size
-    // c) allocate localAlignmentBuffer for many trace points at once
-    // d) like c) but let the user provide an initial size
-    // TODO let the user decide whether the tracePoints need `dup`
-    R alignments;
-    AlignmentChain currentChain;
+    alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-    this(R alignments)
+    R alignments;
+    BufferMode bufferMode;
+    LocalAlignment[] localAlignmentBuffer;
+    size_t numBufferedLocalAlignments;
+    Appender!(LocalAlignment[]) localAlignmentAcc;
+    AlignmentChain currentChain;
+    // used to check if the array is being reused
+    private TracePoint* lastTracePointLocation;
+
+    this(R alignments, BufferMode bufferMode, LocalAlignment[] localAlignmentBuffer = [])
     {
         this.alignments = alignments;
+        this.bufferMode = bufferMode;
+        this.localAlignmentBuffer = localAlignmentBuffer;
 
         popFront();
         // make sure ids start at zero
@@ -498,21 +508,22 @@ struct AlignmentChainPacker(R)
         if (alignments.empty)
             return setEmpty();
 
-        auto localAlignmentsAcc = appender!(AlignmentChain.LocalAlignment[]);
         ++currentChain.id;
         currentChain.contigA = currentFLA.contigA.contig;
         currentChain.contigB = currentFLA.contigB.contig;
         currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
         currentChain.tracePointDistance = currentFLA.tracePointDistance;
-        localAlignmentsAcc ~= makeCurrentLocalAlignment();
-        auto chainStartFlags = currentFLA.flags;
+        bufferCurrentLocalAlignment();
+        const chainStartFlags = currentFLA.flags;
         alignments.popFront();
 
         if (!chainStartFlags.unchained && !chainStartFlags.chainContinuation)
         {
             while (!alignments.empty && currentFLA.flags.chainContinuation)
             {
-                localAlignmentsAcc ~= makeCurrentLocalAlignment();
+                version (assert)
+                    assertMatchingAlignmentHead();
+                bufferCurrentLocalAlignment();
                 alignments.popFront();
             }
         }
@@ -521,7 +532,7 @@ struct AlignmentChainPacker(R)
             enforce!DazzlerCommandException(chainStartFlags.unchained, "chain is missing a start");
         }
 
-        currentChain.localAlignments = localAlignmentsAcc.data;
+        currentChain.localAlignments = finishLocalAlignmentBuffer();
     }
 
 
@@ -539,13 +550,76 @@ struct AlignmentChainPacker(R)
     }
 
 
+    version (assert) private void assertMatchingAlignmentHead() pure nothrow @safe
+    {
+        assert(currentChain.contigA == currentFLA.contigA.contig);
+        assert(currentChain.contigB == currentFLA.contigB.contig);
+        enum ignoredFlags = AlignmentFlags(
+            AlignmentFlag.alternateChain,
+            AlignmentFlag.chainContinuation,
+        );
+        assert((currentChain.flags & ~ignoredFlags) == (currentFLA.flags & ~ignoredFlags));
+        assert(currentChain.tracePointDistance == currentFLA.tracePointDistance);
+    }
+
+
+    protected void bufferCurrentLocalAlignment() pure nothrow @safe
+    {
+        final switch (bufferMode)
+        {
+            case BufferMode.overwrite: goto case;
+            case BufferMode.preallocated:
+                localAlignmentBuffer[numBufferedLocalAlignments++] = makeCurrentLocalAlignment();
+                break;
+            case BufferMode.dynamic:
+                localAlignmentAcc ~= makeCurrentLocalAlignment();
+                break;
+            case BufferMode.skip:
+                break;
+        }
+    }
+
+
+    protected LocalAlignment[] finishLocalAlignmentBuffer() pure nothrow @safe
+    {
+        typeof(return) localAlignments;
+
+        final switch (bufferMode)
+        {
+            case BufferMode.overwrite:
+                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
+                numBufferedLocalAlignments = 0;
+                break;
+            case BufferMode.preallocated:
+                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
+                localAlignmentBuffer = localAlignmentBuffer[numBufferedLocalAlignments .. $];
+                numBufferedLocalAlignments = 0;
+                break;
+            case BufferMode.dynamic:
+                localAlignments = localAlignmentAcc.data;
+                localAlignmentAcc = appender!(LocalAlignment[]);
+                break;
+            case BufferMode.skip:
+                break;
+        }
+
+        return localAlignments;
+    }
+
+
     protected AlignmentChain.LocalAlignment makeCurrentLocalAlignment() pure nothrow @safe
     {
+        assert(
+            lastTracePointLocation is null || lastTracePointLocation != &currentFLA.tracePoints[0],
+            "tracePoints buffer was reused; trace points will be invalid",
+        );
+        lastTracePointLocation = &currentFLA.tracePoints[0];
+
         return AlignmentChain.LocalAlignment(
             currentFLA.contigA.locus,
             currentFLA.contigB.locus,
             currentFLA.tracePoints.map!"a.numDiffs".sum,
-            currentFLA.tracePoints.dup,
+            currentFLA.tracePoints,
         );
     }
 
@@ -571,150 +645,94 @@ auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
 }
 
 
-static if (0) unittest
+unittest
 {
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse;
     import std.algorithm : equal;
 
-    enum testLasDump = [
-        "+ P 9",
-        "% P 9",
-        "+ T 17",
-        "% T 17",
-        "@ T 4",
-        "P 1 2 n >",
-        "L 13 15",
-        "C 3 4 5 6",
-        "D 7",
-        "P 1 2 n -",
-        "L 13 15",
-        "C 12 13 14 15",
-        "D 16",
-        "P 19 20 c +",
-        "L 31 33",
-        "C 21 22 23 24",
-        "D 25",
-        "P 19 20 c -",
-        "L 31 33",
-        "C 30 31 32 33",
-        "D 34",
-        "T 1",
-        "   0 1",
-        "P 37 38 n .",
-        "L 40 42",
-        "C 39 40 41 42",
-        "D 43",
-        "P 46 47 c .",
-        "L 58 60",
-        "C 48 49 50 51",
-        "D 52",
-        "T 3",
-        "   2 102",
-        "   3 101",
-        "   4 104",
-        "P 46 47 n .",
-        "L 58 60",
-        "C 57 58 59 60",
-        "D 61",
-        "T 3",
-        "   3 101",
-        "   4 104",
-        "   2 102",
-        "P 64 65 c >",
-        "L 71 72",
-        "C 66 67 68 69",
-        "D 70",
-        "T 4",
-        "   6 105",
-        "   1 101",
-        "   2 100",
-        "   3  97",
-        "P 55 56 c -",
-        "L 80 81",
-        "C 75 76 77 78",
-        "D 79",
-        "T 2",
-        "   0   2",
-        "   2 102",
-        "P 1 3197 c >",
-        "C 0 71 12 86",
-        "T 1",
-        "   3  74",
-        "P 1 3197 c -",
-        "C 0 8300 0 318",
-        "T 3",
-        "   6 105",
-        "   9 108",
-        "   7 105",
-    ].map!(line => cast(char[]) line.dup);
+    auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+    scope (exit)
+        rmdirRecurse(tmpDir);
 
+    auto lasFile = buildPath(tmpDir, "test.las");
+    dumpLA(lasFile, testLasDump);
+
+    auto alignmentChains = getAlignments(
+        null,
+        null,
+        lasFile,
+        AlignmentReaderFlag.includeTracePoints,
+    );
     alias LocalAlignment = AlignmentChain.LocalAlignment;
-    alias complement = AlignmentFlag.complement;
-    alias alternateChain = AlignmentFlag.alternateChain;
-
-    auto alignmentChains = readLasDump(testLasDump, 0).array;
     auto expectedResult = [
         AlignmentChain(
             0,
-            Contig(1, 13),
-            Contig(2, 15),
+            Contig(1, 0),
+            Contig(2, 0),
             AlignmentFlags(),
             [
                 LocalAlignment(
                     Locus(3, 4),
                     Locus(5, 6),
-                    7,
+                    0,
+                    [TracePoint(0, 1)],
                 ),
                 LocalAlignment(
                     Locus(12, 13),
                     Locus(14, 15),
-                    16,
+                    0,
+                    [TracePoint(0, 1)],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
             1,
-            Contig(19, 31),
-            Contig(20, 33),
-            AlignmentFlags(complement, alternateChain),
+            Contig(19, 0),
+            Contig(20, 0),
+            AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.alternateChain),
             [
                 LocalAlignment(
                     Locus(21, 22),
                     Locus(23, 24),
-                    25,
+                    0,
+                    [TracePoint(0, 1)],
                 ),
                 LocalAlignment(
                     Locus(30, 31),
                     Locus(32, 33),
-                    34,
-                    [
-                        TracePoint(0, 1),
-                    ]
+                    0,
+                    [TracePoint(0, 1)],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
             2,
-            Contig(37, 40),
-            Contig(38, 42),
-            AlignmentFlags(),
+            Contig(37, 0),
+            Contig(38, 0),
+            AlignmentFlags(AlignmentFlag.unchained),
             [
                 LocalAlignment(
                     Locus(39, 40),
                     Locus(41, 42),
-                    43,
+                    0,
+                    [TracePoint(0, 1)],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
             3,
-            Contig(46, 58),
-            Contig(47, 60),
-            AlignmentFlags(complement),
+            Contig(46, 0),
+            Contig(47, 0),
+            AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.unchained),
             [
                 LocalAlignment(
                     Locus(48, 49),
                     Locus(50, 51),
-                    52,
+                    9,
                     [
                         TracePoint(2, 102),
                         TracePoint(3, 101),
@@ -722,17 +740,18 @@ static if (0) unittest
                     ],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
             4,
-            Contig(46, 58),
-            Contig(47, 60),
-            AlignmentFlags(),
+            Contig(46, 0),
+            Contig(47, 0),
+            AlignmentFlags(AlignmentFlag.unchained),
             [
                 LocalAlignment(
                     Locus(57, 58),
                     Locus(59, 60),
-                    61,
+                    9,
                     [
                         TracePoint(3, 101),
                         TracePoint(4, 104),
@@ -740,17 +759,18 @@ static if (0) unittest
                     ],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
             5,
-            Contig(64, 71),
-            Contig(65, 72),
-            AlignmentFlags(complement),
+            Contig(64, 0),
+            Contig(65, 0),
+            AlignmentFlags(AlignmentFlag.complement),
             [
                 LocalAlignment(
                     Locus(66, 67),
                     Locus(68, 69),
-                    70,
+                    12,
                     [
                         TracePoint(6, 105),
                         TracePoint(1, 101),
@@ -758,35 +778,28 @@ static if (0) unittest
                         TracePoint(3, 97),
                     ],
                 ),
-            ],
-        ),
-        AlignmentChain(
-            6,
-            Contig(55, 80),
-            Contig(56, 81),
-            AlignmentFlags(complement),
-            [
                 LocalAlignment(
                     Locus(75, 76),
                     Locus(77, 78),
-                    79,
+                    2,
                     [
                         TracePoint(0, 2),
                         TracePoint(2, 102),
                     ],
                 ),
             ],
+            expectedTracePointDistance,
         ),
         AlignmentChain(
-            7,
+            6,
             Contig(1, 0),
             Contig(3197, 0),
-            AlignmentFlags(complement),
+            AlignmentFlags(AlignmentFlag.complement),
             [
                 LocalAlignment(
                     Locus(0, 71),
                     Locus(12, 86),
-                    0,
+                    3,
                     [
                         TracePoint(3, 74),
                     ],
@@ -794,7 +807,7 @@ static if (0) unittest
                 LocalAlignment(
                     Locus(0, 8300),
                     Locus(0, 318),
-                    0,
+                    22,
                     [
                         TracePoint(6, 105),
                         TracePoint(9, 108),
@@ -802,6 +815,7 @@ static if (0) unittest
                     ],
                 ),
             ],
+            expectedTracePointDistance,
         ),
     ];
 
@@ -811,38 +825,60 @@ static if (0) unittest
 
 auto getFlatLocalAlignments(
     in string lasFile,
-    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+    BufferMode bufferMode = BufferMode.skip,
+    TracePoint[] tracePointBuffer = [],
 )
 {
-    return getFlatLocalAlignments(null, null, lasFile, includeTracePoints);
+    return getFlatLocalAlignments(null, null, lasFile, bufferMode, tracePointBuffer);
 }
 
 auto getFlatLocalAlignments(
     in string dbA,
     in string lasFile,
-    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+    BufferMode bufferMode = BufferMode.skip,
+    TracePoint[] tracePointBuffer = [],
 )
 {
-    return getFlatLocalAlignments(dbA, null, lasFile, includeTracePoints);
+    return getFlatLocalAlignments(dbA, null, lasFile, bufferMode, tracePointBuffer);
 }
 
 auto getFlatLocalAlignments(
     in string dbA,
     in string dbB,
     in string lasFile,
-    Flag!"includeTracePoints" includeTracePoints = No.includeTracePoints,
+    BufferMode bufferMode = BufferMode.skip,
+    TracePoint[] tracePointBuffer = [],
 )
 {
-    return LocalAlignmentReader(lasFile, dbA, dbB, cast(Flag!"skipTracePoints") !includeTracePoints);
+    if (
+        bufferMode.among(BufferMode.overwrite, BufferMode.preallocated) &&
+        tracePointBuffer.length == 0
+    )
+    {
+        auto alignmentHeader = AlignmentHeader.inferFrom(lasFile);
+
+        if (bufferMode == BufferMode.overwrite)
+            tracePointBuffer = uninitializedArray!(typeof(tracePointBuffer))(
+                alignmentHeader.maxTracePoints,
+            );
+        else if (bufferMode == BufferMode.preallocated)
+            tracePointBuffer = uninitializedArray!(typeof(tracePointBuffer))(
+                alignmentHeader.numTracePoints,
+            );
+    }
+
+    return new LocalAlignmentReader(
+        lasFile,
+        dbA,
+        dbB,
+        bufferMode,
+        tracePointBuffer,
+    );
 }
 
-unittest
-{
-    import dentist.util.tempfile : mkdtemp;
-    import std.file : rmdirRecurse;
-    import std.algorithm : equal;
-    import std.range : tee;
 
+version (unittest)
+{
     enum expectedTracePointDistance = 100;
     enum testLasDump = [
         "+ P 11",
@@ -890,7 +926,7 @@ unittest
         "   1 101",
         "   2 100",
         "   3  97",
-        "P 55 56 c -",
+        "P 64 65 c -",
         "C 75 76 77 78",
         "T 2",
         "   0   2",
@@ -906,6 +942,15 @@ unittest
         "   9 108",
         "   7 105",
     ];
+}
+
+
+unittest
+{
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse;
+    import std.algorithm : equal;
+    import std.range : tee;
 
     auto tmpDir = mkdtemp("./.unittest-XXXXXX");
     scope (exit)
@@ -914,9 +959,7 @@ unittest
     auto lasFile = buildPath(tmpDir, "test.las");
     dumpLA(lasFile, testLasDump);
 
-    auto flatLocalAlignments = getFlatLocalAlignments(lasFile, Yes.includeTracePoints)
-        .map!((la) { la.tracePoints = la.tracePoints.dup; return la; })
-        .array;
+    auto flatLocalAlignments = getFlatLocalAlignments(lasFile, BufferMode.preallocated).array;
     alias FlatLocus = FlatLocalAlignment.FlatLocus;
     auto expectedResult = [
         FlatLocalAlignment(
@@ -1008,8 +1051,8 @@ unittest
         ),
         FlatLocalAlignment(
             8,
-            FlatLocus(55, 0, 75, 76),
-            FlatLocus(56, 0, 77, 78),
+            FlatLocus(64, 0, 75, 76),
+            FlatLocus(65, 0, 77, 78),
             AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.chainContinuation),
             expectedTracePointDistance,
             [
@@ -1061,6 +1104,7 @@ struct AlignmentHeader
     size_t numTracePoints;
     /// Maximum number of trace points per local alignment
     size_t maxTracePoints;
+    // TODO size_t maxTracePointsPerContig;
     /// Trace point distance
     size_t tracePointDistance;
 
@@ -1113,7 +1157,7 @@ struct AlignmentHeader
     {
         AlignmentHeader headerData;
 
-        auto lasScanner = LocalAlignmentReader(lasFile, Yes.skipTracePoints);
+        auto lasScanner = new LocalAlignmentReader(lasFile, BufferMode.skip);
 
         size_t currentChainLength;
         id_t lastContig;
@@ -1277,17 +1321,29 @@ version (unittest)
 }
 
 
-struct LocalAlignmentReader
+/// Controls how to manage the buffer when reading data into memory.
+enum BufferMode : ubyte
 {
-    // TODO allow user to choose memory strategy for tracePointBuffer:
-    // a) dynamically increase size of reused tracePointBuffer
-    // b) like a) but let the user provide an initial size
-    // c) allocate tracePointBuffer for many trace points at once
-    // d) like c) but let the user provide an initial size
+    /// Keep a single buffer and keep overwriting it with every new record.
+    overwrite,
+    /// Allocate a new buffer for every record. Use an `Appender` if the
+    /// number of records is unknown.
+    dynamic,
+    /// Write all records to a continuous stretch of memory preallocated by
+    /// the caller. The memory may be uninitialized since it will always be
+    /// written to before any read occurs.
+    preallocated,
+    /// Do not use memory at all instead just skip over the records.
+    skip,
+}
+
+
+class LocalAlignmentReader
+{
     File las;
     coord_t[] aLengths;
     coord_t[] bLengths;
-    Flag!"skipTracePoints" skipTracePoints;
+    BufferMode bufferMode;
     id_t numLocalAlignments;
     trace_point_t tracePointDistance;
     bool isLargeTraceType;
@@ -1295,15 +1351,28 @@ struct LocalAlignmentReader
     id_t numLocalAlignmentsLeft;
     FlatLocalAlignment currentLA;
     DazzlerOverlap overlapHead;
-    ubyte[] tracePointBuffer;
+    TracePoint[] tracePointBuffer;
+    TracePoint[] fullTracePointBuffer;
 
-    this(const string lasFile, Flag!"skipTracePoints" skipTracePoints)
+    this(const string lasFile, BufferMode bufferMode, TracePoint[] tracePointBuffer = [])
     {
-        this(lasFile, cast(string) null, cast(string) null, skipTracePoints);
+        this(
+            lasFile,
+            cast(string) null,
+            cast(string) null,
+            bufferMode,
+            tracePointBuffer
+        );
     }
 
 
-    this(const string lasFile, string dbA, string dbB, Flag!"skipTracePoints" skipTracePoints)
+    this(
+        const string lasFile,
+        string dbA,
+        string dbB,
+        BufferMode bufferMode,
+        TracePoint[] tracePointBuffer = [],
+    )
     {
         this(
             lasFile,
@@ -1311,19 +1380,9 @@ struct LocalAlignmentReader
             dbB !is null && dbA != dbB
                 ? contigLengths(dbB)
                 : contigLengths(dbA),
-            skipTracePoints
+            bufferMode,
+            tracePointBuffer
         );
-    }
-
-
-    coord_t[] contigLengths(string db)
-    {
-        if (db is null)
-            return [];
-
-        return getDbRecords(db, [DBdumpOptions.originalHeader])
-            .map!"a.location.length"
-            .array;
     }
 
 
@@ -1331,15 +1390,41 @@ struct LocalAlignmentReader
         const string lasFile,
         coord_t[] aLengths,
         coord_t[] bLengths,
-        Flag!"skipTracePoints" skipTracePoints,
+        BufferMode bufferMode,
+        TracePoint[] tracePointBuffer,
     )
     {
         this.las = File(lasFile, "rb");
-        this.skipTracePoints = skipTracePoints;
+        this.bufferMode = bufferMode;
+        this.tracePointBuffer = tracePointBuffer;
+        if (bufferMode.among(BufferMode.dynamic, BufferMode.skip))
+            assert(
+                tracePointBuffer.length == 0,
+                "preallocated buffer was supplied but buffer mode does not one: "~
+                "please remove the buffer or adjust the mode according to your needs."
+            );
+        else
+            assert(
+                tracePointBuffer.length > 0,
+                "buffer mode requires a preallocated buffer but none was supplied: "~
+                "please supply a preallocated buffer or adjust the mode according to your needs."
+            );
+        this.fullTracePointBuffer = tracePointBuffer;
         this.aLengths = aLengths;
         this.bLengths = bLengths;
 
         initialize();
+    }
+
+
+    private coord_t[] contigLengths(string db)
+    {
+        if (db is null)
+            return [];
+
+        return getDbRecords(db, [DBdumpOptions.originalHeader])
+            .map!"a.location.length"
+            .array;
     }
 
 
@@ -1356,20 +1441,10 @@ struct LocalAlignmentReader
     }
 
 
-    LocalAlignmentReader dup() const
-    {
-        return typeof(return)(
-            las.name,
-            aLengths.dup,
-            bLengths.dup,
-            skipTracePoints,
-        );
-    }
-
-
     void reset()
     {
         las.rewind();
+        tracePointBuffer = fullTracePointBuffer;
         initialize();
     }
 
@@ -1400,6 +1475,12 @@ struct LocalAlignmentReader
         assert(!empty, "Attempting to fetch the front of an empty LocalAlignmentReader");
 
         return currentLA;
+    }
+
+
+    @property bool skipTracePoints() const pure nothrow @safe
+    {
+        return bufferMode == BufferMode.skip;
     }
 
 
@@ -1455,7 +1536,9 @@ protected:
                 rewriteTracePointBufferToLargeTracePointType();
 
             auto numTracePoints = overlapHead.path.tlen / 2;
-            currentLA.tracePoints = (cast(TracePoint*) tracePointBuffer.ptr)[0 .. numTracePoints];
+            currentLA.tracePoints = tracePointBuffer[0 .. numTracePoints];
+            if (bufferMode == BufferMode.preallocated)
+                tracePointBuffer = tracePointBuffer[numTracePoints .. $];
         }
     }
 
@@ -1540,10 +1623,11 @@ protected:
 
     void readTraceVector(size_t traceLength)
     {
-        tracePointBuffer.reserve(traceLength);
-        tracePointBuffer.length = traceLength;
-        auto tpBuffer = las.rawRead(tracePointBuffer);
-        unexpectedEOF!"tracePoints"(tpBuffer, tracePointBuffer);
+        if (bufferMode == BufferMode.dynamic)
+            tracePointBuffer = uninitializedArray!(TracePoint[])(overlapHead.path.tlen / 2);
+        auto rawBuffer = getRawTracePointBuffer(traceLength);
+        auto tpBuffer = las.rawRead(rawBuffer);
+        unexpectedEOF!"tracePoints"(tpBuffer, rawBuffer);
     }
 
 
@@ -1557,20 +1641,34 @@ protected:
 
     void rewriteTracePointBufferToLargeTracePointType()
     {
-        static assert(is(DazzlerOverlap.largeTraceType == trace_point_t));
-        static assert(is(DazzlerOverlap.smallTraceType == typeof(tracePointBuffer[0])));
+        static assert(is(DazzlerOverlap.largeTraceType == typeof(tracePointBuffer[0].numDiffs)));
 
         auto traceVectorLength = overlapHead.path.tlen;
-        // calculate vector size with large type
-        auto numLargeTraceVectorBytes = traceVectorLength * DazzlerOverlap.largeTraceType.sizeof;
         // make sure enough memory is allocated
-        tracePointBuffer.reserve(numLargeTraceVectorBytes);
-        tracePointBuffer.length = numLargeTraceVectorBytes;
-        // create a second view of the buffer with large type
-        auto largeTraceVector = (cast(trace_point_t*) tracePointBuffer.ptr)[0 .. traceVectorLength];
+        auto smallTraceVector = getRawTracePointBuffer(traceVectorLength);
+        static assert(is(DazzlerOverlap.smallTraceType == typeof(smallTraceVector[0])));
+        // select appropriate portion of tracePointBuffer
+        auto largeTracePoints = tracePointBuffer.ptr[0 .. traceVectorLength / 2];
         // convert numbers in reverse order as to avoid overwriting
-        foreach_reverse (i, ref largeTracePoint; largeTraceVector)
-            largeTracePoint = cast(trace_point_t) tracePointBuffer[i];
+        foreach_reverse (i, ref largeTracePoint; largeTracePoints)
+        {
+            largeTracePoint = TracePoint(
+                smallTraceVector[2 * i],
+                smallTraceVector[2 * i + 1],
+            );
+        }
+    }
+
+
+    @property ubyte[] getRawTracePointBuffer(size_t traceLength) pure nothrow
+    {
+        // prepare bytes buffer
+        auto bufferBytes = tracePointBuffer.length * TracePoint.sizeof;
+        auto rawBuffer = (cast(ubyte*) tracePointBuffer.ptr)[0 .. bufferBytes];
+        // reduce size (triggers bounds check)
+        rawBuffer = rawBuffer[0 .. traceLength];
+
+        return rawBuffer;
     }
 
 
@@ -1624,7 +1722,10 @@ unittest
             .map!"a()";
 
         lasFile.writeAlignments(alignmentChains);
-        auto recoveredFlatLocalAlignments = LocalAlignmentReader(lasFile, No.skipTracePoints);
+        auto recoveredFlatLocalAlignments = new LocalAlignmentReader(
+            lasFile,
+            BufferMode.dynamic,
+        );
 
         assert(equal(computedFlatLocalAlignments, recoveredFlatLocalAlignments));
     }}
@@ -3499,7 +3600,7 @@ string chainLocalAlignments(
     auto flatLocalAlignments = getFlatLocalAlignments(
         dbFile,
         lasFile,
-        Yes.includeTracePoints,
+        BufferMode.preallocated,
     );
 
     auto chainedAlignments = chainLocalAlignmentsAlgo(
@@ -3519,9 +3620,7 @@ string filterPileUpAlignments(
     in coord_t properAlignmentAllowance,
 )
 {
-    auto alignments = getFlatLocalAlignments(dbFile, lasFile, Yes.includeTracePoints)
-        .map!(fla => { fla.tracePoints = fla.tracePoints.dup; return fla; })
-        .map!"a()"
+    auto alignments = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated)
         .array;
 
     filterPileUpAlignments(alignments, properAlignmentAllowance);
