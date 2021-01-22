@@ -1159,6 +1159,11 @@ rule propagate_mask_back_to_reference:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
+rule full_masking:
+    input:
+        *[mask_files(reference, homogenized_mask(m))  for m in masks]
+
+
 checkpoint collect:
     input:
         await_dentist_config(),
