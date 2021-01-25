@@ -1190,7 +1190,7 @@ struct AlignmentHeader
 
             if (flatLocalAlignment.flags.unchained)
             {
-                currentChainLength = 0;
+                currentChainLength = 1;
                 ++headerData.numAlignments;
             }
             else if (flatLocalAlignment.flags.chainContinuation)
@@ -1199,11 +1199,6 @@ struct AlignmentHeader
             }
             else
             {
-                headerData.maxLocalAlignments = max(
-                    headerData.maxLocalAlignments,
-                    currentChainLength,
-                );
-
                 currentChainLength = 1;
                 ++headerData.numAlignmentChains;
                 ++headerData.numAlignments;
@@ -1216,6 +1211,10 @@ struct AlignmentHeader
             headerData.maxTracePoints = max(
                 headerData.maxTracePoints,
                 lasScanner.currentNumTracePoints,
+            );
+            headerData.maxLocalAlignments = max(
+                headerData.maxLocalAlignments,
+                currentChainLength,
             );
 
             lastContig = flatLocalAlignment.contigA.id;
