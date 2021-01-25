@@ -1583,12 +1583,15 @@ protected:
             currentLA.flags |= AlignmentFlag.disabled;
         if (overlapHead.flags & DazzlerOverlap.Flag.complement)
             currentLA.flags |= AlignmentFlag.complement;
-        if (overlapHead.flags & DazzlerOverlap.Flag.alternateChain)
+        if (
+            (overlapHead.flags & DazzlerOverlap.Flag.chainStart) &&
+            !(overlapHead.flags & DazzlerOverlap.Flag.bestChain)
+        )
             currentLA.flags |= AlignmentFlag.alternateChain;
         if (overlapHead.flags & DazzlerOverlap.Flag.chainContinuation)
             currentLA.flags |= AlignmentFlag.chainContinuation;
         if (!(overlapHead.flags & (
-            DazzlerOverlap.Flag.alternateChain |
+            DazzlerOverlap.Flag.chainStart |
             DazzlerOverlap.Flag.bestChain |
             DazzlerOverlap.Flag.chainContinuation
         )))
@@ -1824,7 +1827,7 @@ private struct DazzlerOverlap
     static enum Flag : uint
     {
         complement = 0x1,
-        alternateChain = 0x4,
+        chainStart = 0x4,
         chainContinuation = 0x8,
         bestChain = 0x10,
         disabled = 0x20,
@@ -1887,11 +1890,15 @@ private auto writeAlignmentChain(
         // set flags for this local alignment
         dazzlerOverlap.flags = initialFlags;
         if (i == 0)
-            dazzlerOverlap.flags |= alignmentChain.flags.alternateChain
-                ? DazzlerOverlap.Flag.alternateChain
-                : DazzlerOverlap.Flag.bestChain;
+        {
+            dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainStart;
+            if (!alignmentChain.flags.alternateChain)
+                dazzlerOverlap.flags |= DazzlerOverlap.Flag.bestChain;
+        }
         else
+        {
             dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainContinuation;
+        }
 
         // set coordinates
         dazzlerOverlap.path.abpos = localAlignment.contigA.begin;
@@ -1921,11 +1928,16 @@ private auto writeFlatLocalAlignment(
     if (flatLocalAlignment.flags.complement)
         dazzlerOverlap.flags |= DazzlerOverlap.Flag.complement;
     if (flatLocalAlignment.flags.chainContinuation)
+    {
         dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainContinuation;
-    if (flatLocalAlignment.flags.alternateChain)
-        dazzlerOverlap.flags |= DazzlerOverlap.Flag.alternateChain;
+    }
     else if (!flatLocalAlignment.flags.unchained)
-        dazzlerOverlap.flags |= DazzlerOverlap.Flag.bestChain;
+    {
+        dazzlerOverlap.flags |= DazzlerOverlap.Flag.chainStart;
+
+        if (!flatLocalAlignment.flags.alternateChain)
+            dazzlerOverlap.flags |= DazzlerOverlap.Flag.bestChain;
+    }
 
     // set coordinates
     dazzlerOverlap.path.abpos = flatLocalAlignment.contigA.begin;
