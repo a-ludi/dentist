@@ -772,6 +772,7 @@ localrules:
     reads2db,
     mark_reads,
     propagate_mask_back_to_reference,
+    full_masking,
     extend_dentist_config_for_merge_insertions,
     merge_insertions,
     split_preliminary_gap_closed_vs_reads_alignment,
