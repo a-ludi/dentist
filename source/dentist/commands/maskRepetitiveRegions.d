@@ -21,20 +21,23 @@ import dentist.common.alignments :
     Locus;
 import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
+    alignmentChainPacker,
+    AlignmentHeader,
+    BufferMode,
     DBdumpOptions,
     getDbRecords,
     getFlatLocalAlignments,
     LocalAlignmentReader,
     writeMask;
-import dentist.util.algorithm : filterInPlace;
 import dentist.util.log;
 import std.algorithm :
+    filter,
     joiner,
     map,
     predSwitch,
     sort,
     uniq;
-import std.array : appender, array;
+import std.array : appender, array, uninitializedArray;
 import std.conv : to;
 import std.format : format;
 import std.range :
@@ -44,7 +47,7 @@ import std.range.primitives :
     empty,
     ElementType,
     isInputRange;
-import std.typecons : Tuple;
+import std.typecons : Flag, No, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 /// Options for the `collectPileUps` command.
@@ -69,6 +72,7 @@ class RepeatMaskAssessor
 {
     protected const Options options;
     protected AlignmentType alignmentType;
+    protected AlignmentHeader alignmentHeader;
     protected LocalAlignmentReader alignment;
     protected ReferenceRegion repetitiveRegions;
     protected ReferenceRegion repetitiveRegionsImproper;
@@ -94,6 +98,7 @@ class RepeatMaskAssessor
         alignmentType = options.readsDb is null
             ? AlignmentType.self
             : AlignmentType.reads;
+        alignmentHeader = AlignmentHeader.inferFrom(options.dbAlignmentFile);
 
         final switch (alignmentType)
         {
@@ -130,7 +135,7 @@ class RepeatMaskAssessor
         );
 
         repetitiveRegions = repeatAssessor(
-            AlignmentIntervals(alignment),
+            alignmentIntervals(),
             contigIntervals(),
         );
 
@@ -151,7 +156,7 @@ class RepeatMaskAssessor
 
             alignment.reset();
             repetitiveRegionsImproper = improperRepeatAssessor(
-                AlignmentIntervals(alignment, options.properAlignmentAllowance),
+                alignmentIntervals(Yes.improperOnly),
                 contigIntervals(),
             );
 
@@ -163,6 +168,26 @@ class RepeatMaskAssessor
                 "numRepetitiveRegionsImproper", repetitiveRegionsImproper.intervals.length,
             );
         }
+    }
+
+    protected auto alignmentIntervals(Flag!"improperOnly" improperOnly = No.improperOnly)
+    {
+        alignment.reset();
+        static AlignmentChain.LocalAlignment[] localAlignmentBuffer;
+
+        if (localAlignmentBuffer.length == 0)
+            localAlignmentBuffer = uninitializedArray!(AlignmentChain.LocalAlignment[])(
+                alignmentHeader.maxLocalAlignments,
+            );
+
+        return alignment
+            .alignmentChainPacker(BufferMode.overwrite, localAlignmentBuffer)
+            .filter!(ac => !improperOnly || !ac.isProper(options.properAlignmentAllowance))
+            .map!(ac => ReferenceInterval(
+                ac.contigA.id,
+                ac.first.contigA.begin,
+                ac.last.contigA.end,
+            ));
     }
 
     protected auto contigIntervals()
@@ -200,103 +225,6 @@ class RepeatMaskAssessor
                 repetitiveRegionsImproper.intervals,
             );
         }
-    }
-}
-
-struct AlignmentIntervals
-{
-    LocalAlignmentReader* alignments;
-    coord_t properAlignmentAllowance;
-    ReferenceInterval currentInterval;
-    bool properBegin;
-    bool properEnd;
-
-
-    this(ref LocalAlignmentReader alignments, coord_t properAlignmentAllowance = coord_t.max)
-    {
-        this.alignments = &alignments;
-        this.properAlignmentAllowance = properAlignmentAllowance;
-
-        if (alignments.empty)
-            setEmpty();
-        else
-            popFront();
-    }
-
-
-    @property bool empty() const pure nothrow @safe
-    {
-        return currentInterval.contigId == id_t.max && currentInterval.empty;
-    }
-
-
-    void popFront()
-    {
-        assert(!empty, "Attempting to popFront an empty AlignmentIntervals");
-
-        if (alignments.empty)
-            return setEmpty();
-
-        currentInterval.contigId = currentFLA.contigA.id;
-        updateIntervalBegin();
-        updateIntervalEnd();
-        auto currentFlags = currentFLA.flags;
-        alignments.popFront();
-
-        if (!currentFlags.unchained && !currentFlags.chainContinuation)
-        {
-            while (!alignments.empty && currentFLA.flags.chainContinuation)
-            {
-                updateIntervalEnd();
-                alignments.popFront();
-            }
-        }
-        else
-        {
-            assert(currentFlags.unchained, "chain is missing a start");
-        }
-
-        if (properAlignmentAllowance < coord_t.max && !(properBegin && properEnd))
-            // skip improper alignment chains
-            return popFront();
-    }
-
-
-    void setEmpty() pure nothrow @safe
-    {
-        currentInterval = ReferenceInterval(id_t.max, 0, 0);
-    }
-
-
-    @property ReferenceInterval front() pure nothrow @safe
-    {
-        return currentInterval;
-    }
-
-
-    protected void updateIntervalBegin() pure nothrow @safe
-    {
-        properBegin = (
-            currentFLA.contigA.beginsWithin(properAlignmentAllowance) ||
-            currentFLA.contigB.beginsWithin(properAlignmentAllowance)
-        );
-        currentInterval.begin = currentFLA.contigA.begin;
-    }
-
-
-    protected void updateIntervalEnd() pure nothrow @safe
-    {
-        properEnd = (
-            currentFLA.contigA.endsWithin(properAlignmentAllowance) ||
-            currentFLA.contigB.endsWithin(properAlignmentAllowance)
-        );
-        currentInterval.end = currentFLA.contigA.end;
-    }
-
-
-    protected @property auto currentFLA() pure nothrow @safe
-    {
-        return alignments.front;
     }
 }
 

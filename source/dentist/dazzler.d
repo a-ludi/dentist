@@ -426,8 +426,7 @@ AlignmentChain[] getAlignments(
             ? uninitializedArray!(TracePoint[])(alignmentHeader.numTracePoints)
             : [],
     );
-    auto alignmentChainPacker = AlignmentChainPacker!LocalAlignmentReader(
-        localAlignmentReader,
+    auto packer = localAlignmentReader.alignmentChainPacker(
         BufferMode.preallocated,
         uninitializedArray!(AlignmentChain.LocalAlignment[])(alignmentHeader.numLocalAlignments),
     );
@@ -436,7 +435,7 @@ AlignmentChain[] getAlignments(
     );
     if (alignmentChainsBuffer.length > 0)
     {
-        auto bufferRest = alignmentChainPacker.copy(alignmentChainsBuffer);
+        auto bufferRest = packer.copy(alignmentChainsBuffer);
         alignmentChainsBuffer.length -= bufferRest.length;
     }
 
@@ -650,6 +649,17 @@ struct AlignmentChainPacker(R)
     {
         return alignments.front;
     }
+}
+
+
+auto alignmentChainPacker(R)(
+    R localAlignments,
+    BufferMode bufferMode = BufferMode.skip,
+    AlignmentChain.LocalAlignment[] localAlignmentBuffer = [],
+)
+    if (isInputRange!R && is(ElementType!R == FlatLocalAlignment))
+{
+    return AlignmentChainPacker!R(localAlignments, bufferMode, localAlignmentBuffer);
 }
 
 
