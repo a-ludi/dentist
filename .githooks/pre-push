@@ -47,7 +47,7 @@ set_submodule_upstream_to_local_path()
 
 locally_checkout_head()
 {
-    git clone --local --no-hardlinks --shallow-submodules "$git_root" ./
+    git clone --local --no-hardlinks --shallow-submodules "$git_root" "$PWD"
     set_submodule_upstream_to_local_path
     git submodule update --checkout --recursive
 }
