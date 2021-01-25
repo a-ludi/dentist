@@ -522,8 +522,10 @@ struct AlignmentChainPacker(R)
         currentChain.contigA = currentFLA.contigA.contig;
         currentChain.contigB = currentFLA.contigB.contig;
         currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
-        if (bufferMode != BufferMode.skip)
+        if (bufferMode != BufferMode.skip && currentFLA.tracePoints.length > 0)
             currentChain.tracePointDistance = currentFLA.tracePointDistance;
+        else
+            currentChain.tracePointDistance = 0;
         bufferCurrentLocalAlignment();
         const chainStartFlags = currentFLA.flags;
         alignments.popFront();
@@ -571,7 +573,9 @@ struct AlignmentChainPacker(R)
         );
         assert((currentChain.flags & ~ignoredFlags) == (currentFLA.flags & ~ignoredFlags));
         assert(
-            (bufferMode == BufferMode.skip && currentChain.tracePointDistance == 0) ||
+            // we don't collect tracePoints -or-
+            currentChain.tracePointDistance == 0 ||
+            // the tracePointDistance must not change
             currentChain.tracePointDistance == currentFLA.tracePointDistance
         );
     }
@@ -623,11 +627,15 @@ struct AlignmentChainPacker(R)
 
     protected AlignmentChain.LocalAlignment makeCurrentLocalAlignment() pure nothrow @safe
     {
-        assert(
-            lastTracePointLocation is null || lastTracePointLocation != &currentFLA.tracePoints[0],
-            "tracePoints buffer was reused; trace points will be invalid",
-        );
-        lastTracePointLocation = &currentFLA.tracePoints[0];
+        if (currentChain.tracePointDistance > 0)
+        {
+            // we actually collect tracePoints
+            assert(
+                lastTracePointLocation is null || lastTracePointLocation != &currentFLA.tracePoints[0],
+                "tracePoints buffer was reused; trace points will be invalid",
+            );
+            lastTracePointLocation = &currentFLA.tracePoints[0];
+        }
 
         return AlignmentChain.LocalAlignment(
             currentFLA.contigA.locus,
