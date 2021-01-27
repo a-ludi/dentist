@@ -1372,7 +1372,7 @@ rule skip_gaps:
         with open(output[0], 'w') as skip_gaps_file:
             for validation in validations:
                 if not validation.get("isValid", False):
-                    gap_spec = "-".join((str(cid) for cid in invalid["contigIds"]))
+                    gap_spec = "-".join((str(cid) for cid in validation["contigIds"]))
                     print(gap_spec, file=skip_gaps_file)
 
 if workflow_flags["no_purge_output"]:

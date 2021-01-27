@@ -37,13 +37,15 @@ import dentist.util.range : arrayChunks;
 import dentist.util.region : empty;
 import std.algorithm :
     count,
+    countUntil,
     filter,
     isSorted,
     joiner,
     map,
     maxElement,
     min,
-    sort;
+    sort,
+    sum;
 import std.array :
     appender,
     array,
@@ -159,6 +161,13 @@ class RegionsValidator
             .tee!(interval => assert(&interval))
             .array;
 
+        logJsonInfo(
+            "contigABounds", [minContigAId, maxContigAId].toJson,
+            "numRegions", regions.length,
+            "numContigIds", 2 * contigIds.length,
+            "numReadIds", readIds.map!"a.length".sum,
+        );
+
         if (alignments.length == 0)
             logJsonWarn("info", "empty reads-alignment");
     }
@@ -221,16 +230,14 @@ class RegionsValidator
 
     void restrictRegionsToContigBounds(ref ReferenceInterval[] intervals)
     {
-        auto lowerBoundIntervals = intervals
-            .assumeSorted!"a.contigId < b.contigId"
-            .lowerBound(ReferenceInterval(maxContigAId));
-        intervals = lowerBoundIntervals
-            .upperBound(ReferenceInterval(minContigAId))
-            .release;
+        auto sliceBegin = intervals.countUntil!"a.contigId >= b"(minContigAId);
+        if (sliceBegin < 0)
+            sliceBegin = intervals.length;
+        auto sliceEnd = intervals.countUntil!"a.contigId > b"(maxContigAId);
+        if (sliceEnd < 0)
+            sliceEnd = intervals.length;
 
-        auto sliceBegin = lowerBoundIntervals.length - intervals.length;
-        auto sliceEnd = lowerBoundIntervals.length;
-
+        intervals = intervals[sliceBegin .. sliceEnd];
         contigIds = contigIds[sliceBegin .. sliceEnd];
         readIds = readIds[sliceBegin .. sliceEnd];
     }
@@ -324,7 +331,7 @@ struct RegionValidator
         assessSpanningReadsStats();
         assessWeaklySpannedWindowStats();
 
-        if (options.reportAll || isValid)
+        if (options.reportAll || !isValid)
         {
             auto report = [
                 "region": region.toJson,
