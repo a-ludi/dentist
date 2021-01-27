@@ -3,6 +3,7 @@ dentist
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
+![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?sort=semver)
 
 > Close assembly gaps using long-reads with focus on correctness.
 
@@ -29,11 +30,33 @@ Table of Contents
 Install
 --------
 
+### Use a Singularity Container (recommended)
+
+Make sure [Singularity][singularity] is installed on your system. You can then use the container like so:
+
+```sh
+# launch an interactive shell
+singularity shell docker://aludi/dentist:latest
+
+# execute a single command inside the container
+singularity exec docker://aludi/dentist:latest dentist --version
+
+# run the whole workflow on a cluster using Singularity
+snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+```
+
+The last command is explained in more detail below in
+[the usage section](#usage).
+
+
+[singularity]: https://sylabs.io/guides/3.7/user-guide/index.html
+
+
 ### Use Pre-Built Binaries
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The tarball contains a `dentist` binary as well as
-the snakemake workflow, example config files and this README. In short, everything you to run DENTIST.
+the Snakemake workflow, example config files and this README. In short, everything you to run DENTIST.
 
 
 [release]: https://github.com/a-ludi/dentist/releases
@@ -105,9 +128,13 @@ Suppose we have the genome assembly `reference.fasta` that is to be updated
 and a set of reads `reads.fasta` with 25× coverage.
 
 
-### Quick execution with `snakemake`
+### Quick execution with Snakemake (and Singularity)
 
-Install [snakemake][snakemake] version >=5.10.0 and copy these files into your
+> TL;DR
+>
+>     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+
+Install [Snakemake][snakemake] version >=5.10.0 and copy these files into your
 working directory:
 
 - `./snakemake/Snakefile`
@@ -124,7 +151,7 @@ If no errors occurred the whole workflow can be executed using
     snakemake --configfile=snakemake.yml
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
-One may use snakemakes `--jobs` to run independent jobs in parallel. Larger
+One may use Snakemake's `--jobs` to run independent jobs in parallel. Larger
 data sets may require a cluster in which case you can use Snakemake's
 [cloud][snakemake-cloud] or [cluster][snakemake-cluster] facilities.
 

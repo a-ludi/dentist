@@ -639,6 +639,7 @@ batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
 workflow_flags_names = ["full_validation", "no_purge_output"]
 workflow_flags = dict(((flag, config.get(flag, False))  for flag in workflow_flags_names))
+dentist_container = config.get("dentist_container", "docker://aludi/dentist:stable")
 
 
 # workflow files
@@ -810,6 +811,7 @@ rule ALL:
 
 checkpoint extend_dentist_config:
     output: dentist_config_file
+    container: dentist_container
     run:
         dentist_config = config["dentist_config"]
 
@@ -862,6 +864,7 @@ _fast2dam_checkpoint[reference] = "reference2dam"
 checkpoint reference2dam:
     input: reference_fasta
     output: *db_files(reference)
+    container: dentist_container
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
@@ -875,6 +878,7 @@ _fast2dam_checkpoint[preliminary_gap_closed] = "preliminary_gap_closed2dam"
 checkpoint preliminary_gap_closed2dam:
     input: preliminary_gap_closed_fasta
     output: *db_files(preliminary_gap_closed)
+    container: dentist_container
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
@@ -890,6 +894,7 @@ rule mask_dust:
         assembly_marker("{dam}.dam")
     output:
         mask_files(join(workdir_, "{dam}.dam"), dust_mask)
+    container: dentist_container
     shell:
         "DBdust {additional_reference_dust_options} {workdir_}/{wildcards.dam}"
 
@@ -910,6 +915,7 @@ rule self_alignment_block:
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("self-alignment.{dam}.{block_ref}.{block_reads}")
+    container: dentist_container
     shell:
         """
             {{
@@ -932,6 +938,7 @@ rule self_alignment:
     params:
         dbs = lambda _, input: input.db[0]
     log: log_file("self-alignment.{dam}")
+    container: dentist_container
     shell: LAmerge()
 
 
@@ -945,6 +952,7 @@ rule mask_self:
     output:
         mask_files(join(workdir_, "{dam}.dam"), self_mask)
     log: log_file("mask-self.{dam}")
+    container: dentist_container
     shell:
         "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {self_mask} 2> {log}"
 
@@ -961,6 +969,7 @@ rule tandem_alignment_block:
         alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{dam}.{block}")
     threads: max_threads
+    container: dentist_container
     shell:
         """
             {{
@@ -981,6 +990,7 @@ rule tandem_alignment:
     params:
         dbs = lambda _, input: input.db[0]
     log: log_file("tandem-alignment.{dam}")
+    container: dentist_container
     shell: LAmerge()
 
 
@@ -995,6 +1005,7 @@ rule mask_tandem_block:
         reference_stub = join(workdir_, "{dam}"),
         tanmask_options = prepare_flags(additional_tanmask_options)
     log: log_file("mask-tandem.{dam}.{block}")
+    container: dentist_container
     shell:
         "TANmask {params[tanmask_options]} {params.reference_stub} {input[alignment]} &> {log}"
 
@@ -1008,6 +1019,7 @@ rule mask_tandem:
     output:
         mask_files(join(workdir_, "{dam}.dam"), tandem_mask)
     log: log_file("mask-tandem.{dam}")
+    container: dentist_container
     shell:
         "Catrack -v {input.db[0]} {tandem_mask} &> {log}"
 
@@ -1018,6 +1030,7 @@ checkpoint reads2db:
     output: *db_files(reads)
     params:
         fasta2dazz = fasta2dazz_command(reads)
+    container: dentist_container
     shell:
         "{params.fasta2dazz} {output[0]} {input} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
 
@@ -1046,6 +1059,7 @@ rule ref_vs_reads_alignment_block:
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("ref-vs-reads-alignment.{block_reads}")
+    container: dentist_container
     shell:
         """
             {{
@@ -1067,6 +1081,7 @@ rule ref_vs_reads_alignment:
     params:
         dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("ref-vs-reads-alignment")
+    container: dentist_container
     shell: LAmerge()
 
 
@@ -1080,6 +1095,7 @@ rule reads_vs_ref_alignment:
     params:
         dbs = lambda _, input: (input.readsdb[0], input.refdb[0])
     log: log_file("reads-vs-ref-alignment")
+    container: dentist_container
     shell: LAmerge()
 
 
@@ -1092,6 +1108,7 @@ rule mask_reads:
     output:
         mask_files(reference, reads_mask)
     log: log_file("mask-reads")
+    container: dentist_container
     shell:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
 
@@ -1109,6 +1126,7 @@ rule propagate_mask_to_reads_block:
         inmask = "{mask}",
         outmask = pseudo_block_mask("{mask}", "{block_reads}")
     log: log_file("propagate-mask-to-reads.{mask}.{block_reads}")
+    container: dentist_container
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
 
@@ -1124,6 +1142,7 @@ rule propagate_mask_to_reads_block:
 #         merged_mask = "{mask}",
 #         block_masks = block_masks("{mask}", reads)
 #     log: log_file("propagate-mask-to-reads.{mask}")
+#     container: dentist_container
 #     shell:
 #         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reads} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
@@ -1141,6 +1160,7 @@ rule propagate_mask_back_to_reference_block:
         inmask = pseudo_block_mask("{mask}", "{block_reads}"),
         outmask = pseudo_block_mask(homogenized_mask("{mask}"), "{block_reads}")
     log: log_file("propagate-mask-back-to-reference.{mask}.{block_reads}")
+    container: dentist_container
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reads} {reference} {input[alignment]} {params[outmask]} 2> {log}"
 
@@ -1156,6 +1176,7 @@ rule propagate_mask_back_to_reference:
         merged_mask = homogenized_mask("{mask}"),
         block_masks = pseudo_block_masks(homogenized_mask("{mask}"), reads)
     log: log_file("propagate-mask-back-to-reference.{mask}")
+    container: dentist_container
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
@@ -1179,6 +1200,7 @@ checkpoint collect:
         auxiliary_threads = auxiliary_threads
     threads: max_threads
     log: log_file("collect")
+    container: dentist_container
     shell:
         "dentist collect --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} - - - - 2> {log}"
 
@@ -1199,6 +1221,7 @@ rule process:
         auxiliary_threads = auxiliary_threads
     threads: max_threads
     log: log_file("process.{batch_id}")
+    container: dentist_container
     shell:
         "dentist process --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
 
@@ -1208,6 +1231,7 @@ rule extend_dentist_config_for_merge_insertions:
         await_pile_ups()
     output:
         temp(dentist_merge_insertions_config_file)
+    container: dentist_container
     run:
         merge_config = None
         with open(dentist_config_file, 'r') as base_config:
@@ -1234,6 +1258,7 @@ rule merge_insertions:
     output:
         protected(insertions)
     log: log_file("merge-insertions")
+    container: dentist_container
     shell:
         "dentist merge-insertions --config={dentist_merge_insertions_config_file} {dentist_flags} - - 2> {log}"
 
@@ -1249,6 +1274,7 @@ rule preliminary_output:
     params:
         revert_options = "--revert=agp,cache-contig-alignments,scaffolding,skip-gaps,skip-gaps-file"
     log: log_file("preliminary-output")
+    container: dentist_container
     shell:
         "dentist output --config={dentist_config_file} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} - - {output[0]} 2> {log}"
 
@@ -1272,6 +1298,7 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
     log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
+    container: dentist_container
     shell:
         """
             {{
@@ -1293,6 +1320,7 @@ rule preliminary_gap_closed_vs_reads_alignment:
     params:
         dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("gap-closed-vs-reads-alignment")
+    container: dentist_container
     shell: LAmerge()
 
 
@@ -1302,6 +1330,7 @@ rule split_preliminary_gap_closed_vs_reads_alignment:
     params:
         split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
     log: log_file("split-gap-closed-vs-reads-alignment")
+    container: dentist_container
     shell:
         """
             {{
@@ -1318,6 +1347,7 @@ rule preliminary_closed_gaps_bed2mask:
     output:
         mask_files(preliminary_gap_closed, closed_gaps_mask)
     log: log_file("closed-gaps-bed2mask")
+    container: dentist_container
     shell:
         "dentist bed2mask --config={dentist_config_file} {dentist_flags} --data-comments --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
 
@@ -1335,6 +1365,7 @@ rule validate_regions_block:
         block_mask = block_mask(weak_coverage_mask, "{block_ref}")
     threads: max_threads
     log: log_file("validate-regions-block.{block_ref}")
+    container: dentist_container
     shell:
         "dentist validate-regions --config={dentist_config_file} --threads={threads} --weak-coverage-mask={params.block_mask} {input.refdb[0]} - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
 
@@ -1357,6 +1388,7 @@ rule weak_coverage_mask:
     params:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
+    container: dentist_container
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
@@ -1385,6 +1417,7 @@ if workflow_flags["no_purge_output"]:
             gap_closed_fasta,
             closed_gaps_bed
         log: log_file("unpurged-output")
+        container: dentist_container
         shell:
             "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
 else:
@@ -1398,6 +1431,7 @@ else:
             gap_closed_fasta,
             closed_gaps_bed
         log: log_file("purged-output")
+        container: dentist_container
         shell:
             "dentist output --config={dentist_config_file} {dentist_flags} --skip-gaps-file={input[skip_gaps]} - - - 2> {log}"
 

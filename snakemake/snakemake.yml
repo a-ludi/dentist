@@ -39,6 +39,11 @@
 # raw gap-closed assembly as final output.
 #no_purge_output: true
 
+# The workflow can be easily run inside a container (--use-singularity) to
+# reduce the software installations. The default container is
+# "docker://aludi/dentist:stable" and can be changed by the following line.
+#dentist_container: "docker://aludi/dentist:edge"
+
 
 inputs:
     # The reference assembly where gaps should be closed
