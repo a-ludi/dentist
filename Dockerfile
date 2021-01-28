@@ -44,7 +44,7 @@ RUN REPO=https://github.com/thegenemyers/DAMAPPER.git \
 COPY ./ /opt/dentist
 RUN REPO=https://github.com/a-ludi/dentist.git \
     BRANCH='' \
-    BUILD=debug \
+    BUILD=release \
     /opt/build-and-install.sh dentist dub
 # Check if dependencies are correctly installed and remove build dependencies
 # and artifacts
