@@ -21,25 +21,33 @@ import dentist.common.alignments :
     id_t;
 import dentist.common.commands : TestingCommand;
 import dentist.dazzler :
-    ContigSegment,
-    GapSegment,
-    getScaffoldStructure,
-    readMask,
-    ScaffoldSegment;
-import dentist.util.algorithm : cmpLexicographically;
+    DBdumpOptions,
+    DbRecord,
+    getDbRecords,
+    readMask;
+import dentist.util.algorithm :
+    cmpLexicographically,
+    filterInPlace;
 import dentist.util.log;
 import std.algorithm :
     copy,
+    count,
     filter,
     map,
     sort,
     swap;
 import std.array : array;
 import std.format : format, formattedRead;
-import std.range : assumeSorted, enumerate;
+import std.range :
+    assumeSorted,
+    enumerate,
+    slide;
 import std.stdio : File, writeln;
 import std.string : capitalize;
-import std.typecons : PhobosFlag = Flag, tuple;
+import std.typecons :
+    No,
+    PhobosFlag = Flag,
+    tuple;
 import vibe.data.json : toJson = serializeToJson, serializeToJsonString;
 
 
@@ -58,7 +66,8 @@ void execute(in Options options)
 struct ClosableGapsFinder
 {
     const(Options) options;
-    const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
+    /// Contig locations of the base assembly (trueAssembly)
+    DbRecord[] baseContigs;
     ReferenceRegion mappedRegionsMask;
     TrueAlignment[] trueAlignments;
     ClosableGap[] closableGaps;
@@ -73,20 +82,21 @@ struct ClosableGapsFinder
 
     void init()
     {
-        trueAssemblyScaffoldStructure = getScaffoldStructure(options.trueAssemblyDb).array;
-        mappedRegionsMask = ReferenceRegion(readMask!ReferenceInterval(
+        baseContigs = getDbRecords(options.trueAssemblyDb, [
+            DBdumpOptions.readNumber,
+            DBdumpOptions.originalHeader,
+        ]).array;
+
+        auto mappedIntervals = readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
-        ));
+        );
+        mappedIntervals.filterInPlace!(mapped => mapped.size >= options.contigCutoff);
+        mappedRegionsMask = ReferenceRegion(mappedIntervals);
         trueAlignments = readTrueAlignments(options.readsMap);
 
         logJsonDebug(
-            "trueAssemblyScaffoldStructure", trueAssemblyScaffoldStructure
-                .map!(scaffoldPart => scaffoldPart.peek!GapSegment !is null
-                    ? scaffoldPart.get!GapSegment.toJson
-                    : scaffoldPart.get!ContigSegment.toJson)
-                .array
-                .toJson,
+            "baseContigs", baseContigs.toJson,
             "mappedRegionsMask", mappedRegionsMask.intervals.toJson,
             "trueAlignments", trueAlignments.toJson,
         );
@@ -94,63 +104,65 @@ struct ClosableGapsFinder
 
     void findClosableGaps()
     {
-        alias isContigPart = contigPart => contigPart.peek!ContigSegment !is null;
-        alias mkContigPart = contigPart => contigPart.get!ContigSegment;
+        closableGaps = new ClosableGap[mappedRegionsMask.intervals.length - 1];
+        auto mappedRegionsPairs = mappedRegionsMask
+            .intervals
+            .slide!(No.withPartial)(2)
+            .enumerate;
 
-        id_t currentContigId;
-        foreach (contigPart; trueAssemblyScaffoldStructure.filter!isContigPart.map!mkContigPart)
+        foreach (i, mappedPair; mappedRegionsPairs)
         {
-            // `contigId` is 1-based
-            ++currentContigId;
-            auto trueContigRegion = ReferenceRegion(ReferenceInterval(
-                contigPart.globalContigId,
-                0,
-                contigPart.length,
-            ));
-            auto scaffoldGaps = trueContigRegion - mappedRegionsMask;
-            this.closableGaps.length += scaffoldGaps.intervals.length;
-            auto closableGaps = this.closableGaps[$ - scaffoldGaps.intervals.length .. $];
+            if (mappedPair[0].contigId != mappedPair[1].contigId)
+                // skip if pair is not on the same contig, i.e. not a gap
+                continue;
+
+            auto gap = ReferenceInterval(
+                mappedPair[0].contigId,
+                mappedPair[0].end,
+                mappedPair[1].begin,
+            );
+            auto baseContig = baseContigs[gap.contigId - 1];
+            assert(baseContig.contigId == gap.contigId);
+            // contigIdx starts at 0 on each scaffold -> count zeros
+            // but subtract one because scaffolds are zero-indexed
+            auto scaffoldId = cast(id_t) baseContigs[0 .. baseContig.contigId]
+                .count!"a.location.contigIdx == 0" - 1;
 
             auto trueAlignments = this.trueAlignments
                 .assumeSorted!"a.scaffoldId < b.scaffoldId"
-                .equalRange(TrueAlignment(cast(id_t) contigPart.scaffoldId))
+                // find all TrueAlignments for baseContig
+                .equalRange(TrueAlignment(scaffoldId))
+                .filter!(read => baseContig.location.begin <= read.begin && read.end <= baseContig.location.end)
+                // adjust to contig-coordinates
                 .map!(read => TrueAlignment(
                     read.scaffoldId,
-                    cast(coord_t) (read.begin - contigPart.begin),
-                    cast(coord_t) (read.end - contigPart.begin),
+                    cast(coord_t) (read.begin - baseContig.location.begin),
+                    cast(coord_t) (read.end - baseContig.location.begin),
                     read.flags,
                     read.readId,
                 ))
                 .array;
 
-            foreach (i, gap; scaffoldGaps.intervals)
-            {
-                closableGaps[i].fromContig = cast(id_t) (currentContigId);
-                closableGaps[i].toContig = cast(id_t) (currentContigId + 1);
-                closableGaps[i].gapSize = cast(coord_t) gap.size;
-                closableGaps[i].mappedInterval = gap;
+            closableGaps[i].fromContig = cast(id_t) (i + 1);
+            closableGaps[i].toContig = cast(id_t) (i + 2);
+            closableGaps[i].gapSize = cast(coord_t) gap.size;
+            closableGaps[i].mappedInterval = gap;
 
-                if (gap.begin == 0 || gap.end == contigPart.length)
-                    // Skip gaps at the beginning or end of a true scaffold
-                    continue;
+            foreach (read; trueAlignments)
+                if (
+                    read.begin + options.minAnchorLength <= gap.begin &&
+                    gap.end + options.minAnchorLength <= read.end
+                )
+                    // read spans gap including a context of
+                    // minAnchorLength on either side
+                    closableGaps[i].spanningReads ~= read.readId;
 
-                foreach (read; trueAlignments)
-                    if (
-                        read.begin < gap.begin &&
-                        (gap.begin - read.begin) >= options.minAnchorLength &&
-                        gap.end < read.end &&
-                        (read.end - gap.end) >= options.minAnchorLength
-                    )
-                        closableGaps[i].spanningReads ~= read.readId;
-                closableGaps[i].spanningReads.sort;
-                ++currentContigId;
-            }
+            closableGaps[i].spanningReads.sort;
         }
 
-        auto bufferRest = closableGaps
-            .filter!(closableGap => closableGap.spanningReads.length >= options.minSpanningReads)
-            .copy(closableGaps);
-        closableGaps = closableGaps[0 .. $ - bufferRest.length];
+        closableGaps.filterInPlace!(
+            closableGap => closableGap.spanningReads.length >= options.minSpanningReads
+        );
     }
 }
 

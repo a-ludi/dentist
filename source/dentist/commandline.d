@@ -1213,6 +1213,21 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        TestingCommand.findClosableGaps,
+    ))
+    {
+        @Option("contig-cutoff")
+        @Help(format!"
+            The test assembly will usually have a minimum contig length set.
+            The correct value required in order to get the contig numbering
+            right. Retrieve it with
+            `awk '($4 == \"cutoff\") { print $6 }' assembly-test.dam`
+            (default: %d)
+        }"(defaultValue!contigCutoff))
+        coord_t contigCutoff = 1000;
+    }
+
+    static if (command.among(
         TestingCommand.checkResults,
     ))
     {

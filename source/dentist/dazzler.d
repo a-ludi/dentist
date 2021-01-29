@@ -2658,6 +2658,7 @@ struct DbRecord
     static struct PacBioReadInfo
     {
         id_t well;
+        alias contigIdx = well;
         coord_t pulseStart;
         alias begin = pulseStart;
         coord_t pulseEnd;
