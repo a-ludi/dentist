@@ -11,12 +11,9 @@ module dentist.commands.findClosableGaps;
 import dentist.commandline : OptionsFor;
 import dentist.common :
     isTesting,
-    ReferenceInterval,
-    ReferenceRegion;
+    ReferenceInterval;
 import dentist.common.alignments :
     AlignmentChain,
-    AlignmentFlag = Flag,
-    AlignmentFlags = Flags,
     coord_t,
     id_t;
 import dentist.common.commands : TestingCommand;
@@ -46,7 +43,6 @@ import std.stdio : File, writeln;
 import std.string : capitalize;
 import std.typecons :
     No,
-    PhobosFlag = Flag,
     tuple;
 import vibe.data.json : toJson = serializeToJson, serializeToJsonString;
 
@@ -68,8 +64,8 @@ struct ClosableGapsFinder
     const(Options) options;
     /// Contig locations of the base assembly (trueAssembly)
     DbRecord[] baseContigs;
-    ReferenceRegion mappedRegionsMask;
-    TrueAlignment[] trueAlignments;
+    ReferenceInterval[] mappedContigs;
+    ReadSample[] readSamples;
     ClosableGap[] closableGaps;
 
     void run()
@@ -87,39 +83,37 @@ struct ClosableGapsFinder
             DBdumpOptions.originalHeader,
         ]).array;
 
-        auto mappedIntervals = readMask!ReferenceInterval(
+        mappedContigs = readMask!ReferenceInterval(
             options.trueAssemblyDb,
             options.mappedRegionsMask,
         );
-        mappedIntervals.filterInPlace!(mapped => mapped.size >= options.contigCutoff);
-        mappedRegionsMask = ReferenceRegion(mappedIntervals);
-        trueAlignments = readTrueAlignments(options.readsMap);
+        mappedContigs.filterInPlace!(mapped => mapped.size >= options.contigCutoff);
+        readSamples = readReadSamples(options.readsMap);
 
         logJsonDebug(
             "baseContigs", baseContigs.toJson,
-            "mappedRegionsMask", mappedRegionsMask.intervals.toJson,
-            "trueAlignments", trueAlignments.toJson,
+            "mappedContigs", mappedContigs.toJson,
+            "readSamples", readSamples.toJson,
         );
     }
 
     void findClosableGaps()
     {
-        closableGaps = new ClosableGap[mappedRegionsMask.intervals.length - 1];
-        auto mappedRegionsPairs = mappedRegionsMask
-            .intervals
+        closableGaps = new ClosableGap[mappedContigs.length - 1];
+        auto mappedContigPairs = mappedContigs
             .slide!(No.withPartial)(2)
             .enumerate;
 
-        foreach (i, mappedPair; mappedRegionsPairs)
+        foreach (i, contigPair; mappedContigPairs)
         {
-            if (mappedPair[0].contigId != mappedPair[1].contigId)
+            if (contigPair[0].contigId != contigPair[1].contigId)
                 // skip if pair is not on the same contig, i.e. not a gap
                 continue;
 
             auto gap = ReferenceInterval(
-                mappedPair[0].contigId,
-                mappedPair[0].end,
-                mappedPair[1].begin,
+                contigPair[0].contigId,
+                contigPair[0].end,
+                contigPair[1].begin,
             );
             auto baseContig = baseContigs[gap.contigId - 1];
             assert(baseContig.contigId == gap.contigId);
@@ -128,17 +122,17 @@ struct ClosableGapsFinder
             auto scaffoldId = cast(id_t) baseContigs[0 .. baseContig.contigId]
                 .count!"a.location.contigIdx == 0" - 1;
 
-            auto trueAlignments = this.trueAlignments
+            auto readSamples = this.readSamples
                 .assumeSorted!"a.scaffoldId < b.scaffoldId"
-                // find all TrueAlignments for baseContig
-                .equalRange(TrueAlignment(scaffoldId))
+                // find all ReadSamples for baseContig
+                .equalRange(ReadSample(scaffoldId))
                 .filter!(read => baseContig.location.begin <= read.begin && read.end <= baseContig.location.end)
                 // adjust to contig-coordinates
-                .map!(read => TrueAlignment(
+                .map!(read => ReadSample(
                     read.scaffoldId,
                     cast(coord_t) (read.begin - baseContig.location.begin),
                     cast(coord_t) (read.end - baseContig.location.begin),
-                    read.flags,
+                    read.complement,
                     read.readId,
                 ))
                 .array;
@@ -148,7 +142,7 @@ struct ClosableGapsFinder
             closableGaps[i].gapSize = cast(coord_t) gap.size;
             closableGaps[i].mappedInterval = gap;
 
-            foreach (read; trueAlignments)
+            foreach (read; readSamples)
                 if (
                     read.begin + options.minAnchorLength <= gap.begin &&
                     gap.end + options.minAnchorLength <= read.end
@@ -175,35 +169,18 @@ struct ClosableGap
     id_t[] spanningReads;
 }
 
-struct TrueAlignment
+struct ReadSample
 {
     id_t scaffoldId;
     coord_t begin;
     coord_t end;
-    AlignmentFlags flags;
+    bool complement;
     id_t readId;
 
-    static foreach(flagName; __traits(allMembers, AlignmentFlag))
-    {
-        mixin(format!(q"<
-            static alias %1$s = PhobosFlag!"%2$s";
-
-            @property PhobosFlag!"%2$s" %2$s() pure const nothrow @trusted
-            {
-                return cast(PhobosFlag!"%2$s") flags.%2$s;
-            }
-
-            @property void %2$s(PhobosFlag!"%2$s" %2$s) pure nothrow
-            {
-                flags.%2$s = %2$s;
-            }
-        >")(flagName.capitalize, flagName));
-    }
-
-    int opCmp(in TrueAlignment other) const pure nothrow
+    int opCmp(in ReadSample other) const pure nothrow
     {
         return cmpLexicographically!(
-            TrueAlignment,
+            ReadSample,
             "a.scaffoldId",
             "a.begin",
             "a.end",
@@ -212,36 +189,36 @@ struct TrueAlignment
     }
 }
 
-TrueAlignment[] readTrueAlignments(in string readsMap)
+ReadSample[] readReadSamples(in string readsMap)
 {
-    auto trueAlignments = File(readsMap)
+    auto readSamples = File(readsMap)
         .byLine
         .enumerate(1)
-        .map!parseTrueAlignment
+        .map!parseReadSample
         .array;
-    trueAlignments.sort;
+    readSamples.sort;
 
-    return trueAlignments;
+    return readSamples;
 }
 
 // Not meant for public usage.
-TrueAlignment parseTrueAlignment(EnumLine)(EnumLine enumLine)
+ReadSample parseReadSample(EnumLine)(EnumLine enumLine)
 {
     auto line = enumLine.value;
-    TrueAlignment trueAlignment;
-    trueAlignment.readId = enumLine.index;
+    ReadSample readSample;
+    readSample.readId = enumLine.index;
 
     line.formattedRead!" %d %d %d"(
-        trueAlignment.scaffoldId,
-        trueAlignment.begin,
-        trueAlignment.end,
+        readSample.scaffoldId,
+        readSample.begin,
+        readSample.end,
     );
 
-    if (trueAlignment.begin > trueAlignment.end)
+    if (readSample.begin > readSample.end)
     {
-        swap(trueAlignment.begin, trueAlignment.end);
-        trueAlignment.flags |= AlignmentFlag.complement;
+        swap(readSample.begin, readSample.end);
+        readSample.complement = true;
     }
 
-    return trueAlignment;
+    return readSample;
 }
