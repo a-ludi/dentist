@@ -105,7 +105,7 @@ moment.
 Please use the following versions in your dependencies in case you experience
 troubles:
 
-- [snakemake@5.10.0](https://snakemake.readthedocs.io/en/v5.10.0/getting_started/installation.html)
+- [snakemake@5.11.2](https://snakemake.readthedocs.io/en/v5.10.0/getting_started/installation.html)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
 - [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
@@ -135,7 +135,7 @@ and a set of reads `reads.fasta` with 25× coverage.
 >
 >     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 
-Install [Snakemake][snakemake] version >=5.10.0 and copy these files into your
+Install [Snakemake][snakemake] version >=5.11.2 and copy these files into your
 working directory:
 
 - `./snakemake/Snakefile`

@@ -15,11 +15,24 @@ logdir = None
 insertions_batch = None
 custom_auxiliary_threads = None
 batch_size = None
+dentist_container = None
 
 
 #-----------------------------------------------------------------------------
 # BEGIN functions
 #-----------------------------------------------------------------------------
+
+
+def shellcmd(cmd):
+    if workflow.use_singularity:
+        from snakemake.deployment import singularity
+
+        return singularity.shellcmd(dentist_container, cmd,
+                                    workflow.singularity_args,
+                                    container_workdir=workflow.singularity_prefix)
+    else:
+        return cmd
+
 
 def rel_to_workdir(path):
     from os.path import relpath
@@ -305,7 +318,8 @@ def main_threads(wildcards, threads):
 
 
 def validate_dentist_config(config_file):
-    subprocess.check_output(["dentist", "validate-config", config_file])
+    cmd = shellcmd("dentist validate-config {}".format(shell_esc(config_file)))
+    subprocess.check_output(cmd, shell=True)
 
 
 def generate_options_for(alignment_name, config_file, additional_flags=None):
@@ -313,7 +327,7 @@ def generate_options_for(alignment_name, config_file, additional_flags=None):
         return "false"
 
     generate_template = "dentist generate --quiet --config={}"
-    generate_cmd = generate_template.format(config_file, shell_esc(alignment_name))
+    generate_cmd = shellcmd(generate_template.format(config_file, shell_esc(alignment_name)))
     generate_proc = subprocess.run(generate_cmd,
                                    shell=True,
                                    stderr=subprocess.PIPE,
@@ -358,7 +372,8 @@ __num_contigs_regex = re.compile(r"^\+\s+R\s+(?P<num_contigs>\d+)\s*$", re.MULTI
 
 def get_num_contigs(db):
     try:
-        dbdump = subprocess.check_output(["DBdump", db]).decode()
+        cmd = shellcmd("DBdump {}".format(shell_esc(db)))
+        dbdump = subprocess.check_output(cmd, shell=True, text=True)
         match = __num_contigs_regex.match(dbdump)
 
         if not match:
@@ -483,15 +498,13 @@ def insertion_batch_range(wildcards):
 
 
 def get_num_pile_ups():
-    from subprocess import CalledProcessError
-    from os.path import exists
-
     try:
-        info_cmd = ["dentist", "show-pile-ups", "-j", pile_ups]
-        pile_ups_info = subprocess.check_output(info_cmd, stderr=subprocess.DEVNULL)
+        info_cmd = "dentist show-pile-ups -j {}".format(shell_esc(pile_ups))
+        info_cmd = shellcmd(info_cmd)
+        pile_ups_info = subprocess.check_output(info_cmd, shell=True, stderr=subprocess.DEVNULL)
 
         return json.loads(pile_ups_info)["numPileUps"]
-    except CalledProcessError as e:
+    except subprocess.CalledProcessError as e:
         if exists(pile_ups):
             raise e
 
@@ -811,7 +824,6 @@ rule ALL:
 
 checkpoint extend_dentist_config:
     output: dentist_config_file
-    container: dentist_container
     run:
         dentist_config = config["dentist_config"]
 
@@ -1231,7 +1243,6 @@ rule extend_dentist_config_for_merge_insertions:
         await_pile_ups()
     output:
         temp(dentist_merge_insertions_config_file)
-    container: dentist_container
     run:
         merge_config = None
         with open(dentist_config_file, 'r') as base_config:
