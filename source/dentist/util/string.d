@@ -743,22 +743,24 @@ private EditOp[] tracebackScoringMatrix(in DPMatrix!score_t F)
         );
 
         assert(k > 0);
-        switch (nextScore)
+        if (nextScore == matchScore)
         {
-        case matchScore:
             editPath[--k] = EditOp.substitution;
             --i;
             --j;
-            break;
-        case insertionScore:
+        }
+        else if (nextScore == insertionScore)
+        {
             editPath[--k] = EditOp.insertion;
             --j;
-            break;
-        case deletionScore:
+        }
+        else if (nextScore == deletionScore)
+        {
             editPath[--k] = EditOp.deletetion;
             --i;
-            break;
-        default:
+        }
+        else
+        {
             assert(0, "corrupted scoring matrix");
         }
     }
