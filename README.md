@@ -4,7 +4,6 @@ DENTIST
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)
-![Docker Cloud Build Status](https://img.shields.io/docker/cloud/build/aludi/dentist)
 
 > Close assembly gaps using long-reads with focus on correctness.
 
