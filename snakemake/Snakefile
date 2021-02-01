@@ -322,6 +322,12 @@ def validate_dentist_config(config_file):
     subprocess.check_output(cmd, shell=True)
 
 
+def is_dentist_testing():
+    cmd = shellcmd("dentist --version 2>&1 | grep -qF '+testing'")
+
+    return subprocess.call(cmd, shell=True) == 0
+
+
 def generate_options_for(alignment_name, config_file, additional_flags=None):
     if not exists(config_file):
         return "false"
@@ -696,6 +702,10 @@ insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
+preliminary_output_revert_options = ["agp", "scaffolding", "skip-gaps", "skip-gaps-file"]
+
+if is_dentist_testing():
+    preliminary_output_revert_options.append("cache-contig-alignments")
 
 additional_options = config.get("additional_options", {})
 additional_reference_dbsplit_options = make_flags(additional_options.get("reference_dbsplit", []))
@@ -1283,7 +1293,7 @@ rule preliminary_output:
         preliminary_gap_closed_fasta,
         preliminary_closed_gaps_bed
     params:
-        revert_options = "--revert=agp,cache-contig-alignments,scaffolding,skip-gaps,skip-gaps-file"
+        revert_options = "--revert={}".format(",".join(preliminary_output_revert_options))
     log: log_file("preliminary-output")
     container: dentist_container
     shell:
