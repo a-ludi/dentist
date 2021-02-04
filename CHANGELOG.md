@@ -8,6 +8,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
+## [1.0.0] - 2020-02-04
+### Added
+
+- A Docker container! This means you can just `--use-singularity` with
+  Snakemake.
+- Workflow rule to just produce all the repeat masks (this is used in the
+  paper to calculate the repeat content of the assemblies)
+- Automatic validation of the closed gaps with an alignment of the reads
+  against a preliminary gap-closed assembly:
+    - Added command `bed2mask`
+    - Optionally write a BED file of closed gaps
+    - Added command `validate-regions`
+    - Added interface for reading/writing Dazzler track extras which is
+      utilized to communicate the contig and read IDs between `output` and
+      `validate-regions`
+- Extensively documented the example workflow config `./snakemake/snakemake.yml`
+- Local alignment chaining via command `chain-local-alignments` and internally
+- Using chaining to filter/improve pile up alignments
+- Added possibility to revert CLI options via `--revert`
+- All multi-valued CLI options take their value from a comma-separated list
+  and/or by giving the same option multiple times
+- Added `full_validation` flag to workflow to keep the preliminary assembly
+  and validation results
+- Added `no_purge_output` flag to workflow to prevent the automatic skipping
+  of invalid gaps; this also will not trigger the validation if not requested
+  explicitly
+- Possibility to lazily read local alignments from `.las` file
+- Greatly improved performance of reading `.las` files by switching to binary
+  interface
+- Possibility to manually skip filling of gaps
+- `DBdust` for improved sensitivity in alignments
+- Homogenized masks implemented via new command `propagate-mask` which
+  translates a given mask via an alignment from one DB/DAM to another. The
+  masks are propagated from the assembly to the reads and back to gain
+  sensitivity.
+
+### Changed
+- `dentist --dependencies` now reports the availability of the listed tools
+  and exits non-zero if some dependency is missing
+- Avoid loading the full alignment into memory when masking
+- Refactored `getAlignments` and `getFlatLocalAlignments` such that the caller
+  has full control over the buffering strategy
+- Streamlined option passing for `daligner`, `damapper`, `datander`, `DBdust`
+  and `daccord`. Also, removed `--reference-error` and `--reads-error` in favor of default value `-e.7` in all cases. Basically, one must not modify
+  `-e` without adjusting the rest of the options accordingly. Setting it to the
+  minimum value just ensures no alignments are discarded for no good reason.
+- Masks can be created on a "block-level" and later merged with `merged-masks`
+  (this is incompatible with Dazzler's `Catrack`)
+- Avoid cryptic error message if alignment is not a valid `.las` file
+- Distributed tandem repeat masking
+- Renamed `workdir` → `tmpdir` to avoid confusion
+- Raised default value of `--max-insertion-error` (experiments show a small
+  drop in correctness but large gain in contiguity)
+- Replaced obscure `damapper` argument from `block_alignments` by
+  `block_a=FULL_DB` or `block_b=FULL_DB`
+- Behavior of environment substitution in workflow config files:
+    - The config file may contain `default_env` and/or `override_env`. This
+      allows to create "template" config files and "instantiation" config files
+      because snakemake allows the user to specify more than one config file.
+    - If just the placeholder string is given (e.g. `$FOO`) then substitute
+      the exact value and type in the current `env` dictionary. This means,
+      the type of a value given via `default_env` or `override_env` is
+      copied which in turn prevents type error in DENTIST's config file.
+- Included `filter-mask` into the standard commands because it can be useful
+  for adjusting repeat masks
+- Removed some dead code
+
+### Removed
+- Dependency on `LAdump` and `dumpLA`
+
+### Fixed
+- Added `properAlignmentAllowance` to `completelyCovers`
+- Fixed workflow for non-PacBio reads
+- Snakemake can now run in single pass; before a separate call was required to
+  create DENTIST's config file.
+- Deactivated `daligner`'s bridging (`-B`) when self-alignments are requested
+  (`-I`) to avoid a bug.
+- Many more fixes to workflow and related files under `./snakemake/`
+- Details in commands in README
+- Remedied syntax highlighting errors
+- Many technical bugs/errors
+- Compilation with `ldc2`
+
+
 ## [1.0.0-beta.3] - 2020-07-23
 ### Added
 - Always skip file locking with environment variable `SKIP_FILE_LOCKING=1`

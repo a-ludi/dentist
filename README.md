@@ -102,8 +102,9 @@ available packages on Bioconda are outdated and should not be used at the
 moment.
 
 Please use the following versions in your dependencies in case you experience
-troubles:
+troubles. These should be the same versions used in the [Dockerfile](./blob/develop/Dockerfile):
 
+- [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
 - [snakemake@5.11.2](https://snakemake.readthedocs.io/en/v5.10.0/getting_started/installation.html)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
