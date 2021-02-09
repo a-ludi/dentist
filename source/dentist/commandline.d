@@ -2108,15 +2108,21 @@ struct OptionsFor(DentistCommand _command)
         @Help("try to recover imperfect contigs")
         OptionFlag recoverImperfectContigs;
 
-        @Option()
+        @Option("max-imperfect-contigs-error")
+        @MetaVar("<frac>")
+        @Help(format!"
+            imperfect contigs may have an error up to <frac> (default: %s)
+        "(defaultValue!maxImperfectContigError))
         double maxImperfectContigError = 0.015;
 
         @property string[] recoverImperfectContigsAlignmentOptions() const
         {
+            auto kMerSize = to!uint(ceil(-64*maxImperfectContigError + 32));
+
             return [
                 DalignerOptions.asymmetric,
                 DalignerOptions.numThreads ~ numAuxiliaryThreads.to!string,
-                DalignerOptions.kMerSize ~ "32",
+                DalignerOptions.kMerSize ~ kMerSize.to!string,
                 format!(DalignerOptions.averageCorrelationRate ~ "%f")(
                     1.0 - maxImperfectContigError,
                 ),
