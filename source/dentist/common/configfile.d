@@ -60,7 +60,7 @@ import vibe.data.json :
 /// Identifier for the config object with default values.
 enum configDefaultKey = "__default__";
 
-/// Keys prefixed with this string are ignored.
+/// Arguments with this value are assigned the config value.
 enum configEmptyArgument = "-";
 
 /// Keys prefixed with this string are ignored.
