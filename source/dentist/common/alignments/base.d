@@ -1682,6 +1682,19 @@ enum AlignmentLocationSeed : ubyte
     back,
 }
 
+
+char toChar(const AlignmentLocationSeed seed) pure nothrow @safe
+{
+    final switch (seed)
+    {
+        case AlignmentLocationSeed.front:
+            return 'f';
+        case AlignmentLocationSeed.back:
+            return 'b';
+    }
+}
+
+
 /**
     An alignment chain with a "seed", ie. hint for it's intended location.
 */

@@ -190,6 +190,7 @@ auto getInfoForNewSequenceInsertion(
         (insertion.isExtension && overlaps.length == 1) ^
         (insertion.isGap && overlaps.length == 2)
     );
+    assert(firstOverlap.contigB.length == insertion.payload.sequence.length);
 
     auto slice = ReadInterval(
         firstOverlap.contigB.id,

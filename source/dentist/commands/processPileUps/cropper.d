@@ -27,6 +27,7 @@ import dentist.common.alignments :
     PileUp,
     ReadAlignment,
     SeededAlignment,
+    toChar,
     trace_point_t,
     TracePoint;
 import dentist.dazzler : buildDbFile, getFastaSequences;
@@ -106,19 +107,24 @@ private struct PileUpCropper
 
     void buildDb()
     {
-        enum extensionDbName = "pileup-%d.db";
-        enum gapDbName = "pileup-%d-%d.db";
+        enum extensionDbName = "pileup-%d%c.db";
+        enum gapDbName = "pileup-%d%c-%d%c.db";
 
         fetchCroppingRefPositions();
         fetchSupportPatches();
         auto croppedSequences = pileUpWithSequence().map!(t => getCroppedSequence(t.expand));
 
         if (croppingRefPositions.length == 1)
-            croppedDb = format!extensionDbName(croppingRefPositions[0].contigId);
+            croppedDb = format!extensionDbName(
+                croppingRefPositions[0].contigId,
+                croppingSeeds[0].toChar,
+            );
         else
             croppedDb = format!gapDbName(
                 croppingRefPositions[0].contigId,
+                croppingSeeds[0].toChar,
                 croppingRefPositions[1].contigId,
+                croppingSeeds[1].toChar,
             );
         croppedDb = buildPath(options.tmpdir, croppedDb);
 

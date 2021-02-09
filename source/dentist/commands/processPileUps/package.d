@@ -33,7 +33,8 @@ import dentist.common.alignments :
     PileUp,
     pileUpToSimpleJson,
     ReadAlignment,
-    SeededAlignment;
+    SeededAlignment,
+    toChar;
 import dentist.common.binio :
     CompressedSequence,
     InsertionDb,
@@ -603,9 +604,14 @@ protected class PileUpProcessor
         mixin(traceExecution);
 
         auto flankingContigIds = croppingPositions.map!"a.contigId".array;
+        auto flankingContigIdsWithSeeds = zip(flankingContigIds, croppingSeeds)
+            .map!(pair => tuple(
+                pair[0],
+                pair[1].toChar
+            ));
         auto flankingContigsDbName = buildPath(
             options.tmpdir,
-            format!"contigs-%-(%d-%).dam"(flankingContigIds),
+            format!"contigs-%-(%(%d%c%)-%).dam"(flankingContigIdsWithSeeds),
         );
         auto flankingContigsDb = dbSubset(
             flankingContigsDbName,
@@ -757,6 +763,7 @@ protected class PileUpProcessor
         {
             auto fastaSequence = getFastaSequence(consensusDb, 1);
             insertionSequence = CompressedSequence.from(fastaSequence);
+            assert(fastaSequence.length == insertionSequence.length);
         }
     }
 
@@ -771,6 +778,9 @@ protected class PileUpProcessor
         );
 
         assert(insertion.isParallel == insertionAlignment.isParallel);
+        if (insertionAlignment.length == 2)
+            assert(insertionAlignment[0].contigB == insertionAlignment[1].contigB);
+        assert(insertionSequence.length == insertionAlignment[0].contigB.length);
 
         return insertion;
     }
