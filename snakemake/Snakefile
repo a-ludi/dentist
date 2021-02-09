@@ -1191,12 +1191,13 @@ rule propagate_mask_back_to_reference:
     input:
         await_dentist_config(),
         await_db_files(reference),
+        mask_files(reference, "{mask}"),
         *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads)]
     output:
         mask_files(reference, homogenized_mask("{mask}"))
     params:
         merged_mask = homogenized_mask("{mask}"),
-        block_masks = pseudo_block_masks(homogenized_mask("{mask}"), reads)
+        block_masks = ["{mask}"] + pseudo_block_masks(homogenized_mask("{mask}"), reads)
     log: log_file("propagate-mask-back-to-reference.{mask}")
     container: dentist_container
     shell:
