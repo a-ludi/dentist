@@ -270,7 +270,9 @@ AlignmentChain composeAlignmentChain(R)(R chainedLocalAlignments, Flags addition
 
     // compose local alignments into an alignment chain
     auto firstLA = chainedLocalAlignments.front;
-    auto tracePointDistance = firstLA.tracePointDistance;
+    trace_point_t tracePointDistance = firstLA.tracePoints.length > 0
+        ? firstLA.tracePointDistance
+        : 0;
     auto alignmentChain = AlignmentChain(
         firstLA.id,
         firstLA.contigA.contig,
