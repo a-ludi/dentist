@@ -707,6 +707,7 @@ private struct ResultAnalyzer
     }
 
     @ExternalDependency("DBdump", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
+    @ExternalDependency("DBsplit", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("fasta2DAM", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
     @ExternalDependency("cut", "POSIX")
     @ExternalDependency("fold", "POSIX")
@@ -731,7 +732,8 @@ private struct ResultAnalyzer
                 sed -nE 's/^R />contig-/p'
             ) - |
             fold |
-            fasta2DAM -i %2$s`.outdent.tr("\n", "", "d");
+            fasta2DAM -i %2$s;
+            DBsplit -a -x0 %2$s`.outdent.tr("\n", "", "d");
 
         auto minCutoff = 2 * crop;
         dentistEnforce(
