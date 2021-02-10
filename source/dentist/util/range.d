@@ -11,6 +11,7 @@ module dentist.util.range;
 import std.functional : unaryFun;
 import std.meta : AliasSeq, staticMap;
 import std.range : ElementType, isInputRange;
+import std.range.primitives;
 import std.traits : rvalueOf;
 import std.typecons : tuple, Tuple;
 
