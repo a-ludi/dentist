@@ -38,6 +38,7 @@ mixin("enum DentistCommand {" ~
     "translateCoords," ~
     "validateRegions," ~
     testingOnly!"checkResults," ~
+    testingOnly!"checkScaffolding," ~
 "}");
 
 /// Helper for subcommands that are only available in testing version.

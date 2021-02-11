@@ -26,7 +26,8 @@ static if (isTesting)
     import dentist.commands.checkResults :
         Complement,
         ContigAlignmentsCache,
-        ContigMapping;
+        ContigMapping,
+        DuplicateQueryContig;
 import dentist.common.commands : DentistCommand;
 import dentist.common.binio :
     CompressedSequence,
@@ -674,6 +675,7 @@ class AssemblyWriter
                 ),
                 0,
                 insertionInfo.contigId,
+                DuplicateQueryContig.no,
                 cast(Complement) insertionInfo.complement,
             );
 

@@ -183,12 +183,14 @@ class StopExecution : Exception
 }
 
 alias Complement = Flag!"complement";
+alias DuplicateQueryContig = Flag!"duplicateQueryContig";
 
 struct ContigMapping
 {
     ReferenceInterval reference;
     coord_t referenceContigLength;
     id_t queryContigId;
+    DuplicateQueryContig duplicateQueryContig;
     Complement complement;
 
     T opCast(T)() const pure nothrow if (is(bool : T))
@@ -396,23 +398,22 @@ private struct ResultAnalyzer
             options.resultDb,
             options.refDb,
         )
-            // Ignore contigs that have exact copies in `refDb`
-            .filter!(contigAlignment => contigAlignment.queryContigId !in duplicateContigIds)
-            .array;
+            // Annotate contigs that have exact copies in `refDb` because
+            // they will be ignored in the gap-analysis
+            .map!((contigAlignment) {
+                contigAlignment.duplicateQueryContig = cast(DuplicateQueryContig) (
+                    contigAlignment.queryContigId in duplicateContigIds
+                );
+
+                return contigAlignment;
+            })
+            .array
+            .sort!queryOrder
+            .release;
 
         debug logJsonDebug("perfectContigAlignments", perfectContigAlignments.toJson);
 
-        auto bufferRest = perfectContigAlignments
-            .sort!queryOrder
-            .group!queryEquiv
-            .filter!(group => group[1] == 1)
-            .map!(group => group[0])
-            .copy(perfectContigAlignments);
-        perfectContigAlignments.length -= bufferRest.length;
-
-        return perfectContigAlignments
-            .sort!queryOrder
-            .release;
+        return perfectContigAlignments;
     }
 
     ContigMapping[] findPerfectAlignments(in string refDb, in string queryDb = null)
@@ -535,6 +536,7 @@ private struct ResultAnalyzer
                 ),
                 findResult.refLength,
                 queryContigIds[findResult.queryId],
+                DuplicateQueryContig.no,
                 findResult.complement,
             ))
             .tee!(contigMapping => assert(
@@ -607,6 +609,7 @@ private struct ResultAnalyzer
                     ),
                     recoveredAlignments[0].contigA.length,
                     recoveredAlignments[0].contigB.id,
+                    DuplicateQueryContig.no,
                     recoveredAlignments[0].complement,
                 )
                 : ContigMapping())
@@ -818,8 +821,14 @@ private struct ResultAnalyzer
 
             gapSummary.gapLength = inputGapSize(lhsContigId);
 
-            auto lhsContigAlignments = contigAlignments.equalRange(needleForContig(lhsContigId));
-            auto rhsContigAlignments = contigAlignments.equalRange(needleForContig(rhsContigId));
+            auto lhsContigAlignments = contigAlignments
+                .equalRange(needleForContig(lhsContigId))
+                .filter!(contigAlignment => !contigAlignment.duplicateQueryContig)
+                .array;
+            auto rhsContigAlignments = contigAlignments
+                .equalRange(needleForContig(rhsContigId))
+                .filter!(contigAlignment => !contigAlignment.duplicateQueryContig)
+                .array;
 
             if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
             {
@@ -1120,6 +1129,7 @@ private struct ResultAnalyzer
     size_t getNumMappedContigs()
     {
         return contigAlignments
+            .filter!(contigAlignment => !contigAlignment.duplicateQueryContig)
             .group!queryEquiv
             .filter!(group => group[1] == 1)
             .walkLength;
@@ -1652,6 +1662,7 @@ struct ContigAlignmentsCache
                 ),
                 cast(coord_t) cachedAlignment["referenceContigLength"],
                 cast(id_t) cachedAlignment["queryContigId"],
+                cast(DuplicateQueryContig) cachedAlignment["duplicateQueryContig"].get!bool,
                 cast(Complement) cachedAlignment["complement"].get!bool,
             );
 

@@ -17,6 +17,7 @@ static import dentist.commands.bed2mask;
 static import dentist.commands.buildPartialAssembly;
 static import dentist.commands.chainLocalAlignments;
 static import dentist.commands.checkResults;
+static import dentist.commands.checkScaffolding;
 static import dentist.commands.collectPileUps;
 static import dentist.commands.collectPileUps.filter;
 static import dentist.commands.collectPileUps.pileups;
@@ -75,6 +76,7 @@ alias modules = AliasSeq!(
     dentist.commands.buildPartialAssembly,
     dentist.commands.chainLocalAlignments,
     dentist.commands.checkResults,
+    dentist.commands.checkScaffolding,
     dentist.commands.collectPileUps,
     dentist.commands.collectPileUps.filter,
     dentist.commands.collectPileUps.pileups,
