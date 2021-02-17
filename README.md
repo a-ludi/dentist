@@ -203,7 +203,8 @@ Configuration
 -------------
 
 DENTIST comprises a complex pipeline of with many options for tweaking. This
-section points out some important parameters and their effect on the result.
+section points out some important parameters and their effect on the result or
+performance.
 
 
 #### How to Choose DENTIST Parameters
@@ -232,7 +233,8 @@ have immense influence on the performance of DENTIST.
   intended for one of the following scenarios:
 
   1. DENTIST is meant to close as many gaps as possible in a _de novo_
-     assembly. Then the closed gaps must validated by other means afterwards.
+     assembly. Then the closed gaps must be validated by other means
+     afterwards.
   2. DENTIST is used not with real reads but with an independent assembly.
 
 - `--existing-gap-bonus`: If DENTIST finds evidence to join two contigs that
@@ -254,6 +256,7 @@ have immense influence on the performance of DENTIST.
     methods as it increases the contiguity thus increasing the chance that
     large-scale scaffolding (e.g. Bionano or Hi-C) finds proper joins.
 
+
 #### Choosing the Read Type
 
 In the examples PacBio long reads are assumed but DENTIST can be run using any
@@ -264,8 +267,49 @@ to anything other than `PACBIO_SMRT`. The recommendation is to use
 Further details on the rationale can found in [this issue][issue-nanopore].
 
 
-[src-commandline]: ./blob/master/source/dentist/commandline.d
 [issue-nanopore]: https://github.com/a-ludi/dentist/issues/1#issuecomment-610764625
+
+
+#### Cluster/Cloud Execution
+
+Cluster job schedulers can become unresponsive or even crash if too many jobs
+with short running time are submitted to the cluster. It is therefore
+advisable to adjust the workflow accordingly. We tried to provide a default
+configuration that works in most cases as is but the application scenarios can
+be very diverse and manual adjustments may become necessary. Here is a small
+guide which config parameters influence the number of jobs and how much
+resources they consume.
+
+- `max_threads`: Sets the maximum number of threads/cores a single job may
+  use. A single-threaded job will always allocate a single core but
+  thread-parallel steps, e.g. the sequence alignments, will use up to
+  `max_threads` if snakemake has been provided enough cores via `--cores`.
+- `-s<block_size:uint>`: The assembly and reads FAST/A files are converted into
+  Dazzler DBs. These DBs store the sequence in a 2-bit encoding and have
+  additional features like tracks (similar to BED files). Also they are split
+  into blocks of `<block_size>`Mb. Alignments are calculated on the basis of
+  these blocks which enables easy distribution onto the cluster. The larger the
+  block size the longer are the alignment jobs and the more memory they require
+  but also the number of jobs is reduced. Experience shows that the block size
+  should be between 200Mb and 500Mb.
+- `propagate_batch_size`: The repeat masks are homogenized by propagating them
+  from the assembly to the reads and back again. Usually these jobs are very
+  short because the propagation is parallelized over the blocks of the reads
+  DB. To reduce the number of jobs both propagation directions are grouped
+  together and submitted in batches of `propagate_batch_size` read blocks.
+  Increasing `propagate_batch_size` reduces the number of submitted jobs and
+  increases the run time per job. It has no effect on the memory requirements.
+- `batch_size`: In the `collect` step DENTIST identifies candidates for gap
+  closing each consisting of a pile up of reads. From these pile ups
+  consensus sequences are computed and validated in the `process` step. Each
+  job process `batch_size` pile ups. Increasing `batch_size` reduces the
+  number of submitted jobs and increases the run time per job. It has no
+  effect on the memory requirements.
+- `validation_blocks`: The preliminarily closed gaps are validated by analyzing
+  how the reads align to each closed gap. The validation is conducted in
+  independent jobs for `validation_blocks` many blocks of the gap-closed
+  assembly. Decreasing `validation_blocks` reduces the number of submitted
+  jobs and increases the run time and memory requirements per job. The memory requirement is proportional to the size of the read alignment blocks. 
 
 
 Citation
