@@ -219,11 +219,6 @@ have immense influence on the performance of DENTIST.
   sensitivity. Especially, large gaps cannot be closed if the value is too 
   high. Usually the value should be at least `500` and up to `10_000`.
 
-- `--reference-error`, `--reads-error`: Determines the `-e` parameter for
-  daligner/damapper. Use `dentist generate-dazzler-options` to see the effect
-  of these parameters or consult [`commandline.d`][src-commandline] in the
-  source code.
-
 - `--min-reads-per-pile-up`: Choosing higher values for the minimum number of
   reads drastically reduces sensitivity but has little effect on the quality.
   Small values may be chosen to get the maximum sensitivity in _de novo_
