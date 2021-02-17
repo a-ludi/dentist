@@ -59,6 +59,7 @@ propagate_mask:
     jobname:    dentist.propagate_mask
     memory:     8192
     time:       "02:00"
+    nCPUs:      8
 
 collect:
     memory:     32768
