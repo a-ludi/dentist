@@ -68,11 +68,11 @@ dentist_config:
         ploidy:             2
         max-coverage-self:  3
         verbose:            2
-    validate-regions:
-        # Uncomment to following two lines if the default value
-        # (0.5 * --read-coverage/--ploidy) is suboptimal. It is important to
-        # revert --read-coverage and --ploidy because they are
-        # mutually exclusive with --min-coverage-reads.
+    # Uncomment to following block if the default value for min-coverage-reads
+    # (0.5 * --read-coverage/--ploidy) is suboptimal. It is important to
+    # revert --read-coverage and --ploidy because they are mutually exclusive
+    # with --min-coverage-reads.
+    #validate-regions:
         #min-coverage-reads: 5
         #revert: "read-coverage,ploidy"
     output:
@@ -80,13 +80,18 @@ dentist_config:
 
 additional_options:
     reference_dbsplit:
-        # Adjust `-l` of `ref_vs_reads_alignment` accordinly
-        # if `-x < 1500` (default value of `-l` of `daligner`)
         - -x1000
         - -a
+        # Increase this value to reduce the workload of the cluster scheduler;
+        # this increases the runtime and memory usage per alignment job
+        - -s200
     reads_dbsplit:
         - -x1000
         - -a
+        # Increase this value to reduce the workload of the cluster scheduler;
+        # this increases the runtime and memory usage per alignment job
+        - -s200
+
     # Uncomment and adjust any of the following you need them
 
     # Improve alignment performance by masking low complexity regions
@@ -106,12 +111,7 @@ additional_options:
 
     # Alignment of the reads against the reference for identifying reads for
     # gap closing using damapper
-    ref_vs_reads_alignment:
-        # Choose the same value as for `-x` of `reference_dbsplit`
-        # if `-x < 1500` (default value for `-l` of `daligner`);
-        # otherwise some contigs will not be included in the
-        # gap-closed assembly beacause there are no alignments.
-        - -l1000
+    #ref_vs_reads_alignment: []
 
     # Improve alignment performance by masking low complexity regions
     # using DBdust

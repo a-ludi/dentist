@@ -105,7 +105,7 @@ Please use the following versions in your dependencies in case you experience
 troubles. These should be the same versions used in the [Dockerfile](./blob/develop/Dockerfile):
 
 - [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
-- [snakemake@5.11.2](https://snakemake.readthedocs.io/en/v5.10.0/getting_started/installation.html)
+- [snakemake@5.11.2](https://snakemake.readthedocs.io/en/v5.11.2/getting_started/installation.html)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
 - [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
@@ -139,17 +139,16 @@ Install [Snakemake][snakemake] version >=5.11.2 and copy these files into your
 working directory:
 
 - `./snakemake/Snakefile`
-- `./snakemake/workflow_helper.py`
-- `./snakemake/snakemake.example.yml` → `./snakemake/snakemake.yml`
+- `./snakemake/snakemake.yml`
 
 Next edit `snakemake.yml` to fit your needs and optionally test your
 configuration with
 
-    snakemake --configfile=snakemake.yml -- extend_dentist_config
+    snakemake --configfile=snakemake.yml --use-singularity --cores=1 -- extend_dentist_config
 
 If no errors occurred the whole workflow can be executed using
 
-    snakemake --configfile=snakemake.yml
+    snakemake --configfile=snakemake.yml --use-singularity --cores=all
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
 One may use Snakemake's `--jobs` to run independent jobs in parallel. Larger
@@ -169,18 +168,20 @@ Snakemake use SLURM via DRMAA. Please read the [documentation of
 Snakemake][snakemake-cluster] if this does not suit your needs. Another good
 starting point is [the Snakemake-Profiles project][smp-project].
 
-Start by copying these files to your working directory:
+Start by copying these files to your working/home directory:
     
-- `./snakemake/profile-slurm.yml` → `~/.config/snakemake/<profile>/config.yaml`
-- `./snakemake/cluster.example.yml` → `./snakemake/cluster.yml`
+- `./snakemake/Snakefile`
+- `./snakemake/snakemake.yml`
+- `./snakemake/cluster.yml`
+- `./snakemake/profile-slurm.yml` → `~/.config/snakemake/slurm/config.yaml`
 
-Next [adjust the profile][snakemake-profiles] according to your cluster. This should enable
-Snakemake to submit and track jobs on your cluster. You may use the
-configuration values specified in `cluster.yml` to configure job names and
+Next [adjust the profile][snakemake-profiles] according to your cluster. This
+should enable Snakemake to submit and track jobs on your cluster. You may use
+the configuration values specified in `cluster.yml` to configure job names and
 resource allocation for each step of the pipeline. Now, submit the workflow
 to your cluster by
 
-    snakemake --configfile=snakemake.yml --profile=<profile>
+    snakemake --configfile=snakemake.yml --profile=slurm --use-singularity
 
 Note, parameters specified in the profile provide default values and can be
 overridden by specififying different value on the CLI.
@@ -282,7 +283,7 @@ Citation
 Maintainer
 ----------
 
-Dentist is being developed by Arne Ludwig &lt;<ludwig@mpi-cbg.de>&gt; at
+DENTIST is being developed by Arne Ludwig &lt;<ludwig@mpi-cbg.de>&gt; at
 the Planck Institute of Molecular Cell Biology and Genetics, Dresden, Germany.
 
 
