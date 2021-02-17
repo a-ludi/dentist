@@ -152,6 +152,11 @@ max_threads:        8
 # Defaults to max(1, threads // 4)
 #auxiliary_threads: 1
 
+# Masks are propagated from the assembly to the reads and back in batches
+# of read DB blocks. This makes cluster jobs run for at least a few minutes
+# as each block usually just takes much less than a minute.
+propagate_batch_size: 50
+
 # Insertions are generated in batches of `batch_size`; use lower number to
 # shorten the runtime of each job while increasing the number of jobs.
 batch_size:         50

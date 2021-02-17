@@ -55,11 +55,8 @@ mask_reads:
     memory:     1024
     time:       "00:15"
 
-propagate_mask_to_reads_block:
-    memory:     8192
-    time:       "00:30"
-
-propagate_mask_back_to_reference_block:
+propagate_mask:
+    jobname:    dentist.propagate_mask
     memory:     8192
     time:       "02:00"
 

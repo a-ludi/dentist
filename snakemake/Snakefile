@@ -393,15 +393,23 @@ def get_num_contigs(db):
 FULL_DB = object()
 
 
-def __blocks_for(db, batch_size, block):
+class block_range:
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+
+
+def blocks_for(db, batch_size, block=None):
     def __dbblocks(db, batch_size):
         num_blocks = get_num_blocks(db)
+        range_requested = isinstance(batch_size, block_range) or batch_size > 1
+        if isinstance(batch_size, block_range):
+            batch_size = batch_size.batch_size
         blocks = range(1, num_blocks + 1, batch_size)
 
         def __range(b):
             return "{}-{}".format(b, min(b + batch_size - 1, num_blocks))
 
-        if batch_size > 1:
+        if range_requested:
             blocks = [__range(b)  for b in blocks]
 
         return blocks
@@ -431,8 +439,8 @@ def block_alignments(db_a, db_b=None, block_a=None, block_b=None):
     if db_b is None:
         db_b = db_a
 
-    blocks_a = __blocks_for(db_a, 1, block_a)
-    blocks_b = __blocks_for(db_b, 1, block_b)
+    blocks_a = blocks_for(db_a, 1, block_a)
+    blocks_b = blocks_for(db_b, 1, block_b)
 
     if not blocks_a is None and not blocks_b is None:
         return (alignment_file(db_a, db_b, i, j)  for i in blocks_a for j in blocks_b)
@@ -460,8 +468,8 @@ def pseudo_block_mask(mask, block):
     return "{}-{}B".format(mask, block)
 
 
-def pseudo_block_masks(mask, db):
-    blocks = __blocks_for(db, 1, None)
+def pseudo_block_masks(mask, db, block=None):
+    blocks = blocks_for(db, 1, block)
 
     return [pseudo_block_mask(mask, b)  for b in blocks]
 
@@ -654,6 +662,7 @@ logdir = config["logdir"]
 workflow_ = config.get("workflow", {})
 max_threads = config["max_threads"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
+propagate_batch_size = config["propagate_batch_size"]
 batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
 workflow_flags_names = ["full_validation", "no_purge_output"]
@@ -695,6 +704,7 @@ masks = [
     tandem_mask,
     reads_mask,
 ]
+propagate_mask_batch_marker = join(workdir_, ".propagted-mask.{mask}.{blocks_reads}")
 pile_ups = join(workdir_, workflow_.get("pile_ups", "pile-ups.db"))
 insertions_batch = join(workdir_, workflow_.get("insertions_batch", "insertions/batch.{batch_id}.db"))
 insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
@@ -795,6 +805,7 @@ localrules:
     mask_tandem,
     reads2db,
     mark_reads,
+    propagate_mask_batch,
     propagate_mask_back_to_reference,
     full_masking,
     extend_dentist_config_for_merge_insertions,
@@ -1148,25 +1159,10 @@ rule propagate_mask_to_reads_block:
         inmask = "{mask}",
         outmask = pseudo_block_mask("{mask}", "{block_reads}")
     log: log_file("propagate-mask-to-reads.{mask}.{block_reads}")
+    group: "propagate_mask"
     container: dentist_container
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
-
-
-# rule propagate_mask_to_reads:
-#     input:
-#         await_dentist_config(),
-#         await_db_files(reads),
-#         *[mask_files(reads, m) for m in block_masks("{mask}", reads)]
-#     output:
-#         mask_files(reads, "{mask}")
-#     params:
-#         merged_mask = "{mask}",
-#         block_masks = block_masks("{mask}", reads)
-#     log: log_file("propagate-mask-to-reads.{mask}")
-#     container: dentist_container
-#     shell:
-#         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reads} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
 
 rule propagate_mask_back_to_reference_block:
@@ -1181,18 +1177,31 @@ rule propagate_mask_back_to_reference_block:
     params:
         inmask = pseudo_block_mask("{mask}", "{block_reads}"),
         outmask = pseudo_block_mask(homogenized_mask("{mask}"), "{block_reads}")
-    log: log_file("propagate-mask-back-to-reference.{mask}.{block_reads}")
+    log: log_file("propagate-mask-back-to-reference-block.{mask}.{block_reads}")
+    group: "propagate_mask"
     container: dentist_container
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reads} {reference} {input[alignment]} {params[outmask]} 2> {log}"
+
+
+rule propagate_mask_batch:
+    input:
+        await_dentist_config(),
+        await_db_files(reference),
+        await_db_files(reads),
+        lambda wildcards: chain(*(mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask(wildcards.mask), reads, wildcards.blocks_reads)))
+    output:
+        touch(propagate_mask_batch_marker)
+    group: "propagate_mask"
 
 
 rule propagate_mask_back_to_reference:
     input:
         await_dentist_config(),
         await_db_files(reference),
+        lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=b, mask=wildcards.mask) for b in blocks_for(reads, block_range(propagate_batch_size))],
         mask_files(reference, "{mask}"),
-        *[mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask("{mask}"), reads)]
+        lambda wildcards : chain(*(mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask(wildcards.mask), reads)))
     output:
         mask_files(reference, homogenized_mask("{mask}"))
     params:
@@ -1250,19 +1259,20 @@ rule process:
 
 rule extend_dentist_config_for_merge_insertions:
     input:
-        await_dentist_config(),
-        await_pile_ups()
+        config = await_dentist_config(),
+        pile_ups = await_pile_ups(),
+        insertions_batches = lambda _: insertions_batches()
     output:
         temp(dentist_merge_insertions_config_file)
     run:
         merge_config = None
-        with open(dentist_config_file, 'r') as base_config:
+        with open(str(input.config), 'r') as base_config:
             merge_config = json.load(base_config)
 
         if "merge-insertions" not in merge_config:
             merge_config["merge-insertions"] = dict()
         merge_config["merge-insertions"]["insertions"] = insertions
-        merge_config["merge-insertions"]["partitioned-insertions"] = list(insertions_batches())
+        merge_config["merge-insertions"]["partitioned-insertions"] = list(input.insertions_batches)
 
         with open(output[0], 'w') as ext_config_file:
             json.dump(merge_config, ext_config_file)
