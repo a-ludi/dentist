@@ -1454,6 +1454,23 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+    ))
+    {
+        @Option("dust-ref")
+        @MetaVar("<dust-option>[,<dust-option>...]")
+        @Help("Provide additional options to `dust`")
+        @(RevertField!"additionalRefDustOptions")
+        void addAdditionalRefDustOptions(string option)
+        {
+            additionalRefDustOptions ~= option.split(',');
+        }
+
+        @Option()
+        string[] additionalRefDustOptions;
+    }
+
+    static if (command.among(
         DentistCommand.collectPileUps,
     ))
     {

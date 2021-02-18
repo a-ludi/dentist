@@ -15,6 +15,8 @@ import std.stdio : writefln, writeln;
 /// Execute the `generateDazzlerOptions` command with `options`.
 void execute(Options)(in Options options)
 {
+    writeln("# DBdust reference");
+    writefln!"DBdust %-(%s %) <reference>"(options.additionalRefDustOptions);
     writeln("# self alignment options (consider using `HPC.daligner`)");
     writefln!"daligner %-(%s %) <reference> <reference>"(options.selfAlignmentOptions);
     writeln("# tandem alignment options (consider using `HPC.daligner`)");
