@@ -44,6 +44,10 @@
 # "docker://aludi/dentist:stable" and can be changed by the following line.
 #dentist_container: "docker://aludi/dentist:edge"
 
+# Config file for dentist. Use this file to adjust parameters of DENTIST.
+# You must set at least either `ploidy` and `read-coverage` or
+# `max-coverage-reads` and `min-coverage-reads`.
+dentist_config:         dentist.json
 
 inputs:
     # The reference assembly where gaps should be closed
@@ -60,74 +64,19 @@ outputs:
     # JSON file with a validation report for each closed gap
     #validation_report:  $workdir/validation-report.json
 
-# This will be used to generate a config file for dentist. Vital parameters
-# and options are automatically inserted by the workflow.
-dentist_config:
-    __default__:
-        read-coverage:      73.0
-        ploidy:             2
-        max-coverage-self:  3
-        verbose:            2
-    # Uncomment to following block if the default value for min-coverage-reads
-    # (0.5 * --read-coverage/--ploidy) is suboptimal. It is important to
-    # revert --read-coverage and --ploidy because they are mutually exclusive
-    # with --min-coverage-reads.
-    #validate-regions:
-        #min-coverage-reads: 5
-        #revert: "read-coverage,ploidy"
-    output:
-        fasta-line-width:   80
+reference_dbsplit:
+    - -x1000
+    - -a
+    # Increase this value to reduce the workload of the cluster scheduler;
+    # this increases the runtime and memory usage per alignment job
+    - -s200
+reads_dbsplit:
+    - -x1000
+    - -a
+    # Increase this value to reduce the workload of the cluster scheduler;
+    # this increases the runtime and memory usage per alignment job
+    - -s200
 
-additional_options:
-    reference_dbsplit:
-        - -x1000
-        - -a
-        # Increase this value to reduce the workload of the cluster scheduler;
-        # this increases the runtime and memory usage per alignment job
-        - -s200
-    reads_dbsplit:
-        - -x1000
-        - -a
-        # Increase this value to reduce the workload of the cluster scheduler;
-        # this increases the runtime and memory usage per alignment job
-        - -s200
-
-    # Uncomment and adjust any of the following you need them
-
-    # Improve alignment performance by masking low complexity regions
-    # using DBdust
-    #reference_dust: []
-
-    # Alignment of the reference assembly against itself for repeat detection
-    # using daligner
-    #self_alignment: []
-
-    # Alignment of the reference assembly against itself for tandem repeat
-    # detection using datander
-    #tandem_alignment: []
-
-    # Tandem repeat detection using TANmask
-    #tanmask: []
-
-    # Alignment of the reads against the reference for identifying reads for
-    # gap closing using damapper
-    #ref_vs_reads_alignment: []
-
-    # Improve alignment performance by masking low complexity regions
-    # using DBdust
-    #reads_dust: []
-
-    # Alignment of the reads against themselves before building a consensus
-    # using daligner
-    #reads_vs_reads_alignment: []
-
-    # Alignment of the consensus (sequence inserted into the gaps) against
-    # the flanking contigs for validation and exact splicing using daligner
-    #consensus_alignment: []
-
-    # Options for building the consensus (sequence inserted into the gaps)
-    # using daccord
-    #consensus: []
 
 # Directories for intermediate and log files.
 workdir:            workdir
@@ -136,11 +85,11 @@ logdir:             logs
 # Workflow files that are created inside of workdir; uncomment and adjust if
 # you feel the need
 #workflow:
-#    config:             dentist.json
 #    self_mask:          dentist-self
 #    reads_mask:         dentist-reads
 #    pile_ups:           pile-ups.db
 #    insertions_batch:   insertions/batch.{batch_id}.db
+#    dentist_merge_config_file: dentist.merge.json
 #    insertions:         insertions.db
 #    closed_gaps_mask:   closed-gaps
 #    weak_coverage_mask: dentist-weak-coverage

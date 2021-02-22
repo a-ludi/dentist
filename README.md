@@ -107,7 +107,7 @@ Please use the following versions in your dependencies in case you experience
 troubles. These should be the same versions used in the [Dockerfile](./blob/develop/Dockerfile):
 
 - [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
-- [snakemake@5.11.2](https://snakemake.readthedocs.io/en/v5.11.2/getting_started/installation.html)
+- [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
 - [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
@@ -135,18 +135,20 @@ and a set of reads `reads.fasta` with 25× coverage.
 
 > TL;DR
 >
+>     # edit dentist.json and snakemake.yml
 >     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 
-Install [Snakemake][snakemake] version >=5.11.2 and copy these files into your
+Install [Snakemake][snakemake] version >=5.32.1 and copy these files into your
 working directory:
 
 - `./snakemake/Snakefile`
 - `./snakemake/snakemake.yml`
+- `./snakemake/dentist.json`
 
-Next edit `snakemake.yml` to fit your needs and optionally test your
-configuration with
+Next edit `snakemake.yml` and `dentist.json` to fit your needs and optionally
+test your configuration with
 
-    snakemake --configfile=snakemake.yml --use-singularity --cores=1 -- extend_dentist_config
+    snakemake --configfile=snakemake.yml --use-singularity --cores=1 -f -- validate_dentist_config
 
 If no errors occurred the whole workflow can be executed using
 

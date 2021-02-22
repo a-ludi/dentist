@@ -1,6 +1,6 @@
 from snakemake.utils import min_version
 
-min_version("3.11.2")
+min_version("5.32.1")
 
 import json
 from itertools import chain
@@ -146,13 +146,6 @@ def await_db_files(db):
             raise Exception("unknown db: {}".format(expanded_db));
 
     return __await_db_files
-
-
-def await_dentist_config():
-    def __await_dentist_config(wildcards):
-        return checkpoints.extend_dentist_config.get().output
-
-    return __await_dentist_config
 
 
 def await_pile_ups():
@@ -321,9 +314,62 @@ def main_threads(wildcards, threads):
     return threads // auxiliary_threads(wildcards, threads=threads)
 
 
-def validate_dentist_config(config_file):
-    cmd = shellcmd("dentist validate-config {}".format(shell_esc(config_file)))
-    subprocess.check_output(cmd, shell=True)
+def dentist_validate_file(config_file):
+    validate_cmd = shellcmd("dentist validate-config {}".format(shell_esc(config_file)))
+    validate_result = subprocess.run(validate_cmd, shell=True, text=True, check=True,
+                                     stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+
+
+def full_validate_dentist_config(config_file):
+    errors = list()
+    config = None
+    with open(config_file, 'r') as cf:
+        config = json.load(cf)
+
+    def prohibit_revert_in_default():
+        if "__default__" in config:
+            if "revert" in config["__default__"]:
+                errors.append("highly discouraged use of `revert` in `__default__`")
+
+    def __get_presence_of_flags(command, *inspect_flags):
+        flags = dict()
+        if "__default__" in config:
+            for flag in inspect_flags:
+                flags[flag] = flag in config["__default__"]
+        if command in config:
+            for flag in inspect_flags:
+                flags[flag] = flag in config[command]
+            if "revert" in config[command]:
+                for flag in inspect_flags:
+                    if flag in config[command]["revert"]:
+                        flags[flag] = False
+        return flags
+
+    def check_presence_of_read_masking_threshold():
+        flags = __get_presence_of_flags("mask-repetitive-regions", "read-coverage", "max-coverage-reads")
+
+        if not (flags["read-coverage"] ^ flags["max-coverage-reads"]):
+            errors.append("must specify either --read-coverage or --max-coverage-reads for command `mask-repetitive-regions`")
+
+    def check_presence_of_validation_coverage_threshold():
+        flags = __get_presence_of_flags("validate-regions", "read-coverage", "ploidy", "min-coverage-reads")
+
+        if not ((flags["read-coverage"] and flags["ploidy"]) ^ flags["min-coverage-reads"]):
+            errors.append("must specify either --read-coverage and --ploidy or --min-coverage-reads for command `validate-regions")
+
+    prohibit_revert_in_default()
+    check_presence_of_read_masking_threshold()
+    check_presence_of_validation_coverage_threshold()
+
+    try:
+        dentist_validate_file(config_file);
+    except subprocess.CalledProcessError as e:
+        errors.append(e.stderr)
+
+    if len(errors) > 0:
+        raise Exception("; ".join(errors))
+
+    return config
 
 
 def is_dentist_testing():
@@ -516,17 +562,21 @@ def insertion_batch_range(wildcards):
 
 
 def get_num_pile_ups():
-    try:
-        info_cmd = "dentist show-pile-ups -j {}".format(shell_esc(pile_ups))
-        info_cmd = shellcmd(info_cmd)
-        pile_ups_info = subprocess.check_output(info_cmd, shell=True, stderr=subprocess.DEVNULL)
+    # emit at least one pile up in order to prevent the DAG from falling apart
+    num_pile_ups = 1
 
-        return json.loads(pile_ups_info)["numPileUps"]
-    except subprocess.CalledProcessError as e:
-        if exists(pile_ups):
+    if exists(pile_ups):
+        try:
+            info_cmd = "dentist show-pile-ups -j {}".format(shell_esc(pile_ups))
+            info_cmd = shellcmd(info_cmd)
+            pile_ups_info_json = subprocess.check_output(info_cmd, shell=True, stderr=subprocess.DEVNULL)
+            pile_ups_info = json.loads(pile_ups_info_json)
+            num_pile_ups = pile_ups_info["numPileUps"]
+        except subprocess.CalledProcessError as e:
             raise e
 
-        return 1
+
+    return num_pile_ups
 
 
 def ceildiv(n, d):
@@ -544,7 +594,7 @@ def insertions_batches():
 
         return insertions_batch.format(batch_id=batch_id)
 
-    return (get_insertions_batch(i)  for i in range(num_batches))
+    return [get_insertions_batch(i)  for i in range(num_batches)]
 
 
 def docstring(string):
@@ -678,6 +728,7 @@ dentist_container = config.get("dentist_container", "docker://aludi/dentist:stab
 reference_fasta = inputs["reference"]
 reads_fasta = inputs["reads"]
 gap_closed_fasta = outputs["output_assembly"]
+gap_closed_agp = db_stub(gap_closed_fasta) + ".agp"
 preliminary_gap_closed_fasta = join(workdir_, db_name(outputs["output_assembly"]) + "-preliminary.fasta")
 validation_report = outputs.get("validation_report", join(workdir_, "validation-report.json"))
 validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
@@ -685,12 +736,13 @@ gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
 preliminary_gap_closed = fasta_to_workdb(preliminary_gap_closed_fasta, "dam")
 closed_gaps_mask = workflow_.get("closed_gaps_mask", "closed-gaps")
 preliminary_closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(preliminary_gap_closed), closed_gaps_mask))
-closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(gap_closed), closed_gaps_mask))
+closed_gaps_bed = "{}.{}.bed".format(db_stub(gap_closed_fasta), closed_gaps_mask)
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
-dentist_config_file = join(workdir_, workflow_.get("config", "dentist.json"))
-dentist_merge_insertions_config_file = prepend_ext(dentist_config_file, ".merge")
+dentist_config_file = config.get("dentist_config", "dentist.json")
+dentist_config = full_validate_dentist_config(dentist_config_file)
+dentist_merge_config_file = join(workdir_, workflow_.get("dentist_merge_config_file", "dentist.merge.json"))
 skip_gaps = join(workdir_, workflow_.get("skip-gaps", "skip-gaps.txt"))
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
@@ -721,14 +773,13 @@ preliminary_output_revert_options = ["agp", "scaffolding", "skip-gaps", "skip-ga
 if is_dentist_testing():
     preliminary_output_revert_options.append("cache-contig-alignments")
 
-additional_options = config.get("additional_options", {})
-additional_reference_dbsplit_options = make_flags(additional_options.get("reference_dbsplit", []))
+additional_reference_dbsplit_options = make_flags(config.get("reference_dbsplit", []))
 assert_flag(
     additional_reference_dbsplit_options,
     "-x",
     "DBsplit should have a -x flag; provide at minimum -x20 to avoid errors",
 )
-additional_reads_dbsplit_options = make_flags(additional_options.get("reads_dbsplit", []))
+additional_reads_dbsplit_options = make_flags(config.get("reads_dbsplit", []))
 assert_flag(
     additional_reads_dbsplit_options,
     "-x",
@@ -740,25 +791,11 @@ additional_tanmask_options = ensure_flags(additional_tanmask_options, {
     "-n": tandem_mask,
 })
 
-additional_self_alignment_options = make_flags(additional_options.get("self_alignment", []))
-additional_tandem_alignment_options = make_flags(additional_options.get("tandem_alignment", []))
-additional_ref_vs_reads_alignment_options = make_flags(additional_options.get("ref_vs_reads_alignment", []))
-additional_reads_vs_reads_alignment_options = make_flags(additional_options.get("reads_vs_reads_alignment", []))
-additional_consensus_alignment_options = make_flags(additional_options.get("consensus_alignment", []))
-additional_consensus_options = make_flags(additional_options.get("consensus", []))
-additional_reference_dust_options = make_flags(additional_options.get("reference_dust", []))
-additional_reads_dust_options = make_flags(additional_options.get("reads_dust", []))
 additional_lamerge_options = make_flags(["-v"])
 additional_lacheck_options = make_flags(["-v"])
 
 if "TMPDIR" in environ:
     tmpdir_flag = { "-P": environ["TMPDIR"] }
-
-    additional_self_alignment_options = ensure_flags(additional_self_alignment_options, tmpdir_flag)
-    additional_tandem_alignment_options = ensure_flags(additional_tandem_alignment_options, tmpdir_flag)
-    additional_ref_vs_reads_alignment_options = ensure_flags(additional_ref_vs_reads_alignment_options, tmpdir_flag)
-    additional_reads_vs_reads_alignment_options = ensure_flags(additional_reads_vs_reads_alignment_options, tmpdir_flag)
-    additional_consensus_alignment_options = ensure_flags(additional_consensus_alignment_options, tmpdir_flag)
     additional_lamerge_options = ensure_flags(additional_lamerge_options, tmpdir_flag)
 
 lacheck_failed_notice = shell_esc(docstring("""
@@ -801,7 +838,7 @@ def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", 
 
 localrules:
     ALL,
-    extend_dentist_config,
+    validate_dentist_config,
     reference2dam,
     mark_assembly_reference,
     preliminary_gap_closed2dam,
@@ -812,7 +849,7 @@ localrules:
     propagate_mask_batch,
     propagate_mask_back_to_reference,
     full_masking,
-    extend_dentist_config_for_merge_insertions,
+    make_merge_config,
     merge_insertions,
     split_preliminary_gap_closed_vs_reads_alignment,
     preliminary_closed_gaps_bed2mask,
@@ -847,54 +884,9 @@ rule ALL:
     input: default_targets
 
 
-checkpoint extend_dentist_config:
-    output: dentist_config_file
-    run:
-        dentist_config = config["dentist_config"]
-
-        if "__default__" not in dentist_config:
-            dentist_config["__default__"] = dict()
-        dentist_config["__default__"]["reference"] = reference
-        dentist_config["__default__"]["reads"] = reads
-        dentist_config["__default__"]["result"] = gap_closed_fasta
-        dentist_config["__default__"]["ref-vs-reads-alignment"] = ref_vs_reads_alignment
-        dentist_config["__default__"]["mask"] = [homogenized_mask(m)  for m in masks]
-        dentist_config["__default__"]["pile-ups"] = pile_ups
-        dentist_config["__default__"]["insertions"] = insertions
-        dentist_config["__default__"]["daccord"] = shlex.split(additional_consensus_options)
-        dentist_config["__default__"]["daligner-consensus"] = shlex.split(additional_consensus_alignment_options)
-        dentist_config["__default__"]["daligner-reads-vs-reads"] = shlex.split(additional_reads_vs_reads_alignment_options)
-        dentist_config["__default__"]["daligner-self"] = shlex.split(additional_self_alignment_options)
-        dentist_config["__default__"]["damapper-ref-vs-reads"] = shlex.split(additional_ref_vs_reads_alignment_options)
-        dentist_config["__default__"]["datander-ref"] = shlex.split(additional_tandem_alignment_options)
-        dentist_config["__default__"]["dust-reads"] = shlex.split(additional_reads_dust_options)
-
-
-        if "mask-repetitive-regions" not in dentist_config:
-            dentist_config["mask-repetitive-regions"] = dict()
-        dentist_config["mask-repetitive-regions"]["reads"] = None
-
-        if "bed2mask" not in dentist_config:
-            dentist_config["bed2mask"] = dict()
-        dentist_config["bed2mask"]["mask"] = None
-
-        if "propagate-mask" not in dentist_config:
-            dentist_config["propagate-mask"] = dict()
-        dentist_config["propagate-mask"]["mask"] = []
-
-        if "output" not in dentist_config:
-            dentist_config["output"] = dict()
-        dentist_config["output"]["closed-gaps-bed"] = closed_gaps_bed
-
-        if "validate-regions" not in dentist_config:
-            dentist_config["validate-regions"] = dict()
-        dentist_config["validate-regions"]["reference"] = preliminary_gap_closed
-        dentist_config["validate-regions"]["regions"] = closed_gaps_mask
-
-        with open(output[0], 'w') as ext_config_file:
-            json.dump(dentist_config, ext_config_file)
-
-        validate_dentist_config(output[0])
+rule validate_dentist_config:
+    input: dentist_config_file
+    run: full_validate_dentist_config(str(input))
 
 
 _fast2dam_checkpoint[reference] = "reference2dam"
@@ -904,6 +896,23 @@ checkpoint reference2dam:
     container: dentist_container
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+
+
+# _fast2dam_checkpoint[reference] = "reference2dam"
+# if reference_fasta.endswith(".dam"):
+#     checkpoint reference2dam:
+#         input: db_files(reference_fasta)
+#         output: *db_files(reference)
+#         container: dentist_container
+#         shell:
+#             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+# else:
+#     checkpoint reference2dam:
+#         input: reference_fasta
+#         output: *db_files(reference)
+#         container: dentist_container
+#         shell:
+#             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
 rule mark_assembly_reference:
@@ -931,14 +940,16 @@ rule mask_dust:
         assembly_marker("{dam}.dam")
     output:
         mask_files(join(workdir_, "{dam}.dam"), dust_mask)
+    params:
+        dustcmd = prepare_flags(lambda : generate_options_for("DBdust reference", dentist_config_file)),
     container: dentist_container
     shell:
-        "DBdust {additional_reference_dust_options} {workdir_}/{wildcards.dam}"
+        "{params.dustcmd} {workdir_}/{wildcards.dam}"
 
 
 rule self_alignment_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(join(workdir_, "{dam}.dam")),
         assembly_marker("{dam}.dam"),
         mask_files(join(workdir_, "{dam}.dam"), dust_mask),
@@ -947,7 +958,7 @@ rule self_alignment_block:
         temp(alignment_file("{dam}", block_a='{block_ref}', block_b='{block_reads}')),
         temp(alignment_file("{dam}", block_b='{block_ref}', block_a='{block_reads}'))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file, ensure_masks(additional_self_alignment_options, dust_mask, tandem_mask))),
+        aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file, ensure_masks("", dust_mask, tandem_mask))),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
     threads: max_threads
@@ -982,7 +993,7 @@ rule self_alignment:
 
 rule mask_self:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         dam = await_db_files(join(workdir_, "{dam}.dam")),
         marker = assembly_marker("{dam}.dam"),
         alignment = alignment_file("{dam}")
@@ -996,13 +1007,13 @@ rule mask_self:
 
 rule tandem_alignment_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(join(workdir_, "{dam}.dam")),
         assembly_marker("{dam}.dam")
     output:
         temp(alignment_file("TAN", "{dam}", block_b="{block}"))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file, additional_tandem_alignment_options)),
+        aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file)),
         alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{dam}.{block}")
     threads: max_threads
@@ -1049,7 +1060,7 @@ rule mask_tandem_block:
 
 rule mask_tandem:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         db = await_db_files(join(workdir_, "{dam}.dam")),
         marker = assembly_marker("{dam}.dam"),
         mask_files = lambda wildcards: chain(*(mask_files(join(workdir_, "{dam}.dam"), m)  for m in block_masks(tandem_mask, join(workdir_, wildcards.dam + ".dam"))))
@@ -1079,7 +1090,7 @@ rule mark_reads:
 
 rule ref_vs_reads_alignment_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reference, dust_mask),
@@ -1089,7 +1100,7 @@ rule ref_vs_reads_alignment_block:
         alignment_file(reference, reads, block_b='{block_reads}'),
         alignment_file(reads, reference, block_a='{block_reads}')
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks("", dust_mask, self_mask, tandem_mask))),
         reference_stub = db_stub(rel_to_workdir(reference)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
@@ -1138,7 +1149,7 @@ rule reads_vs_ref_alignment:
 
 rule mask_reads:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
         ref_vs_reads_alignment
@@ -1152,7 +1163,7 @@ rule mask_reads:
 
 rule propagate_mask_to_reads_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reference, "{mask}"),
@@ -1171,7 +1182,7 @@ rule propagate_mask_to_reads_block:
 
 rule propagate_mask_back_to_reference_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
         mask_files(reads, "{mask}", pseudo_block="{block_reads}"),
@@ -1190,7 +1201,7 @@ rule propagate_mask_back_to_reference_block:
 
 rule propagate_mask_batch:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         await_db_files(reads),
         lambda wildcards: chain(*(mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask(wildcards.mask), reads, wildcards.blocks_reads)))
@@ -1201,7 +1212,7 @@ rule propagate_mask_batch:
 
 rule propagate_mask_back_to_reference:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(reference),
         lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=b, mask=wildcards.mask) for b in blocks_for(reads, block_range(propagate_batch_size))],
         mask_files(reference, "{mask}"),
@@ -1224,86 +1235,79 @@ rule full_masking:
 
 checkpoint collect:
     input:
-        await_dentist_config(),
-        await_db_files(reference),
-        await_db_files(reads),
-        ref_vs_reads_alignment,
-        *[mask_files(reference, homogenized_mask(m))  for m in masks]
+        *[mask_files(reference, homogenized_mask(m))  for m in masks],
+        config = dentist_config_file,
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
+        alignment = ref_vs_reads_alignment
     output:
         protected(pile_ups)
     params:
         main_threads = main_threads,
-        auxiliary_threads = auxiliary_threads
+        auxiliary_threads = auxiliary_threads,
+        masks = ",".join([homogenized_mask(m)  for m in masks])
     threads: max_threads
     log: log_file("collect")
     container: dentist_container
     shell:
-        "dentist collect --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} - - - - 2> {log}"
+        "dentist collect --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {output} 2> {log}"
 
 
 rule process:
     input:
-        await_dentist_config(),
-        await_db_files(reference),
-        await_db_files(reads),
-        ref_vs_reads_alignment,
-        await_pile_ups(),
-        *[mask_files(reference, homogenized_mask(m))  for m in masks]
+        *[mask_files(reference, homogenized_mask(m))  for m in masks],
+        config = dentist_config_file,
+        refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
+        pile_ups = await_pile_ups()
     output:
         temp(insertions_batch)
     params:
         batch_range = insertion_batch_range,
         main_threads = main_threads,
-        auxiliary_threads = auxiliary_threads
+        auxiliary_threads = auxiliary_threads,
+        masks = ",".join([homogenized_mask(m)  for m in masks])
     threads: max_threads
     log: log_file("process.{batch_id}")
     container: dentist_container
     shell:
-        "dentist process --config={dentist_config_file} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --batch={params.batch_range} - - - - {output} 2> {log}"
+        "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} '<ignored>' {input.pile_ups} {output} 2> {log}"
 
-rule extend_dentist_config_for_merge_insertions:
+rule make_merge_config:
     input:
-        config = await_dentist_config(),
         pile_ups = await_pile_ups(),
         insertions_batches = lambda _: insertions_batches()
     output:
-        temp(dentist_merge_insertions_config_file)
+        temp(dentist_merge_config_file)
     run:
-        merge_config = None
-        with open(str(input.config), 'r') as base_config:
-            merge_config = json.load(base_config)
+        merge_config = dict()
+        merge_config["merge-insertions"] = dict()
+        merge_config["merge-insertions"]["partitioned-insertions"] = insertions_batches()
 
-        if "merge-insertions" not in merge_config:
-            merge_config["merge-insertions"] = dict()
-        merge_config["merge-insertions"]["insertions"] = insertions
-        merge_config["merge-insertions"]["partitioned-insertions"] = list(input.insertions_batches)
+        with open(output[0], 'w') as merge_config_file:
+            json.dump(merge_config, merge_config_file)
 
-        with open(output[0], 'w') as ext_config_file:
-            json.dump(merge_config, ext_config_file)
-
-        validate_dentist_config(output[0])
+        dentist_validate_file(output[0])
 
 
 rule merge_insertions:
     input:
-        dentist_merge_insertions_config_file,
-        await_db_files(reference),
-        await_db_files(reads),
-        await_pile_ups(),
+        config = dentist_merge_config_file,
+        pile_ups = await_pile_ups(),
         insertions_batches = lambda _: insertions_batches()
     output:
         protected(insertions)
     log: log_file("merge-insertions")
     container: dentist_container
     shell:
-        "dentist merge-insertions --config={dentist_merge_insertions_config_file} {dentist_flags} - - 2> {log}"
+        "dentist merge-insertions --config={input.config} {dentist_flags} {output} - 2> {log}"
 
 
 rule preliminary_output:
     input:
-        await_dentist_config(),
-        await_db_files(reference),
-        insertions
+        config = dentist_config_file,
+        refdb = await_db_files(reference),
+        insertions = insertions
     output:
         preliminary_gap_closed_fasta,
         preliminary_closed_gaps_bed
@@ -1312,12 +1316,12 @@ rule preliminary_output:
     log: log_file("preliminary-output")
     container: dentist_container
     shell:
-        "dentist output --config={dentist_config_file} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} - - {output[0]} 2> {log}"
+        "dentist output --config={input.config} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[0]} 2> {log}"
 
 
 rule preliminary_gap_closed_vs_reads_alignment_block:
     input:
-        await_dentist_config(),
+        dentist_config_file,
         await_db_files(preliminary_gap_closed),
         await_db_files(reads),
         mask_files(preliminary_gap_closed, dust_mask),
@@ -1327,7 +1331,7 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         alignment_file(preliminary_gap_closed, reads, block_b='{block_reads}'),
         temp(alignment_file(reads, preliminary_gap_closed, block_a='{block_reads}'))
     params:
-        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks(additional_reads_vs_reads_alignment_options, dust_mask, self_mask, tandem_mask))),
+        aligncmd = prepare_flags(lambda : generate_options_for("reads", dentist_config_file, ensure_masks("", dust_mask, self_mask, tandem_mask))),
         preliminary_gap_closed_stub = db_stub(rel_to_workdir(preliminary_gap_closed)),
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
@@ -1391,7 +1395,7 @@ rule preliminary_closed_gaps_bed2mask:
 rule validate_regions_block:
     input:
         refdb = await_db_files(preliminary_gap_closed),
-        reads = await_db_files(reads),
+        readsdb = await_db_files(reads),
         mask_files = mask_files(preliminary_gap_closed, closed_gaps_mask),
         alignment = alignment_file(preliminary_gap_closed, reads, block_a="{block_ref}")
     output:
@@ -1403,7 +1407,7 @@ rule validate_regions_block:
     log: log_file("validate-regions-block.{block_ref}")
     container: dentist_container
     shell:
-        "dentist validate-regions --config={dentist_config_file} --threads={threads} --weak-coverage-mask={params.block_mask} {input.refdb[0]} - {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
+        "dentist validate-regions --config={dentist_config_file} --threads={threads} --weak-coverage-mask={params.block_mask} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
 
 
 rule validate_regions:
@@ -1446,30 +1450,32 @@ rule skip_gaps:
 if workflow_flags["no_purge_output"]:
     rule unpurged_output:
         input:
-            await_dentist_config(),
-            await_db_files(reference),
-            insertions
+            config = dentist_config_file,
+            refdb = await_db_files(reference),
+            insertions = insertions
         output:
-            gap_closed_fasta,
-            closed_gaps_bed
+            fasta = gap_closed_fasta,
+            bed = closed_gaps_bed,
+            agp = gap_closed_agp
         log: log_file("unpurged-output")
         container: dentist_container
         shell:
-            "dentist output --config={dentist_config_file} {dentist_flags} - - - 2> {log}"
+            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
 else:
     rule purged_output:
         input:
-            await_dentist_config(),
-            await_db_files(reference),
-            insertions,
+            config = dentist_config_file,
+            refdb = await_db_files(reference),
+            insertions = insertions,
             skip_gaps = skip_gaps
         output:
-            gap_closed_fasta,
-            closed_gaps_bed
+            fasta = gap_closed_fasta,
+            bed = closed_gaps_bed,
+            agp = gap_closed_agp
         log: log_file("purged-output")
         container: dentist_container
         shell:
-            "dentist output --config={dentist_config_file} {dentist_flags} --skip-gaps-file={input[skip_gaps]} - - - 2> {log}"
+            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} --skip-gaps-file={input.skip_gaps} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
 
 
 #-----------------------------------------------------------------------------
