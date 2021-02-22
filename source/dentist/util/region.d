@@ -393,6 +393,32 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TI(0, 10, 20) - TI(1, 25, 30) == R([TI(0, 10, 20)]));
         }
 
+        /// Returns the symmetric difference of both intervals.
+        Region opBinary(string op)(in TaggedInterval other) const if (op == "^")
+        {
+            auto intersection = this & other;
+
+            if (intersection.empty)
+                return Region([this, other]);
+
+            return convexHull(this, other) - intersection;
+        }
+
+        ///
+        unittest
+        {
+            alias R = Region!(int, int);
+            alias TI = R.TaggedInterval;
+
+            assert((TI(0, 10, 20) ^ TI(0, 0, 5)) == R([TI(0, 0, 5), TI(0, 10, 20)]));
+            assert((TI(0, 10, 20) ^ TI(0, 5, 15)) == R([TI(0, 5, 10), TI(0, 15, 20)]));
+            assert((TI(0, 10, 20) ^ TI(0, 12, 18)) == R([TI(0, 10, 12), TI(0, 18, 20)]));
+            assert((TI(0, 10, 20) ^ TI(0, 10, 20)) == R([]));
+            assert((TI(0, 10, 20) ^ TI(0, 15, 25)) == R([TI(0, 10, 15), TI(0, 20, 25)]));
+            assert((TI(0, 10, 20) ^ TI(0, 25, 30)) == R([TI(0, 10, 20), TI(0, 25, 30)]));
+            assert((TI(0, 10, 20) ^ TI(1, 25, 30)) == R([TI(0, 10, 20), TI(1, 25, 30)]));
+        }
+
         int opCmp(in TaggedInterval other) const pure nothrow
         {
             return cmp(
