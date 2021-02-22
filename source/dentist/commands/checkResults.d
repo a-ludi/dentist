@@ -192,6 +192,7 @@ struct ContigMapping
     id_t queryContigId;
     DuplicateQueryContig duplicateQueryContig;
     Complement complement;
+    double alignmentError;
 
     T opCast(T)() const pure nothrow if (is(bool : T))
     {
@@ -538,6 +539,7 @@ private struct ResultAnalyzer
                 queryContigIds[findResult.queryId],
                 DuplicateQueryContig.no,
                 findResult.complement,
+                0.0, // perfect match
             ))
             .tee!(contigMapping => assert(
                 contigMapping.reference.begin < contigMapping.reference.end &&
@@ -611,6 +613,7 @@ private struct ResultAnalyzer
                     recoveredAlignments[0].contigB.id,
                     DuplicateQueryContig.no,
                     recoveredAlignments[0].complement,
+                    recoveredAlignments[0].averageErrorRate,
                 )
                 : ContigMapping())
             .filter!"a"
@@ -1664,6 +1667,9 @@ struct ContigAlignmentsCache
                 cast(id_t) cachedAlignment["queryContigId"],
                 cast(DuplicateQueryContig) cachedAlignment["duplicateQueryContig"].get!bool,
                 cast(Complement) cachedAlignment["complement"].get!bool,
+                "alignmentError" in cachedAlignment
+                    ? cachedAlignment["alignmentError"].to!double
+                    : 0.0,
             );
 
         return contigAlignments;
