@@ -1,3 +1,4 @@
+
 # Changelog
 All notable changes to this project will be documented in this file.
 
@@ -8,7 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
-## [1.0.0] - 2020-02-04
+## [1.0.1] - 2021-02-22
+### Added
+- A wonderful logo :-)
+
+### Changed
+- Updated README and other docs
+- Some jobs in the workflow are grouped to reduce the number of cluster jobs
+- Workflow requires a minimum Snakemake version
+- Ignoring unused parameter in `process-pile-ups`; will be removed in next
+  major release
+- Disentangled workflow configuration for better usability and less build time
+  for Sakemake's DAG
+
+### Removed
+- Old documentation parts/details
+
+### Fixed
+- Sporadically lost masked regions in mask homogenization
+- Handling of cyclic scaffolds
+- Overly strict handling of types in DENTIST's config file
+- Several minor bugs
+
+
+## [1.0.0] - 2021-02-04
 ### Added
 
 - A Docker container! This means you can just `--use-singularity` with
