@@ -9,10 +9,12 @@
 module dentist.common.scaffold;
 
 import dentist.common.alignments : getType;
+import dentist.util.algorithm : uniqInPlace;
 import dentist.util.log;
 import dentist.util.math :
     add,
     bulkAdd,
+    EdgeExistsException,
     filterEdges,
     Graph,
     MissingNodeException,
@@ -40,6 +42,7 @@ import std.range :
     retro,
     save,
     walkLength;
+import std.range.primitives;
 import std.typecons : Flag, No, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
@@ -192,6 +195,33 @@ Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceCont
     auto scaffold = initScaffold!T(numReferenceContigs)
         .addJoins!(mergeMultiEdges, T)(rawJoins)
         .removeNoneJoins!T;
+
+    return scaffold;
+}
+
+/// Build a scaffold graph using `rawJoins`. The nodes are deduced from
+/// rawJoins.
+///
+/// Throws: EdgeExistsException if rawJoins contains duplicate joins.
+auto buildScaffold(R)(R rawJoins)
+{
+    alias T = typeof(rawJoins.front.payload);
+    auto joins = rawJoins.array;
+    auto nodes = joins
+        .map!(join => only(join.start, join.end))
+        .joiner
+        .array
+        .sort
+        .release;
+    uniqInPlace(nodes);
+
+    auto scaffold = Scaffold!T(nodes);
+    scaffold.bulkAdd!((joinGroup) {
+        if (joinGroup.length > 1)
+            throw new EdgeExistsException();
+
+        return joinGroup[0];
+    })(joins);
 
     return scaffold;
 }

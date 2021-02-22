@@ -430,6 +430,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.buildPartialAssembly,
         TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
+        TestingCommand.checkScaffolding,
     ))
     {
         @Argument("<in:true-assembly>")
@@ -638,6 +639,7 @@ struct OptionsFor(DentistCommand _command)
         TestingCommand.findClosableGaps,
         TestingCommand.buildPartialAssembly,
         TestingCommand.checkResults,
+        TestingCommand.checkScaffolding,
     ))
     {
         @Argument("<in:mapped-regions-mask>")
@@ -682,6 +684,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.translateCoords,
+        TestingCommand.checkScaffolding,
     ))
     {
         @Argument("<in:scaffolding>")
@@ -2085,6 +2088,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.validateRegions,
+        TestingCommand.checkScaffolding,
     ))
     {
         @Option("proper-alignment-allowance")
@@ -2383,6 +2387,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.processPileUps,
         DentistCommand.validateRegions,
         TestingCommand.checkResults,
+        TestingCommand.checkScaffolding,
     ))
     {
         @Option()
