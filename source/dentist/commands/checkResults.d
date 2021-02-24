@@ -1258,7 +1258,7 @@ private struct ResultAnalyzer
         );
 
         if (options.cropAlignment > 0)
-            alignment.cropReference(options.cropAlignment);
+            alignment = alignment.cropReference(options.cropAlignment);
 
         return alignment;
     }
