@@ -7,14 +7,13 @@ DENTIST
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
 
-> Close assembly gaps using long-reads with focus on correctness.
+> DENTIST uses long reads to close assembly gaps at high accuracy.
 
-Today, many genome sequencing project have been conducted using
-second-generation sequencers which produce short reads. Such assemblies have
-many gaps. `dentist` closes these gaps using a (small) set of long reads.
-Furthermore, it can be used to scaffold contigs freely using a set of long
-reads. This can be used to fix known scaffolding errors or to further scaffold
-output of a long-read assembly pipeline.
+Long sequencing reads allow increasing contiguity and completeness of
+fragmented, short-read based genome assemblies by closing assembly gaps,
+ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
+automated pipeline method to close gaps in (short read) assemblies with long
+reads.
 
 
 Table of Contents
@@ -22,7 +21,9 @@ Table of Contents
 
 - [Install](#install)
 - [Usage](#usage)
+- [Example](#example)
 - [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
 - [Citation](#citation)
 - [Maintainer](#maintainer)
 - [Contributing](#contributing)
@@ -127,9 +128,9 @@ troubles. These should be the same versions used in the [Dockerfile](./blob/deve
 Usage
 -----
 
-Suppose we have the genome assembly `reference.fasta` that is to be updated
-and a set of reads `reads.fasta` with 25× coverage.
-
+Before you start producing wonderful scientific results, you should skip over
+to the [example section](#example) and try to run the small example. This will
+make sure your setup is working as expected.
 
 ### Quick execution with Snakemake (and Singularity)
 
@@ -201,6 +202,34 @@ Please inspect the Snakemake workflow to get all the details. It might be
 useful to execute Snakemake with the `-p` switch which causes Snakemake to
 print the shell commands. If you plan to write your own workflow management
 for DENTIST please feel free to contact the maintainer!
+
+
+Example
+-------
+
+After installing [Snakemake][snakemake] (5.32.1 or later) and
+[Singularity][singularity] 3.5.x or later, you may check your installation
+with this [example dataset][example-tarball-v1.0.1] (182Mb).
+
+```sh
+wget https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
+tar -xzf dentist-example.tar.v1.0.1.gz
+cd dentist-example
+```
+
+Execute the entire workflow on your *local machine* using `all` cores:
+
+```sh
+# run the workflow
+snakemake --configfile=snakemake.yaml --use-singularity --cores=all
+# validate the files
+md5sum -c checksum.md5
+```
+
+Execution takes approx. 7 minutes and a maximum of 1GB memory on my little
+laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
+
+[example-tarball-v1.0.1]: https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
 
 
 Configuration
@@ -316,11 +345,36 @@ resources they consume.
   jobs and increases the run time and memory requirements per job. The memory requirement is proportional to the size of the read alignment blocks. 
 
 
+Troubleshooting
+---------------
+
+When executed on a single machine, `snakemake` will sometimes quit with an
+`ProtectedOutputException` ([Snakemake bug report filed][sm-884]). You may try the follow snippet to get `snakemake`
+back on track:
+
+```sh
+# make sure workdir exists to avoid errors with chmod
+mkdir -p workdir
+# keep track of the number of retries to avoid an infinite loop
+RETRY=0
+# try running snakemake as long as the gap-closed assembly was not created
+# and we have retries left
+while [[ ! -f "gap-closed.fasta" ]] && (( RETRY++ < 3 )); do
+    # allow snakemake to overwrite protected output
+    chmod -R u+w workdir
+    # try snakemake...
+    snakemake --configfile=snakemake.yaml --use-singularity --cores=all
+done
+```
+
+[sm-884]: https://github.com/snakemake/snakemake/issues/884
+
+
 Citation
 --------
 
-> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – close
-> assembly gaps with high confidence. _In preparation._
+> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – using long
+> reads to close assembly gaps at high accuracy. _In preparation._
 
 
 Maintainer

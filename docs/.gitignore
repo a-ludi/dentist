@@ -1,2 +1,6 @@
+/.jekyll-cache
+/_site
+/.bundle
+/vendor
 *.png
 *.pdf
