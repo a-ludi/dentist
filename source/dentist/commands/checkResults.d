@@ -1665,7 +1665,9 @@ struct ContigAlignmentsCache
                 ),
                 cast(coord_t) cachedAlignment["referenceContigLength"],
                 cast(id_t) cachedAlignment["queryContigId"],
-                cast(DuplicateQueryContig) cachedAlignment["duplicateQueryContig"].get!bool,
+                "duplicateQueryContig" in cachedAlignment
+                    ? cast(DuplicateQueryContig) cachedAlignment["duplicateQueryContig"].get!bool
+                    : No.duplicateQueryContig,
                 cast(Complement) cachedAlignment["complement"].get!bool,
                 "alignmentError" in cachedAlignment
                     ? cachedAlignment["alignmentError"].to!double
