@@ -1,14 +1,9 @@
-DENTIST
-=======
-
-![DENTIST](./docs/logo.png?sanitize=true&raw=true)
+# DENTIST
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
-
-> DENTIST uses long reads to close assembly gaps at high accuracy.
 
 Long sequencing reads allow increasing contiguity and completeness of
 fragmented, short-read based genome assemblies by closing assembly gaps,
@@ -227,7 +222,7 @@ snakemake --configfile=snakemake.yaml --use-singularity --cores=all
 md5sum -c checksum.md5
 ```
 
-Execution takes approx. 7 minutes and a maximum of 1GB memory on my little
+Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 [example-tarball-v1.0.1]: https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
