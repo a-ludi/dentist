@@ -22,8 +22,9 @@ before_deploy:
 
 deploy:
     provider: releases
-    api_key:
-        secure: "G2/u6VexH0O+XvK1kqmnblz5foYgYpi0pAu9szVcS7VyuIGN37u5+64LJ0m5gmHwYq39CEAwpHvAzn8+UxCmA1EPjTAYYulRmllU96AMRsT8ggPwvDNygdIcV/J9fI3izmO8Lj2X0XMU7kZ7mCt4n8PNpLNPty2T6BdYbcmhsFdwtmcFK7QrxowAN5YM+kMnoq5suC6cfGZalFTq/T6+cz+KS1n3i8jAapJNr0VkP7anYOvX+H72DwypJJE0uyMzfhhlp5vEv8vqBUlmpuC79Fff9Ln1gOF6ByTUAGArH+o4pgSf+mx4QhLrwjXpG+ww2UbgCx7va9dpGscRJ7ptOfd82fRASvq75I34xuzk41YR+Gxtn+feMlxgY+DJPoh1n/G2k2Qh0Ru5PJTssY/DxM4a3IlPw8nnXSSkv88ZeSVqbkczgNHKVFsE7hhyqjMm4josiqCtJnvX2nuL0eph4O6N9GC0ZLafS4sCeK0H+TyEN8dilqnC2yOOwRjrS6JAsSiGlMPenky2pSdM7yef4q9LW9+XXgKTP4/h3NurbCgdqQTSiuY1xejIFrBMN1ZKjWjQ6GRnJiaCWwJYO03CxBdIa7ewsGhxjGeBUWiQnXBKW4mkjZD4v4a7X2zvcQPunQwjkMqqh2IQ9NBx/+48FuIAwUSq4uPxCjANGjvHdJo="
+    user: "arne.ludwig@posteo.de"
+    password:
+        secure: "v3zgAWzb1rIiBgQNGTu44nyN9qi8i6C1grmavVt4ozIqxcr9F6NmM5WC7dqKEpqmlI/Qs8i7cV/YKqD/SvDms+n5kAm4r3R4EQkrDlJM24vuQCKUunsEEubvFusEtY9dbgioUQrKahbARCCM2qF+ZzcQDpp47wK3CCGleHerjKr4hUw/ze6CGXKa4QpgFdB+LNP9saRPNQr6h2DAG69KR0+Iq15s8jdpqaFAyfjnWZ6SHKH1ULyVnDvBZL/R4c78uh6LOI3Hg/RvSqHIW+cPCQOld+/qk9roNBa9FicL+jMS06OsJadJZn+XPdIdnbNVbhzFnfBFcb0b03lCDT04FbkxnZJ63xM4TlRkebIeSVjs3zP6T4BNfPhQ9xOR4AKTgSlhH6aQC0H9Pr5+YAxtorBLOaYLk5XCjCVDr63lqBMUQdPGTArSbNkZiKR6MSeuoswL1UQuMU/TF7//Uc3OGzJBVJbybM7Z6ESjnfnF1+9QTxW+blCPhtY03SUPz+YDyKVPEhqg2LZypsK8sExV92CoQVbwG6ugKDQIFmMr/JUMpd5isVAMBE0xqigCg+5VrGDTnPItxTrQ7EYYMBbbtkeBbUPBLHA9daLbeY/tUOhZf4ectIqMLcho8M3+PxJdi+KrLU257sEWXoxx/MjsXH3XYS9f9+YOvhmHdVrY1+U="
     file: "dentist.*.tar.gz"
     skip_cleanup: true
     draft: true
