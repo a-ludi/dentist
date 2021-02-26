@@ -28,4 +28,5 @@ deploy:
     skip_cleanup: true
     draft: true
     on:
-        tags: true
+        all_branches: true
+        condition: $TRAVIS_BRANCH = travis-ci || $TRAVIS_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[^[:space:]]+)?$
