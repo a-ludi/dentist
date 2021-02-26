@@ -117,7 +117,7 @@ function main()
 
     parse_args "$@"
 
-    dub build --build=release
+    dub build ${DC:+"--compiler=$DC"} --build=release
     strip -s "$DENTIST"
 
     DENTIST_VERSION="$("$DENTIST" --version |& head -n1)"
