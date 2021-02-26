@@ -12,3 +12,13 @@ branches:
 
 script:
     - ./make-release.sh
+
+deploy:
+    provider: releases
+    api_key:
+        secure: "G2/u6VexH0O+XvK1kqmnblz5foYgYpi0pAu9szVcS7VyuIGN37u5+64LJ0m5gmHwYq39CEAwpHvAzn8+UxCmA1EPjTAYYulRmllU96AMRsT8ggPwvDNygdIcV/J9fI3izmO8Lj2X0XMU7kZ7mCt4n8PNpLNPty2T6BdYbcmhsFdwtmcFK7QrxowAN5YM+kMnoq5suC6cfGZalFTq/T6+cz+KS1n3i8jAapJNr0VkP7anYOvX+H72DwypJJE0uyMzfhhlp5vEv8vqBUlmpuC79Fff9Ln1gOF6ByTUAGArH+o4pgSf+mx4QhLrwjXpG+ww2UbgCx7va9dpGscRJ7ptOfd82fRASvq75I34xuzk41YR+Gxtn+feMlxgY+DJPoh1n/G2k2Qh0Ru5PJTssY/DxM4a3IlPw8nnXSSkv88ZeSVqbkczgNHKVFsE7hhyqjMm4josiqCtJnvX2nuL0eph4O6N9GC0ZLafS4sCeK0H+TyEN8dilqnC2yOOwRjrS6JAsSiGlMPenky2pSdM7yef4q9LW9+XXgKTP4/h3NurbCgdqQTSiuY1xejIFrBMN1ZKjWjQ6GRnJiaCWwJYO03CxBdIa7ewsGhxjGeBUWiQnXBKW4mkjZD4v4a7X2zvcQPunQwjkMqqh2IQ9NBx/+48FuIAwUSq4uPxCjANGjvHdJo="
+    file: "dentist.*.tar.gz"
+    skip_cleanup: true
+    draft: true
+    # on:
+    #     tags: true
