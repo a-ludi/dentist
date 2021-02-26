@@ -10,10 +10,5 @@ branches:
         - travis-ci
         - /^v\d+\.\d+\.\d+(-\S+)?$/
 
-env:
-    - DALIGNER_COMMIT=ed40ce5c2ae1050b49a7021e798ea0d54ebe57fe
-
-before_script:
-  - wget https://github.com/thegenemyers/DALIGNER/archive/$DALIGNER_COMMIT.tar.gz
-  - tar -xzvf "$DALIGNER_COMMIT.tar.gz"
-  - ( cd "DALIGNER-$DALIGNER_COMMIT" && make dumpLA && sudo install -t /usr/bin dumpLA )
+script:
+    - ./make-release.sh
