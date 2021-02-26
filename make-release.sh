@@ -52,6 +52,8 @@ function print_help()
     echo 'Build DENTIST in release mode and create a tarball.'
     echo
     echo 'Optional arguments:'
+    echo ' --store-target-name=<file>, -t<file>'
+    echo '                 On success, store name of the tarball in <file>.'
     echo ' --help, -h      Prints this help.'
     echo ' --usage         Print a short command summary.'
     echo ' --version       Print software version.'
@@ -74,6 +76,10 @@ function parse_args()
         if [[ "${ARG:0:1}" == - ]];
         then
             case "$ARG" in
+                -t*|--store-target-name=*)
+                    STORE_TARGET_NAME="${ARG#-t}"
+                    STORE_TARGET_NAME="${STORE_TARGET_NAME#--store-target-name=}"
+                    ;;
                 -h|--help)
                     print_help
 
@@ -131,6 +137,11 @@ function main()
     tar --remove-files -czf "$TARBALL" "$DIST_DIR"
 
     log "created $TARBALL"
+
+    if [[ -v "$STORE_TARGET_NAME" ]]
+    then
+        echo "$TARBALL" > "$STORE_TARGET_NAME"
+    fi
 }
 
 
