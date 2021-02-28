@@ -227,7 +227,7 @@ snakemake --configfile=snakemake.yaml --use-singularity --cores=all
 md5sum -c checksum.md5
 ```
 
-Execution takes approx. 7 minutes and a maximum of 1GB memory on my little
+Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 [example-tarball-v1.0.1]: https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
@@ -375,7 +375,10 @@ Citation
 --------
 
 > Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – using long
-> reads to close assembly gaps at high accuracy. _In preparation._
+> reads to close assembly gaps at high accuracy. __Submitted for peer review__.
+> Pre-print at [https://doi.org/10.1101/2021.02.26.432990][dentist-bioarxiv]
+
+[dentist-bioarxiv]: https://doi.org/10.1101/2021.02.26.432990 "Pre-print manuscript at bioRxiv"
 
 
 Maintainer

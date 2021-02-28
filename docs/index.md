@@ -1,8 +1,10 @@
-# DENTIST
+DENTIST
+=======
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
+[![Build Status](https://travis-ci.org/a-ludi/dentist.svg?branch=travis-ci)](https://travis-ci.org/a-ludi/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
 
 Long sequencing reads allow increasing contiguity and completeness of
@@ -370,7 +372,10 @@ Citation
 --------
 
 > Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – using long
-> reads to close assembly gaps at high accuracy. _In preparation._
+> reads to close assembly gaps at high accuracy. __Submitted for peer review__.
+> Pre-print at [https://doi.org/10.1101/2021.02.26.432990][dentist-bioarxiv]
+
+[dentist-bioarxiv]: https://doi.org/10.1101/2021.02.26.432990 "Pre-print manuscript at bioRxiv"
 
 
 Maintainer
