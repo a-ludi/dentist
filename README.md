@@ -40,10 +40,10 @@ Make sure [Singularity][singularity] is installed on your system. You can then u
 
 ```sh
 # launch an interactive shell
-singularity shell docker://aludi/dentist:latest
+singularity shell docker://aludi/dentist:stable
 
 # execute a single command inside the container
-singularity exec docker://aludi/dentist:latest dentist --version
+singularity exec docker://aludi/dentist:stable dentist --version
 
 # run the whole workflow on a cluster using Singularity
 snakemake --configfile=snakemake.yml --use-singularity --profile=slurm

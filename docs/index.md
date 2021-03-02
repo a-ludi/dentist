@@ -4,7 +4,6 @@ DENTIST
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
-[![Build Status](https://travis-ci.org/a-ludi/dentist.svg?branch=travis-ci)](https://travis-ci.org/a-ludi/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
 
 Long sequencing reads allow increasing contiguity and completeness of
@@ -37,10 +36,10 @@ Make sure [Singularity][singularity] is installed on your system. You can then u
 
 ```sh
 # launch an interactive shell
-singularity shell docker://aludi/dentist:latest
+singularity shell docker://aludi/dentist:stable
 
 # execute a single command inside the container
-singularity exec docker://aludi/dentist:latest dentist --version
+singularity exec docker://aludi/dentist:stable dentist --version
 
 # run the whole workflow on a cluster using Singularity
 snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
