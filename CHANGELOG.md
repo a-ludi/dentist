@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
+## Unreleased
+### Changed
+- Updated dependencies
+
+### Fixed
+- Compiler error and deprecation warnings
+
+
 ## [1.0.1] - 2021-02-22
 ### Added
 - A wonderful logo :-)
