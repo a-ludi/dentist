@@ -17,6 +17,6 @@
 		"string-transform-d": "1.0.0",
 		"taggedalgebraic": "0.10.11",
 		"vibe-core": "1.4.1",
-		"vibe-d": "0.8.4"
+		"vibe-d": "0.9.3"
 	}
 }

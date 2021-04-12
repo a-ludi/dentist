@@ -6,7 +6,7 @@ license           "MIT"
 
 dependency        "darg"               path="./darg"
 dependency        "string-transform-d" version="~>1.0.0"
-dependency        "vibe-d:data"        version="~>0.8.4-alpha.1"
+dependency        "vibe-d:data"        version="~>0.9.3"
 
 targetType        "executable"
 mainSourceFile    "source/app.d"
