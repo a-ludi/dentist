@@ -349,6 +349,11 @@ resources they consume.
 Troubleshooting
 ---------------
 
+### Unexpected `ProtectedOutputException` when running on a single machine
+
+**See also:** [Regular
+`ProtectedOutputException`](#regular-protected-output-exception).
+
 When executed on a single machine, `snakemake` will sometimes quit with an
 `ProtectedOutputException` ([Snakemake bug report filed][sm-884]). You may try the follow snippet to get `snakemake`
 back on track:
@@ -369,6 +374,63 @@ done
 ```
 
 [sm-884]: https://github.com/snakemake/snakemake/issues/884
+
+
+### Regular `ProtectedOutputException`
+
+**See also:** [Unexpected
+`ProtectedOutputException` when running on a single machine
+](#unexpected-protected-output-exception-when-running-on-a-single-machine).
+
+Snakemake has a [built-in facility to protect files][sm-protected-files] from
+accidental overwrites. This is meant to avoid overwriting precious results
+that took many CPU hours to produce. If executing a rule would overwrite a
+protected file, Snakemake raises a `ProtectedOutputException`, e.g.:
+
+```
+ProtectedOutputException in line 1236 of /tmp/dentist-example/Snakefile:
+Write-protected output files for rule collect:
+workdir/pile-ups.db
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 136, in run_jobs
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 441, in run
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 230, in _run
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 155, in _run
+```
+
+Here `workdir/pile-ups.db` is the protected file that caused the error. If you
+are sure of what you are doing, you can simply raise the protection by `chmod
+-R +w ./workdir` and execute Snakemake again. Now, it will overwrite any files.
+
+
+[sm-protected-files]: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#protected-and-temporary-files
+
+
+### No internet connection on compute nodes
+
+If you have no internet connection on your compute nodes or even the cluster
+head node and want to use Singularity for execution, you will need to download
+the container image manually and put it to a location accessible by all jobs.
+Assume `/path/to/dir` is such a location on your cluster. Then download the
+container image using
+
+```sh
+# IF internet connection on head node
+singularity pull --dir /path/to/dir docker://aludi/dentist:stable
+
+# ELSE (on local machine)
+singularity pull docker://aludi/dentist:stable
+# copy dentist_stable.sif to cluster
+scp dentist_stable.sif cluster:/path/to/dir/dentist_stable.sif
+```
+
+When the image is in place you will need to adjust your configuration in
+`snakemake.yml`:
+
+```yaml
+dentist_container: "/path/to/dir/dentist_stable.sif"
+```
+
+Now, you are ready for execution.
 
 
 Citation
