@@ -1,7 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
 # Unofficial Bash Strict Mode (http://redsymbol.net/articles/unofficial-bash-strict-mode/)
-set -eu
+set -euo pipefail
 IFS="$(printf '\n\t')"
 
 # An example hook script to verify what is about to be pushed.  Called by "git
@@ -53,10 +53,54 @@ locally_checkout_head()
 }
 
 
+check_link()
+{
+    local FILE="$1"
+    local LINE="$2"
+    local URL="$3"
+
+    if ! curl --head --fail --silent --location "$URL" > /dev/null
+    then
+        echo "broken link at $FILE:$LINE: '$URL'"
+
+        return 1
+    fi
+}
+
+
+check_for_broken_links()
+{
+    PARALLEL=16
+    FAILED=0
+
+    echo 'testing links ...'
+    for FILE in "$@"
+    do
+        while IFS=':' read -r FILE LINE URL
+        do
+            (( $(jobs | wc -l) < PARALLEL )) || { wait -n || (( ++FAILED )); }
+
+            check_link "$FILE" "$LINE" "$URL" &
+        done < <(grep -HnoP '(ftp|https?):[^[:space:]\]\)]+' "$FILE")
+        wait || (( ++FAILED ))
+    done
+
+    if (( FAILED == 0 ))
+    then
+        echo 'done'
+    else
+        echo 'failed'
+
+        return 1
+    fi
+}
+
+
 if [ "$num_new_commits" -gt 0 ];
 then
     create_testdir
     cd "$testdir"
     locally_checkout_head
+    check_for_broken_links ./*.md ./LICENSE
     dub test --config=testing
 fi

@@ -163,8 +163,8 @@ data sets may require a cluster in which case you can use Snakemake's
 
 
 [snakemake]: https://snakemake.readthedocs.io/en/stable/index.html
-[snakemake-cloud]: https://snakemake.readthedocs.io/en/stable/executable.html#cloud-support
-[snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executable.html#cluster-execution
+[snakemake-cloud]: https://snakemake.readthedocs.io/en/stable/executing/cloud.html
+[snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executing/cluster.html
 
 
 #### Executing on a Cluster
