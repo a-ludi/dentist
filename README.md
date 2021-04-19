@@ -190,7 +190,7 @@ to your cluster by
     snakemake --configfile=snakemake.yml --profile=slurm --use-singularity
 
 Note, parameters specified in the profile provide default values and can be
-overridden by specififying different value on the CLI.
+overridden by specifying different value on the CLI.
 
 
 [smp-project]: https://github.com/snakemake-profiles/doc
@@ -263,13 +263,14 @@ have immense influence on the performance of DENTIST.
   correctness of closed gaps but reduce sensitivity. The value must be well
   below the expected coverage.
 
-- `--allow-single-reads`: May be used under careful consideration. This is
-  intended for one of the following scenarios:
+- `--allow-single-reads`: May be used under careful consideration in
+  combination with `--min-spanning-reads=1`. This is intended for one of the
+  following scenarios:
 
-  1. DENTIST is meant to close as many gaps as possible in a _de novo_
-     assembly. Then the closed gaps must be validated by other means
-     afterwards.
-  2. DENTIST is used not with real reads but with an independent assembly.
+    1. DENTIST is meant to close as many gaps as possible in a _de novo_
+       assembly. Then the closed gaps must be validated by other means
+       afterwards.
+    2. DENTIST is used not with real reads but with an independent assembly.
 
 - `--existing-gap-bonus`: If DENTIST finds evidence to join two contigs that
   are already consecutive in the input assembly (i.e. joined by `N`s) then it
@@ -279,16 +280,20 @@ have immense influence on the performance of DENTIST.
 
 - `--join-policy`: Choose according to your needs:
   
-  - `scaffoldGaps`: Closes only gaps that are marked by `N`s in the assembly.
-    This is the default mode of operation. Use this if you do not want to alter
-    the scaffolding of the assembly. See also `--existing-gap-bonus`.
-  - `scaffolds`: Allows whole scaffolds to be joined in addition to the effects
-    of `scaffoldGaps`. Use this if you have (many) scaffolds that are not yet
-    full chromosome-scale.
-  - `contigs`: Allows contigs to be rearranged freely. This is especially
-    useful in _de novo_ assemblies **before** applying any other scaffolding
-    methods as it increases the contiguity thus increasing the chance that
-    large-scale scaffolding (e.g. Bionano or Hi-C) finds proper joins.
+      `scaffoldGaps`
+      :   Closes only gaps that are marked by `N`s in the assembly. This is the
+          default mode of operation. Use this if you do not want to alter the
+          scaffolding of the assembly. See also `--existing-gap-bonus`.
+      `scaffolds`
+      :   Allows whole scaffolds to be joined in addition to the effects of
+          `scaffoldGaps`. Use this if you have (many) scaffolds that are not
+          yet full chromosome-scale.
+      `contigs`
+      :   Allows contigs to be rearranged freely. This is especially useful in
+          _de novo_ assemblies **before** applying any other scaffolding
+          methods as it increases the contiguity thus increasing the chance
+          that large-scale scaffolding (e.g. Bionano or Hi-C) finds proper
+          joins.
 
 
 #### Choosing the Read Type
