@@ -179,7 +179,7 @@ Start by copying these files to your working/home directory:
 - `./snakemake/Snakefile`
 - `./snakemake/snakemake.yml`
 - `./snakemake/cluster.yml`
-- `./snakemake/profile-slurm.yml` → `~/.config/snakemake/slurm/config.yaml`
+- _One_ of `./snakemake/profile-slurm.*.yml` → `~/.config/snakemake/slurm/config.yaml`
 
 Next [adjust the profile][snakemake-profiles] according to your cluster. This
 should enable Snakemake to submit and track jobs on your cluster. You may use
