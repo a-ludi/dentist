@@ -813,22 +813,10 @@ additional_tanmask_options = ensure_flags(additional_tanmask_options, {
 })
 
 additional_lamerge_options = make_flags(["-v"])
-additional_lacheck_options = make_flags(["-v"])
 
 if "TMPDIR" in environ:
     tmpdir_flag = { "-P": environ["TMPDIR"] }
     additional_lamerge_options = ensure_flags(additional_lamerge_options, tmpdir_flag)
-
-lacheck_failed_notice = base64.b64encode(docstring("""
-    Check failed. Possible solutions:
-
-    Duplicate LAs: can be fixed by LAsort from 2020-03-22 or later.
-
-    In order to make checks mandatory, you may use the environment variable
-    ERROR_LACHECK=1. Use only if you are a very cautious and curious person!
-""").encode())
-
-lacheck_handler = f"{{ echo '{lacheck_failed_notice}' | base64 -d; (( ${{ERROR_LACHECK:-0}} == 0 )); }}"
 
 
 def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", log="log"):
@@ -837,20 +825,11 @@ def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", 
         "{additional_lamerge_options}",
         "{" + merged + ":q}",
         "{" + parts + ":q}"])
-    lacheck_cmd = " ".join([
-        "LAcheck",
-        "{additional_lacheck_options}",
-        "{" + dbs + ":q}",
-        "{" + merged + ":q}",
-        "||",
-        "{lacheck_handler}"])
 
     if log:
-        indent = 4 * " "
-        full_cmd = indent + lamerge_cmd + "\n" + indent + lacheck_cmd + "\n"
-        return "{{ " + full_cmd + " }} &> {" + log + ":q}"
+        return lamerge_cmd + " &> {" + log + ":q}"
     else:
-        return lamerge_cmd + "\n" + lacheck_cmd
+        return lamerge_cmd
 
 
 #-----------------------------------------------------------------------------
@@ -990,9 +969,6 @@ rule self_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {wildcards.dam}.{wildcards.block_ref} {wildcards.dam}.{wildcards.block_reads}
-
-                LAcheck -v {wildcards.dam} {params.alignment_file_a_vs_b} || {lacheck_handler}
-                LAcheck -v {wildcards.dam} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1044,7 +1020,6 @@ rule tandem_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {wildcards.dam}.{wildcards.block}
-                LAcheck -v {wildcards.dam} {params.alignment_file} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1134,8 +1109,6 @@ rule ref_vs_reads_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.reference_stub} {params.reads_stub}.{wildcards.block_reads}
-                LAcheck -v {params.reference_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
-                LAcheck -v {params.reads_stub} {params.reference_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1365,8 +1338,6 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
             {{
                 cd {workdir_}
                 {params.aligncmd} {params.preliminary_gap_closed_stub} {params.reads_stub}.{wildcards.block_reads}
-                LAcheck -v {params.preliminary_gap_closed_stub} {params.reads_stub} {params.alignment_file_a_vs_b} || {lacheck_handler}
-                LAcheck -v {params.reads_stub} {params.preliminary_gap_closed_stub} {params.alignment_file_b_vs_a} || {lacheck_handler}
             }} &> {log}
         """
 
@@ -1393,12 +1364,7 @@ rule split_preliminary_gap_closed_vs_reads_alignment:
     log: log_file("split-gap-closed-vs-reads-alignment")
     container: dentist_container
     shell:
-        """
-            {{
-                LAsplit {params.split_alignment} {validation_blocks} < {input}
-                LAcheck -v {preliminary_gap_closed} {reads} {output} || {lacheck_handler}
-            }} &> {log}
-        """
+        "LAsplit {params.split_alignment} {validation_blocks} < {input} &> {log}"
 
 
 rule preliminary_closed_gaps_bed2mask:
