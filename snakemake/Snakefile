@@ -799,16 +799,16 @@ if "TMPDIR" in environ:
     tmpdir_flag = { "-P": environ["TMPDIR"] }
     additional_lamerge_options = ensure_flags(additional_lamerge_options, tmpdir_flag)
 
-lacheck_failed_notice = shell_esc(base64.b64encode(docstring("""
+lacheck_failed_notice = base64.b64encode(docstring("""
     Check failed. Possible solutions:
 
     Duplicate LAs: can be fixed by LAsort from 2020-03-22 or later.
 
     In order to make checks mandatory, you may use the environment variable
     ERROR_LACHECK=1. Use only if you are a very cautious and curious person!
-""")))
+""").encode())
 
-lacheck_handler = "{ echo " + lacheck_failed_notice + " | base64 -d; (( ${ERROR_LACHECK:-0} == 0 )); }"
+lacheck_handler = f"{{ echo '{lacheck_failed_notice}' | base64 -d; (( ${{ERROR_LACHECK:-0}} == 0 )); }}"
 
 
 def LAmerge(merged="output", parts="input[block_alignments]", dbs="params.dbs", log="log"):
