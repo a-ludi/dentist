@@ -16,6 +16,8 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
+**First time here? Head over to [the example](#example) and make sure it works.**
+
 
 Table of Contents
 -----------------
@@ -32,7 +34,7 @@ Table of Contents
 
 
 Install
---------
+-------
 
 ### Use a Singularity Container (recommended)
 
@@ -212,17 +214,24 @@ After installing [Snakemake][snakemake] (5.32.1 or later) and
 [Singularity][singularity] 3.5.x or later, you may check your installation
 with this [example dataset][example-tarball-v1.0.1] (182Mb).
 
+If Singularity is not an option for you, plaese following the [installation
+instructions](#install) for an alternative.
+
 ```sh
-wget https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
-tar -xzf dentist-example.tar.v1.0.1.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v1.0.1-2/dentist-example.tar.gz
+tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
+
+
+### Local Execution
 
 Execute the entire workflow on your *local machine* using `all` cores:
 
 ```sh
 # run the workflow
-snakemake --configfile=snakemake.yaml --use-singularity --cores=all
+snakemake --configfile=snakemake.yml --use-singularity --cores=all
+
 # validate the files
 md5sum -c checksum.md5
 ```
@@ -230,7 +239,30 @@ md5sum -c checksum.md5
 Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
-[example-tarball-v1.0.1]: https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
+
+### Cluster Execution
+
+Execute the workflow on a *SLURM cluster*:
+
+```sh
+mkdir -p "$HOME/.config/snakemake/slurm"
+# select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
+cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yml"
+# execute using the cluster profile
+snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+If you want to run with a differnt cluster manager or in the cloud, please
+read [the advice above](#executing-on-a-cluster). The easiest option is
+to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
+`qsub -sync yes`. The command must submit a job to the cluster and *wait* for
+it to finish.
+
+
+[example-tarball-v1.0.1]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.1-2/dentist-example.tar.gz
 
 
 Configuration
