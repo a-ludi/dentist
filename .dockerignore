@@ -13,3 +13,4 @@
 !CHANGELOG.md
 !LICENSE
 !snakemake
+!.dockerignore

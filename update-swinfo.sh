@@ -20,7 +20,24 @@ function main()
 
 function is_git_dirty()
 {
-    git status --porcelain | grep -qv '\bsource/dentist/swinfo.d$'
+    git status --porcelain | \
+        awk '
+            BEGIN {
+                ignore = "source/dentist/swinfo.d"
+            }
+
+            (FILENAME == ".dockerignore" && substr($0, 1, 1) == "!") {
+                dockerignore = dockerignore?  dockerignore "|" substr($0, 2) : substr($0, 2);
+            }
+
+            (FILENAME == "-") {
+                if (match($2, ignore)) {
+                    # ignore
+                } else if ($1 != "D" || match($2, dockerignore)) {
+                    exit 1;
+                }
+            }' \
+        .dockerignore -
 }
 
 function get_updated_swinfo()
