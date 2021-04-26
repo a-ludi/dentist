@@ -61,8 +61,39 @@ The last command is explained in more detail below in
 ### Use Pre-Built Binaries
 
 Download the latest pre-built binaries from the [releases section][release]
-and extract the contents. The tarball contains a `dentist` binary as well as
-the Snakemake workflow, example config files and this README. In short, everything you to run DENTIST.
+and extract the contents. The pre-built binaries are stored in a subfolder
+called `bin`. Here are the instructions for `v1.0.1`:
+
+```sh
+# download & extract pre-built binaries
+wget https://github.com/a-ludi/dentist/releases/download/v1.0.1/dentist.v1.0.1.x86_64.tar.gz
+tar -xzf dentist.v1.0.1.x86_64.tar.gz
+
+# make binaries available to your shell
+cd dentist.v1.0.1.x86_64
+PATH="$PWD/bin:$PATH"
+
+# check installation with
+dentist -d
+# Expected output:
+# 
+#daligner (part of `DALIGNER`; see https://github.com/thegenemyers/DALIGNER) [OK]
+#damapper (part of `DAMAPPER`; see https://github.com/thegenemyers/DAMAPPER) [OK]
+#DAScover (part of `DASCRUBBER`; see https://github.com/thegenemyers/DASCRUBBER) [OK]
+#DASqv (part of `DASCRUBBER`; see https://github.com/thegenemyers/DASCRUBBER) [OK]
+#DBdump (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBdust (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBrm (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBshow (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBsplit (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#fasta2DAM (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#fasta2DB (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#computeintrinsicqv (part of `daccord`; see https://gitlab.com/german.tischler/daccord) [OK]
+#daccord (part of `daccord`; see https://gitlab.com/german.tischler/daccord) [OK]
+```
+
+The tarball additionally contains the Snakemake workflow, example config files
+and this README. In short, everything you to run DENTIST.
 
 
 [release]: https://github.com/a-ludi/dentist/releases
