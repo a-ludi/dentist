@@ -19,21 +19,33 @@ TOOLCHAIN="$2"
 
 [[ -v REPO ]] || fail 'missing variable REPO'
 
+function mkabsdir() {
+    mkdir -p "$1"
+    realpath "$1"
+}
+
 BRANCH="${BRANCH:-}"
 BUILD="${BUILD:-release}"
 PREBUILD="${PREBUILD:-}"
 INSTALL_CMD="${INSTALL_CMD:-install -t \"\$BINDIR\" \$(find . -maxdepth 1 -executable -not -type d)}"
-BINDIR="${BINDIR:-/usr/local/bin}"
-BUILDDIR="${BUILDDIR:-/opt}"
+CLEANBUILD="${CLEANBUILD:-1}"
+BINDIR="$(mkabsdir "${BINDIR:-/usr/local/bin}")"
+BUILDDIR="$(mkabsdir "${BUILDDIR:-/opt}")"
+SOURCEDIR="$(realpath "$BUILDDIR/$SOFTWARE")"
 NCPUS="${NCPUS:-1}"
 (( NCPUS >= 1 )) || fail 'NCPUS must be integer >= 1'
 NCPUS="$(( NCPUS ))"
 
 
-cd "$BUILDDIR"
-[[ -d "$SOFTWARE" ]] || git clone "$REPO" "$SOFTWARE"
-cd "$SOFTWARE"
-[[ -z "$BRANCH" ]] || git checkout "$BRANCH"
+[[ -d "$SOURCEDIR" ]] || git clone "$REPO" "$SOURCEDIR"
+
+pushd "$SOURCEDIR"
+
+if [[ -n "$BRANCH" ]] && ! git diff --quiet HEAD "$BRANCH"
+then
+    git checkout "$BRANCH"
+fi
+
 if [[ -f .gitmodules ]]
 then
     git submodule init
@@ -51,5 +63,7 @@ else
     exit 10
 fi
 eval "$INSTALL_CMD"
-cd "$BUILDDIR"
-rm -rf "$SOFTWARE"
+
+popd
+
+(( CLEANBUILD == 0 )) || rm -rf "$SOURCEDIR"

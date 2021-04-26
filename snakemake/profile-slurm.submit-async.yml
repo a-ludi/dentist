@@ -1,0 +1,39 @@
+# These two parameters reduce the load on the queuing system. If you still
+# experience troubles please reduce the numbers even further.
+jobs:                512
+max-jobs-per-second: 50
+max-status-checks-per-second: 1
+
+# Restart failed jobs automatically for a few times; maybe it helps.
+restart-times:       3
+
+# In case of an error, try to finish as many jobs as possible before stopping
+# the current run.
+keep-going:          true
+
+# This is only for convenience to reduce typing on the CLI
+cluster-config:      "cluster.yml"
+
+# This submits a job to the cluster and prints the job ID to stdout.
+# The job ID is required for the cluster-status command!
+cluster: |-
+    function submit() {{
+        sbatch -J {cluster.jobname} --mem={cluster.memory} --mincpus={cluster.nCPUs} --partition={cluster.partition} --time={cluster.time} --parsable "$@" | \
+        {{ IFS=';' read -r JOBID CLUSTER && echo "$JOBID"; }};
+    }};
+    submit
+# Used to check job status (takes output of cluster command as parameter)
+cluster-status: |-
+    function job_state() {
+        JOBID="$1";
+        if [[ "$(squeue -j"$JOBID" -h -o 'running' 2> /dev/null)" == running ]];
+        then
+            echo running;
+        elif [[ "$(sacct -j"$JOBID" -nPX -o State)" == COMPLETED ]];
+        then
+            echo success;
+        else
+            echo failed;
+        fi;
+    };
+    job_state

@@ -102,38 +102,22 @@ function parse_args()
 }
 
 
-function prepare_dist()
-{
-    [[ ! -e "$DIST_DIR" ]] || bail_out "could not create dist directory: file already exists: $DIST_DIR"
-
-    mkdir "$DIST_DIR"
-    cp dentist README.md CHANGELOG.md LICENSE "$DIST_DIR"
-
-    mkdir "$DIST_DIR/snakemake"
-    cp snakemake/cluster.yml "$DIST_DIR/snakemake/cluster.example.yml"
-    cp snakemake/snakemake.yml "$DIST_DIR/snakemake/snakemake.example.yml"
-    cp snakemake/{profile-slurm.yml,Snakefile} "$DIST_DIR/snakemake"
-}
-
 
 function main()
 {
-    DENTIST='./dentist'
-
     parse_args "$@"
 
-    dub build --build=release
-    strip -s "$DENTIST"
+    log "building all binaries"
+    trap 'rm -f .docker-build-id' exit
+    TARBALL="$(docker build -f Dockerfile.build-release --iidfile .docker-build-id --build-arg NCPUS=4 . | tee /dev/stderr | grep -E '^tarball:')"
+    TARBALL="${TARBALL#tarball:}"
+    log "build finished"
 
-    DENTIST_VERSION="$("$DENTIST" --version |& head -n1)"
-    DENTIST_VERSION="${DENTIST_VERSION#dentist }"
-    DENTIST_VERSION="${DENTIST_VERSION% (*)}"
-    ARCH="$(uname -m)"
-    TARBALL="dentist.$DENTIST_VERSION.$ARCH.tar.gz"
-    DIST_DIR="dentist.$DENTIST_VERSION.$ARCH"
-
-    prepare_dist
-    tar --remove-files -czf "$TARBALL" "$DIST_DIR"
+    (
+        CONTAINER_ID=$(docker create "$(< .docker-build-id)") && \
+        trap 'docker rm $CONTAINER_ID' exit && \
+        docker cp "$CONTAINER_ID:/tmp/$TARBALL" ./
+    )
 
     log "created $TARBALL"
 }

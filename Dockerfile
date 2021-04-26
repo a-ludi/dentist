@@ -48,6 +48,11 @@ RUN REPO=https://github.com/a-ludi/dentist.git \
     BRANCH='' \
     BUILD=release \
     /opt/build-and-install.sh dentist dub
+RUN REPO=https://github.com/a-ludi/dentist.git \
+    BRANCH='' \
+    BUILD=unittest \
+    INSTALL_CMD='install dentist "$BINDIR/dentist-unittest"' \
+    /opt/build-and-install.sh dentist dub
 
 # Check if dependencies are correctly installed and remove build dependencies
 # and artifacts
@@ -60,4 +65,6 @@ RUN rm -rf /opt/build-and-install.sh \
         build-base gcc abuild binutils dmd dub zlib-static zlib-dev avr-libc \
         git autoconf automake libtool gmp-dev jq && \
     # let dentist check if the dependencies are present
-    dentist -d
+    dentist -d && \
+    # make sure unit tests pass
+    dentist-unittest

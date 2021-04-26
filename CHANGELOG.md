@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
+## [1.0.2] - 2021-04-26
+### Added
+- provide pre-built binaries of DENTIST and all dependencies in release tarball
+- included unit tests in Docker build
+- github.io page
+
+### Changed
+- Improved README a lot
+- Updated dependencies
+- Removed `LAcheck` from the workflow beacuse it is useless
+  (see [issue 14](https://github.com/a-ludi/dentist/issues/14))
+
+### Fixed
+- Compiler error and deprecation warnings
+
+
 ## [1.0.1] - 2021-02-22
 ### Added
 - A wonderful logo :-)

@@ -9,3 +9,8 @@
 !source
 !update-modules.sh
 !update-swinfo.sh
+!README.md
+!CHANGELOG.md
+!LICENSE
+!snakemake
+!.dockerignore

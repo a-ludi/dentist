@@ -167,7 +167,10 @@ AlignmentChain[] filterContainedAlignmentChains(AlignmentChain[] alignmentChains
     return filter(alignmentChains);
 }
 
-alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
+bool groupByRead(const AlignmentChain lhs, const AlignmentChain rhs) pure nothrow @safe @nogc
+{
+    return lhs.contigB.id == rhs.contigB.id;
+}
 
 alias orderByReadAndErrorRate = orderLexicographically!(
     AlignmentChain,

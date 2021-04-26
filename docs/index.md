@@ -12,6 +12,8 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
+**First time here? Head over to [the example](#example) and make sure it works.**
+
 
 Table of Contents
 -----------------
@@ -28,7 +30,7 @@ Table of Contents
 
 
 Install
---------
+-------
 
 ### Use a Singularity Container (recommended)
 
@@ -55,8 +57,39 @@ The last command is explained in more detail below in
 ### Use Pre-Built Binaries
 
 Download the latest pre-built binaries from the [releases section][release]
-and extract the contents. The tarball contains a `dentist` binary as well as
-the Snakemake workflow, example config files and this README. In short, everything you to run DENTIST.
+and extract the contents. The pre-built binaries are stored in a subfolder
+called `bin`. Here are the instructions for `v1.0.1`:
+
+```sh
+# download & extract pre-built binaries
+wget https://github.com/a-ludi/dentist/releases/download/v1.0.1/dentist.v1.0.1.x86_64.tar.gz
+tar -xzf dentist.v1.0.1.x86_64.tar.gz
+
+# make binaries available to your shell
+cd dentist.v1.0.1.x86_64
+PATH="$PWD/bin:$PATH"
+
+# check installation with
+dentist -d
+# Expected output:
+# 
+#daligner (part of `DALIGNER`; see https://github.com/thegenemyers/DALIGNER) [OK]
+#damapper (part of `DAMAPPER`; see https://github.com/thegenemyers/DAMAPPER) [OK]
+#DAScover (part of `DASCRUBBER`; see https://github.com/thegenemyers/DASCRUBBER) [OK]
+#DASqv (part of `DASCRUBBER`; see https://github.com/thegenemyers/DASCRUBBER) [OK]
+#DBdump (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBdust (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBrm (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBshow (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#DBsplit (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#fasta2DAM (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#fasta2DB (part of `DAZZ_DB`; see https://github.com/thegenemyers/DAZZ_DB) [OK]
+#computeintrinsicqv (part of `daccord`; see https://gitlab.com/german.tischler/daccord) [OK]
+#daccord (part of `daccord`; see https://gitlab.com/german.tischler/daccord) [OK]
+```
+
+The tarball additionally contains the Snakemake workflow, example config files
+and this README. In short, everything you to run DENTIST.
 
 
 [release]: https://github.com/a-ludi/dentist/releases
@@ -159,8 +192,8 @@ data sets may require a cluster in which case you can use Snakemake's
 
 
 [snakemake]: https://snakemake.readthedocs.io/en/stable/index.html
-[snakemake-cloud]: https://snakemake.readthedocs.io/en/stable/executable.html#cloud-support
-[snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executable.html#cluster-execution
+[snakemake-cloud]: https://snakemake.readthedocs.io/en/stable/executing/cloud.html
+[snakemake-cluster]: https://snakemake.readthedocs.io/en/stable/executing/cluster.html
 
 
 #### Executing on a Cluster
@@ -175,7 +208,7 @@ Start by copying these files to your working/home directory:
 - `./snakemake/Snakefile`
 - `./snakemake/snakemake.yml`
 - `./snakemake/cluster.yml`
-- `./snakemake/profile-slurm.yml` → `~/.config/snakemake/slurm/config.yaml`
+- _One_ of `./snakemake/profile-slurm.*.yml` → `~/.config/snakemake/slurm/config.yaml`
 
 Next [adjust the profile][snakemake-profiles] according to your cluster. This
 should enable Snakemake to submit and track jobs on your cluster. You may use
@@ -186,7 +219,7 @@ to your cluster by
     snakemake --configfile=snakemake.yml --profile=slurm --use-singularity
 
 Note, parameters specified in the profile provide default values and can be
-overridden by specififying different value on the CLI.
+overridden by specifying different value on the CLI.
 
 
 [smp-project]: https://github.com/snakemake-profiles/doc
@@ -208,17 +241,24 @@ After installing [Snakemake][snakemake] (5.32.1 or later) and
 [Singularity][singularity] 3.5.x or later, you may check your installation
 with this [example dataset][example-tarball-v1.0.1] (182Mb).
 
+If Singularity is not an option for you, plaese following the [installation
+instructions](#install) for an alternative.
+
 ```sh
-wget https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
-tar -xzf dentist-example.tar.v1.0.1.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v1.0.1-2/dentist-example.tar.gz
+tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
+
+
+### Local Execution
 
 Execute the entire workflow on your *local machine* using `all` cores:
 
 ```sh
 # run the workflow
-snakemake --configfile=snakemake.yaml --use-singularity --cores=all
+snakemake --configfile=snakemake.yml --use-singularity --cores=all
+
 # validate the files
 md5sum -c checksum.md5
 ```
@@ -226,7 +266,30 @@ md5sum -c checksum.md5
 Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
-[example-tarball-v1.0.1]: https://bds.mpi-cbg.de/hillerlab/DENTIST/dentist-example.v1.0.1.tar.gz
+
+### Cluster Execution
+
+Execute the workflow on a *SLURM cluster*:
+
+```sh
+mkdir -p "$HOME/.config/snakemake/slurm"
+# select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
+cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yml"
+# execute using the cluster profile
+snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+If you want to run with a differnt cluster manager or in the cloud, please
+read [the advice above](#executing-on-a-cluster). The easiest option is
+to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
+`qsub -sync yes`. The command must submit a job to the cluster and *wait* for
+it to finish.
+
+
+[example-tarball-v1.0.1]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.1-2/dentist-example.tar.gz
 
 
 Configuration
@@ -259,13 +322,14 @@ have immense influence on the performance of DENTIST.
   correctness of closed gaps but reduce sensitivity. The value must be well
   below the expected coverage.
 
-- `--allow-single-reads`: May be used under careful consideration. This is
-  intended for one of the following scenarios:
+- `--allow-single-reads`: May be used under careful consideration in
+  combination with `--min-spanning-reads=1`. This is intended for one of the
+  following scenarios:
 
-  1. DENTIST is meant to close as many gaps as possible in a _de novo_
-     assembly. Then the closed gaps must be validated by other means
-     afterwards.
-  2. DENTIST is used not with real reads but with an independent assembly.
+    1. DENTIST is meant to close as many gaps as possible in a _de novo_
+       assembly. Then the closed gaps must be validated by other means
+       afterwards.
+    2. DENTIST is used not with real reads but with an independent assembly.
 
 - `--existing-gap-bonus`: If DENTIST finds evidence to join two contigs that
   are already consecutive in the input assembly (i.e. joined by `N`s) then it
@@ -275,16 +339,20 @@ have immense influence on the performance of DENTIST.
 
 - `--join-policy`: Choose according to your needs:
   
-  - `scaffoldGaps`: Closes only gaps that are marked by `N`s in the assembly.
-    This is the default mode of operation. Use this if you do not want to alter
-    the scaffolding of the assembly. See also `--existing-gap-bonus`.
-  - `scaffolds`: Allows whole scaffolds to be joined in addition to the effects
-    of `scaffoldGaps`. Use this if you have (many) scaffolds that are not yet
-    full chromosome-scale.
-  - `contigs`: Allows contigs to be rearranged freely. This is especially
-    useful in _de novo_ assemblies **before** applying any other scaffolding
-    methods as it increases the contiguity thus increasing the chance that
-    large-scale scaffolding (e.g. Bionano or Hi-C) finds proper joins.
+      `scaffoldGaps`
+      :   Closes only gaps that are marked by `N`s in the assembly. This is the
+          default mode of operation. Use this if you do not want to alter the
+          scaffolding of the assembly. See also `--existing-gap-bonus`.
+      `scaffolds`
+      :   Allows whole scaffolds to be joined in addition to the effects of
+          `scaffoldGaps`. Use this if you have (many) scaffolds that are not
+          yet full chromosome-scale.
+      `contigs`
+      :   Allows contigs to be rearranged freely. This is especially useful in
+          _de novo_ assemblies **before** applying any other scaffolding
+          methods as it increases the contiguity thus increasing the chance
+          that large-scale scaffolding (e.g. Bionano or Hi-C) finds proper
+          joins.
 
 
 #### Choosing the Read Type
@@ -345,6 +413,11 @@ resources they consume.
 Troubleshooting
 ---------------
 
+### Unexpected `ProtectedOutputException` when running on a single machine
+
+**See also:** [Regular
+`ProtectedOutputException`](#regular-protected-output-exception).
+
 When executed on a single machine, `snakemake` will sometimes quit with an
 `ProtectedOutputException` ([Snakemake bug report filed][sm-884]). You may try the follow snippet to get `snakemake`
 back on track:
@@ -365,6 +438,63 @@ done
 ```
 
 [sm-884]: https://github.com/snakemake/snakemake/issues/884
+
+
+### Regular `ProtectedOutputException`
+
+**See also:** [Unexpected
+`ProtectedOutputException` when running on a single machine
+](#unexpected-protected-output-exception-when-running-on-a-single-machine).
+
+Snakemake has a [built-in facility to protect files][sm-protected-files] from
+accidental overwrites. This is meant to avoid overwriting precious results
+that took many CPU hours to produce. If executing a rule would overwrite a
+protected file, Snakemake raises a `ProtectedOutputException`, e.g.:
+
+```
+ProtectedOutputException in line 1236 of /tmp/dentist-example/Snakefile:
+Write-protected output files for rule collect:
+workdir/pile-ups.db
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 136, in run_jobs
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 441, in run
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 230, in _run
+  File "/usr/lib/python3.9/site-packages/snakemake/executors/__init__.py", line 155, in _run
+```
+
+Here `workdir/pile-ups.db` is the protected file that caused the error. If you
+are sure of what you are doing, you can simply raise the protection by `chmod
+-R +w ./workdir` and execute Snakemake again. Now, it will overwrite any files.
+
+
+[sm-protected-files]: https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#protected-and-temporary-files
+
+
+### No internet connection on compute nodes
+
+If you have no internet connection on your compute nodes or even the cluster
+head node and want to use Singularity for execution, you will need to download
+the container image manually and put it to a location accessible by all jobs.
+Assume `/path/to/dir` is such a location on your cluster. Then download the
+container image using
+
+```sh
+# IF internet connection on head node
+singularity pull --dir /path/to/dir docker://aludi/dentist:stable
+
+# ELSE (on local machine)
+singularity pull docker://aludi/dentist:stable
+# copy dentist_stable.sif to cluster
+scp dentist_stable.sif cluster:/path/to/dir/dentist_stable.sif
+```
+
+When the image is in place you will need to adjust your configuration in
+`snakemake.yml`:
+
+```yaml
+dentist_container: "/path/to/dir/dentist_stable.sif"
+```
+
+Now, you are ready for execution.
 
 
 Citation
