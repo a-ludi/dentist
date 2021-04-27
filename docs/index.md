@@ -289,7 +289,7 @@ to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
 it to finish.
 
 
-[example-tarball-v1.0.2]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-1/dentist-example.tar.gz
+[example-tarball-v1.0.2]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-2/dentist-example.tar.gz
 
 
 Configuration
