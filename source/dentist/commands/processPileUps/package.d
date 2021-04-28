@@ -774,7 +774,7 @@ protected class PileUpProcessor
             insertionSequence,
             0,
             insertionAlignment[],
-            pileUp.map!"a[0].contigB.id".array,
+            pileUp.map!"a[0].contigB.id".array.sort.release,
         );
 
         assert(insertion.isParallel == insertionAlignment.isParallel);
