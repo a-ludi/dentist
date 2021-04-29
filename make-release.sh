@@ -102,24 +102,63 @@ function parse_args()
 }
 
 
+function make_tarball()
+{
+    DENTIST_VERSION="$(dentist --version 2>&1 | head -n1)" && \
+    DENTIST_VERSION="${DENTIST_VERSION#dentist }" && \
+    DENTIST_VERSION="${DENTIST_VERSION% (*)}" && \
+    DENTIST_SRC="/opt/dentist" && \
+    ARCH="$(uname -m)" && \
+    TARBALL="dentist.$DENTIST_VERSION.$ARCH.tar.gz" && \
+    DIST_DIR="dentist.$DENTIST_VERSION.$ARCH" && \
+    cd /tmp && \
+    install -Dt "$DIST_DIR" \
+        "$DENTIST_SRC/README.md" \
+        "$DENTIST_SRC/CHANGELOG.md" \
+        "$DENTIST_SRC/LICENSE" && \
+    install -Dt "$DIST_DIR/snakemake" \
+        "$DENTIST_SRC/snakemake/cluster.yml" \
+        "$DENTIST_SRC/snakemake/snakemake.yml" \
+        "$DENTIST_SRC/snakemake/profile-slurm."*".yml" \
+        "$DENTIST_SRC/snakemake/Snakefile" && \
+    install -Dt "$DIST_DIR/bin" \
+        "$BINDIR/dentist" \
+        $({
+            dentist -d;
+            echo TANmask;
+            echo datander;
+            echo LAshow;
+            echo LAdump;
+            echo DB2fasta;
+            echo DAM2fasta;
+        } | awk -F' ' '{print ENVIRON["BINDIR"] "/" $1}') && \
+    tar --remove-files -czf "$TARBALL" "$DIST_DIR" && \
+    echo "tarball:$TARBALL"
+    realpath "$TARBALL"
+}
+
 
 function main()
 {
     parse_args "$@"
 
-    log "building all binaries"
+    log "building conatiner image"
     trap 'rm -f .docker-build-id' exit
-    TARBALL="$(docker build -f Dockerfile.build-release --iidfile .docker-build-id --build-arg NCPUS=4 . | tee /dev/stderr | grep -E '^tarball:')"
-    TARBALL="${TARBALL#tarball:}"
-    log "build finished"
+    docker build --iidfile .docker-build-id --build-arg NCPUS=4 .
 
     (
-        CONTAINER_ID=$(docker create "$(< .docker-build-id)") && \
+        log "gathering release files"
+        CONTAINER_ID=$(docker create "$(< .docker-build-id)" bash -c "$(declare -f make_tarball); make_tarball") && \
         trap 'docker rm $CONTAINER_ID' exit && \
-        docker cp "$CONTAINER_ID:/tmp/$TARBALL" ./
-    )
 
-    log "created $TARBALL"
+        TARBALL="$(docker start -a "$CONTAINER_ID" | tee /dev/stderr | grep -E '^tarball:')"
+        TARBALL="${TARBALL#tarball:}"
+
+        log "copying tarball $TARBALL"
+        docker cp "$CONTAINER_ID:/tmp/$TARBALL" ./
+
+        log "created $TARBALL"
+    )
 }
 
 
