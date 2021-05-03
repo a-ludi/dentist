@@ -111,6 +111,16 @@ function make_tarball()
     ARCH="$(uname -m)" && \
     TARBALL="dentist.$DENTIST_VERSION.$ARCH.tar.gz" && \
     DIST_DIR="dentist.$DENTIST_VERSION.$ARCH" && \
+    INCLUDE_BINARIES=( Catrack DAM2fasta DAScover DASqv DB2fasta DBa2b DBb2a
+        DBdump DBdust DBmv DBrm DBshow DBsplit DBstats DBtrim DBwipe LAa2b
+        LAb2a LAcat LAcheck LAdump LAmerge LAshow LAsort LAsplit TANmask
+        computeintrinsicqv daccord daligner damapper datander dentist dumpLA
+        fasta2DAM fasta2DB lasfilteralignments rangen simulator )
+    for (( I = ${#INCLUDE_BINARIES[*]} - 1; I >= 0; --I ))
+    do
+        INCLUDE_BINARIES[$I]="$BINDIR/${INCLUDE_BINARIES[$I]}"
+    done
+
     cd /tmp && \
     install -Dt "$DIST_DIR" \
         "$DENTIST_SRC/README.md" \
@@ -121,17 +131,7 @@ function make_tarball()
         "$DENTIST_SRC/snakemake/snakemake.yml" \
         "$DENTIST_SRC/snakemake/profile-slurm."*".yml" \
         "$DENTIST_SRC/snakemake/Snakefile" && \
-    install -Dt "$DIST_DIR/bin" \
-        "$BINDIR/dentist" \
-        $({
-            dentist -d;
-            echo TANmask;
-            echo datander;
-            echo LAshow;
-            echo LAdump;
-            echo DB2fasta;
-            echo DAM2fasta;
-        } | awk -F' ' '{print ENVIRON["BINDIR"] "/" $1}') && \
+    install -Dt "$DIST_DIR/bin" "${INCLUDE_BINARIES[@]}" && \
     tar --remove-files -czf "$TARBALL" "$DIST_DIR" && \
     echo "tarball:$TARBALL"
     realpath "$TARBALL"
@@ -144,7 +144,7 @@ function main()
 
     log "building conatiner image"
     trap 'rm -f .docker-build-id' exit
-    docker build --iidfile .docker-build-id --build-arg NCPUS=4 .
+    docker build --iidfile .docker-build-id .
 
     (
         log "gathering release files"
