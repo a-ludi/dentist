@@ -14,36 +14,21 @@ ENV TZ=Europe/London
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Install dependencies (build & runtime) via apt-get
 RUN apt-get update && \
-    apt-get install -y \
-        bash zlib1g avr-libc && \
+    apt-get install -y bash zlib1g avr-libc libgomp1 && \
     apt-get clean
-# RUN apt-get update && \
-#     # install build dependencies
-#     apt-get install -y \
-#         bash jq curl \
-#         build-essential autoconf pkg-config zlib1g zlib1g-dev \
-#         avr-libc git libtool libgmp-dev
-# RUN echo "$DMD_URL" && \
-#     curl -o /tmp/dmd.deb -L "https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2021/dmd_${DMD_VERSION}-${DMD_REL}_amd64.deb" && \
-#     dpkg -i /tmp/dmd.deb && \
-#     rm /tmp/dmd.deb
-# RUN curl -o /tmp/dub.tar.gz -L "https://github.com/dlang/dub/releases/download/v${DUB_VERSION}/dub-v${DUB_VERSION}-linux-x86_64.tar.gz" && \
-#     tar -C /usr/local/bin -xzf /tmp/dub.tar.gz && \
-#     rm /tmp/dub.tar.gz
 # Provide our convenient build script to reduce verbosity
 COPY ./build-and-install.sh /opt/
-
 # Build runtime dependencies
+
+# libmaus2 & daccord
 RUN BUILD_DEPS="build-essential autoconf pkg-config zlib1g-dev git libtool libgmp-dev" && \
     apt-get update && apt-get install -y $BUILD_DEPS && \
     REPO=https://gitlab.com/german.tischler/libmaus2.git \
     BRANCH=2.0.724-release-20200702192714 \
     PREBUILD='autoupdate && autoreconf -i -f && ./configure --prefix="$PREFIX" --with-gmp && make' \
     INSTALL_CMD='make install' \
+    CLEANBUILD=0 \
     /opt/build-and-install.sh libmaus2 make && \
-    apt-get remove -y $BUILD_DEPS && apt-get autoremove -y && apt-get clean
-RUN BUILD_DEPS="build-essential autoconf pkg-config zlib1g-dev git libtool libgmp-dev" && \
-    apt-get update && apt-get install -y $BUILD_DEPS && \
     REPO=https://gitlab.com/german.tischler/daccord.git \
     BRANCH=0.0.18-release-20200702195851 \
     PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:}$PKG_CONFIG_PATH" \
@@ -51,6 +36,7 @@ RUN BUILD_DEPS="build-essential autoconf pkg-config zlib1g-dev git libtool libgm
     PREBUILD='autoreconf -i -f && ./configure --prefix="$PREFIX" --with-libmaus2' \
     INSTALL_CMD='make install' \
     /opt/build-and-install.sh daccord make && \
+    make -C /opt/libmaus2 uninstall && rm -rf /opt/libmaus2 && \
     apt-get remove -y $BUILD_DEPS && apt-get autoremove -y && apt-get clean
 RUN BUILD_DEPS="build-essential git zlib1g-dev" && \
     apt-get update && apt-get install -y $BUILD_DEPS && \
