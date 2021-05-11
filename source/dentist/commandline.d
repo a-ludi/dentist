@@ -1637,7 +1637,12 @@ struct OptionsFor(DentistCommand _command)
             considered repetitive; a default value is derived from --read-coverage;
             both options are mutually exclusive
         }")
-        id_t maxCoverageReads;
+        id_t maxCoverageReads = id_t.max;
+
+        @property bool hasMaxCoverageReads() const pure nothrow @safe
+        {
+            return maxCoverageReads != defaultValue!maxCoverageReads;
+        }
 
         @Option()
         id_t[2] coverageBoundsReads;
@@ -1649,13 +1654,11 @@ struct OptionsFor(DentistCommand _command)
                 return;
 
             enforce!CLIException(
-                maxCoverageReads != maxCoverageReads.init ||
-                hasReadCoverage,
+                hasMaxCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --max-coverage-reads",
             );
             enforce!CLIException(
-                (maxCoverageReads != maxCoverageReads.init) ^
-                hasReadCoverage,
+                hasMaxCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --max-coverage-reads",
             );
 
@@ -1714,7 +1717,12 @@ struct OptionsFor(DentistCommand _command)
             considered repetitive; a default value is derived from --read-coverage;
             both options are mutually exclusive
         ")
-        id_t maxImproperCoverageReads;
+        id_t maxImproperCoverageReads = id_t.max;
+
+        @property bool hasMaxImproperCoverageReads() const pure nothrow @safe
+        {
+            return maxImproperCoverageReads != defaultValue!maxImproperCoverageReads;
+        }
 
         @Option()
         id_t[2] improperCoverageBoundsReads;
@@ -1726,13 +1734,11 @@ struct OptionsFor(DentistCommand _command)
                 return;
 
             enforce!CLIException(
-                maxImproperCoverageReads != maxImproperCoverageReads.init ||
-                hasReadCoverage,
+                hasMaxImproperCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --max-improper-coverage-reads",
             );
             enforce!CLIException(
-                (maxImproperCoverageReads != maxImproperCoverageReads.init) ^
-                hasReadCoverage,
+                hasMaxImproperCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --max-improper-coverage-reads",
             );
 
@@ -1829,7 +1835,12 @@ struct OptionsFor(DentistCommand _command)
             <num> properly aligned reads; see --weak-coverage-mask for more
             details
         ")
-        id_t minCoverageReads;
+        id_t minCoverageReads = id_t.max;
+
+        @property bool hasMinCoverageReads() const pure nothrow @safe
+        {
+            return minCoverageReads != defaultValue!minCoverageReads;
+        }
 
         @Option()
         id_t[2] coverageBoundsReads;
@@ -1841,13 +1852,11 @@ struct OptionsFor(DentistCommand _command)
                 return;
 
             enforce!CLIException(
-                minCoverageReads != minCoverageReads.init ||
-                hasReadCoverage,
+                hasMinCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --min-coverage-reads",
             );
             enforce!CLIException(
-                (minCoverageReads != minCoverageReads.init) ^
-                hasReadCoverage,
+                hasMinCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --min-coverage-reads",
             );
             enforce!CLIException(
