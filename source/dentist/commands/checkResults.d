@@ -31,14 +31,19 @@ import dentist.dazzler :
     ContigSegment,
     DBdumpOptions,
     GapSegment,
-    getFlatLocalAlignments,
+    getBlockSize,
     getContigCutoff,
     getDalignment,
     getFastaSequence,
+    getFlatLocalAlignments,
     getDbRecords,
+    getLasFile,
+    getNumBlocks,
     getScaffoldStructure,
+    LAmerge,
     readMask,
-    ScaffoldSegment;
+    ScaffoldSegment,
+    stripDbExtension;
 import dentist.util.algorithm :
     filterInPlace,
     first,
@@ -49,6 +54,7 @@ import dentist.util.algorithm :
 import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
+    ceildiv,
     mean,
     median,
     N,
@@ -580,13 +586,34 @@ private struct ResultAnalyzer
             queryChunk,
             options.tmpdir,
         );
-        auto croppedContigMappingFile = getDalignment(
+        enum dalignerMaxBlockSize = 2*2^^30;
+        const numResultBlocks = options.resultDb.getNumBlocks();
+        const resultBlockSize = options.resultDb.getBlockSize();
+        const blocksPerCall = dalignerMaxBlockSize / resultBlockSize;
+        const numCalls = ceildiv(numResultBlocks, blocksPerCall);
+        foreach (callIdx; 0 .. numCalls)
+            cast(void) getDalignment(
+                format!"%s@%d-%d"(
+                    options.resultDb.stripDbExtension,
+                    callIdx * blocksPerCall,
+                    min((callIdx + 1) * blocksPerCall, numResultBlocks),
+                ),
+                croppedContigDb,
+                options.recoverImperfectContigsAlignmentOptions,
+                options.tmpdir,
+            );
+
+        auto croppedContigMappingFile = getLasFile(
             options.resultDb,
             croppedContigDb,
-            options.recoverImperfectContigsAlignmentOptions,
             options.tmpdir,
         );
-
+        LAmerge(croppedContigMappingFile, iota(numResultBlocks)
+            .map!(blockIdx => getLasFile(
+                format!"%s.%d"(options.resultDb.stripDbExtension, blockIdx + 1),
+                croppedContigDb,
+                options.tmpdir,
+            )));
         auto croppedContigAlignments = getFlatLocalAlignments(
             options.resultDb,
             croppedContigDb,
