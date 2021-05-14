@@ -586,23 +586,14 @@ private struct ResultAnalyzer
             queryChunk,
             options.tmpdir,
         );
-        enum dalignerMaxBlockSize = 2*2^^30;
         const numResultBlocks = options.resultDb.getNumBlocks();
-        const resultBlockSize = options.resultDb.getBlockSize();
-        const blocksPerCall = dalignerMaxBlockSize / resultBlockSize;
-        const numCalls = ceildiv(numResultBlocks, blocksPerCall);
-        foreach (callIdx; 0 .. numCalls)
+        foreach (blockIdx; 0 .. numResultBlocks)
             cast(void) getDalignment(
-                format!"%s@%d-%d"(
-                    options.resultDb.stripDbExtension,
-                    callIdx * blocksPerCall,
-                    min((callIdx + 1) * blocksPerCall, numResultBlocks),
-                ),
+                format!"%s.%d"(options.resultDb.stripDbExtension, blockIdx + 1),
                 croppedContigDb,
                 options.recoverImperfectContigsAlignmentOptions,
                 options.tmpdir,
             );
-
         auto croppedContigMappingFile = getLasFile(
             options.resultDb,
             croppedContigDb,
