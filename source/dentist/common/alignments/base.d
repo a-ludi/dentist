@@ -1560,6 +1560,37 @@ struct FlatLocalAlignment
     }
 
 
+    int opCmp(ref const FlatLocalAlignment other) const pure nothrow @safe @nogc
+    {
+        long cmp;
+
+        enum compare(string field) = q{
+            cmp = cast(long) this.} ~ field ~ q{ -
+                  cast(long) other.} ~ field ~ q{;
+
+            if (cmp != 0)
+                return cmp > 0 ? 1 : -1;
+        };
+
+        mixin(compare!"contigA.id");
+        mixin(compare!"contigB.id");
+        mixin(compare!"flags.complement");
+        mixin(compare!"contigA.begin");
+        mixin(compare!"contigA.end");
+        mixin(compare!"contigB.begin");
+        mixin(compare!"contigB.end");
+        mixin(compare!"numDiffs");
+
+        return 0;
+    }
+
+
+    @property coord_t numDiffs() const pure nothrow @safe @nogc
+    {
+        return tracePoints.map!(tp => cast(coord_t) tp.numDiffs).sum;
+    }
+
+
     @property Trace trace() const pure nothrow @safe
     {
         return Trace(

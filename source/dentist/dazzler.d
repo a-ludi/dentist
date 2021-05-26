@@ -3668,6 +3668,7 @@ string filterPileUpAlignments(
     in string dbFile,
     in string lasFile,
     in coord_t properAlignmentAllowance,
+    Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
     auto alignments = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated)
@@ -3713,6 +3714,7 @@ void filterPileUpAlignments(
 void filterPileUpAlignments(
     ref FlatLocalAlignment[] alignments,
     in coord_t properAlignmentAllowance,
+    Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
     /// An alignment in a pile up is valid iff it is proper and the begin/end
@@ -3735,7 +3737,19 @@ void filterPileUpAlignments(
     }
 
     foreach (ref alignment; alignments)
+    {
         alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
+
+        if (forceFlat && ! alignment.flags.disabled)
+        {
+            alignment.flags.alternateChain = false;
+            alignment.flags.chainContinuation = false;
+            alignment.flags.unchained = true;
+        }
+    }
+
+    if (forceFlat)
+        alignments.sort;
 }
 
 

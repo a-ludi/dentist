@@ -488,7 +488,12 @@ protected class PileUpProcessor
 
         .computeQVs(croppedDb, chainedPileUpAlignment, coverage);
 
-        pileUpAlignment = filterPileUpAlignments(croppedDb, chainedPileUpAlignment, options.properAlignmentAllowance);
+        pileUpAlignment = filterPileUpAlignments(
+            croppedDb,
+            chainedPileUpAlignment,
+            options.properAlignmentAllowance,
+            Yes.forceFlat,
+        );
 
         dentistEnforce(
             !lasEmpty(pileUpAlignment),
