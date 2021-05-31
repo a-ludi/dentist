@@ -36,13 +36,16 @@ def prefetch_singularity_image(container_url):
     from snakemake.persistence import Persistence
     from snakemake.logging import logger
 
-    logger.info("Pre-fetching singularity image...")
     dag = type('FakeDAG', (object,), dict(
         workflow=type('FakeWorkflow', (object,), dict(
                 persistence=Persistence(singularity_prefix=workflow.singularity_prefix)
             ))))
 
-    Image(container_url, dag, is_containerized=True).pull()
+    image = Image(container_url, dag)
+
+    if not exists(image.path):
+        logger.info("Pre-fetching singularity image...")
+        image.pull()
 
 
 def shellcmd(cmd):
