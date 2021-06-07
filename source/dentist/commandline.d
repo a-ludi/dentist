@@ -571,15 +571,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        DentistCommand.processPileUps,
-    ))
-    {
-        @Argument("<ignored>")
-        @Help("arugment is kept for compatibility only; will be removed in v2.0")
-        string _dummyArg;
-    }
-
-    static if (command.among(
         DentistCommand.validateRegions,
     ))
     {
