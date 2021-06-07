@@ -303,6 +303,9 @@ DENTIST comprises a complex pipeline of with many options for tweaking. This
 section points out some important parameters and their effect on the result or
 performance.
 
+The default parameters are rather **conservative**, i.e. they focus on
+correctness of the result while not sacrificing too much sensitivity.
+
 
 #### How to Choose DENTIST Parameters
 
@@ -357,6 +360,14 @@ have immense influence on the performance of DENTIST.
           methods as it increases the contiguity thus increasing the chance
           that large-scale scaffolding (e.g. Bionano or Hi-C) finds proper
           joins.
+
+- `--min-coverage-reads`, `--min-spanning-reads`, `--region-context`:
+  DENTIST validates closed gaps by mapping the reads to the gap-closed
+  assembly. It requires for each gap and the base pairs down- and upstream
+  (`--region-context`) are (1) covered by at least `--min-coverage-reads` reads
+  at every position and (2) are spanned by at least `--min-spanning-reads`
+  reads. Thus, increasing any of these numbers makes the *valid* gaps more
+  robust but may reduce their number.
 
 
 #### Choosing the Read Type
