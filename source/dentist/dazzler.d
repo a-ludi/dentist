@@ -3674,7 +3674,7 @@ string filterPileUpAlignments(
     auto alignments = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated)
         .array;
 
-    filterPileUpAlignments(alignments, properAlignmentAllowance);
+    filterPileUpAlignments(alignments, properAlignmentAllowance, forceFlat);
 
     string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
     writeAlignments(filteredLasFile, alignments);
