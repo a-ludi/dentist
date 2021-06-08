@@ -1268,7 +1268,7 @@ rule process:
     log: log_file("process.{batch_id}")
     container: dentist_container
     shell:
-        "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} '<ignored>' {input.pile_ups} {output} 2> {log}"
+        "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} {input.pile_ups} {output} 2> {log}"
 
 rule make_merge_config:
     input:
