@@ -763,6 +763,7 @@ validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
 gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
 preliminary_gap_closed = fasta_to_workdb(preliminary_gap_closed_fasta, "dam")
 closed_gaps_mask = workflow_.get("closed_gaps_mask", "closed-gaps")
+preliminary_closed_gaps_agp = join(workdir_, "{}.{}.agp".format(db_name(preliminary_gap_closed), closed_gaps_mask))
 preliminary_closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(preliminary_gap_closed), closed_gaps_mask))
 closed_gaps_bed = "{}.{}.bed".format(db_stub(gap_closed_fasta), closed_gaps_mask)
 reference = fasta_to_workdb(reference_fasta, "dam")
@@ -796,7 +797,7 @@ insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
-preliminary_output_revert_options = ["agp", "scaffolding", "skip-gaps", "skip-gaps-file"]
+preliminary_output_revert_options = ["scaffolding", "skip-gaps", "skip-gaps-file"]
 
 if is_dentist_testing():
     preliminary_output_revert_options.append("cache-contig-alignments")
@@ -1310,14 +1311,15 @@ rule preliminary_output:
         refdb = await_db_files(reference),
         insertions = insertions
     output:
-        preliminary_gap_closed_fasta,
-        preliminary_closed_gaps_bed
+        fasta = preliminary_gap_closed_fasta,
+        agp = preliminary_closed_gaps_agp,
+        bed = preliminary_closed_gaps_bed
     params:
         revert_options = "--revert={}".format(",".join(preliminary_output_revert_options))
     log: log_file("preliminary-output")
     container: dentist_container
     shell:
-        "dentist output --config={input.config} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[0]} 2> {log}"
+        "dentist output --config={input.config} {dentist_flags} --agp={output[agp]} --closed-gaps-bed={output[bed]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[fasta]} 2> {log}"
 
 
 rule preliminary_gap_closed_vs_reads_alignment_block:
