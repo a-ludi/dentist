@@ -92,6 +92,7 @@ import std.array :
     split;
 import std.conv;
 import std.exception :
+    assumeWontThrow,
     basicExceptionCtors,
     enforce,
     ErrnoException;
@@ -135,7 +136,8 @@ import std.range :
     takeOne;
 import std.regex :
     ctRegex,
-    matchFirst;
+    matchFirst,
+    replaceAll;
 import std.stdio :
     File,
     stderr,
@@ -143,6 +145,11 @@ import std.stdio :
 import std.string :
     join,
     lineSplitter,
+    stripLeft,
+    outdent,
+    replace,
+    strip,
+    toUpper,
     tr,
     wrap;
 import std.traits :
@@ -215,6 +222,12 @@ ReturnCode run(in string[] args)
         {
             return ReturnCode.runtimeError;
         }
+
+        return ReturnCode.ok;
+    case "-l":
+        goto case;
+    case "--list-options":
+        printListOfAllOptions();
 
         return ReturnCode.ok;
     case "--usage":
@@ -313,6 +326,148 @@ void assertExternalToolsAvailable()
         ),
     );
 }
+
+void printListOfAllOptions()
+{
+    import darg : isArgumentHandler, isOptionHandler;
+    import std.stdio : writefln;
+
+    enum defaultValueRegex = ctRegex!`\s*\(default:\s*([^)]+)\)\s*`;
+
+    string[][string] optionNames;
+    string[string] argumentName;
+    string[string] defaultValue;
+    string[string] help;
+    string[][string] commands;
+
+    static foreach (command; EnumMembers!DentistCommand)
+    {{
+        alias Options = OptionsFor!command;
+
+        foreach (member; __traits(allMembers, Options))
+        {
+            alias symbol = Alias!(__traits(getMember, Options, member));
+            alias optionUDAs = getUDAs!(symbol, Option);
+
+            static if (optionUDAs.length > 0 && optionUDAs[0].names.length > 0)
+            {
+                alias Symbol = typeof(symbol);
+                enum optionUDA = optionUDAs[0];
+                enum optionName = optionUDA.names[0];
+                alias metaVarUDAs = getUDAs!(symbol, MetaVar);
+                static assert(metaVarUDAs.length <= 1);
+                alias helpUDAs = getUDAs!(symbol, Help);
+                static assert(helpUDAs.length <= 1);
+
+                static if (metaVarUDAs.length > 0)
+                    enum currentArgumentName = metaVarUDAs[0].name;
+                else static if (isArgumentHandler!(Symbol))
+                    enum currentArgumentName = member.toUpper;
+                else static if (isOptionHandler!(Symbol) || is(Symbol == OptionFlag))
+                    enum currentArgumentName = "";
+                else
+                    enum currentArgumentName = "<"~ Symbol.stringof ~ ">";
+
+                static if (helpUDAs.length > 0)
+                    enum currentHelp = helpUDAs[0].help.wrap(size_t.max);
+                else
+                    enum currentHelp = "";
+
+                const currentDefaultValue = currentHelp.matchFirst(defaultValueRegex)[1];
+
+                if (optionName in optionNames)
+                {
+                    assert(optionNames[optionName] == optionUDA.names);
+                    assert(argumentName[optionName] == currentArgumentName);
+                    assert(defaultValue[optionName] == currentDefaultValue);
+                    assert(help[optionName] == currentHelp);
+                }
+                else
+                {
+                    optionNames[optionName] = optionUDA.names;
+                    argumentName[optionName] = currentArgumentName;
+                    defaultValue[optionName] = currentDefaultValue;
+                    help[optionName] = currentHelp;
+                }
+                commands[optionName] ~= Options.commandName;
+            }
+        }
+    }}
+
+    alias commandList = (optionName) =>
+        commands[optionName].length == dentistCommands.length
+            ? "all"
+            : commands[optionName].length + 1 == dentistCommands.length && !commands[optionName].canFind("validate-config")
+                ? "all except `validate-config`"
+                : format!"%-(`%s`%|, %)"(commands[optionName]);
+
+    writefln!("
+        List of Commandline Options
+        ===========================
+
+        The following list contains all options across all command of DENTIST.
+        Default values are given in parentheses after the option name and the
+        associated commands are stated in parentheses after the colon.
+
+        **Example:**
+
+        ```
+        --fasta-line-width, -w <ulong>(50): (output)
+                                      └──┘  └──────┘
+                            default value    command
+        ```
+
+        **List of options:**
+".stripLeft("\n").outdent);
+
+    foreach (optionName; optionNames.keys.sort)
+        writefln!"- `%-(%s, %) %s%s`: (%s)  \n    %s\n"(
+            optionNames[optionName]
+                .map!(name => name.length == 1 ? "-" ~ name : "--" ~ name),
+            argumentName[optionName],
+            defaultValue[optionName] !is null
+                ? format!"(%s)"(defaultValue[optionName])
+                : "",
+            commandList(optionName),
+            help[optionName]
+                .replaceAll(defaultValueRegex, "")
+                .strip
+                .htmlEscape
+                .markdownHtmlUnescape,
+        );
+    writefln!"";
+    writefln!"---";
+    writefln!"<small>This file was generated by `dentist --list-options` at %s.</small>"(version_);
+}
+
+
+private string htmlEscape(string str) pure nothrow @safe
+{
+    return str
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;");
+}
+
+
+private string htmlUnescape(string str) pure nothrow @safe
+{
+    return str
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">");
+}
+
+
+private string markdownHtmlUnescape(string str) nothrow @safe
+{
+    enum markdownCodeRegex = ctRegex!r"`([^`]+)`";
+
+    alias unescapeCode = match => format!"`%s`"(htmlUnescape(match[1]));
+
+    return assumeWontThrow(str.replaceAll!unescapeCode(markdownCodeRegex));
+}
+
 
 string parseCommandName(in string[] args)
 {
@@ -892,10 +1047,10 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("bad-fraction")
         @MetaVar("<frac>")
-        @Help("
+        @Help(format!"
             Intrinsic QVs are categorized as \"bad\" if they are greater or equal to the best QV
-            of the worst <frac> trace point intervals.
-        ")
+            of the worst <frac> trace point intervals. (default: %s)
+        "(defaultValue!badFraction))
         @(Validate!(value => enforce!CLIException(
             0.0 <= value && value < 0.5,
             "--bad-fraction must be within [1, 0.5)")
@@ -2428,7 +2583,7 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Option("threads", "T")
-        @Help("use <uint> threads (defaults to the number of cores)")
+        @Help("use <uint> threads (default: number of cores)")
         uint numThreads;
 
         @PostValidate(Priority.high)
@@ -2800,7 +2955,7 @@ struct OptionsFor(DentistCommand _command)
     {
         OptionsFor!command defaultOptions;
 
-        auto value = __traits(getMember, defaultOptions, property.stringof);
+        const value = __traits(getMember, defaultOptions, property.stringof);
 
         static if (isFloatingPoint!(typeof(value)))
             return value.toString(precision);
@@ -3010,6 +3165,10 @@ struct BaseOptions
     @Option("help", "h")
     @Help("Prints this help.")
     OptionFlag help;
+
+    @Option("list-options", "-l")
+    @Help("Print a list of all options across all commands.")
+    OptionFlag listOptions;
 
     @Option("usage")
     @Help("Print a short command summary.")
