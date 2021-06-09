@@ -4,7 +4,7 @@
         "or `max-coverage-reads` and `min-coverage-reads`."
     ],
     "__default__": {
-        "read-coverage": 73.0,
+        "read-coverage": 20.0,
         "ploidy": 2,
         "max-coverage-self": 3,
         "verbose": 2,
