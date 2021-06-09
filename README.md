@@ -245,7 +245,7 @@ After installing [Snakemake][snakemake] (5.32.1 or later) and
 [Singularity][singularity] 3.5.x or later, you may check your installation
 with this [example dataset][example-tarball-v1.0.2] (182Mb).
 
-If Singularity is not an option for you, plaese following the [installation
+If Singularity is not an option for you, please following the [installation
 instructions](#install) for an alternative.
 
 ```sh
