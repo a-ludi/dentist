@@ -96,11 +96,20 @@ check_for_broken_links()
 }
 
 
+lint_snakefile()
+(
+    cd snakemake
+    snakemake --lint=json --configfile=snakemake.yml | \
+        jq -r 'map_values(length) | add | "Lints for Snakefile: \(.)"'
+)
+
+
 if [ "$num_new_commits" -gt 0 ];
 then
     create_testdir
     cd "$testdir"
     locally_checkout_head
     check_for_broken_links ./*.md ./LICENSE
+    lint_snakefile
     dub test --config=testing
 fi
