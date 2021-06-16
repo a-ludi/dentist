@@ -17,6 +17,7 @@ import dentist.common.alignments :
     id_t,
     FlatLocalAlignment;
 import dentist.common.commands : DentistCommand;
+import dentist.util.algorithm : sliceBy;
 import dentist.util.log;
 import dentist.util.math :
     ceildiv,
@@ -116,29 +117,14 @@ class MaskPropagator
 
     auto getLocalAlignmentsByContig()
     {
-        auto alignmentHeader = AlignmentHeader.inferFrom(options.dbAlignmentFile);
         auto localAlignments = getFlatLocalAlignments(
             options.refDb,
             options.readsDb,
             options.dbAlignmentFile,
             BufferMode.preallocated,
-        );
-        auto bufferSize = alignmentHeader.maxLocalAlignmentsPerContig;
+        ).array;
 
-        static auto bufferChunks(C)(C chunk, size_t bufferSize)
-        {
-            auto contigId = chunk.front.contigA.id;
-            auto chunkBuffer = new FlatLocalAlignment[bufferSize];
-
-            auto bufferRest = chunk.copy(chunkBuffer);
-            chunkBuffer.length -= bufferRest.length;
-
-            return chunkBuffer;
-        }
-
-        return localAlignments
-            .chunkBy!((a, b) => a.contigA.id == b.contigA.id)
-            .map!(chunk => bufferChunks(chunk, bufferSize));
+        return localAlignments.sliceBy!((a, b) => a.contigA.id == b.contigA.id);
     }
 
 
