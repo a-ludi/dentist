@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:16.04
 LABEL maintainer="Arne Ludwig <ludwig@mpi-cbg.de>"
 
 ARG NCPUS=1
