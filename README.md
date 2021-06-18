@@ -306,6 +306,11 @@ performance.
 The default parameters are rather **conservative**, i.e. they focus on
 correctness of the result while not sacrificing too much sensitivity.
 
+We also provide a **greedy** sample configuration
+([`snakemake/dentist.greedy.json`](./blob/develop/snakemake/dentist.greedy.json)) which
+focuses on sensitivity but may introduce more errors. _**Warning:** Use with
+care! Always validate the closed gaps (e.g. manual inspection)._
+
 In any case, the workflow creates an intermediate assembly
 `workdir/{output_assembly}-preliminary.fasta` that contains all closed gaps,
 i.e. before validation. It is accompanied by an AGP and BED file. You may
