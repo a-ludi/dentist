@@ -100,7 +100,7 @@ lint_snakefile()
 (
     cd snakemake
     snakemake --lint=json --configfile=snakemake.yml | \
-        jq -r 'map_values(length) | add | "Lints for Snakefile: \(.)"'
+        jq -r 'map_values(length) | add | "Lints for Snakefile: \(.)"' || true
 )
 
 
