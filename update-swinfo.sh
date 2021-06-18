@@ -18,26 +18,53 @@ function main()
     fi
 }
 
-function is_git_dirty()
+function is_git_clean()
 {
     git status --porcelain | \
         awk '
             BEGIN {
-                ignore = "source/dentist/swinfo.d"
+                ignore["source/dentist/swinfo.d"] = 1;
+                ignore["source/dentist/swinfo.d~"] = 1;
+                ignore["update-swinfo.sh"] = 1;
+
+                list_dirty_files = ("LIST_DIRTY_FILES" in ENVIRON && ENVIRON["LIST_DIRTY_FILES"] != 0);
             }
 
             (FILENAME == ".dockerignore" && substr($0, 1, 1) == "!") {
-                dockerignore = dockerignore?  dockerignore "|" substr($0, 2) : substr($0, 2);
+                current = substr($0, 2);
+                gsub(/\*/, "[^/]*", current);
+                gsub(/\?/, "[^/]?", current);
+                gsub(/\./, "\\.", current);
+                current = "^" current "(/|$)";
+
+                if (include_re)
+                    include_re = include_re "|" current;
+                else
+                    include_re = current;
             }
 
             (FILENAME == "-") {
-                if (match($2, ignore)) {
+                if ($2 in ignore || !($2 ~ include_re)) {
                     # ignore
-                } else if ($1 != "D" || match($2, dockerignore)) {
-                    exit 1;
+                } else {
+                    # there is a change to a file that is not ignored
+                    if (list_dirty_files)
+                        dirty_files[++n] = $0;
+                    else
+                        exit ++n;
                 }
-            }' \
-        .dockerignore -
+            }
+
+            END {
+                if (list_dirty_files) {
+                    print "include_re" "=" include_re > "/dev/stderr";
+                    for (i = 1; i <= n; ++i)
+                        print dirty_files[i] > "/dev/stderr";
+                }
+
+                exit n
+            }
+        ' .dockerignore -
 }
 
 function get_updated_swinfo()
@@ -56,7 +83,7 @@ function get_updated_swinfo()
         GIT_VERSION="$(git config --get gitflow.prefix.versiontag)${GIT_BRANCH#release/}"
     fi
 
-    if is_git_dirty
+    if ! is_git_clean
     then
         GIT_VERSION="$GIT_VERSION-dirty"
         GIT_COMMIT="$GIT_COMMIT+dirty"
