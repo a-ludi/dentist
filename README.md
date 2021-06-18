@@ -446,38 +446,8 @@ resources they consume.
 Troubleshooting
 ---------------
 
-### Unexpected `ProtectedOutputException` when running on a single machine
-
-**See also:** [Regular
-`ProtectedOutputException`](#regular-protected-output-exception).
-
-When executed on a single machine, `snakemake` will sometimes quit with an
-`ProtectedOutputException` ([Snakemake bug report filed][sm-884]). You may try the follow snippet to get `snakemake`
-back on track:
-
-```sh
-# make sure workdir exists to avoid errors with chmod
-mkdir -p workdir
-# keep track of the number of retries to avoid an infinite loop
-RETRY=0
-# try running snakemake as long as the gap-closed assembly was not created
-# and we have retries left
-while [[ ! -f "gap-closed.fasta" ]] && (( RETRY++ < 3 )); do
-    # allow snakemake to overwrite protected output
-    chmod -R u+w workdir
-    # try snakemake...
-    snakemake --configfile=snakemake.yaml --use-singularity --cores=all
-done
-```
-
-[sm-884]: https://github.com/snakemake/snakemake/issues/884
-
 
 ### Regular `ProtectedOutputException`
-
-**See also:** [Unexpected
-`ProtectedOutputException` when running on a single machine
-](#unexpected-protected-output-exception-when-running-on-a-single-machine).
 
 Snakemake has a [built-in facility to protect files][sm-protected-files] from
 accidental overwrites. This is meant to avoid overwriting precious results
