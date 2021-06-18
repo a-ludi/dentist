@@ -10,7 +10,9 @@ SCRIPTDIR="$(dirname "$0")"
 function set_defaults()
 {
     README="$(realpath "$SCRIPTDIR/../README.md")"
-    TARGET="$(realpath "$SCRIPTDIR/index.md")"
+    INDEX="$(realpath "$SCRIPTDIR/index.md")"
+    LICENSE="$(realpath "$SCRIPTDIR/../LICENSE")"
+    LICENSE_MD="$(realpath "$SCRIPTDIR/license.md")"
 }
 
 
@@ -115,6 +117,80 @@ function parse_args()
 }
 
 
+function remove_logo()
+{
+    sed -E '/docs\/logo\.png/ { N; d }'
+}
+
+
+function remove_short_description()
+{
+    sed -E '
+        1, /Table of Contents/ {
+            /^>.*DENTIST.*/ { N; d }
+        }
+    '
+}
+
+
+function remove_table_of_contents()
+{
+    sed -E '
+        /^(#\s*)?Table of Contents$/,/^(#\s*)?Install$/ {
+            /^(#\s*)?Install$/ ! d
+        }
+    '
+}
+
+
+function adjust_relative_paths()
+{
+    sed -E '
+        s,\./blob/develop/docs(/.+)\.md,.\1.html,g
+        s,\./blob/develop/LICENSE,./license.html,g
+        s,\.(/blob|tree/),https://github.com/a-ludi/dentist\1,g
+    '
+}
+
+
+function add_license_header()
+{
+    echo 'License'
+    echo '======='
+    echo
+    cat
+}
+
+
+function adjust_email_links()
+{
+    sed -E 's/<[^>]+>/\&lt;&\&gt;/'
+}
+
+
+function list_sub_pages()
+{
+    find . -maxdepth 1 -type f -name '*.md' -not -name 'index.md'
+}
+
+function add_back_link()
+{
+    sed -i -E '
+        /^={3,}/ {
+            n;
+            /Back to homepage/ ! {
+                i \
+[&larr; Back to homepage](/)\
+
+                :print-rest
+                n
+                b print-rest
+            }
+        }
+    ' "$@"
+}
+
+
 function main()
 {
     set_defaults
@@ -122,26 +198,23 @@ function main()
 
     if [[ -v DRY_RUN ]]
     then
-        TARGET=/dev/stdout
+        INDEX=/dev/stdout
+        LICENSE_MD=/dev/stdout
     fi
 
-    awk '
-        (!print_all_lines && $0 ~ /docs\/logo\.png|^>/) {
-            skip_lines = 2;
-        }
+    cat "$README" \
+    | remove_logo \
+    | remove_short_description \
+    | remove_table_of_contents \
+    | adjust_relative_paths \
+    > "$INDEX"
 
-        ($0 == "Table of Contents") {
-            print_all_lines = 1;
-        }
+    cat "$LICENSE" \
+    | add_license_header \
+    | adjust_email_links \
+    > "$LICENSE_MD"
 
-        {
-            if (!print_all_lines && skip_lines > 0) {
-                --skip_lines;
-            } else {
-                print
-            }
-        }
-    ' "$README" > "$TARGET"
+    [[ -v DRY_RUN ]] || add_back_link $(list_sub_pages)
 }
 
 

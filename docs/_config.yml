@@ -3,3 +3,5 @@ title: DENTIST
 logo: ./logo.png
 theme: jekyll-theme-minimal
 show_downloads: false
+include:
+    - license.md
