@@ -133,8 +133,8 @@ function make_tarball()
         "$DENTIST_SRC/snakemake/Snakefile" && \
     install -Dt "$DIST_DIR/bin" "${INCLUDE_BINARIES[@]}" && \
     tar --remove-files -czf "$TARBALL" "$DIST_DIR" && \
-    echo "tarball:$TARBALL"
-    realpath "$TARBALL"
+    echo "TARBALL='$TARBALL'"
+    echo "DENTIST_VERSION='$DENTIST_VERSION'"
 }
 
 
@@ -142,7 +142,7 @@ function main()
 {
     parse_args "$@"
 
-    log "building conatiner image"
+    log "building container image"
     trap 'rm -f .docker-build-id' exit
     docker build --iidfile .docker-build-id .
 
@@ -151,13 +151,16 @@ function main()
         CONTAINER_ID=$(docker create -v "$PWD:/opt/dentist:ro" "$(< .docker-build-id)" bash -c "$(declare -f make_tarball); make_tarball") && \
         trap 'docker rm $CONTAINER_ID' exit && \
 
-        TARBALL="$(docker start -a "$CONTAINER_ID" | tee /dev/stderr | grep -E '^tarball:')"
-        TARBALL="${TARBALL#tarball:}"
+        # set TARBALL and DENTIST_VERSION
+        eval "$(docker start -a "$CONTAINER_ID" | tee /dev/stderr | grep -F '=')"
 
         log "copying tarball $TARBALL"
         docker cp "$CONTAINER_ID:/tmp/$TARBALL" ./
 
         log "created $TARBALL"
+
+        log "creating Docker image tag aludi/dentist:$DENTIST_VERSION"
+        docker tag "$(< .docker-build-id)" "aludi/dentist:$DENTIST_VERSION"
     )
 }
 
