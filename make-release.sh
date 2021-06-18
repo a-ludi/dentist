@@ -148,7 +148,7 @@ function main()
 
     (
         log "gathering release files"
-        CONTAINER_ID=$(docker create "$(< .docker-build-id)" bash -c "$(declare -f make_tarball); make_tarball") && \
+        CONTAINER_ID=$(docker create -v "$PWD:/opt/dentist:ro" "$(< .docker-build-id)" bash -c "$(declare -f make_tarball); make_tarball") && \
         trap 'docker rm $CONTAINER_ID' exit && \
 
         TARBALL="$(docker start -a "$CONTAINER_ID" | tee /dev/stderr | grep -E '^tarball:')"
