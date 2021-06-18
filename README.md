@@ -314,10 +314,11 @@ inspect these file for maximum sensitivity.
 
 #### How to Choose DENTIST Parameters
 
-[The list of all commandline parameters](./docs/list-of-commandline-options.md)
-is rather long and confusing. Therefore, we provide a shorter list of important
-and influential parameters. Please also consider adjusting the performance
-parameter in the workflow configuration (`snakemake/snakemake.yml`).
+While [the list of all commandline parameters][dentist-cli-summary] is a good
+reference, it does not provide an overview of the important parameters.
+Therefore, we provide this shorter list of important and influential
+parameters. Please also consider adjusting the performance parameter in the
+workflow configuration (`snakemake/snakemake.yml`).
 
 
 - `--dust-{reads,ref}`, `--daligner-{consensus,reads-vs-reads,self}`,
@@ -386,6 +387,9 @@ parameter in the workflow configuration (`snakemake/snakemake.yml`).
   at every position and (2) are spanned by at least `--min-spanning-reads`
   reads. Thus, increasing any of these numbers makes the *valid* gaps more
   robust but may reduce their number.
+
+
+[dentist-cli-summary]: ./blob/develop/docs/list-of-commandline-options.md
 
 
 #### Choosing the Read Type
