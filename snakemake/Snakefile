@@ -1216,7 +1216,8 @@ rule propagate_mask_back_to_reference:
     input:
         dentist_config_file,
         await_db_files(reference),
-        lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=b, mask=wildcards.mask) for b in blocks_for(reads, block_range(propagate_batch_size))],
+        await_db_files(reads),
+        lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=brange, mask=wildcards.mask) for brange in blocks_for(reads, block_range(propagate_batch_size))],
         mask_files(reference, "{mask}"),
         lambda wildcards : chain(*(mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask(wildcards.mask), reads)))
     output:
