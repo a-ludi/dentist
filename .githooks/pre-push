@@ -73,7 +73,7 @@ check_for_broken_links()
     PARALLEL=16
     FAILED=0
 
-    echo 'testing links ...'
+    echo -n 'testing links ...'
     for FILE in "$@"
     do
         while IFS=':' read -r FILE LINE URL
