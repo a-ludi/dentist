@@ -59,6 +59,7 @@ function remove_existing_release_tag()
 {
     if git rev-parse --quiet --verify "$RELEASE_TAG" > /dev/null
     then
+        user_confirm "The release tag ($RELEASE_TAG) already exists. Really delete?"
         git tag -d "$RELEASE_TAG"
     fi
 }
@@ -80,7 +81,7 @@ function user_confirm()
 {
     local CLEANUP="${2:-true}"
     local REPLY
-    read -rp "$1 (y/N)"
+    read -rp "$1 (y/N) "
 
     [[ "$REPLY" == "y" ]] || cancel_by_user "$CLEANUP"
 }
