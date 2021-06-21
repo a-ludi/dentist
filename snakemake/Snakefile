@@ -36,13 +36,20 @@ def prefetch_singularity_image(container_url):
     from snakemake.persistence import Persistence
     from snakemake.logging import logger
 
-    logger.info("Pre-fetching singularity image...")
     dag = type('FakeDAG', (object,), dict(
         workflow=type('FakeWorkflow', (object,), dict(
                 persistence=Persistence(singularity_prefix=workflow.singularity_prefix)
             ))))
 
-    Image(container_url, dag, is_containerized=True).pull()
+    image = None
+    try:
+        image = Image(container_url, dag, is_containerized=True)
+    except TypeError:
+        image = Image(container_url, dag)
+
+    if not exists(image.path):
+        logger.info("Pre-fetching singularity image...")
+        image.pull()
 
 
 def shellcmd(cmd):
@@ -756,6 +763,7 @@ validation_report_block = join(workdir_, "validation-report.{block_ref}.json")
 gap_closed = fasta_to_workdb(gap_closed_fasta, "dam")
 preliminary_gap_closed = fasta_to_workdb(preliminary_gap_closed_fasta, "dam")
 closed_gaps_mask = workflow_.get("closed_gaps_mask", "closed-gaps")
+preliminary_closed_gaps_agp = join(workdir_, "{}.{}.agp".format(db_name(preliminary_gap_closed), closed_gaps_mask))
 preliminary_closed_gaps_bed = join(workdir_, "{}.{}.bed".format(db_name(preliminary_gap_closed), closed_gaps_mask))
 closed_gaps_bed = "{}.{}.bed".format(db_stub(gap_closed_fasta), closed_gaps_mask)
 reference = fasta_to_workdb(reference_fasta, "dam")
@@ -789,7 +797,7 @@ insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
-preliminary_output_revert_options = ["agp", "scaffolding", "skip-gaps", "skip-gaps-file"]
+preliminary_output_revert_options = ["scaffolding", "skip-gaps", "skip-gaps-file"]
 
 if is_dentist_testing():
     preliminary_output_revert_options.append("cache-contig-alignments")
@@ -1208,7 +1216,8 @@ rule propagate_mask_back_to_reference:
     input:
         dentist_config_file,
         await_db_files(reference),
-        lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=b, mask=wildcards.mask) for b in blocks_for(reads, block_range(propagate_batch_size))],
+        await_db_files(reads),
+        lambda wildcards : [propagate_mask_batch_marker.format(blocks_reads=brange, mask=wildcards.mask) for brange in blocks_for(reads, block_range(propagate_batch_size))],
         mask_files(reference, "{mask}"),
         lambda wildcards : chain(*(mask_files(reference, m) for m in pseudo_block_masks(homogenized_mask(wildcards.mask), reads)))
     output:
@@ -1265,7 +1274,7 @@ rule process:
     log: log_file("process.{batch_id}")
     container: dentist_container
     shell:
-        "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} '<ignored>' {input.pile_ups} {output} 2> {log}"
+        "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} {input.pile_ups} {output} 2> {log}"
 
 rule make_merge_config:
     input:
@@ -1303,14 +1312,15 @@ rule preliminary_output:
         refdb = await_db_files(reference),
         insertions = insertions
     output:
-        preliminary_gap_closed_fasta,
-        preliminary_closed_gaps_bed
+        fasta = preliminary_gap_closed_fasta,
+        agp = preliminary_closed_gaps_agp,
+        bed = preliminary_closed_gaps_bed
     params:
         revert_options = "--revert={}".format(",".join(preliminary_output_revert_options))
     log: log_file("preliminary-output")
     container: dentist_container
     shell:
-        "dentist output --config={input.config} {dentist_flags} --closed-gaps-bed={output[1]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[0]} 2> {log}"
+        "dentist output --config={input.config} {dentist_flags} --agp={output[agp]} --closed-gaps-bed={output[bed]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[fasta]} 2> {log}"
 
 
 rule preliminary_gap_closed_vs_reads_alignment_block:

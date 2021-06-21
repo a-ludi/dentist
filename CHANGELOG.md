@@ -1,5 +1,6 @@
+Changelog
+=========
 
-# Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -7,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 [standard-readme]: https://github.com/RichardLitt/standard-readme
+
+
+## [2.0.0] - 2021-06-18
+### Added
+- list of all commandline options
+- example for a greedy DENTIST configuration
+- guide on how to release a new version of DENTIST
+
+### Changed
+- release v1.0.1 contained breaking changes so this release updates to v2.0.0:
+  the changes to the workflow make it incompatible with old configuration files
+- moved Docker image to Ubuntu and reduced size
+- improved compatibility of pre-compiled binaries by compiling on Ubuntu 16.04
+- sort read IDs in `insertions.db` to make AGP and BED files comparable
+- allow `--min-*-coverage` in `dentist mask-repetitive-regions` to be zero
+- avoid confusing message about pre-fetching the Singularity image if possible
+- updated README
+
+### Removed
+- unused argument for `process-pile-ups`
+- replaced `Dockerfile.build-release` by regular `Dockerfile`
+
+### Fixed
+- fixed `ProtectedOutputException` bug that was listed in the Troubleshooting
+  section of the README
+- sort LAS files for daccord without chaining
+- buffer overflow in `propagate-mask`
+- adjust `read-coverage` in example configuration to actual coverage in the
+  example dataset
 
 
 ## [1.0.2] - 2021-04-26
@@ -18,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved README a lot
 - Updated dependencies
-- Removed `LAcheck` from the workflow beacuse it is useless
+- Removed `LAcheck` from the workflow because it is useless
   (see [issue 14](https://github.com/a-ludi/dentist/issues/14))
 
 ### Fixed

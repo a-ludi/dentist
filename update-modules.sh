@@ -31,7 +31,7 @@ function get_updated_modules()
             # NOTE: `app` module is excluded to fix linker error in unit tests;
             #       it is irrelevant anyway. :o)
             grep -vE '^app$' |
-            sort
+            LC_ALL=C sort
     ))
 
     echo "/**"

@@ -488,7 +488,12 @@ protected class PileUpProcessor
 
         .computeQVs(croppedDb, chainedPileUpAlignment, coverage);
 
-        pileUpAlignment = filterPileUpAlignments(croppedDb, chainedPileUpAlignment, options.properAlignmentAllowance);
+        pileUpAlignment = filterPileUpAlignments(
+            croppedDb,
+            chainedPileUpAlignment,
+            options.properAlignmentAllowance,
+            Yes.forceFlat,
+        );
 
         dentistEnforce(
             !lasEmpty(pileUpAlignment),
@@ -774,7 +779,7 @@ protected class PileUpProcessor
             insertionSequence,
             0,
             insertionAlignment[],
-            pileUp.map!"a[0].contigB.id".array,
+            pileUp.map!"a[0].contigB.id".array.sort.release,
         );
 
         assert(insertion.isParallel == insertionAlignment.isParallel);

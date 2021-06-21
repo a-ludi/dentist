@@ -31,14 +31,19 @@ import dentist.dazzler :
     ContigSegment,
     DBdumpOptions,
     GapSegment,
-    getFlatLocalAlignments,
+    getBlockSize,
     getContigCutoff,
     getDalignment,
     getFastaSequence,
+    getFlatLocalAlignments,
     getDbRecords,
+    getLasFile,
+    getNumBlocks,
     getScaffoldStructure,
+    LAmerge,
     readMask,
-    ScaffoldSegment;
+    ScaffoldSegment,
+    stripDbExtension;
 import dentist.util.algorithm :
     filterInPlace,
     first,
@@ -49,6 +54,7 @@ import dentist.util.algorithm :
 import dentist.util.fasta : getFastaLength;
 import dentist.util.log;
 import dentist.util.math :
+    ceildiv,
     mean,
     median,
     N,
@@ -580,13 +586,25 @@ private struct ResultAnalyzer
             queryChunk,
             options.tmpdir,
         );
-        auto croppedContigMappingFile = getDalignment(
+        const numResultBlocks = options.resultDb.getNumBlocks();
+        foreach (blockIdx; 0 .. numResultBlocks)
+            cast(void) getDalignment(
+                format!"%s.%d"(options.resultDb.stripDbExtension, blockIdx + 1),
+                croppedContigDb,
+                options.recoverImperfectContigsAlignmentOptions,
+                options.tmpdir,
+            );
+        auto croppedContigMappingFile = getLasFile(
             options.resultDb,
             croppedContigDb,
-            options.recoverImperfectContigsAlignmentOptions,
             options.tmpdir,
         );
-
+        LAmerge(croppedContigMappingFile, iota(numResultBlocks)
+            .map!(blockIdx => getLasFile(
+                format!"%s.%d"(options.resultDb.stripDbExtension, blockIdx + 1),
+                croppedContigDb,
+                options.tmpdir,
+            )));
         auto croppedContigAlignments = getFlatLocalAlignments(
             options.resultDb,
             croppedContigDb,

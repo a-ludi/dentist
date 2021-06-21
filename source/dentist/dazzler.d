@@ -293,6 +293,13 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
     return outputDb;
 }
 
+/// Merge given las files.
+@ExternalDependency("LAmerge", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
+void LAmerge(R)(in string mergedLas, R lasFiles)
+{
+    executeCommand(chain(only("LAmerge", mergedLas), lasFiles));
+}
+
 /// ditto
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
@@ -3661,12 +3668,13 @@ string filterPileUpAlignments(
     in string dbFile,
     in string lasFile,
     in coord_t properAlignmentAllowance,
+    Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
     auto alignments = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated)
         .array;
 
-    filterPileUpAlignments(alignments, properAlignmentAllowance);
+    filterPileUpAlignments(alignments, properAlignmentAllowance, forceFlat);
 
     string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
     writeAlignments(filteredLasFile, alignments);
@@ -3706,6 +3714,7 @@ void filterPileUpAlignments(
 void filterPileUpAlignments(
     ref FlatLocalAlignment[] alignments,
     in coord_t properAlignmentAllowance,
+    Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
     /// An alignment in a pile up is valid iff it is proper and the begin/end
@@ -3728,7 +3737,19 @@ void filterPileUpAlignments(
     }
 
     foreach (ref alignment; alignments)
+    {
         alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
+
+        if (forceFlat && ! alignment.flags.disabled)
+        {
+            alignment.flags.alternateChain = false;
+            alignment.flags.chainContinuation = false;
+            alignment.flags.unchained = true;
+        }
+    }
+
+    if (forceFlat)
+        alignments.sort;
 }
 
 
@@ -3908,7 +3929,7 @@ string getLasFile(in string dbA, in string baseDirectory)
 
 string getLasFile(in string dbA, in string dbB, in string baseDirectory)
 {
-    alias dbName = dbFile => dbFile.baseName.stripExtension;
+    alias dbName = dbFile => dbFile.baseName.stripDbExtension;
 
     enum fileTemplate = "%s/%s.%s.las";
     auto dbAName = dbName(dbA);
@@ -3952,6 +3973,35 @@ id_t getNumBlocks(in string damFile)
     }
 
     return numBlocks;
+}
+
+coord_t getBlockSize(in string damFile)
+{
+    // see also in dazzler's DB.h:434
+    //     #define DB_PARAMS "size = %11lld cutoff = %9d all = %1d\n"
+    enum blockSizeFormat = "size = %d";
+    enum blockSizeFormatStart = blockSizeFormat[0 .. 4];
+    coord_t blockSize;
+    auto matchingLines = File(damFile.stripBlock).byLine.filter!(
+            line => line.startsWith(blockSizeFormatStart));
+
+    if (matchingLines.empty)
+    {
+        auto errorMessage = format!(
+            "could not read the block size in `%s`; try using DBsplit to fix"
+        )(damFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    auto matchingLine = matchingLines.front;
+
+    if (formattedRead!blockSizeFormat(matchingLine, blockSize) != 1)
+    {
+        auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
+        throw new DazzlerCommandException(errorMessage);
+    }
+
+    return blockSize;
 }
 
 coord_t getContigCutoff(in string dbFile)
