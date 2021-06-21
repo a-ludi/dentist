@@ -44,10 +44,10 @@ static import dentist.common.alignments.base;
 static import dentist.common.alignments.chaining;
 static import dentist.common.binio;
 static import dentist.common.binio._base;
-static import dentist.common.binio.insertiondb;
-static import dentist.common.binio.pileupdb;
 static import dentist.common.binio._testdata.insertiondb;
 static import dentist.common.binio._testdata.pileupdb;
+static import dentist.common.binio.insertiondb;
+static import dentist.common.binio.pileupdb;
 static import dentist.common.commands;
 static import dentist.common.configfile;
 static import dentist.common.external;
@@ -103,10 +103,10 @@ alias modules = AliasSeq!(
     dentist.common.alignments.chaining,
     dentist.common.binio,
     dentist.common.binio._base,
-    dentist.common.binio.insertiondb,
-    dentist.common.binio.pileupdb,
     dentist.common.binio._testdata.insertiondb,
     dentist.common.binio._testdata.pileupdb,
+    dentist.common.binio.insertiondb,
+    dentist.common.binio.pileupdb,
     dentist.common.commands,
     dentist.common.configfile,
     dentist.common.external,
