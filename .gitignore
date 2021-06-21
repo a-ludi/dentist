@@ -20,3 +20,4 @@ dentist-test-*
 *.tar.gz
 .gdbinit
 *.sif
+.snakemake
