@@ -49,22 +49,36 @@ The following steps must be taken to prepare the DENTIST release locally:
 
 2. Bump version number with `./bump-version.sh`.
 
-# ------------------------------- continue here -------------------------------
 3. Make release tarball and Docker image with `./make-release.sh`.
 
-4. Verify correct software version with `docker run --rm a-ludi/dentist:vX.Y.Z`
+4. Verify correct software version with `docker run --rm aludi/dentist:vX.Y.Z`
+   and update latest tag upon success:
+   `docker tag aludi/dentist:vX.Y.Z aludi/dentist:latest`
 
 5. Update `master` branch using `git checkout master && git merge --ff develop`
 
-6. Update GitHub Page:
 
-    ```sh
-    git checkout gh-pages
-    git checkout -f develop .
-    ...
-    ```
+## Update GitHub Pages
 
-99. To be continued... (... update git branches)
+```sh
+# Switch to gh-pages
+git checkout gh-pages
+# Merge latest develop but stop before comitting
+git merge --no-commit
+
+# Resolve the merge...
+git checkout gh-pages docs/_config.yml docs/_layouts/default.html \
+  docs/index.md docs/Gemfile docs/Gemfile.lock
+docker run --rm aludi/dentist:latest dentist --list-options > docs/list-of-commandline-options.md
+# Prepare files for the webserver
+( cd docs && ./prepare-site.sh )
+
+# Create a combined commit
+git merge --continue
+
+# Go back to develop
+git checkout develop
+```
 
 
 ## Prepare example release
