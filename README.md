@@ -62,15 +62,15 @@ The last command is explained in more detail below in
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The pre-built binaries are stored in a subfolder
-called `bin`. Here are the instructions for `v1.0.2`:
+called `bin`. Here are the instructions for `v2.0.0`:
 
 ```sh
 # download & extract pre-built binaries
-wget https://github.com/a-ludi/dentist/releases/download/v1.0.2/dentist.v1.0.2.x86_64.tar.gz
-tar -xzf dentist.v1.0.2.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v2.0.0/dentist.v2.0.0.x86_64.tar.gz
+tar -xzf dentist.v2.0.0.x86_64.tar.gz
 
 # make binaries available to your shell
-cd dentist.v1.0.2.x86_64
+cd dentist.v2.0.0.x86_64
 PATH="$PWD/bin:$PATH"
 
 # check installation with
@@ -243,13 +243,13 @@ Example
 
 After installing [Snakemake][snakemake] (5.32.1 or later) and
 [Singularity][singularity] 3.5.x or later, you may check your installation
-with this [example dataset][example-tarball-v1.0.2] (182Mb).
+with this [example dataset][example-tarball-v2.0.0] (182Mb).
 
 If Singularity is not an option for you, please following the [installation
 instructions](#install) for an alternative.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-2/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-2/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -293,7 +293,7 @@ to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
 it to finish.
 
 
-[example-tarball-v1.0.2]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-2/dentist-example.tar.gz
+[example-tarball-v2.0.0]: https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
 
 
 Configuration
