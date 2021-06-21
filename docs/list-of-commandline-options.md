@@ -1,5 +1,7 @@
 List of Commandline Options
 ===========================
+[&larr; Back to homepage](/)
+
 
 The following list contains all options across all command of DENTIST.
 Default values are given in parentheses after the option name and the
