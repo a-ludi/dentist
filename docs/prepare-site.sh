@@ -182,7 +182,7 @@ function add_back_link()
             n;
             /Back to homepage/ ! {
                 i \
-[&larr; Back to homepage](/)\
+[&larr; Back to homepage](/dentist)\
 
                 :print-rest
                 n

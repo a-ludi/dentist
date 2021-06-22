@@ -1,6 +1,7 @@
 List of Commandline Options
 ===========================
-[&larr; Back to homepage](/)
+[&larr; Back to homepage](/dentist)
+
 
 
 The following list contains all options across all command of DENTIST.

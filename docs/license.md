@@ -1,6 +1,6 @@
 License
 =======
-[&larr; Back to homepage](/)
+[&larr; Back to homepage](/dentist)
 
 
 Copyright © 2018 Arne Ludwig &lt;<arne.ludwig@posteo.de>&gt;
