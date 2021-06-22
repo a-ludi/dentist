@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
-## [2.0.0] - 2021-06-18
+## [2.0.0] - 2021-06-21
 ### Added
 - list of all commandline options
 - example for a greedy DENTIST configuration
-- guide on how to release a new version of DENTIST
+- guide on how to release a new version of DENTIST (work in progress)
 
 ### Changed
 - release v1.0.1 contained breaking changes so this release updates to v2.0.0:

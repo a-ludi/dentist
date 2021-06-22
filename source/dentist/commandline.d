@@ -3166,7 +3166,7 @@ struct BaseOptions
     @Help("Prints this help.")
     OptionFlag help;
 
-    @Option("list-options", "-l")
+    @Option("list-options", "l")
     @Help("Print a list of all options across all commands.")
     OptionFlag listOptions;
 
