@@ -139,7 +139,7 @@ available packages on Bioconda are outdated and should not be used at the
 moment.
 
 Please use the following versions in your dependencies in case you experience
-troubles. These should be the same versions used in the [Dockerfile](./blob/develop/Dockerfile):
+troubles. These should be the same versions used in the [Dockerfile](./Dockerfile):
 
 - [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
 - [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
@@ -307,7 +307,7 @@ The default parameters are rather **conservative**, i.e. they focus on
 correctness of the result while not sacrificing too much sensitivity.
 
 We also provide a **greedy** sample configuration
-([`snakemake/dentist.greedy.json`](./blob/develop/snakemake/dentist.greedy.json)) which
+([`snakemake/dentist.greedy.json`](./snakemake/dentist.greedy.json)) which
 focuses on sensitivity but may introduce more errors. _**Warning:** Use with
 care! Always validate the closed gaps (e.g. manual inspection)._
 
@@ -394,7 +394,7 @@ workflow configuration (`snakemake/snakemake.yml`).
   robust but may reduce their number.
 
 
-[dentist-cli-summary]: ./blob/develop/docs/list-of-commandline-options.md
+[dentist-cli-summary]: ./docs/list-of-commandline-options.md
 
 
 #### Choosing the Read Type
@@ -552,4 +552,4 @@ If you do not want to enable just a subset use `ln -s .githooks/{hook} .git/hook
 License
 -------
 
-This project is licensed under MIT License (see [LICENSE](./blob/develop/LICENSE)).
+This project is licensed under MIT License (see [LICENSE](./LICENSE)).
