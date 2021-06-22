@@ -28,6 +28,7 @@ url="$2"
 num_new_commits="$(grep -E '^refs/' | grep -cvE '^refs/tags/' || true)"
 export git_root
 git_root="$PWD"
+ignored_links=""
 
 
 create_testdir()
@@ -53,13 +54,40 @@ locally_checkout_head()
 }
 
 
+should_ignore_link()
+{
+    if [[ "$1" == *\$DENTIST_VERSION* ]]
+    then
+        # ignore links with env variable (usually from RELEASE.md)
+        return 0
+    fi
+
+    [[ -v IGNORE_LINKS ]] || return 1
+
+    awk -v"url=$1" '
+        {
+            for (i = 1; i <= NF; ++i)
+                if ($i == url)
+                    exit 0; # found URL -> report ignored
+        }
+
+        END {
+            exit $i != url;
+        }
+    ' <<<"$IGNORE_LINKS"
+}
+
+
 check_link()
 {
     local FILE="$1"
     local LINE="$2"
     local URL="$3"
 
-    if ! curl --head --fail --silent --location "$URL" > /dev/null
+    if should_ignore_link "$URL"
+    then
+        return
+    elif ! curl --head --fail --silent --location "$URL" > /dev/null
     then
         echo "broken link at $FILE:$LINE: '$URL'"
 
@@ -73,7 +101,7 @@ check_for_broken_links()
     PARALLEL=16
     FAILED=0
 
-    echo -n 'testing links ...'
+    echo -n 'testing links ... '
     for FILE in "$@"
     do
         while IFS=':' read -r FILE LINE URL
