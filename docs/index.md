@@ -37,22 +37,22 @@ The last command is explained in more detail below in
 [the usage section](#usage).
 
 
-[singularity]: https://sylabs.io/guides/3.7/user-guide/index.html
+[singularity]: https://sylabs.io/guides/3.5/user-guide/index.html
 
 
 ### Use Pre-Built Binaries
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The pre-built binaries are stored in a subfolder
-called `bin`. Here are the instructions for `v1.0.2`:
+called `bin`. Here are the instructions for `v2.0.0`:
 
 ```sh
 # download & extract pre-built binaries
-wget https://github.com/a-ludi/dentist/releases/download/v1.0.2/dentist.v1.0.2.x86_64.tar.gz
-tar -xzf dentist.v1.0.2.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v2.0.0/dentist.v2.0.0.x86_64.tar.gz
+tar -xzf dentist.v2.0.0.x86_64.tar.gz
 
 # make binaries available to your shell
-cd dentist.v1.0.2.x86_64
+cd dentist.v2.0.0.x86_64
 PATH="$PWD/bin:$PATH"
 
 # check installation with
@@ -121,7 +121,7 @@ available packages on Bioconda are outdated and should not be used at the
 moment.
 
 Please use the following versions in your dependencies in case you experience
-troubles. These should be the same versions used in the [Dockerfile](https://github.com/a-ludi/dentist/blob/develop/Dockerfile):
+troubles. These should be the same versions used in the [Dockerfile](./Dockerfile):
 
 - [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
 - [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
@@ -223,15 +223,16 @@ for DENTIST please feel free to contact the maintainer!
 Example
 -------
 
-After installing [Snakemake][snakemake] (5.32.1 or later) and
-[Singularity][singularity] 3.5.x or later, you may check your installation
-with this [example dataset][example-tarball-v1.0.2] (182Mb).
+Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-If Singularity is not an option for you, please following the [installation
-instructions](#install) for an alternative.
+You can also use the convenient Singularity container to execute the rules.
+Just make sure you have [Singularity][singularity] 3.5.x or later installed.
+
+First of all download the test data and workflow and switch to the
+`dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-2/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -243,7 +244,7 @@ Execute the entire workflow on your *local machine* using `all` cores:
 
 ```sh
 # run the workflow
-snakemake --configfile=snakemake.yml --use-singularity --cores=all
+PATH="$PWD/bin:$PATH" snakemake --configfile=snakemake.yml --cores=all
 
 # validate the files
 md5sum -c checksum.md5
@@ -253,6 +254,19 @@ Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 
+### Execution in Singularity Container
+
+Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
+
+```sh
+# run the workflow
+snakemake --configfile=snakemake.yml --use-singularity --cores=all
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+
 ### Cluster Execution
 
 Execute the workflow on a *SLURM cluster*:
@@ -260,7 +274,7 @@ Execute the workflow on a *SLURM cluster*:
 ```sh
 mkdir -p "$HOME/.config/snakemake/slurm"
 # select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
-cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yml"
+cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yaml"
 # execute using the cluster profile
 snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 
@@ -268,14 +282,8 @@ snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 md5sum -c checksum.md5
 ```
 
-If you want to run with a differnt cluster manager or in the cloud, please
-read [the advice above](#executing-on-a-cluster). The easiest option is
-to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
-`qsub -sync yes`. The command must submit a job to the cluster and *wait* for
-it to finish.
-
-
-[example-tarball-v1.0.2]: https://github.com/a-ludi/dentist-example/releases/download/v1.0.2-2/dentist-example.tar.gz
+If you want to run with a different cluster manager or in the cloud, please
+read the [advice below](#executing-on-a-cluster).
 
 
 Configuration
@@ -289,7 +297,7 @@ The default parameters are rather **conservative**, i.e. they focus on
 correctness of the result while not sacrificing too much sensitivity.
 
 We also provide a **greedy** sample configuration
-([`snakemake/dentist.greedy.json`](https://github.com/a-ludi/dentist/blob/develop/snakemake/dentist.greedy.json)) which
+([`snakemake/dentist.greedy.json`](./snakemake/dentist.greedy.json)) which
 focuses on sensitivity but may introduce more errors. _**Warning:** Use with
 care! Always validate the closed gaps (e.g. manual inspection)._
 
@@ -352,20 +360,17 @@ workflow configuration (`snakemake/snakemake.yml`).
 
 - `--join-policy`: Choose according to your needs:
   
-      `scaffoldGaps`
-      :   Closes only gaps that are marked by `N`s in the assembly. This is the
-          default mode of operation. Use this if you do not want to alter the
-          scaffolding of the assembly. See also `--existing-gap-bonus`.
-      `scaffolds`
-      :   Allows whole scaffolds to be joined in addition to the effects of
-          `scaffoldGaps`. Use this if you have (many) scaffolds that are not
-          yet full chromosome-scale.
-      `contigs`
-      :   Allows contigs to be rearranged freely. This is especially useful in
-          _de novo_ assemblies **before** applying any other scaffolding
-          methods as it increases the contiguity thus increasing the chance
-          that large-scale scaffolding (e.g. Bionano or Hi-C) finds proper
-          joins.
+    - `scaffoldGaps`: Closes only gaps that are marked by `N`s in the
+      assembly. This is the default mode of operation. Use this if you do not
+      want to alter the scaffolding of the assembly. See also
+      `--existing-gap-bonus`.
+    - `scaffolds`: Allows whole scaffolds to be joined in addition to the
+      effects of `scaffoldGaps`. Use this if you have (many) scaffolds that
+      are not yet full chromosome-scale.
+    - `contigs`: Allows contigs to be rearranged freely. This is especially
+      useful in _de novo_ assemblies **before** applying any other scaffolding
+      methods as it increases the contiguity thus increasing the chance that
+      large-scale scaffolding (e.g. Bionano or Hi-C) finds proper joins.
 
 - `--min-coverage-reads`, `--min-spanning-reads`, `--region-context`:
   DENTIST validates closed gaps by mapping the reads to the gap-closed
@@ -376,7 +381,7 @@ workflow configuration (`snakemake/snakemake.yml`).
   robust but may reduce their number.
 
 
-[dentist-cli-summary]: ./list-of-commandline-options.html
+[dentist-cli-summary]: ./docs/list-of-commandline-options.md
 
 
 #### Choosing the Read Type
