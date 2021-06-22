@@ -241,12 +241,13 @@ for DENTIST please feel free to contact the maintainer!
 Example
 -------
 
-After installing [Snakemake][snakemake] (5.32.1 or later) and
-[Singularity][singularity] 3.5.x or later, you may check your installation
-with this [example dataset][example-tarball-v2.0.0] (182Mb).
+Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-If Singularity is not an option for you, please following the [installation
-instructions](#install) for an alternative.
+You can also use the convenient Singularity container to execute the rules.
+Just make sure you have [Singularity][singularity] 3.5.x or later installed.
+
+First of all download the test data and workflow and switch to the
+`dentist-example` directory.
 
 ```sh
 wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
@@ -261,7 +262,7 @@ Execute the entire workflow on your *local machine* using `all` cores:
 
 ```sh
 # run the workflow
-snakemake --configfile=snakemake.yml --use-singularity --cores=all
+PATH="$PWD/bin:$PATH" snakemake --configfile=snakemake.yml --cores=all
 
 # validate the files
 md5sum -c checksum.md5
@@ -271,6 +272,19 @@ Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 
+### Execution in Singularity Container
+
+Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
+
+```sh
+# run the workflow
+snakemake --configfile=snakemake.yml --use-singularity --cores=all
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+
 ### Cluster Execution
 
 Execute the workflow on a *SLURM cluster*:
@@ -278,7 +292,7 @@ Execute the workflow on a *SLURM cluster*:
 ```sh
 mkdir -p "$HOME/.config/snakemake/slurm"
 # select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
-cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yml"
+cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yaml"
 # execute using the cluster profile
 snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 
@@ -286,14 +300,8 @@ snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 md5sum -c checksum.md5
 ```
 
-If you want to run with a differnt cluster manager or in the cloud, please
-read [the advice above](#executing-on-a-cluster). The easiest option is
-to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
-`qsub -sync yes`. The command must submit a job to the cluster and *wait* for
-it to finish.
-
-
-[example-tarball-v2.0.0]: https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
+If you want to run with a different cluster manager or in the cloud, please
+read the [advice below](#executing-on-a-cluster).
 
 
 Configuration
