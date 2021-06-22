@@ -170,7 +170,7 @@ function adjust_email_links()
 
 function list_sub_pages()
 {
-    find . -maxdepth 1 -type f -name '*.md' -not -name 'index.md'
+    find "$SCRIPTDIR" -maxdepth 1 -type f -name '*.md' -not -name 'index.md'
 }
 
 function add_back_link()
