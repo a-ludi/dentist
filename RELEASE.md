@@ -1,7 +1,7 @@
 DENTIST Release Guide
 =====================
 
-![Document version: v1](https://img.shields.io/badge/Document%20version-v1-informational?logo=markdown)
+![Document version: v2](https://img.shields.io/badge/Document%20version-v2-informational?logo=markdown)
 
 This document describes the steps to take when preparing a new release.
 
@@ -209,6 +209,13 @@ above steps before publishing.
     # Create a public release and remeber to include the release tarball
     # and the Singularity image. Use the title and text from the CHANGELOG.
     gio open https://github.com/a-ludi/dentist/releases/new
+
+    # Publish Docker image
+    docker push "aludi/dentist:v$DENTIST_VERSION"
+    docker push aludi/dentist:latest
+
+    # Update DUB package
+    gio open https://code.dlang.org/my_packages/dentist
     ```
 
 2. Publish DENTIST GitHub page:
@@ -217,7 +224,7 @@ above steps before publishing.
     git push public --no-verify gh-pages
     ```
 
-2. Publish the example:
+3. Publish the example:
 
     ```sh
     cd ../dentist-example
@@ -229,8 +236,7 @@ above steps before publishing.
     gio open https://github.com/a-ludi/dentist-example/releases/new
     ```
 
-
-3. Push code changes to public repository:
+4. Push code changes to public repository:
 
     ```sh
     IGNORE_LINKS="
@@ -243,4 +249,9 @@ above steps before publishing.
 ## Verify public release
 
 1. Follow the instructions at <https://github.com/a-ludi/dentist/tree/develop#example>.
+
 2. Check the GitHub page <https://a-ludi.github.io/dentist/>.
+
+3. Check the DUB package at <https://code.dlang.org/packages/dentist>.
+
+4. Check the Docker image at <https://hub.docker.com/repository/docker/aludi/dentist>.
