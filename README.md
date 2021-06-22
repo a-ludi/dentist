@@ -557,4 +557,4 @@ If you do not want to enable just a subset use `ln -s .githooks/{hook} .git/hook
 License
 -------
 
-This project is licensed under MIT License (see [LICENSE](./blob/develop/LICENSE)).
+This project is licensed under MIT License (see [LICENSE](./LICENSE)).
