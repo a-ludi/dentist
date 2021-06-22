@@ -55,7 +55,7 @@ The last command is explained in more detail below in
 [the usage section](#usage).
 
 
-[singularity]: https://sylabs.io/guides/3.7/user-guide/index.html
+[singularity]: https://sylabs.io/guides/3.5/user-guide/index.html
 
 
 ### Use Pre-Built Binaries
