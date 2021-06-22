@@ -146,9 +146,11 @@ function remove_table_of_contents()
 function adjust_relative_paths()
 {
     sed -E '
-        s,\./blob/develop/docs(/.+)\.md,.\1.html,g
-        s,\./blob/develop/LICENSE,./license.html,g
-        s,\.(/blob|tree/),https://github.com/a-ludi/dentist\1,g
+        s,\./docs(/.+)\.md,%DOT%\1.html,g
+        s,\./LICENSE,%DOT%/license.html,g
+        s,(`[^`])*\.(/[^`]*`),\1%DOT%\2,g
+        s,\./,https://github.com/a-ludi/dentist/blob/develop/,g
+        s,%DOT%,.,g
     '
 }
 
