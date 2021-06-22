@@ -249,7 +249,7 @@ If Singularity is not an option for you, please following the [installation
 instructions](#install) for an alternative.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-2/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
