@@ -18,7 +18,7 @@ The following requirements must be met before creating a release:
    for broken links, syntax check of the workflow and unit tests. Simply
    execute by pushing the `develop` branch.
 
-4. Build Docker image with `docker build -t dentist:edge .`. This may take a
+4. Build Docker image with `docker build -t aludi/dentist:edge .`. This may take a
    while – go drink a coffee.
 
 5. The example finishes successfully:
