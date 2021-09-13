@@ -87,7 +87,7 @@ ARG DMD_VERSION="2.096.0-0"
 ARG DUB_VERSION="1.23.0"
 ARG DENTIST_BUILD=release
 COPY ./ /opt/dentist
-RUN BUILD_DEPS="build-essential git jq curl libcurl3" && \
+RUN BUILD_DEPS="build-essential git curl libcurl3" && \
     apt-get update && apt-get install -y $BUILD_DEPS && \
     curl -o /tmp/dmd.deb -L "https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2021/dmd_${DMD_VERSION}_amd64.deb" && \
     dpkg -i /tmp/dmd.deb && \
