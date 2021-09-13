@@ -1382,11 +1382,11 @@ class LocalAlignmentReader
     coord_t[] aLengths;
     coord_t[] bLengths;
     BufferMode bufferMode;
-    id_t numLocalAlignments;
+    size_t numLocalAlignments;
     trace_point_t tracePointDistance;
     bool isLargeTraceType;
 
-    id_t numLocalAlignmentsLeft;
+    size_t numLocalAlignmentsLeft;
     FlatLocalAlignment currentLA;
     DazzlerOverlap overlapHead;
     TracePoint[] tracePointBuffer;
@@ -1538,10 +1538,10 @@ protected:
 
     void readNumLocalAlignments()
     {
-        long[1] numLocalAlignments;
-        auto nlaBuffer = las.rawRead(numLocalAlignments[]);
-        unexpectedEOF!"numLocalAlignments"(nlaBuffer, numLocalAlignments[]);
-        this.numLocalAlignments = numLocalAlignments[0].to!id_t;
+        long numLocalAlignments;
+        auto nlaBuffer = las.rawRead((&numLocalAlignments)[0 .. 1]);
+        unexpectedEOF!"numLocalAlignments"(nlaBuffer, (&numLocalAlignments)[0 .. 1]);
+        this.numLocalAlignments = numLocalAlignments.to!size_t;
     }
 
 

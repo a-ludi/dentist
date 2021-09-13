@@ -335,7 +335,7 @@ struct AlignmentChain
 
     static enum maxScore = 2 ^^ 16;
 
-    id_t id;
+    size_t id;
     Contig contigA;
     Contig contigB;
     Flags flags;
@@ -1542,7 +1542,7 @@ struct FlatLocalAlignment
         }
     }
 
-    id_t id;
+    size_t id;
     FlatLocus contigA;
     FlatLocus contigB;
     Flags flags;

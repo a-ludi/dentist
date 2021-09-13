@@ -949,7 +949,7 @@ private struct SeededAlignmentStorage
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
 
-    id_t id;
+    size_t id;
     id_t contigAId;
     coord_t contigALength;
     id_t contigBId;
