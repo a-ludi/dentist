@@ -111,3 +111,6 @@ RUN BUILD_DEPS="build-essential git jq curl libcurl3" && \
     /opt/build-and-install.sh dentist dub && \
     dentist -d && \
     rm -f /usr/local/bin/dub && rm -rf "$HOME/.dub" && apt-get remove -y $BUILD_DEPS && apt-get autoremove -y && apt-get clean
+
+# Provide alternative location for bash
+RUN ln -s /bin/bash /usr/bin/bash
