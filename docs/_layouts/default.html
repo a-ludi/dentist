@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% assign github_repo = site.github.public_repositories | where: "name", site.github.repository_name | first %}
+    <meta name="keywords" content="{{ github_repo.topics | join: ', ' | escape }}"/>
 
 {% seo %}
     <link rel="stylesheet" href="{{ "/assets/css/style.css?v=" | append: site.github.build_revision | relative_url }}">
@@ -21,6 +23,10 @@
       header,
       footer {
         position: static;
+      }
+
+      header .keywords {
+        font-variant: small-caps;
       }
 
       header nav ul {
@@ -59,6 +65,8 @@
         </h1>
 
         <p>{{ site.description | default: site.github.project_tagline }}</p>
+
+        <p><small><b>Keywords:</b> <span class="keywords">{{ github_repo.topics | join: ', ' | escape }}</span></small></p>
 
         {% if site.github.is_project_page %}
         <p class="view"><a href="{{ site.github.repository_url }}">View the Project on GitHub <small>{{ site.github.repository_nwo }}</small></a></p>
