@@ -1742,6 +1742,24 @@ struct OptionsFor(DentistCommand _command)
         string[] repeatMasks;
     }
 
+    static if (command.among(
+        DentistCommand.generateDazzlerOptions,
+        DentistCommand.collectPileUps,
+        DentistCommand.processPileUps,
+    ))
+    {
+        @Option("max-alignment-error", "e")
+        @Help(format!"
+            local alignments may have an error rate of no more than <double>
+            (default: %s)
+        "(defaultValue!maxAlignmentError))
+        @(Validate!(value => enforce!CLIException(
+            0.0 < value && value <= 0.3,
+            "maximum alignment error rate must be in (0, 0.3]"
+        )))
+        double maxAlignmentError = 1.0 - minAverageCorrelationRate;
+    }
+
     static if (needChainingOptions)
     {
         @Option("max-chain-gap")
@@ -2757,6 +2775,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (
         is(typeof(OptionsFor!command().additionalSelfAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().maxAlignmentError)) &&
         is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     )
@@ -2769,7 +2788,7 @@ struct OptionsFor(DentistCommand _command)
                     .withOption(cast(string) identity, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
                     .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
-                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, (1.0 - maxAlignmentError).to!string, replaceOrAdd)
                     .withOption(cast(string) masks, "dust", ensurePresent)
                     .withOption(cast(string) asymmetric, remove)
                     .withOption(cast(string) minAReadLength, remove)
@@ -2781,6 +2800,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (
         is(typeof(OptionsFor!command().additionalTandemAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().maxAlignmentError)) &&
         is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     )
@@ -2793,7 +2813,7 @@ struct OptionsFor(DentistCommand _command)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
                     .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
                     .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
-                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, (1.0 - maxAlignmentError).to!string, replaceOrAdd)
                     .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)
                     .array;
         }
@@ -2801,6 +2821,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (
         is(typeof(OptionsFor!command().additionalReadsVsReadsAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().maxAlignmentError)) &&
         is(typeof(OptionsFor!command().minAnchorLength)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     )
@@ -2814,7 +2835,7 @@ struct OptionsFor(DentistCommand _command)
                     .withOption(cast(string) bridge, ensurePresent)
                     .withOption(cast(string) tracePointDistance, forceLargeTracePointType.to!string, replaceOrAdd)
                     .withOption(cast(string) minAlignmentLength, minAnchorLength.to!string, replaceOrAdd)
-                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, (1.0 - maxAlignmentError).to!string, replaceOrAdd)
                     .withOption(cast(string) masks, "dust", ensurePresent)
                     .withOption(cast(string) identity, remove)
                     .withOption(cast(string) asymmetric, remove)
@@ -2859,6 +2880,7 @@ struct OptionsFor(DentistCommand _command)
 
     static if (
         is(typeof(OptionsFor!command().additionalRefVsReadsAlignmentOptions)) &&
+        is(typeof(OptionsFor!command().maxAlignmentError)) &&
         is(typeof(OptionsFor!command().numAuxiliaryThreads))
     ) {
         @property string[] refVsReadsAlignmentOptions() const
@@ -2868,7 +2890,7 @@ struct OptionsFor(DentistCommand _command)
                     .dup
                     .withOption(cast(string) symmetric, ensurePresent)
                     .withOption(cast(string) numThreads, numAuxiliaryThreads.to!string, replaceOrAdd)
-                    .withOption(cast(string) averageCorrelationRate, minAverageCorrelationRate.to!string, replaceOrAdd)
+                    .withOption(cast(string) averageCorrelationRate, (1.0 - maxAlignmentError).to!string, replaceOrAdd)
                     .withOption(cast(string) sortPileOrder, remove)
                     .withOption(cast(string) oneDirection, remove)
                     .withOption(cast(string) tempDir, environment.get("TMPDIR", null), defaultValue)

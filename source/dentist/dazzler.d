@@ -3640,6 +3640,115 @@ string getDamapping(
 }
 
 
+string filterLocalAlignments(alias pred)(in string lasFile)
+{
+    return filterLocalAlignments!pred(null, lasFile);
+}
+
+string filterLocalAlignments(alias pred)(in string dbFile, in string lasFile)
+{
+    string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
+    auto flatLocalAlignments = getFlatLocalAlignments(
+        dbFile,
+        lasFile,
+        BufferMode.overwrite,
+    );
+
+    filteredLasFile.writeAlignments(flatLocalAlignments.filter!pred);
+
+    return filteredLasFile;
+}
+
+unittest
+{
+    import dentist.util.tempfile : mkdtemp;
+    import std.file : rmdirRecurse;
+    import std.algorithm : equal;
+    import std.range : tee;
+
+    auto tmpDir = mkdtemp("./.unittest-XXXXXX");
+    scope (exit)
+        rmdirRecurse(tmpDir);
+
+    auto lasFile = buildPath(tmpDir, "test.las");
+    dumpLA(lasFile, testLasDump);
+
+    auto filteredLas = filterLocalAlignments!"a.id % 2 == 0"(lasFile);
+
+    auto flatLocalAlignments = getFlatLocalAlignments(filteredLas, BufferMode.preallocated).array;
+    alias FlatLocus = FlatLocalAlignment.FlatLocus;
+    auto expectedResult = [
+        FlatLocalAlignment(
+            0,
+            FlatLocus(1, 0, 3, 4),
+            FlatLocus(2, 0, 5, 6),
+            AlignmentFlags(),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 1),
+            ],
+        ),
+        FlatLocalAlignment(
+            1,
+            FlatLocus(19, 0, 21, 22),
+            FlatLocus(20, 0, 23, 24),
+            AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.alternateChain),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 1),
+            ],
+        ),
+        FlatLocalAlignment(
+            2,
+            FlatLocus(37, 0, 39, 40),
+            FlatLocus(38, 0, 41, 42),
+            AlignmentFlags(AlignmentFlag.unchained),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 1),
+            ],
+        ),
+        FlatLocalAlignment(
+            3,
+            FlatLocus(46, 0, 57, 58),
+            FlatLocus(47, 0, 59, 60),
+            AlignmentFlags(AlignmentFlag.unchained),
+            expectedTracePointDistance,
+            [
+                TracePoint(3, 101),
+                TracePoint(4, 104),
+                TracePoint(2, 102),
+            ],
+        ),
+        FlatLocalAlignment(
+            4,
+            FlatLocus(64, 0, 75, 76),
+            FlatLocus(65, 0, 77, 78),
+            AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.chainContinuation),
+            expectedTracePointDistance,
+            [
+                TracePoint(0, 2),
+                TracePoint(2, 102),
+            ],
+        ),
+        FlatLocalAlignment(
+            5,
+            FlatLocus(1, 0, 0, 8300),
+            FlatLocus(3197, 0, 0, 318),
+            AlignmentFlags(AlignmentFlag.complement, AlignmentFlag.chainContinuation),
+            expectedTracePointDistance,
+            [
+                TracePoint(6, 105),
+                TracePoint(9, 108),
+                TracePoint(7, 105),
+            ],
+        ),
+    ];
+
+    assert(flatLocalAlignments == expectedResult);
+}
+
+
 string chainLocalAlignments(
     in string dbFile,
     in string lasFile,

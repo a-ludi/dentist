@@ -88,6 +88,25 @@ abstract class ReadFilter : AlignmentChainFilter
     InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains);
 }
 
+/// Discard alignments with low quality.
+class LQAlignmentChainsFilter : AlignmentChainFilter
+{
+    double maxAlignmentError;
+
+    this(double maxAlignmentError)
+    {
+        this.maxAlignmentError = maxAlignmentError;
+    }
+
+    override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
+    {
+        foreach (ref alignmentChain; alignmentChains)
+            alignmentChain.disableIf(alignmentChain.averageErrorRate > maxAlignmentError);
+
+        return alignmentChains;
+    }
+}
+
 /// Discard improper alignments.
 class ImproperAlignmentChainsFilter : AlignmentChainFilter
 {

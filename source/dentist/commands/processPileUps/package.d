@@ -59,6 +59,7 @@ import dentist.dazzler :
     DBdumpOptions,
     DbRecord,
     filterPileUpAlignments,
+    filterLocalAlignments,
     getAlignments,
     getDalignment,
     getDbRecords,
@@ -469,15 +470,18 @@ protected class PileUpProcessor
             options.pileUpAlignmentOptions,
             options.tmpdir,
         );
+        auto hqPileUpAlignment = filterLocalAlignments!(
+            a => a.averageErrorRate <= options.maxAlignmentError
+        )(croppedDb, rawPileUpAlignment);
 
         dentistEnforce(
-            !lasEmpty(rawPileUpAlignment),
-            "empty raw pileup alignment",
+            !lasEmpty(hqPileUpAlignment),
+            "empty pileup alignment",
         );
 
         auto chainedPileUpAlignment = chainLocalAlignments(
             croppedDb,
-            rawPileUpAlignment,
+            hqPileUpAlignment,
             options.chainingOptions,
         );
 

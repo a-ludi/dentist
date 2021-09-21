@@ -1560,6 +1560,12 @@ struct FlatLocalAlignment
     }
 
 
+    @property double averageErrorRate() const pure
+    {
+        return numDiffs.to!double / contigA.mappedLength.to!double;
+    }
+
+
     int opCmp(ref const FlatLocalAlignment other) const pure nothrow @safe @nogc
     {
         long cmp;

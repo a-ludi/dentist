@@ -13,6 +13,7 @@ import dentist.commands.collectPileUps.filter :
     AmbiguousAlignmentChainsFilter,
     ContainedAlignmentChainsFilter,
     ImproperAlignmentChainsFilter,
+    LQAlignmentChainsFilter,
     RedundantAlignmentChainsFilter,
     WeaklyAnchoredAlignmentChainsFilter;
 import dentist.common :
@@ -119,6 +120,7 @@ class PileUpCollector
         mixin(traceExecution);
 
         auto filters = tuple(
+            new LQAlignmentChainsFilter(options.maxAlignmentError),
             new ImproperAlignmentChainsFilter(options.properAlignmentAllowance),
             new WeaklyAnchoredAlignmentChainsFilter(repetitiveRegions, options.minAnchorLength),
             new ContainedAlignmentChainsFilter(),
