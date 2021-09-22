@@ -7,6 +7,7 @@ DENTIST
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
+[![DOI 10.1101/2021.02.26.432990](https://img.shields.io/badge/DOI-(pre--print)_10.1101%2F2021.02.26.432990-informational)](https://doi.org/10.1101/2021.02.26.432990)
 
 > DENTIST uses long reads to close assembly gaps at high accuracy.
 
