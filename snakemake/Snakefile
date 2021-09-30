@@ -739,7 +739,7 @@ outputs = config["outputs"]
 workdir_ = config["workdir"]
 logdir = config["logdir"]
 workflow_ = config.get("workflow", {})
-max_threads = config["max_threads"]
+threads_per_process = config["threads_per_process"]
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
 propagate_batch_size = config["propagate_batch_size"]
 batch_size = config["batch_size"]
@@ -969,7 +969,7 @@ rule self_alignment_block:
         aligncmd = prepare_flags(lambda : generate_options_for("self", dentist_config_file, ensure_masks("", dust_mask, tandem_mask))),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("self-alignment.{dam}.{block_ref}.{block_reads}")
     container: dentist_container
     shell:
@@ -1021,7 +1021,7 @@ rule tandem_alignment_block:
         aligncmd = prepare_flags(lambda : generate_options_for("tandem", dentist_config_file)),
         alignment_file = lambda _, output: basename(output[0])
     log: log_file("tandem-alignment.{dam}.{block}")
-    threads: max_threads
+    threads: threads_per_process
     container: dentist_container
     shell:
         """
@@ -1109,7 +1109,7 @@ rule ref_vs_reads_alignment_block:
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("ref-vs-reads-alignment.{block_reads}")
     container: dentist_container
     shell:
@@ -1249,7 +1249,7 @@ checkpoint collect:
         main_threads = main_threads,
         auxiliary_threads = auxiliary_threads,
         masks = ",".join([homogenized_mask(m)  for m in masks])
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("collect")
     container: dentist_container
     shell:
@@ -1270,7 +1270,7 @@ rule process:
         main_threads = main_threads,
         auxiliary_threads = auxiliary_threads,
         masks = ",".join([homogenized_mask(m)  for m in masks])
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("process.{batch_id}")
     container: dentist_container
     shell:
@@ -1340,7 +1340,7 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
         reads_stub = db_stub(rel_to_workdir(reads)),
         alignment_file_a_vs_b = lambda _, output: basename(output[0]),
         alignment_file_b_vs_a = lambda _, output: basename(output[1])
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
     container: dentist_container
     shell:
@@ -1400,7 +1400,7 @@ rule validate_regions_block:
         temp(mask_files(preliminary_gap_closed, block_mask(weak_coverage_mask, "{block_ref}")))
     params:
         block_mask = block_mask(weak_coverage_mask, "{block_ref}")
-    threads: max_threads
+    threads: threads_per_process
     log: log_file("validate-regions-block.{block_ref}")
     container: dentist_container
     shell:
