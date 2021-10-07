@@ -109,7 +109,7 @@ check_for_broken_links()
             (( $(jobs | wc -l) < PARALLEL )) || { wait -n || (( ++FAILED )); }
 
             check_link "$FILE" "$LINE" "$URL" &
-        done < <(grep -HnoP '(ftp|https?):[^[:space:]\]\)]+' "$FILE")
+        done < <(grep -HnoP '(ftp|https?):[^[:space:]>\]\)]+' "$FILE")
         wait || (( ++FAILED ))
     done
 
