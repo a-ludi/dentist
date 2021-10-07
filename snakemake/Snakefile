@@ -746,7 +746,7 @@ batch_size = config["batch_size"]
 validation_blocks = config["validation_blocks"]
 workflow_flags_names = ["full_validation", "no_purge_output"]
 workflow_flags = dict(((flag, config.get(flag, False))  for flag in workflow_flags_names))
-dentist_container = config.get("dentist_container", "docker://aludi/dentist:stable")
+dentist_container = config.get("dentist_container", "docker://aludi/dentist:v2.0.0")
 
 if workflow.use_singularity:
     prefetch_singularity_image(dentist_container)
