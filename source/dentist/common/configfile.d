@@ -18,9 +18,15 @@ import dentist.commandline : OptionsFor;
 import dentist.common.commands :
     DentistCommand,
     dentistCommands;
+import dyaml :
+    YAMLLoader = Loader,
+    YAML = Node,
+    YAMLType = NodeType;
 import std.algorithm :
     all,
     canFind,
+    endsWith,
+    map,
     startsWith;
 import std.conv : to;
 import std.exception :
@@ -32,6 +38,7 @@ import std.meta : Alias;
 import std.range :
     ElementType,
     only;
+import std.range.primitives;
 import std.stdio : File;
 import std.string :
     split;
@@ -51,7 +58,7 @@ import std.traits :
     isUnsigned,
     Parameters,
     ReturnType;
-import std.typecons : tuple;
+import std.typecons : No, tuple;
 import vibe.data.json :
     Json,
     parseJson;
@@ -146,12 +153,7 @@ Options retroInitFromConfig(Options)(ref Options options, in string configFile)
 Options parseConfig(Options)(in string configFile)
 {
     enum dentistCommand = Options.commandName;
-    auto configContent = readConfigFile(configFile);
-    auto configValues = parseJson(
-        configContent,
-        null,
-        configFile,
-    );
+    auto configValues = parseConfigFile(configFile);
 
     validateConfig(configValues);
 
@@ -185,12 +187,7 @@ Options parseConfig(Options)(in string configFile)
 
 void validateConfigFile(in string configFile)
 {
-    auto configContent = readConfigFile(configFile);
-    auto configValues = parseJson(
-        configContent,
-        null,
-        configFile,
-    );
+    auto configValues = parseConfigFile(configFile);
 
     validateConfig(configValues);
 }
@@ -457,6 +454,26 @@ auto getConfigValue(SymbolType)(Json configValue)
     }
 }
 
+Json parseConfigFile(in string configFileName)
+{
+    auto configContent = readConfigFile(configFileName);
+
+    if (configFileName.endsWith(".yaml", ".yml"))
+    {
+        auto loader = YAMLLoader.fromFile(configFileName);
+
+        return loader.load().toJson;
+    }
+    else if (configFileName.endsWith(".json"))
+        return parseJson(
+            configContent,
+            null,
+            configFileName,
+        );
+    else
+        throw new ConfigFileException("unknown file type");
+}
+
 string readConfigFile(in string configFileName)
 {
     auto configFile = File(configFileName, "r");
@@ -471,6 +488,70 @@ string readConfigFile(in string configFileName)
 
     return cast(string) configContent;
 }
+
+Json toJson(YAML yaml)
+{
+    import std.datetime : SysTime;
+
+    alias value(T) = () => yaml.get!(T, No.stringConversion)();
+
+    final switch (yaml.type)
+    {
+        case YAMLType.null_:
+            return Json(null);
+        case YAMLType.boolean:
+            return Json(value!bool());
+        case YAMLType.integer:
+            return Json(value!long());
+        case YAMLType.string:
+            return Json(value!string());
+        case YAMLType.mapping:
+            auto map = Json.emptyObject;
+
+            foreach (pair; value!(YAML.Pair[])())
+            {
+                enforce!ConfigFileException(
+                    pair.key.type == YAMLType.string,
+                    "only string-keys are allowed",
+                );
+
+                map[pair.key.get!string] = pair.value.toJson;
+            }
+
+            return map;
+        case YAMLType.sequence:
+            auto seq = Json.emptyArray;
+
+            foreach (element; value!(YAML[])())
+                seq ~= element.toJson;
+
+            return seq;
+        case YAMLType.decimal:
+            return Json(value!real());
+        case YAMLType.binary:
+        case YAMLType.timestamp:
+        case YAMLType.merge:
+        case YAMLType.invalid:
+            throw new ConfigFileException(format!"unsupported YAML type: %s"(yaml.type));
+    }
+}
+
+unittest {
+    enum complexJson = `{
+    "int": 42,
+    "float": 3.1415,
+    "truth": true,
+    "void": null,
+    "answer": "The answer is 42.",
+    "list": ["Apple", "Banana", "Coconut", {"weird": "thing"}],
+}`;
+
+    auto expected = ((json) => parseJson(json))(complexJson);
+    auto yamlConverted = YAMLLoader.fromString(complexJson).load().toJson();
+
+    assert(expected == yamlConverted);
+}
+
 
 enum SizeUnit
 {

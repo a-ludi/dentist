@@ -1351,7 +1351,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     enum configHelpString = "
-        provide configuration values in a JSON file. See README.md for
+        provide configuration values in a YAML or JSON file. See README.md for
         usage and examples.
     ";
 
@@ -1360,6 +1360,7 @@ struct OptionsFor(DentistCommand _command)
         @Argument("<in:config>")
         @Help(configHelpString)
         @(Validate!validateFileExists)
+        @(Validate!(validateFileExtension!(".json", ".yaml", ".yml")))
         string configFile;
     }
     else
@@ -1368,6 +1369,7 @@ struct OptionsFor(DentistCommand _command)
         @MetaVar("<config-json>")
         @Help(configHelpString)
         @(Validate!(value => (value is null).execUnless!(() => validateFileExists(value))))
+        @(Validate!(value => value is null || value.validateFileExtension!(".json", ".yaml", ".yml")))
         string configFile;
 
         @PreValidate(Priority.high)
@@ -3605,17 +3607,15 @@ private
 
     alias typeOf(alias T) = typeof(T);
 
-    void validateFileExtension(
+    void validateFileExtension(extensions...)(
+        in string file,
         string msg = "expected %-(%s or %) but got %s",
-        extensions...
-    )(in string file)
-            if (allSatisfy!(isSomeString, staticMap!(typeOf, extensions)))
+    )
+    if (allSatisfy!(isSomeString, staticMap!(typeOf, extensions)))
     {
-        enum defaultMsg = "expected %-(%s or %) but got %s";
-
         enforce!CLIException(
             file.endsWith(extensions),
-            format!(msg !is null ? msg : defaultMsg)([extensions], file)
+            format(msg, [extensions], file)
         );
     }
 
@@ -3627,7 +3627,7 @@ private
         else
             enum extensions = AliasSeq!(extension);
 
-        validateFileExtension!(null, extensions)(dbFile);
+        validateFileExtension!extensions(dbFile);
         validateFileExists(dbFile);
 
         foreach (hiddenDbFile; getHiddenDbFiles(dbFile))
