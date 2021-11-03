@@ -2299,8 +2299,14 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("read-coverage", "C")
         @Help(q"{
-            this is used to provide good default values for --max-coverage-reads
-            or --min-coverage-reads; both options are mutually exclusive
+            This is used to provide good default values for --max-coverage-reads
+            (mask-repetitive-regions) or --min-coverage-reads (validate-regions);
+            --read-coverage and --*-coverage-reads are mutually exclusive.
+            Ideally, the user provides the haploid read coverage which, for
+            example, may be inferred using a histogram of the alignment
+            coverage across the genome. Alternatively, the average raw read
+            coverage can be used which is the number of base pairs in the
+            reads divided by the number of base pairs in the assembly.
         }")
         double readCoverage;
 

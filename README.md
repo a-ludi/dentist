@@ -334,6 +334,63 @@ Therefore, we provide this shorter list of important and influential
 parameters. Please also consider adjusting the performance parameter in the
 workflow configuration (`snakemake/snakemake.yml`).
 
+- `--read-coverage`: This is the preferred way of providing values to
+  `--max-coverage-reads`, `--max-improper-coverage-reads` and
+  `--min-coverage-reads`. See below how their values are derived from
+  `--read-coverage`.
+
+    Ideally, the user provides the haploid read coverage
+    which, for example, may be inferred using a histogram of the alignment
+    coverage across the genome. Alternatively, the average raw read coverage can
+    be used which is the number of base pairs in the reads divided by the number
+    of base pairs in the assembly.
+
+- `--ploidy`: This combined with `--read-coverage` is the preferred way of
+    providing `--min-coverage-reads`. 
+
+    > Ploidy (/ˈplɔɪdi/) is the number of complete sets of chromosomes in a
+    > cell [...]. (https://en.wikipedia.org/wiki/Ploidy)
+
+- `--max-coverage-reads`, `--max-improper-coverage-reads`: 
+  These parameters are used to derive a repeat mask from the ref vs. reads
+  alignment. If the coverage of (improper) alignments is larger than the given
+  theshold it will be considered repetitive. If supplied, default values are derived from `--read-coverage` as follows:
+  
+    The maximum read coverage `C_max` is calculated from the global read
+    coverage `C` (provided via --read-coverage) such that the probability of
+    observing more than `C_max` alignments in a unique (non-repetitive) genomic
+    region is very small (see [pre-print][dentist-bioarxiv], Methods section
+    and Supplementary Table 2). In practice, this probability is approximated
+    via
+
+    ```
+    C_max = floor(C / log(log(log(b * C + c) / log(a))))
+    where
+        a = 1.65
+        b = 0.1650612
+        c = 5.9354533
+    ```
+
+    To further increase the sensitivity, DENTIST searches for smaller
+    repeat-induced local alignments. To this end, we define an alignment as
+    proper if there are at most 100 bp (adjustable via
+    --proper-alignment-allowance) of unaligned sequence on either end of the
+    read. All other alignments, where only a smaller substring of the read
+    aligns, are called improper. Improper alignments are often indicative of
+    repetitive regions. Therefore, DENTIST considers genomic regions, where the
+    number of improper read alignments is higher than a threshold to be
+    repetitive. By default, this threshold equals half the global read coverage C.
+    (see [pre-print][dentist-bioarxiv], Methods section). In practice, a smoothed
+    version of `max(4, x/2)` is used to provide better performance for very low
+    read coverage. The maximum improper read coverage `I_max` is computed as
+
+    ```
+    I_max = floor(a*x + exp(b*(c - x)))
+    where
+        a = 0.5
+        b = 0.1875
+        c = 8
+    ```
 
 - `--dust-{reads,ref}`, `--daligner-{consensus,reads-vs-reads,self}`,
   `--damapper-ref-vs-reads`, `--datander-ref`, `--daccord`:  
@@ -398,6 +455,17 @@ workflow configuration (`snakemake/snakemake.yml`).
   at every position and (2) are spanned by at least `--min-spanning-reads`
   reads. Thus, increasing any of these numbers makes the *valid* gaps more
   robust but may reduce their number.
+
+    If `--min-coverage-reads` is not provided, it will be derived from
+    `--read-coverage` (see above) and `--ploidy`. Given (haploid) read coverage
+    `C` and ploidy `p`, the minimum read coverage `C_min` is calculated as
+
+    ```
+      C_min = C / (2 * p)
+    ```
+
+    This corresponds to 50% of the long read coverage expected to be sequenced
+    from a haploid locus (see [pre-print][dentist-bioarxiv], Methods section).
 
 
 [dentist-cli-summary]: ./docs/list-of-commandline-options.md
