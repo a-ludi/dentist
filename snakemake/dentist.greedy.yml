@@ -1,0 +1,19 @@
+# WARNING: Use with care!
+#          Always validate the closed gaps (e.g. manual inspection).
+
+# NOTE: The workflow creates an intermediate assembly
+#   `workdir/{output_assembly}-preliminary.fasta` that contains all closed
+#   gaps, i.e. before validation. It is accompanied by an AGP and BED file.
+#   You may inspect these files for manual selection of the closed gaps to
+#   get maximum sensitivity. After selecting viable closed gaps, you have
+#   to adjust the file `workdir/skip-gaps.txt` to reflect your wishes.
+
+__default__:
+    verbose: 2
+    allow-single-reads: true
+    best-pile-up-margin: 1.5
+    existing-gap-bonus: 3.0
+    join-policy: contigs
+    min-reads-per-pile-up: 1
+    min-spanning-reads: 1
+    proper-alignment-allowance: 500

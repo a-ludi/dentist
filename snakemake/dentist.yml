@@ -1,0 +1,32 @@
+# You must set at least either `ploidy` and `read-coverage`
+# or `max-coverage-reads` and `min-coverage-reads`.
+
+__default__:
+    read-coverage: 20.0
+    ploidy: 2
+    max-coverage-self: 3
+    verbose: 2
+
+    # The following options influence alignment, consensus and dust/tandem
+    # masking both in the workflow and when called internally by dentist
+
+    daccord: []
+    daligner-consensus: []
+    daligner-reads-vs-reads: []
+    daligner-self: []
+    damapper-ref-vs-reads: []
+    datander-ref: []
+    dust-ref: []
+    dust-reads: []
+
+# Uncomment the following block if: the default value for min-coverage-reads
+# (0.5 * --read-coverage/--ploidy) is suboptimal. It is important to revert
+# --read-coverage and --ploidy because they are mutually exclusive with
+# ---min-coverage-reads.
+
+#validate-regions:
+#    min-coverage-reads: 5
+#    revert: "read-coverage,ploidy"
+
+output:
+    fasta-line-width: 80
