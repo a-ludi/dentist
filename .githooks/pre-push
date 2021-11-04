@@ -145,6 +145,15 @@ lint_snakefile()
 )
 
 
+validate_config()
+{
+    for CONFIG in "$@"
+    do
+        ./dentist validate-config "$CONFIG"
+    done
+}
+
+
 if [ "$num_new_commits" -gt 0 ];
 then
     create_testdir
@@ -152,5 +161,7 @@ then
     locally_checkout_head
     check_for_broken_links ./*.md ./LICENSE
     lint_snakefile
+    dub build --config=testing
     dub test --config=testing
+    validate_config ./snakemake/dentist.greedy.yml ./snakemake/dentist.yml
 fi
