@@ -171,7 +171,7 @@ make sure your setup is working as expected.
 
 > TL;DR
 >
->     # edit dentist.json and snakemake.yml
+>     # edit dentist.yml and snakemake.yml
 >     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 
 Install [Snakemake][snakemake] version >=5.32.1 and copy these files into your
@@ -179,9 +179,9 @@ working directory:
 
 - `./snakemake/Snakefile`
 - `./snakemake/snakemake.yml`
-- `./snakemake/dentist.json`
+- `./snakemake/dentist.yml`
 
-Next edit `snakemake.yml` and `dentist.json` to fit your needs and optionally
+Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
 test your configuration with
 
     snakemake --configfile=snakemake.yml --use-singularity --cores=1 -f -- validate_dentist_config
@@ -316,7 +316,7 @@ The default parameters are rather **conservative**, i.e. they focus on
 correctness of the result while not sacrificing too much sensitivity.
 
 We also provide a **greedy** sample configuration
-([`snakemake/dentist.greedy.json`](./snakemake/dentist.greedy.json)) which
+([`snakemake/dentist.greedy.yml`](./snakemake/dentist.greedy.yml)) which
 focuses on sensitivity but may introduce more errors. _**Warning:** Use with
 care! Always validate the closed gaps (e.g. manual inspection)._
 

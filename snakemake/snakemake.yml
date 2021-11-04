@@ -47,7 +47,7 @@
 # Config file for dentist. Use this file to adjust parameters of DENTIST.
 # You must set at least either `ploidy` and `read-coverage` or
 # `max-coverage-reads` and `min-coverage-reads`.
-dentist_config:         dentist.json
+dentist_config:         dentist.yml
 
 inputs:
     # The reference assembly where gaps should be closed

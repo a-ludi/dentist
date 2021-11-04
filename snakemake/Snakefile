@@ -4,6 +4,7 @@ min_version("5.32.1")
 
 import base64
 import json
+import yaml
 from itertools import chain
 from math import *
 from os import environ
@@ -349,7 +350,7 @@ def full_validate_dentist_config(config_file):
     errors = list()
     config = None
     with open(config_file, 'r') as cf:
-        config = json.load(cf)
+        config = yaml.safe_load(cf)
 
     def prohibit_revert_in_default():
         if "__default__" in config:
@@ -769,9 +770,9 @@ closed_gaps_bed = "{}.{}.bed".format(db_stub(gap_closed_fasta), closed_gaps_mask
 reference = fasta_to_workdb(reference_fasta, "dam")
 reads_db_type = "db" if inputs["reads_type"] == "PACBIO_SMRT" else "dam"
 reads = fasta_to_workdb(reads_fasta, reads_db_type)
-dentist_config_file = config.get("dentist_config", "dentist.json")
+dentist_config_file = config.get("dentist_config", "dentist.yml")
 dentist_config = full_validate_dentist_config(dentist_config_file)
-dentist_merge_config_file = join(workdir_, workflow_.get("dentist_merge_config_file", "dentist.merge.json"))
+dentist_merge_config_file = join(workdir_, workflow_.get("dentist_merge_config_file", "dentist.merge.yml"))
 skip_gaps = join(workdir_, workflow_.get("skip-gaps", "skip-gaps.txt"))
 self_alignment = alignment_file(reference)
 tandem_alignment = alignment_file("TAN", reference)
