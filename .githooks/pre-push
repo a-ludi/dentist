@@ -78,6 +78,19 @@ should_ignore_link()
 }
 
 
+has_sucess_response()
+{
+    BEST_RESPONSE_CODE="$(
+        curl --head --silent --location "$1" | \
+        sed -nE 's!^HTTP/([0-9]+(\.[0-9]+)?)\s+([0-9]+)(\s+\w+)?$!\3!p' | \
+        sort -n | \
+        head -n1
+    )"
+
+    (( BEST_RESPONSE_CODE < 400 ))
+}
+
+
 check_link()
 {
     local FILE="$1"
@@ -87,7 +100,7 @@ check_link()
     if should_ignore_link "$URL"
     then
         return
-    elif ! curl --head --fail --silent --location "$URL" > /dev/null
+    elif ! has_sucess_response "$URL"
     then
         echo "broken link at $FILE:$LINE: '$URL'"
 
