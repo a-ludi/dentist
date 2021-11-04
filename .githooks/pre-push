@@ -28,7 +28,14 @@ url="$2"
 num_new_commits="$(grep -E '^refs/' | grep -cvE '^refs/tags/' || true)"
 export git_root
 git_root="$PWD"
-ignored_links=""
+IGNORE_LINKS=""
+IGNORE_PATHS='
+    ./workdir
+    ./dentist-example
+    ./../../dentist
+    ./prepare-site.sh
+    ./snakemake/profile-slurm.*.yml
+'
 
 
 create_testdir()
@@ -137,6 +144,72 @@ check_for_broken_links()
 }
 
 
+should_ignore_path()
+{
+    if [[ "$1" == *\$DENTIST_VERSION* ]]
+    then
+        # ignore paths with env variable (usually from RELEASE.md)
+        return 0
+    fi
+
+    [[ -v IGNORE_PATHS ]] || return 1
+
+    awk -v"path=$1" '
+        {
+            for (i = 1; i <= NF; ++i)
+                if ($i == path)
+                    exit 0; # found path -> report ignored
+        }
+
+        END {
+            exit $i != path;
+        }
+    ' <<<"$IGNORE_PATHS"
+}
+
+
+check_path()
+{
+    local FILE="$1"
+    local LINE="$2"
+    local PATH_="$3"
+
+    if should_ignore_path "$PATH_"
+    then
+        return
+    elif ! [[ -e "$PATH_" ]] && ! [[ -d "$PATH_" ]]
+    then
+        echo "broken path at $FILE:$LINE: '$PATH_'"
+
+        return 1
+    fi
+}
+
+
+check_for_broken_paths()
+{
+    FAILED=0
+
+    echo -n 'testing local paths ... '
+    for FILE in "$@"
+    do
+        while IFS=':' read -r FILE LINE PATH_
+        do
+            check_path "$FILE" "$LINE" "$PATH_" || (( ++FAILED ))
+        done < <(grep -HnoP '\./[^[:space:]>\]\)"`\?]+' "$FILE")
+    done
+
+    if (( FAILED == 0 ))
+    then
+        echo 'done'
+    else
+        echo 'failed'
+
+        return 1
+    fi
+}
+
+
 lint_snakefile()
 (
     cd snakemake
@@ -159,6 +232,7 @@ then
     create_testdir
     cd "$testdir"
     locally_checkout_head
+    check_for_broken_paths ./*.md ./LICENSE
     check_for_broken_links ./*.md ./LICENSE
     lint_snakefile
     dub build --config=testing
