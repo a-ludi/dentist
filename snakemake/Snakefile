@@ -601,6 +601,8 @@ def get_num_pile_ups():
         except subprocess.CalledProcessError as e:
             raise e
 
+        if num_pile_ups == 0:
+            raise Exception("no candidates for gap closing found; stopping the pipeline immediately")
 
     return num_pile_ups
 
