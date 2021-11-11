@@ -10,7 +10,7 @@ dependency        "vibe-d:data"        version="~>0.9.3"
 dependency        "dyaml"              version="~>0.8.4"
 
 targetType        "executable"
-mainSourceFile    "source/app.d"
+mainSourceFile    "source/dentist/commandline.d"
 stringImportPaths "scripts"
 
 buildRequirements "allowWarnings"

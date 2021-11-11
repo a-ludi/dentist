@@ -180,8 +180,27 @@ import vibe.data.json :
     toJson = serializeToJson;
 
 
+version (Posix)
+{
+    version (NoAppMain) { } else
+    {
+        /// Application entry point.
+        ///
+        /// See_also: $(MREF dentist,commandline,run)
+        int main(string[] args)
+        {
+            return cast(int) run(args);
+        }
+    }
+}
+else
+{
+    static assert(0, "not compatible with non-POSIX systems.");
+}
+
+
 /// Possible returns codes of the command line execution.
-enum ReturnCode
+enum ReturnCode : int
 {
     ok,
     commandlineError,
