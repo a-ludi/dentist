@@ -583,6 +583,17 @@ dentist_container: "/path/to/dir/dentist_stable.sif"
 Now, you are ready for execution.
 
 
+### Illegally formatted line from `DBshow -n`
+
+This error message may appear in DENTIST's log files. It is a known bug that
+will be fixed in a future release. In the meantime avoid FASTA headers that
+contain a string like this:
+
+```
+ :: Contig 27[4174278,32079331]
+```
+
+
 Citation
 --------
 
