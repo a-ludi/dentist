@@ -505,9 +505,16 @@ struct AlignmentChainPacker(R)
         this.bufferMode = bufferMode;
         this.localAlignmentBuffer = localAlignmentBuffer;
 
-        popFront();
-        // make sure ids start at zero
-        --currentChain.id;
+        if (this.alignments.empty)
+        {
+            setEmpty();
+        }
+        else
+        {
+            popFront();
+            // make sure ids start at zero
+            --currentChain.id;
+        }
     }
 
 
@@ -667,6 +674,14 @@ auto alignmentChainPacker(R)(
     if (isInputRange!R && is(ElementType!R == FlatLocalAlignment))
 {
     return AlignmentChainPacker!R(localAlignments, bufferMode, localAlignmentBuffer);
+}
+
+// test empty input
+unittest
+{
+    FlatLocalAlignment[] emptyAlignments;
+
+    assert(emptyAlignments.alignmentChainPacker().empty);
 }
 
 

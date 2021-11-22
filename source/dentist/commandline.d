@@ -727,7 +727,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:alignment>")
         @Help("self-alignment of the reference assembly or reads vs. reference alignment")
-        @(Validate!validateLasFile)
+        @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string dbAlignmentFile;
     }
 
