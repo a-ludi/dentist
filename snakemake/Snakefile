@@ -12,6 +12,7 @@ from os.path import basename, exists, join
 import re
 import shlex
 import subprocess
+from snakemake.logging import logger
 
 
 # Declare variables so they are available in functions
@@ -35,7 +36,6 @@ def prefetch_singularity_image(container_url):
 
     from snakemake.deployment.singularity import Image
     from snakemake.persistence import Persistence
-    from snakemake.logging import logger
 
     dag = type('FakeDAG', (object,), dict(
         workflow=type('FakeWorkflow', (object,), dict(
@@ -742,7 +742,17 @@ outputs = config["outputs"]
 workdir_ = config["workdir"]
 logdir = config["logdir"]
 workflow_ = config.get("workflow", {})
-threads_per_process = config["threads_per_process"]
+threads_per_process = None
+if "max_threads" in config:
+    if "threads_per_process" in config:
+        logger.warning("config[threads_per_process] takes precedence over config[max_threads] which is deprecated; remove max_threads from your config")
+        threads_per_process = config["threads_per_process"]
+    else:
+        logger.warning("config[max_threads] is deprecated; use config[threads_per_process] instead")
+        threads_per_process = config["max_threads"]
+else:
+    threads_per_process = config["threads_per_process"]
+
 custom_auxiliary_threads = config.get("auxiliary_threads", None)
 propagate_batch_size = config["propagate_batch_size"]
 batch_size = config["batch_size"]
