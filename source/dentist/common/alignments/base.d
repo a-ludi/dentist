@@ -1757,29 +1757,18 @@ struct SeededAlignment
         )(this, other);
     }
 
-    static InputRange!SeededAlignment from(AlignmentChain alignmentChain)
+    static auto from(AlignmentChain alignmentChain)
     {
         alias Seed = AlignmentLocationSeed;
 
-        if (isFrontExtension(alignmentChain) && isBackExtension(alignmentChain))
-        {
-            return inputRangeObject(only(
-                SeededAlignment(alignmentChain, Seed.front),
-                SeededAlignment(alignmentChain, Seed.back),
+        return only(
+            SeededAlignment(alignmentChain, Seed.front),
+            SeededAlignment(alignmentChain, Seed.back),
+        )
+            .filter!(sa => (
+                (sa.seed == Seed.front && isFrontExtension(alignmentChain)) ||
+                (sa.seed == Seed.back && isBackExtension(alignmentChain))
             ));
-        }
-        else if (isFrontExtension(alignmentChain) && !isBackExtension(alignmentChain))
-        {
-            return inputRangeObject(only(SeededAlignment(alignmentChain, Seed.front)));
-        }
-        else if (isBackExtension(alignmentChain) && !isFrontExtension(alignmentChain))
-        {
-            return inputRangeObject(only(SeededAlignment(alignmentChain, Seed.back)));
-        }
-        else
-        {
-            return inputRangeObject(takeNone!(SeededAlignment[]));
-        }
     }
 }
 
