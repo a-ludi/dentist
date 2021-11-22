@@ -1,0 +1,37 @@
+{% set binaries = [
+  "fasta2DB", "DB2fasta", "quiva2DB", "DB2quiva", "DBsplit", "DBdust",
+  "Catrack", "DBshow", "DBstats", "DBrm", "DBmv", "simulator", "fasta2DAM",
+  "DAM2fasta", "DBdump", "rangen", "arrow2DB", "DB2arrow", "DBwipe", "DBtrim",
+  "DBa2b", "DBb2a"
+] %}
+package:
+  name:     dazz_db
+  # git rev-list -1 --date=format:%Y%m%d --format='1.0.%cd+commit.%h' HEAD | tail -n1
+  version:  "1.0.20200727+commit.d22ae58"
+
+source:
+  git_rev: d22ae58d32a663d09325699f17373ccf8c6f93a0
+  git_url: https://github.com/thegenemyers/DAZZ_DB.git
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - make
+  host:
+    - zlib
+
+test:
+  commands:
+    {% for binary in binaries %}
+    {% if binary in ["DBa2b", "DBb2a"] %}
+    - {{ binary }} - 2>&1 | grep Usage
+    {% else %}
+    - {{ binary }} 2>&1 | grep Usage
+    {% endif %}
+    {% endfor %}
+
+about:
+  home: https://github.com/thegenemyers/DAZZ_DB
+  license: Custom
+  license_file: LICENSE
+  summary: The Dazzler Data Base.

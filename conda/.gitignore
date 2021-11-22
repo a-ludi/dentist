@@ -1,0 +1,4 @@
+# directory for build results
+_artifacts
+# build results files
+*.tar.bz2

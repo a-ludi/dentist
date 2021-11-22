@@ -1,0 +1,55 @@
+{% set name = "DENTIST" %}
+{% set git_rev = "v2.0.0" %}
+
+{% set version = environ['GIT_DESCRIBE_TAG'] %}
+{% if version[0] == "v" %}
+  {% set version = version[1:] %}
+{% endif %}
+{% if environ['GIT_DESCRIBE_NUMBER'] == 0 %}
+  {% set version = version~".dev"~environ['GIT_BUILD_STR'] %}
+{% endif %}
+{% set build_type = environ.get('BUILD_TYPE', 'release') %}
+{% set build_config = environ.get('DUB_CONFIG', 'default') %}
+{% if build_type != "release" %}
+  {% set version = version~"."~build_type %}
+{% endif %}
+{% if build_config != "default" %}
+  {% set version = version~"."~build_config %}
+{% endif %}
+
+package:
+  name:     "{{ name | lower }}-core"
+  version:  "{{ version }}"
+
+source:
+  git_rev: "{{ git_rev }}"
+  git_url: https://github.com/a-ludi/dentist.git
+
+build:
+  script_env:
+    - DENTIST_BUILD={{ build_type }}
+    - DENTIST_BUILD_CONFIG={{ build_config }}
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - jq==1.6
+  run:
+    - daligner==2.0.20200115+commit.c2b47da
+    - damapper==1.0.20200322+commit.b2c9d7f
+    - damasker==1.0.20200115+commit.22139ff
+    - dascrubber==1.0.20200726+commit.a53dbe8
+    - daccord==0.0.18+release.20200702195851
+    - dazz_db==1.0.20200727+commit.d22ae58
+
+test:
+  commands:
+    - dentist-unittest
+    - dentist -d
+
+about:
+  home: https://a-ludi.github.io/dentist/
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: DENTIST core tools. Install package `dentist` instead.

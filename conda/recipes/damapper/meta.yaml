@@ -1,0 +1,25 @@
+package:
+  name:     damapper
+  # git rev-list -1 --date=format:%Y%m%d --format='1.0.%cd+commit.%h' HEAD | tail -n1
+  version:  "1.0.20200322+commit.b2c9d7f"
+
+source:
+  git_rev: b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc
+  git_url: https://github.com/thegenemyers/DAMAPPER.git
+  patches:
+    - patches/makefile.patch
+
+requirements:
+  build:
+    - make
+    - {{ compiler('c') }}
+
+test:
+  commands:
+    - damapper 2>&1 | grep Usage
+
+about:
+  home: https://github.com/thegenemyers/DAMAPPER
+  license: Custom
+  license_file: LICENSE
+  summary: Long read to reference genome mapping tool.

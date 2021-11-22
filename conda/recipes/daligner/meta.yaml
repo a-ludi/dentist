@@ -1,0 +1,34 @@
+{% set binaries = [
+  "daligner", "HPC.daligner", "LAsort", "LAmerge", "LAsplit", "LAcat",
+  "LAshow", "LAdump", "LAcheck", "LAa2b", "LAb2a", "dumpLA"
+] %}
+
+package:
+  name:     daligner
+  # git rev-list -1 --date=format:%Y%m%d --format='2.0.%cd+commit.%h' HEAD | tail -n1
+  version:  "2.0.20200115+commit.c2b47da"
+
+source:
+  git_rev: c2b47da6b3c94ed248a6be395c5b96a4e63b3f63
+  git_url: https://github.com/thegenemyers/DALIGNER.git
+
+requirements:
+  build:
+    - make
+    - {{ compiler('c') }}
+
+test:
+  commands:
+    {% for binary in binaries %}
+    {% if binary in ["LAa2b", "LAb2a"] %}
+    - {{ binary }} - 2>&1 | grep Usage
+    {% else %}
+    - {{ binary }} 2>&1 | grep Usage
+    {% endif %}
+    {% endfor %}
+
+about:
+  home: https://github.com/thegenemyers/DALIGNER
+  license: Custom
+  license_file: LICENSE
+  summary: Find all significant local alignments between reads.

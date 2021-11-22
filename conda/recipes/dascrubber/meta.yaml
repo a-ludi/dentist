@@ -1,0 +1,29 @@
+{% set binaries = [
+  "DAScover", "DASqv", "DAStrim", "DASpatch", "DASedit", "DASmap",
+  "DASrealign", "REPcover", "REPqv", "REPtrim"
+] %}
+package:
+  name:     dascrubber
+  # git rev-list -1 --date=format:%Y%m%d --format='1.0.%cd+commit.%h' HEAD | tail -n1
+  version:  "1.0.20200726+commit.a53dbe8"
+
+source:
+  git_rev: a53dbe879a716e7b08338f397de5a0403637641e
+  git_url: https://github.com/thegenemyers/DASCRUBBER.git
+
+requirements:
+  build:
+    - make
+    - {{ compiler('c') }}
+
+test:
+  commands:
+    {% for binary in binaries %}
+    - {{ binary }} 2>&1 | grep Usage
+    {% endfor %}
+
+about:
+  home: https://github.com/thegenemyers/DASCRUBBER
+  license: Custom
+  license_file: LICENSE
+  summary:  Alignment-based Scrubbing pipeline.

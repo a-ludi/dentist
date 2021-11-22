@@ -1,0 +1,14 @@
+diff --git a/configure.ac b/configure.ac
+index 7f5b106..f1b31d6 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -21,6 +21,9 @@ AC_ARG_ENABLE(fast,
+         AS_HELP_STRING([--enable-fast],[disable evaluation of assertions (default no)]),
+         [fast=${enableval}],[fast=no])
+ 
++CFLAGS="${CFLAGS} -I$BUILD_PREFIX/include -Wl,-L$BUILD_PREFIX/lib -Wl,-rpath,$BUILD_PREFIX/lib -Wl,-rpath-link,$BUILD_PREFIX/lib"
++CXXFLAGS="${CXXFLAGS} -I$BUILD_PREFIX/include -Wl,-L$BUILD_PREFIX/lib -Wl,-rpath,$BUILD_PREFIX/lib -Wl,-rpath-link,$BUILD_PREFIX/lib"
++
+ # check for C compiler
+ CFLAGS_SAVE="${CFLAGS}"
+ CFLAGS=""

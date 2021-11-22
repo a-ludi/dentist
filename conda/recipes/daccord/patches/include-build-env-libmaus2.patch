@@ -1,0 +1,14 @@
+diff --git a/configure.ac b/configure.ac
+index 13d0d5f0..5f2f7d44 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -27,6 +27,9 @@ if test \( "${LIBMAUS2_IS_NATIVE}" -eq 1 \) -a \( "${BASHPROG}" != "no" \) -a \(
+ 	TESTDIR=test
+ fi
+ 
++CFLAGS="${CFLAGS} -I$BUILD_PREFIX/include -Wl,-L$BUILD_PREFIX/lib -Wl,-rpath,$BUILD_PREFIX/lib -Wl,-rpath-link,$BUILD_PREFIX/lib"
++CXXFLAGS="${CXXFLAGS} -I$BUILD_PREFIX/include -Wl,-L$BUILD_PREFIX/lib -Wl,-rpath,$BUILD_PREFIX/lib -Wl,-rpath-link,$BUILD_PREFIX/lib"
++
+ CFLAGS_SAVE="${CFLAGS}"
+ CFLAGS=""
+ AC_PROG_CC

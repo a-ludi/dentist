@@ -1,0 +1,44 @@
+{% set name = "libunwind-static" %}
+{% set version = "1.5.0" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  url: http://download.savannah.nongnu.org/releases/libunwind/libunwind-{{ version }}.tar.gz
+  sha256: 90337653d92d4a13de590781371c604f9031cdb50520366aa1e3a91e1efb1017 
+  patches:
+    - patches/lib64.patch
+
+build:
+  number: 1 
+  run_exports:
+    # breaks backwards compatibility sometimes but we trust the maintainers that they were only internal
+    # https://abi-laboratory.pro/index.php?view=timeline&l=libunwind
+    - {{ pin_compatible('libunwind', max_pin='x') }}
+  skip: true  # [win or osx]
+
+requirements:
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - make
+    - autoconf
+    - automake
+    - libtool
+  host:
+
+test:
+  commands:
+    - test -f "${PREFIX}/lib/libunwind.so"
+    - test -f "${PREFIX}/lib/libunwind.a"
+    - test -f "${PREFIX}/include/libunwind.h"
+    - test -f "${PREFIX}/include/unwind.h"
+
+about:
+  home: http://www.nongnu.org/libunwind
+  license: MIT
+  license_family: MIT
+  license_file: COPYING
+  summary: 'libunwind for static linking'

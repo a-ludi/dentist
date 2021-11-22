@@ -1,0 +1,48 @@
+{% set test_binaries = [
+  "computeintrinsicqv", "computeextrinsicqv", "lasfilteralignments",
+  "daccord", "computeintrinsicqv2"
+] %}
+{% set version = environ['GIT_DESCRIBE_TAG'] | replace('-', '+', 1) | replace('-', '.', 1) %}
+
+package:
+  name:     daccord
+  version:  "{{ version }}"
+
+source:
+  - folder: daccord
+    git_rev: 0.0.18-release-20200702195851
+    git_url: https://gitlab.com/german.tischler/daccord.git
+    patches:
+      - patches/include-build-env-daccord.patch
+  - folder: libmaus2
+    git_rev: 2.0.724-release-20200702192714
+    git_url: https://gitlab.com/german.tischler/libmaus2.git
+    patches:
+      - patches/include-build-env-libmaus2.patch
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - automake>=1.15,<1.16
+    - gmp
+    - libgomp
+    - libtool
+    - libunwind-static
+    - make
+    - pkg-config
+    - zlib
+  run:
+    - gmp
+    - libgomp
+
+test:
+  commands:
+    {% for binary in test_binaries %}
+    - {{ binary }} 2>&1 | grep usage
+    {% endfor %}
+
+about:
+  home: https://gitlab.com/german.tischler/daccord
+  license: GPLv3
+  license_file: daccord/COPYING
+  summary: Find all significant local alignments between reads.

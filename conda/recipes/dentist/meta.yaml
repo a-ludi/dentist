@@ -1,0 +1,54 @@
+{% set name = "DENTIST" %}
+{% set git_rev = "v2.0.0" %}
+
+{% set version = environ['GIT_DESCRIBE_TAG'] %}
+{% if version[0] == "v" %}
+  {% set version = version[1:] %}
+{% endif %}
+{% if environ['GIT_DESCRIBE_NUMBER'] == 0 %}
+  {% set version = version~".dev"~environ['GIT_BUILD_STR'] %}
+{% endif %}
+{% set build_type = environ.get('BUILD_TYPE', 'release') %}
+{% set build_config = environ.get('DUB_CONFIG', 'default') %}
+{% if build_type != "release" %}
+  {% set version = version~"."~build_type %}
+{% endif %}
+{% if build_config != "default" %}
+  {% set version = version~"."~build_config %}
+{% endif %}
+
+package:
+  name:     "{{ name | lower }}"
+  version:  "{{ version }}"
+
+source:
+  git_rev: "{{ git_rev }}"
+  git_url: https://github.com/a-ludi/dentist.git
+
+requirements:
+  run:
+    - dentist-core=={{ version }}
+    - snakemake==6.10.0
+    - pygraphviz==1.7 # NOTE: fixes some bug in the dependency solver
+
+test:
+  source_files:
+    - snakemake
+  commands:
+    - "dentist -d"
+    - "cd snakemake && snakemake --lint --configfile=snakemake.yml || true"
+
+about:
+  home: https://a-ludi.github.io/dentist/
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: DENTIST uses long reads to close assembly gaps at high accuracy.
+  tags:
+    - gap-filling
+    - close-assembly-gaps
+    - bioinformatics
+    - genome-assembly
+    - pacbio
+    - long-reads
+    - cluster

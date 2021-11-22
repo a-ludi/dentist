@@ -1,0 +1,26 @@
+diff --git a/Makefile b/Makefile
+index 958cfe3..d943a8e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,10 +5,10 @@ ALL = damapper HPC.damapper
+ all: $(ALL)
+ 
+ damapper: damapper.c map.c map.h align.c align.h DB.c DB.h QV.c QV.h
+-	gcc $(CFLAGS) -o damapper damapper.c map.c align.c DB.c QV.c -lpthread -lm
++	$(CC) $(CFLAGS) -o damapper damapper.c map.c align.c DB.c QV.c -lpthread -lm
+ 
+ HPC.damapper: HPC.damapper.c DB.c DB.h QV.c QV.h
+-	gcc $(CFLAGS) -o HPC.damapper HPC.damapper.c DB.c QV.c -lm
++	$(CC) $(CFLAGS) -o HPC.damapper HPC.damapper.c DB.c QV.c -lm
+ 
+ clean:
+ 	rm -f $(ALL)
+@@ -16,7 +16,7 @@ clean:
+ 	rm -f damapper.tar.gz
+ 
+ install:
+-	cp $(ALL) ~/bin
++	cp $(ALL) $(BINDIR)
+ 
+ package:
+ 	make clean

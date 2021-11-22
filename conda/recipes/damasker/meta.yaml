@@ -1,0 +1,32 @@
+{% set binaries = [
+  "datander", "TANmask", "REPmask", "HPC.TANmask", "HPC.REPmask",
+  "HPC.DAScover"
+] %}
+
+package:
+  name:     damasker
+  # git rev-list -1 --date=format:%Y%m%d --format='2.0.%cd+commit.%h' HEAD | tail -n1
+  version:  "1.0.20200115+commit.22139ff"
+
+source:
+  git_rev: 22139ff1c2b2c0ff2589fbc9cc948370be799827
+  git_url: https://github.com/thegenemyers/DAMASKER.git
+  patches:
+    - patches/makefile.patch
+    - patches/ccs-typo.patch
+
+requirements:
+  build:
+    - make
+    - {{ compiler('c') }}
+
+test:
+  commands:
+    {% for binary in binaries %}
+    - {{ binary }} 2>&1 | grep Usage
+    {% endfor %}
+
+about:
+  home: https://github.com/thegenemyers/DAMASKER
+  license: Custom
+  summary: Module to determine where repeats are and make soft-masks of said.
