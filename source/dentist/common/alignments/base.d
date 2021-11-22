@@ -1,5 +1,6 @@
 /**
-    Everything to handle local alignments and friends.
+    Defines alignment central data structures `AlignmentChain` and
+    `FlatLocalAlignment` as well as derived types and helper functions.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -77,26 +78,38 @@ import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writefln, writeln;
 
+/// Type aliases used throughout DENTIST to make definitions more meaningful.
 alias arithmetic_t = int;
+/// ditto
 alias coord_t = uint;
+/// ditto
 alias diff_t = uint;
+/// ditto
 alias id_t = uint;
+/// ditto
 alias trace_point_t = ushort;
 
 
-
+/// Holds information about a contig.
 struct Contig
 {
+    /// One-based contig ID. Zero is used as a special `undefined` value.
     id_t id;
+    /// Optional. Length of the contig.
     coord_t length;
 }
 
 
+/// Right-open locus, i.e. interval, on a contig.
 struct Locus
 {
+    /// Zero-based begin coordinate (inclusive).
     coord_t begin;
+    /// Zero-based end coordinate (exclusive).
     coord_t end;
 
+
+    /// Computed length of the locus.
     @property coord_t length() const pure nothrow
     {
         return end - begin;
@@ -104,19 +117,34 @@ struct Locus
 }
 
 
+/// Alignment flag.
 enum Flag : ubyte
 {
+    /// Alignment is relative the the reverse-complement of contig B.
     complement = 1 << 0,
+    /// Alignment should be ignored.
     disabled = 1 << 1,
+    /// Alignment is the start of an alternate chain.
     alternateChain = 1 << 2,
+    /// Alignment continuation of a chain of alignments.
     chainContinuation = 1 << 3,
+    /// Alignment is explicitly unchained.
     unchained = 1 << 4,
 }
 
 
+/// Bit field of `Flag`. Flags are accessible as properties, e.g.
+/// `flags.disabled`.
+///
+/// See_also: `std.typecons.BitFlags`
 alias Flags = BitFlags!Flag;
 
 
+/// A single trace point. Alignments are encoded using a list of equally
+/// spaced (on contig A) trace points (`tracePointSpacing`) by providing the
+/// number of base pairs consumed on contig B and additionally the number of
+/// diffs. This allows efficient reconstruction using local Needleman-Wunsch
+/// algorithm.
 struct TracePoint
 {
     trace_point_t numDiffs;
@@ -124,6 +152,13 @@ struct TracePoint
 }
 
 
+/// Pair of coordinates on contig A/B that map exactly to one another
+/// according to an alignment.
+///
+/// See_also: `Trace.translateTracePoint`,
+///     `AlignmentChain.LocalAlignment.getTrace`,
+///     `AlignmentChain.LocalAlignment.translateTracePoint`,
+///     `FlatLocalAlignment.trace`
 struct TranslatedTracePoint
 {
     coord_t contigA;
@@ -139,6 +174,14 @@ struct Trace
     const(TracePoint)[] tracePoints;
 
 
+    /// Translate `contigPos` on `contig` to a position on the other contig
+    /// using `tracePoints` without exact alignment reconstruction.
+    ///
+    /// `contigPos` is assigned to one of the coordinates in the trace using
+    /// `roundingMode` and the returned structure contains this adjusted
+    /// position.
+    ///
+    /// Returns: `TranslatedTracePoint` with the computed positions.
     TranslatedTracePoint translateTracePoint(string contig)(
         coord_t contigPos,
         RoundingMode roundingMode,
@@ -160,6 +203,10 @@ struct Trace
     }
 
 
+    /// Return the number of trace points up to and including `contigAPos`/
+    /// `contigBPos` using `roundingMode`.
+    ///
+    /// Note: `RoundingMode.round` is not implemented.
     auto tracePointsUpTo(string contig)(
         coord_t contigAPos,
         RoundingMode roundingMode,
@@ -216,6 +263,7 @@ struct Trace
         assert(0 <= tpsUpTo && tpsUpTo <= trace.tracePoints.length);
     }
 
+    /// ditto
     auto tracePointsUpTo(string contig)(
         coord_t contigBPos,
         RoundingMode roundingMode,
@@ -268,6 +316,10 @@ struct AlignmentChain
         TracePoint[] tracePoints;
 
 
+        /// Return trace object. Holds a `const` reference to `tracePoints`.
+        ///
+        /// Params:
+        ///     tracePointDistance = spacing on contig A between trace points.
         Trace getTrace(trace_point_t tracePointDistance) const pure nothrow @safe
         {
             return Trace(
@@ -279,6 +331,15 @@ struct AlignmentChain
         }
 
 
+        /// Translate `contigPos` on `contig` to a position on the other contig
+        /// using `tracePoints` without exact alignment reconstruction.
+        ///
+        /// Params:
+        ///     contig             = Either `"contigA"` or `"contigB"`.
+        ///     contigPos          = Input coordinate on `contig`.
+        ///     tracePointDistance = spacing on contig A between trace points.
+        ///     roundingMode       = see `dentist.util.math.RoundingMode`.
+        /// See_also: `Trace.translateTracePoint`
         TranslatedTracePoint translateTracePoint(string contig = "contigA")(
             coord_t contigPos,
             trace_point_t tracePointDistance,
@@ -288,7 +349,17 @@ struct AlignmentChain
             return getTrace(tracePointDistance).translateTracePoint!contig(contigPos, roundingMode);
         }
 
-        /// Crops this local alignment from startingSeed to contigPos.
+
+        /// Crops this local alignment from `startingSeed` (begin or end of
+        /// alignment) to `contigPos`.
+        ///
+        /// Params:
+        ///     contig             = Either `"contigA"` or `"contigB"`.
+        ///     startingSeed       = Begin (`AlignmentLocationSeed.front`) or
+        ///         end (`AlignmentLocationSeed.back`) of alignment.
+        ///     contigPos          = Input coordinate on `contig`.
+        ///     tracePointDistance = spacing on contig A between trace points.
+        ///     roundingMode       = see `dentist.util.math.RoundingMode`.
         void cropToTracePoint(string contig = "contigA")(
             in AlignmentLocationSeed startingSeed,
             in coord_t contigPos,
@@ -320,6 +391,15 @@ struct AlignmentChain
             numDiffs = tracePoints.map!(tp => tp.numDiffs.to!diff_t).sum;
         }
 
+        /// Return the number of trace points up to and including `contigPos`
+        /// using `roundingMode`.
+        ///
+        /// Params:
+        ///     contig             = Either `"contigA"` or `"contigB"`.
+        ///     contigPos          = Input coordinate on `contig`.
+        ///     tracePointDistance = spacing on contig A between trace points.
+        ///     roundingMode       = see `dentist.util.math.RoundingMode`.
+        /// See_also: `Trace.tracePointsUpTo`
         auto tracePointsUpTo(string contig)(
             coord_t contigPos,
             trace_point_t tracePointDistance,
@@ -333,6 +413,7 @@ struct AlignmentChain
         }
     }
 
+    deprecated("obsolete; will be removed in future version without replacement")
     static enum maxScore = 2 ^^ 16;
 
     size_t id;
@@ -342,6 +423,8 @@ struct AlignmentChain
     LocalAlignment[] localAlignments;
     trace_point_t tracePointDistance;
 
+
+    /// Return a minimal `AlignmentChain` with the disabled flag set.
     static @property AlignmentChain disabledInstance()
     {
         AlignmentChain ac;
@@ -354,13 +437,16 @@ struct AlignmentChain
     static foreach(flagName; __traits(allMembers, Flag))
     {
         mixin(format!(q"<
+            deprecated("will be removed in future version without replacement")
             static alias %1$s = PhobosFlag!"%2$s";
 
+            deprecated("will be removed in future version; use `flags.%2$s`")
             @property PhobosFlag!"%2$s" %2$s() pure const nothrow @trusted
             {
                 return cast(PhobosFlag!"%2$s") flags.%2$s;
             }
 
+            deprecated("will be removed in future version; use `flags.%2$s`")
             @property void %2$s(PhobosFlag!"%2$s" %2$s) pure nothrow
             {
                 flags.%2$s = %2$s;
@@ -419,6 +505,8 @@ struct AlignmentChain
             }
     }
 
+
+    /// Return first local alignment.
     @property ref const(LocalAlignment) first() const pure nothrow @safe
     {
         return localAlignments[0];
@@ -436,6 +524,7 @@ struct AlignmentChain
             }
     }
 
+    /// Return last local alignment.
     @property ref const(LocalAlignment) last() const pure nothrow @safe
     {
         return localAlignments[$ - 1];
@@ -453,42 +542,52 @@ struct AlignmentChain
             }
     }
 
+
+    /// Set the disable flag if `disable == true` unless it is already set.
+    ///
+    /// This does not evaluate `disable` if `flags.disabled` is already set.
     PhobosFlag!"disabled" disableIf(lazy bool disable) pure
     {
         if (!flags.disabled)
-        {
             flags.disabled = disable;
-        }
-
 
         return disabled;
     }
 
-    /// This alignment is called proper iff it starts and ends at a read boundary.
+
+    /// This alignment is called proper iff it starts and ends at a contig
+    /// boundary within `allowance`.
     @property bool isProper(coord_t allowance = 0) const pure nothrow @safe
     {
         return (beginsWith!"contigA"(allowance) || beginsWith!"contigB"(allowance)) &&
                (endsWith!"contigA"(allowance) || endsWith!"contigB"(allowance));
     }
 
+
+    /// This alignment begins within `allowance` of the begin of `contig`.
     @property bool beginsWith(string contig)(coord_t allowance = 0) const pure nothrow @safe
         if (contig.among("contigA", "contigB"))
     {
         return mixin("first."~contig~".begin <= allowance");
     }
 
+
+    /// This alignment ends within `allowance` of the end of `contig`.
     @property bool endsWith(string contig)(coord_t allowance = 0) const pure nothrow @safe
         if (contig.among("contigA", "contigB"))
     {
         return mixin("last."~contig~".end + allowance >= "~contig~".length");
     }
 
-    /// Returns true iff this alignment covers `contig` completely.
+
+    /// Returns true iff this alignment covers `contig` completely within
+    /// `allowance`.
     @property bool completelyCovers(string contig)(coord_t allowance = 0) const pure nothrow
         if (contig.among("contigA", "contigB"))
     {
         return beginsWith!contig(allowance) && endsWith!contig(allowance);
     }
+
 
     /**
         Returns true if the aligned read `contigB` (with extensions on either
@@ -574,11 +673,16 @@ struct AlignmentChain
             }
     }
 
+
+    deprecated("obsolete; will be removed in future version without replacement")
     @property size_t totalLength() const pure
     {
         return last.contigA.end - first.contigA.begin;
     }
 
+
+    /// Sum of bases covered by each local alignment on contig A. Some bases
+    /// may be counted multiple times.
     @property size_t coveredBases(string contig)() const pure
     {
         return localAlignments.map!("a." ~ contig ~ ".end - a." ~ contig ~ ".begin").sum;
@@ -596,6 +700,8 @@ struct AlignmentChain
             }
     }
 
+
+    /// Sum of differences in each local alignment.
     @property size_t totalDiffs() const pure
     {
         return localAlignments.map!"a.numDiffs".sum;
@@ -613,6 +719,8 @@ struct AlignmentChain
             }
     }
 
+
+    deprecated("obsolete; will be removed in future version without replacement")
     @property size_t totalGapLength() const pure
     {
         return localAlignments
@@ -633,6 +741,8 @@ struct AlignmentChain
             }
     }
 
+
+    deprecated("obsolete; will be removed in future version without replacement")
     @property size_t numMatchingBps() const pure
     {
         return totalLength - (totalDiffs + totalGapLength);
@@ -650,6 +760,8 @@ struct AlignmentChain
             }
     }
 
+
+    deprecated("obsolete; will be removed in future version without replacement")
     @property size_t score() const pure
     {
         return numMatchingBps * maxScore / totalLength;
@@ -667,6 +779,8 @@ struct AlignmentChain
             }
     }
 
+
+    /// Average diffs per base pair over all local alignments.
     @property double averageErrorRate() const pure
     {
         return totalDiffs.to!double / coveredBases!"contigA".to!double;
@@ -674,7 +788,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -684,6 +798,8 @@ struct AlignmentChain
             }
     }
 
+
+    /// Compare this alignment chain to other only by contig IDs.
     int compareIds(ref const AlignmentChain other) const pure nothrow
     {
         return cmpLexicographically!(
@@ -695,7 +811,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
                 auto acs = [
@@ -722,6 +838,20 @@ struct AlignmentChain
             }
     }
 
+
+    /// Compare this alignment chain to `other`. Sort order is determined
+    /// by these criteria:
+    ///
+    /// $(OL
+    ///     $(LI `contigA.id`)
+    ///     $(LI `contigB.id`)
+    ///     $(LI `first.contigA.begin`)
+    ///     $(LI `first.contigB.begin`)
+    ///     $(LI `last.contigA.end`)
+    ///     $(LI `last.contigB.end`)
+    /// )
+    ///
+    /// Note, this is incompatible with `FlatLocalAlignment.opCmp`.
     int opCmp(ref const AlignmentChain other) const pure nothrow
     {
         return cmpLexicographically!(
@@ -737,7 +867,7 @@ struct AlignmentChain
 
     unittest
     {
-        // see compareIds
+        // see `compareIds`
         with (Complement) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
@@ -815,6 +945,13 @@ struct AlignmentChain
             }
     }
 
+
+    /// Translate `contigPos` on `contig` to a position on the other contig
+    /// without exact alignment reconstruction. The first local alignment
+    /// that covers `contigPos` is selected for translation.
+    ///
+    /// See_also: `coveringLocalAlignmentIndex`,
+    ///     `LocalAlignment.translateTracePoint`
     TranslatedTracePoint translateTracePoint(string contig = "contigA")(
         in coord_t contigPos,
         RoundingMode roundingMode,
@@ -895,7 +1032,18 @@ struct AlignmentChain
         assertThrown!Exception(ac.translateTracePoint(2585, RoundingMode.floor));
     }
 
-    /// Crops this alignment chain from startingSeed to contigPos.
+
+    /// Crops this local alignment from `startingSeed` (begin or end of
+    /// alignment chain) to `contigPos`.
+    ///
+    /// Params:
+    ///     contig             = Either `"contigA"` or `"contigB"`.
+    ///     startingSeed       = Begin (`AlignmentLocationSeed.front`) or
+    ///         end (`AlignmentLocationSeed.back`) of alignment.
+    ///     contigPos          = Input coordinate on `contig`.
+    ///     roundingMode       = see `dentist.util.math.RoundingMode`.
+    /// See_also: `coveringLocalAlignmentIndex`,
+    ///     `LocalAlignment.cropToTracePoint`
     void cropToTracePoint(string contig = "contigA")(
         in AlignmentLocationSeed startingSeed,
         in coord_t contigPos,
@@ -1069,6 +1217,11 @@ struct AlignmentChain
         assertThrown!Exception(getAC().cropToTracePoint(front, 2585, RoundingMode.floor));
     }
 
+
+    /// Return the index of the first local alignment that covers `contigPos`.
+    ///
+    /// Throws: `Exception` if `contigPos` is not covered by any local
+    ///     alignment.
     protected size_t coveringLocalAlignmentIndex(string contig = "contigA")(
         in coord_t contigPos,
         in RoundingMode roundingMode,
@@ -1089,11 +1242,13 @@ struct AlignmentChain
         return index;
     }
 
+
     /**
         Generate a cartoon of this alignment relative to `contig`.
 
         Params:
             bpsPerChar =    Number of base pairs that one char represents.
+            alignmentChains = List of alignments to show
 
         Returns: a cartoon of this alignment
     */
@@ -1203,6 +1358,11 @@ struct AlignmentChain
     }
 
 
+    /// Split this alignment chain into a range of `FlatLocalAlignment`s. The
+    /// resulting alignment are flagged appropriately to make reconstruction
+    /// of the chain possible.
+    ///
+    /// Returns: range of `FlatLocalAlignment`s
     auto toFlatLocalAlignments() pure nothrow
     {
         return this
@@ -1231,6 +1391,9 @@ struct AlignmentChain
     }
 }
 
+
+/// Returns true if `ac1` is smaller than `ac2` according to
+/// `AlignmentChain.compareIds`.
 bool idsPred(in AlignmentChain ac1, in AlignmentChain ac2) pure
 {
     auto cmpValue = ac1.compareIds(ac2);
@@ -1264,6 +1427,9 @@ unittest
         }
 }
 
+
+/// Returns true if `ac1` and `ac2` are equal according to
+/// `AlignmentChain.compareIds`.
 auto haveEqualIds(in AlignmentChain ac1, in AlignmentChain ac2) pure
 {
     auto cmpValue = ac1.compareIds(ac2);
@@ -1299,6 +1465,9 @@ unittest
     ]));
 }
 
+
+/// Return the slice of `acList` where the contig IDs match. `acList` must be
+/// sorted by `idsPred`.
 auto equalIdsRange(in AlignmentChain[] acList, in id_t contigAID, in id_t contigBID) pure
 {
     assert(isSorted!idsPred(acList));
@@ -1332,11 +1501,30 @@ unittest
     assert(sortedTestChains.equalIdsRange(42, 1337).equal(sortedTestChains[0 .. 0]));
 }
 
-/**
-    Returns true iff ac1 begins before ac2 on the given contig (in).
-*/
+
+/// Compare `lhs` to `rhs`. Sort order is determined by these criteria:
+///
+/// $(OL
+///     $(LI `contigA.id`)
+///     $(LI `contigB.id`)
+///     $(LI `flags.complement`)
+/// )
+///
+/// Note, this is incompatible with `AlignmentChain.opCmp`.
+int cmpIdsAndComplement(ref const AlignmentChain lhs, ref const AlignmentChain rhs)
+{
+    return cmpLexicographically!(
+        const(AlignmentChain),
+        ac => ac.contigA.id,
+        ac => ac.contigB.id,
+        ac => ac.flags.complement,
+    )(lhs, rhs);
+}
+
+
+/// Returns true iff `ac1` begins before `ac2` on the given contig.
 bool isBefore(string contig)(in AlignmentChain ac1, in AlignmentChain ac2) pure
-        if (contig == "contigA" || contig == "contigB")
+if (contig == "contigA" || contig == "contigB")
 {
     assert(__traits(getMember, ac1, contig) == __traits(getMember, ac2, contig),
             "alignment chains do not belong to the same contig");
@@ -1348,7 +1536,7 @@ bool isBefore(string contig)(in AlignmentChain ac1, in AlignmentChain ac2) pure
     }
     else
     {
-
+        static assert("not implemented for contigB");
     }
 }
 
@@ -1379,8 +1567,14 @@ unittest
         }
 }
 
+
 /// Calculates the coverage of the contigs by the given alignments. Only
 /// contigs involved in the alignments are regarded.
+///
+/// Returns:
+/// ---
+/// totalCoveredBases / totalContigLength
+/// ---
 double alignmentCoverage(in AlignmentChain[] alignments)
 {
     static double coveredBases(T)(T alignmentsPerContig)
@@ -1470,22 +1664,30 @@ unittest
 }
 
 
+/// A single local alignment. These correspond to the entries in a LAS file.
 struct FlatLocalAlignment
 {
+    /// Describes the locus of the alignment.
     static struct FlatLocus
     {
+        /// Contig ID
         id_t id;
+        /// Contig length
         coord_t length;
+        /// Locus begin (inclusive)
         coord_t begin;
+        /// Locus end (exclusive)
         coord_t end;
 
 
+        /// Construct a `Contig` struct from this locus.
         @property Contig contig() const pure nothrow @safe
         {
             return Contig(id, length);
         }
 
 
+        /// Assign contig ID and length from `newContig`.
         @property void contig(Contig newContig) pure nothrow @safe
         {
             this.id = newContig.id;
@@ -1493,12 +1695,14 @@ struct FlatLocalAlignment
         }
 
 
+        /// Construct a `Locus` struct from this locus.
         @property Locus locus() const pure nothrow @safe
         {
             return Locus(begin, end);
         }
 
 
+        /// Assign locus begin and end from `newLocus`.
         @property void locus(Locus newLocus) pure nothrow @safe
         {
             this.begin = newLocus.begin;
@@ -1506,50 +1710,69 @@ struct FlatLocalAlignment
         }
 
 
+        /// Returns the length of the locus, i.e. `end - begin`.
         @property coord_t mappedLength() const pure nothrow @safe
         {
             return end - begin;
         }
 
 
+        /// Set `this.begin` to `begin` bounded by `this.length`.
         @property void boundedBegin(coord_t begin) pure nothrow @safe
         {
             this.begin = min(begin, length);
         }
 
 
+        /// Set `this.end` to `end` bounded by `this.length`.
         @property void boundedEnd(coord_t end) pure nothrow @safe
         {
             this.end = min(end, length);
         }
 
 
+        /// Returns true if this locus begins within `allowance` base pairs
+        /// of the begin of the containing contig.
         bool beginsWithin(coord_t allowance) const pure nothrow @safe
         {
             return begin <= allowance;
         }
 
 
+        /// Returns true if this locus ends within `allowance` base pairs
+        /// of the begin of the containing contig.
         bool endsWithin(coord_t allowance) const pure nothrow @safe
         {
             return end + allowance >= length;
         }
 
 
+        /// Returns true if this locus begins/ends within `allowance` base pairs
+        /// of the begin/end of the containing contig.
         bool isFullyContained(coord_t allowance) const pure nothrow @safe
         {
             return beginsWithin(allowance) && endsWithin(allowance);
         }
     }
 
+
+    /// Optional ID of this local alignment.
     size_t id;
+    /// Alignment locus on contig A.
     FlatLocus contigA;
+    /// Alignment locus on contig B.
     FlatLocus contigB;
+    /// Alignment flags.
     Flags flags;
+    /// Optional spacing between trace points.
     trace_point_t tracePointDistance;
+    /// Optional list of trace points.
     TracePoint[] tracePoints;
 
 
+    /// Set the disable flag if `disable == true` unless it is already set.
+    ///
+    /// This does not evaluate `disable` if `flags.disabled` is already set.
     PhobosFlag!"disabled" disableIf(lazy bool disable) pure
     {
         if (!flags.disabled)
@@ -1560,12 +1783,30 @@ struct FlatLocalAlignment
     }
 
 
+    /// Average diffs per base pair over all local alignments.
     @property double averageErrorRate() const pure
     {
         return numDiffs.to!double / contigA.mappedLength.to!double;
     }
 
 
+    /// Compare this local alignment to `other`'.
+    ///
+    /// Sort order is determined according to `LAsort`, i.e. by these
+    /// criteria:
+    ///
+    /// $(OL
+    ///     $(LI `contigA.id`)
+    ///     $(LI `contigB.id`)
+    ///     $(LI `flags.complement`)
+    ///     $(LI `contigA.begin`)
+    ///     $(LI `contigA.end`)
+    ///     $(LI `contigB.begin`)
+    ///     $(LI `contigB.end`)
+    ///     $(LI `numDiffs`)
+    /// )
+    ///
+    /// Note, this is incompatible with `AlignmentChain.opCmp`.
     int opCmp(ref const FlatLocalAlignment other) const pure nothrow @safe @nogc
     {
         long cmp;
@@ -1591,12 +1832,14 @@ struct FlatLocalAlignment
     }
 
 
+    /// Sum of diffs across all `tracePoints`.
     @property coord_t numDiffs() const pure nothrow @safe @nogc
     {
         return tracePoints.map!(tp => cast(coord_t) tp.numDiffs).sum;
     }
 
 
+    /// Construct `Trace` object from this local alignment.
     @property Trace trace() const pure nothrow @safe
     {
         return Trace(
@@ -1608,6 +1851,14 @@ struct FlatLocalAlignment
     }
 
 
+    /// Translate `contigPos` on `contig` to a position on the other contig
+    /// using `tracePoints` without exact alignment reconstruction.
+    ///
+    /// Params:
+    ///     contig             = Either `"contigA"` or `"contigB"`.
+    ///     contigPos          = Input coordinate on `contig`.
+    ///     roundingMode       = see `dentist.util.math.RoundingMode`.
+    /// See_also: `Trace.translateTracePoint`
     TranslatedTracePoint translateTracePoint(string contig = "contigA")(
         coord_t contigPos,
         RoundingMode roundingMode,
@@ -1701,25 +1952,20 @@ struct FlatLocalAlignment
 }
 
 
-int cmpIdsAndComplement(ref const AlignmentChain lhs, ref const AlignmentChain rhs)
-{
-    return cmpLexicographically!(
-        const(AlignmentChain),
-        ac => ac.contigA.id,
-        ac => ac.contigB.id,
-        ac => ac.flags.complement,
-    )(lhs, rhs);
-}
-
-
-/// Type of the read alignment.
+/// Seed location of a read alignment. This marks the begin or end of an
+/// alignment or contig.
+///
+/// See_also: `AlignmentChain.cropToTracePoint`, `SeededAlignment.seed`
 enum AlignmentLocationSeed : ubyte
 {
+    /// Mark the begin/front.
     front,
+    /// Mark the end/back.
     back,
 }
 
 
+/// Returns `'f'` for `front` and `'b'` for `back`.
 char toChar(const AlignmentLocationSeed seed) pure nothrow @safe
 {
     final switch (seed)
@@ -1732,12 +1978,18 @@ char toChar(const AlignmentLocationSeed seed) pure nothrow @safe
 }
 
 
-/**
-    An alignment chain with a "seed", ie. hint for it's intended location.
-*/
+/// An alignment chain with a "seed", ie. hint for it's intended location.
+/// This is used to separate alignment that fully cover a contig into one that
+/// is used for the left/previous gap and one that is used for that right/next
+/// gap.
 struct SeededAlignment
 {
+    /// The alignment chain. Properties can be accessed directly on the
+    /// `SeededAlignment` because of `alias alignment this`.
     AlignmentChain alignment;
+    /// Mark the end of the contained contig that this alignment belongs to.
+    /// This is used to discriminate between copies of alignments that fully
+    /// cover the contig.
     AlignmentLocationSeed seed;
 
     alias alignment this;
@@ -1748,6 +2000,9 @@ struct SeededAlignment
         assert(seed != AlignmentLocationSeed.back || isBackExtension(alignment));
     }
 
+
+    /// Compare according to `AlignmentChain.opCmp` and break ties by
+    /// comparing `seed`s.
     int opCmp(ref const SeededAlignment other) const pure nothrow
     {
         return cmpLexicographically!(
@@ -1757,6 +2012,14 @@ struct SeededAlignment
         )(this, other);
     }
 
+
+    /// Construct a range of `SeededAlignment`s from `alignmentChain`. The
+    /// resulting range will contain:
+    /// $(UL
+    ///     $(LI a `front` copy if `isFrontExtension`)
+    ///     $(LI a `back` copy if `isBackExtension`)
+    /// )
+    ///
     static auto from(AlignmentChain alignmentChain)
     {
         alias Seed = AlignmentLocationSeed;
@@ -1772,20 +2035,20 @@ struct SeededAlignment
     }
 }
 
-/// Type of the read alignment.
-static enum ReadAlignmentType
-{
-    front = 0,
-    gap = 1,
-    back = 2,
-}
 
-private bool isExtension(in AlignmentChain alignment) pure nothrow
+/// Returns true if `alignment` either `isFrontExtension` or `isBackExtension`
+/// but not both. A more complete description can be found at
+/// `ReadAlignment.isExtension`.
+protected bool isExtension(in AlignmentChain alignment) pure nothrow
 {
     return isFrontExtension(alignment) ^ isBackExtension(alignment);
 }
 
-private bool isFrontExtension(in AlignmentChain alignment) pure nothrow
+
+/// Returns true if the sequence of the aligned read extends beyond the
+/// contig begin. A more complete description can be found at
+/// `ReadAlignment.isFrontExtension`.
+protected bool isFrontExtension(in AlignmentChain alignment) pure nothrow
 {
     auto readExtensionLength = alignment.first.contigB.begin;
     auto referenceExtensionLength = alignment.first.contigA.begin;
@@ -1793,7 +2056,11 @@ private bool isFrontExtension(in AlignmentChain alignment) pure nothrow
     return readExtensionLength > referenceExtensionLength;
 }
 
-private bool isBackExtension(in AlignmentChain alignment) pure nothrow
+
+/// Returns true if the sequence of the aligned read extends beyond the
+/// contig end. A more complete description can be found at
+/// `ReadAlignment.isBackExtension`.
+protected bool isBackExtension(in AlignmentChain alignment) pure nothrow
 {
     auto readExtensionLength = alignment.contigB.length - alignment.last.contigB.end;
     auto referenceExtensionLength = alignment.contigA.length - alignment.last.contigA.end;
@@ -1801,16 +2068,42 @@ private bool isBackExtension(in AlignmentChain alignment) pure nothrow
     return readExtensionLength > referenceExtensionLength;
 }
 
+
+/// Type of the read alignment.
+static enum ReadAlignmentType
+{
+    /// Read aligns only to the front of a contig.
+    ///
+    /// See_also: `ReadAlignment.isFront`
+    front = 0,
+    /// Read aligns to two distinct contigs.
+    ///
+    /// See_also: `ReadAlignment.isGap`
+    gap = 1,
+    /// Read aligns only to the back of a contig.
+    ///
+    /// See_also: `ReadAlignment.isBack`
+    back = 2,
+}
+
+
 /**
     Alignment of a read against the reference. This is either one or two
     alignment chains which belong to the same read and one or two reference
     contig(s).
+
+    It uses a static array of `SeededAlignment`s to store the alignments, thus
+    avoiding memory allocation.
 */
 struct ReadAlignment
 {
-    SeededAlignment[2] _alignments;
-    size_t _length;
+    private SeededAlignment[2] _alignments;
+    private size_t _length;
 
+
+    /// Construct from one or two `SeededAlignment`s. Returns an empty
+    /// `ReadAlignment` If `alignments` has an invalid length and writes a
+    /// `dentist.util.log.LogLevel.debug` message.
     this(SeededAlignment[] alignments...)
     {
         if (1 <= alignments.length && alignments.length <= 2)
@@ -1829,21 +2122,28 @@ struct ReadAlignment
         }
     }
 
+
+    /// Returns the number of `SeededAlignment`s.
     @property size_t length() pure const nothrow
     {
         return _length;
     }
 
+    /// ditto
     @property size_t opDollar() pure const nothrow
     {
         return _length;
     }
 
+
+    /// Return a view of the contained alignments.
     inout(SeededAlignment[]) opIndex() inout pure nothrow
     {
         return _alignments[0 .. _length];
     }
 
+
+    /// Return the alignment at `idx` (zero-based).
     inout(SeededAlignment) opIndex(T)(T idx) inout pure nothrow
     {
         return this[][idx];
@@ -1870,6 +2170,7 @@ struct ReadAlignment
         assert(ra2[$ - 1] == ac2);
     }
 
+
     /**
         If readAlignment is a gap return true iff the first alignment's
         `contigA.id` is lower than the second alignment's; otherwise returns
@@ -1880,15 +2181,16 @@ struct ReadAlignment
         return !isGap || _alignments[0].contigA.id < _alignments[1].contigA.id;
     }
 
+
+    /// Swap contained alignments if they are not `isInOrder`.
     ReadAlignment getInOrder() pure nothrow
     {
         if (isGap && !isInOrder)
-        {
             swap(_alignments[0], _alignments[1]);
-        }
 
         return this;
     }
+
 
     /**
         Returns true iff the read alignment is valid, ie. it is either an
@@ -1898,6 +2200,7 @@ struct ReadAlignment
     {
         return isExtension ^ isGap;
     }
+
 
     /**
         Get the type of the read alignment.
@@ -1922,6 +2225,7 @@ struct ReadAlignment
         }
     }
 
+
     /**
         Returns true iff the read alignment is an extension, ie. it is a front or
         back extension.
@@ -1933,6 +2237,7 @@ struct ReadAlignment
         // A single SeededAlignment is always a valid extension.
         return _length == 1;
     }
+
 
     /**
         Returns true iff the read alignment is an front extension, ie. it is an
@@ -1961,6 +2266,7 @@ struct ReadAlignment
         return _length == 1 && _alignments[0].seed == AlignmentLocationSeed.front;
     }
 
+
     /**
         Returns true iff the read alignment is an back extension, ie. it is an
         extension and reaches over the back of the reference contig.
@@ -1988,6 +2294,7 @@ struct ReadAlignment
         return _length == 1 && _alignments[0].seed == AlignmentLocationSeed.back;
     }
 
+
     /**
         Returns true iff the read alignment spans a gap, ie. two alignments of
         the same read on different reference contigs are involved.
@@ -1999,6 +2306,7 @@ struct ReadAlignment
             _alignments[0].contigB.id == _alignments[1].contigB.id;
     }
 
+
     /**
         Returns true iff the read alignment spans a gap and the flanking
         contigs have in the same orientation (according to this alignment).
@@ -2007,8 +2315,9 @@ struct ReadAlignment
     {
         return isGap &&
             _alignments[0].seed != _alignments[1].seed &&
-            _alignments[0].complement == _alignments[1].complement;
+            _alignments[0].flags.complement == _alignments[1].flags.complement;
     }
+
 
     /**
         Returns true iff the read alignment spans a gap and the flanking
@@ -2018,7 +2327,7 @@ struct ReadAlignment
     {
         return isGap &&
             _alignments[0].seed == _alignments[1].seed &&
-            _alignments[0].complement != _alignments[1].complement;
+            _alignments[0].flags.complement != _alignments[1].flags.complement;
     }
 
     unittest
@@ -2374,11 +2683,14 @@ struct ReadAlignment
         }
     }
 
+
+    deprecated("obsolete; will be removed in future version without replacement")
     double meanScore() const pure
     {
         return this[].map!"a.score".mean;
     }
 }
+
 
 /// Generate basic join from read alignment.
 J makeJoin(J)(ReadAlignment readAlignment)
@@ -2425,11 +2737,9 @@ J makeJoin(J)(ReadAlignment readAlignment)
     }
 }
 
-/**
-    A pile of read alignments belonging to the same gap/contig end.
 
-    See_Also: Hit
-*/
+/// A pile of read alignments belonging to the same gap/contig ends. These
+/// are the candidates for gap closing.
 alias PileUp = ReadAlignment[];
 
 /**
@@ -2454,11 +2764,17 @@ ReadAlignmentType getType(in PileUp pileUp) pure nothrow
     }
 }
 
+
+/// Returns true iff the read alignment is valid, ie. it either `isExtension`
+/// or `isGap`.
 bool isValid(in PileUp pileUp) pure nothrow
 {
     return pileUp.isExtension ^ pileUp.isGap;
 }
 
+
+/// Returns true if all alignments in `pileUp` are either
+/// `ReadAlignment.isFrontExtension` or `ReadAlignment.isBackExtension`.
 bool isExtension(in PileUp pileUp) pure nothrow
 {
     if (pileUp.length > 0 && pileUp[0].isFrontExtension)
@@ -2475,11 +2791,15 @@ bool isExtension(in PileUp pileUp) pure nothrow
     }
 }
 
+
+/// Returns true if all alignments in `pileUp` are `ReadAlignment.isGap`.
 bool isGap(in PileUp pileUp) pure nothrow
 {
     return pileUp.any!(readAlignment => readAlignment.isGap);
 }
 
+
+/// Returns true if all alignments in `pileUp` are `ReadAlignment.isParallel`.
 auto isParallel(in PileUp pileUp) pure nothrow
 {
     return pileUp.isGap && pileUp
@@ -2488,6 +2808,9 @@ auto isParallel(in PileUp pileUp) pure nothrow
         .isParallel;
 }
 
+
+/// Returns true if all alignments in `pileUp` are
+/// `ReadAlignment.isAntiParallel`.
 auto isAntiParallel(in PileUp pileUp) pure nothrow
 {
     return pileUp.isGap && pileUp
@@ -2496,6 +2819,10 @@ auto isAntiParallel(in PileUp pileUp) pure nothrow
         .isAntiParallel;
 }
 
+
+/// Efficiently determines the contig IDs involved in `pileUp`. This assumes
+/// that there are one or two contigs involved. Consequently, an empty
+/// `pileUp` is not allowed.
 Contig[] contigs(in PileUp pileUp) nothrow
 {
     Contig[] contigs;
@@ -2516,6 +2843,7 @@ Contig[] contigs(in PileUp pileUp) nothrow
 
     return contigs;
 }
+
 
 /// Returns a list of pointers to all involved alignment chains.
 AlignmentChain*[] getAlignmentRefs(PileUp pileUp) pure nothrow
@@ -2555,6 +2883,7 @@ unittest
     assert(pileUp[0][1].id == 2);
     assert(pileUp[1][0].id == 3);
 }
+
 
 /// Converts the pileup into a simple JSON object for diagnostic purposes.
 Json pileUpToSimpleJson(in PileUp pileUp)

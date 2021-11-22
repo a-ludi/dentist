@@ -2,6 +2,7 @@
     This package holds function for easy verification of external tools'
     existence.
 
+    See_also: `ExternalDependency`, `externalDependencies`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -19,12 +20,28 @@ import std.meta : Filter, staticMap;
 import std.traits : getUDAs;
 
 
+/// Used as a decorator to mark external dependencies. External dependencies
+/// are executable that are expected to be on the `PATH`.
+///
+/// This decorator allows for automatic checks concerning these dependencies
+/// at start up of the program rather than waiting for an error during
+/// execution.
 struct ExternalDependency
 {
+    /// Name of the executable, e.g. `LAsort`.
     string executable;
+
+    /// Package name that is displayed to the user to aid installation of
+    /// missing dependencies, e.g. `DALIGNER`.
     string package_;
+
+    /// Package url/homepage that is displayed to the user to aid
+    /// installation of missing dependencies, e.g.
+    /// `https://github.com/thegenemyers/DALIGNER`.
     string url;
 
+
+    /// Build a human-readable string that contains all available information.
     string toString() const pure nothrow
     {
         if (package_ is null && url is null)
@@ -37,7 +54,8 @@ struct ExternalDependency
             return executable ~ " (part of `" ~ package_ ~ "`; see " ~ url ~ ")";
     }
 
-    static enum isExternalDependency(alias value) = is(typeof(value) == ExternalDependency);
+
+    private static enum isExternalDependency(alias value) = is(typeof(value) == ExternalDependency);
 
     unittest
     {
@@ -57,12 +75,16 @@ struct ExternalDependency
     }
 }
 
-static enum ExternalDependency[] fromSymbol(alias symbol) = [Filter!(
+
+/// Extract external dependencies declared for `symbol`.
+private static enum ExternalDependency[] fromSymbol(alias symbol) = [Filter!(
     ExternalDependency.isExternalDependency,
     getUDAs!(symbol, ExternalDependency),
 )];
 
-ExternalDependency[] getExternalDependencies(Modules...)()
+
+/// Extract all external dependencies of all symbols in the listed `Modules`.
+private ExternalDependency[] getExternalDependencies(Modules...)()
 {
     import std.array : array;
     import std.algorithm : joiner, multiSort;
@@ -115,4 +137,10 @@ unittest
     ]);
 }
 
+
+/// All external dependencies in DENTIST. Note that the actual list depends
+/// on the build config (`testing` or not). You can get a valid list by
+/// calling `dentist -d`.
+///
+/// See_also: `ExternalDependency`
 enum externalDependencies = getExternalDependencies!modules;

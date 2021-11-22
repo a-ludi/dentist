@@ -1,5 +1,29 @@
 /**
-    This is the `processPileUps` command of `dentist`.
+    This is the `process-pile-ups` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Filter and process pile ups into insertions for gap closing.
+
+    Each pile up is processed independently by these steps:
+
+    1. Check if the pile up contains a sufficient number of reads
+       (--min-reads-per-pile-up) unless --allow-single-reads is given.
+       Skip the pile up if the check fails.
+    2. Immediately create insertion from the read sequence and alignment(s) if
+       the pile up consists of a single reads --allow-single-reads is given.
+    3. Crop all reads to a common trace point on the reference contigs that
+       is not masked as repetitive.
+    4. Align cropped reads to each other.
+    5. Compute intrinsic quality values (QVs).
+    6. Select read with the least number of "bad" QVs (see --bad-fraction).
+    7. Try computing a consensus with daccord. Select the next reference
+       and retry until no more reference reads are available.
+    8. Align consensus sequence to the reference contigs.
+    9. Check that the consensus aligns to the contig tips as expected.
+    10. Create insertion from consensus sequence and alignment(s).
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +31,28 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.processPileUps;
+
+package(dentist) enum summary = "
+    Filter and process pile ups into insertions for gap closing.
+
+    Each pile up is processed independently by these steps:
+
+    1. Check if the pile up contains a sufficient number of reads
+       (--min-reads-per-pile-up) unless --allow-single-reads is given.
+       Skip the pile up if the check fails.
+    2. Immediately create insertion from the read sequence and alignment(s) if
+       the pile up consists of a single reads --allow-single-reads is given.
+    3. Crop all reads to a common trace point on the reference contigs that
+       is not masked as repetitive.
+    4. Align cropped reads to each other.
+    5. Compute intrinsic quality values (QVs).
+    6. Select read with the least number of \"bad\" QVs (see --bad-fraction).
+    7. Try computing a consensus with daccord. Select the next reference
+       and retry until no more reference reads are available.
+    8. Align consensus sequence to the reference contigs.
+    9. Check that the consensus aligns to the contig tips as expected.
+    10. Create insertion from consensus sequence and alignment(s).
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.commands.collectPileUps.filter : filterContainedAlignmentChains;
@@ -107,24 +153,26 @@ import std.typecons : tuple, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
-/// Options for the `processPileUps` command.
+/// Options for the `process-pile-ups` command.
 alias Options = OptionsFor!(DentistCommand.processPileUps);
 
-/// Execute the `processPileUps` command with `options`.
-void execute(Options)(in Options options)
+
+/// Execute the `process-pile-ups` command with `options`.
+void execute(in Options options)
 {
     auto processor = new PileUpsProcessor(options);
 
     processor.run();
 }
 
-/// This class comprises the `processPileUps` step of the `dentist` algorithm
-class PileUpsProcessor
+
+private class PileUpsProcessor
 {
     protected const Options options;
     protected PileUp[] pileUps;
     ReferenceRegion repeatMask;
     Insertion[] insertions;
+
 
     this(in ref Options options)
     {
@@ -132,6 +180,7 @@ class PileUpsProcessor
         this.pileUps.reserve(options.numPileUps);
         this.insertions = minimallyInitializedArray!(Insertion[])(options.numPileUps);
     }
+
 
     void run()
     {
@@ -148,12 +197,14 @@ class PileUpsProcessor
         writeInsertions();
     }
 
+
     protected void processPileUp(size_t i, PileUp pileUp)
     {
         auto processor = new PileUpProcessor(options, repeatMask);
 
         processor.run(i, pileUp, &insertions[i]);
     }
+
 
     protected void readPileUps()
     {
@@ -164,6 +215,7 @@ class PileUpsProcessor
         foreach (pileUpBatch; options.pileUpBatches)
             pileUps ~= pileUpDb[pileUpBatch[0] .. pileUpBatch[1]];
     }
+
 
     protected void readRepeatMask()
     {
@@ -176,10 +228,12 @@ class PileUpsProcessor
             ));
     }
 
+
     protected void dropEmptyInsertions()
     {
         insertions = insertions.find!(ins => ins.start.contigId != 0);
     }
+
 
     protected void writeInsertions()
     {
@@ -194,14 +248,8 @@ class PileUpsProcessor
 }
 
 
-alias Enumerated(T) = Tuple!(
-    size_t, "index",
-    T, "value",
-);
-
-
 /// This class processes a single pileup.
-protected class PileUpProcessor
+private class PileUpProcessor
 {
     const(Options) options;
     const(ReferenceRegion) originalRepeatMask;
@@ -226,6 +274,7 @@ protected class PileUpProcessor
     protected CompressedSequence insertionSequence;
     protected Insertion insertion;
 
+
     this(in Options options, in ReferenceRegion repeatMask)
     {
         this.options = options;
@@ -236,6 +285,7 @@ protected class PileUpProcessor
             .joiner
             .array;
     }
+
 
     void run(size_t pileUpIdx, PileUp pileUp, Insertion* resultInsertion)
     {
@@ -269,6 +319,7 @@ protected class PileUpProcessor
 
         processPileUp();
     }
+
 
     protected void processPileUp()
     {
@@ -363,10 +414,12 @@ protected class PileUpProcessor
         }
     }
 
+
     protected bool shouldProcessSingularPileUp() const nothrow
     {
         return options.allowSingleReads && pileUp.length == 1;
     }
+
 
     protected bool shouldSkipSmallPileUp() const nothrow
     {
@@ -386,6 +439,7 @@ protected class PileUpProcessor
         return false;
     }
 
+
     protected void reduceRepeatMaskToFlankingContigs()
     {
         auto pileUpContigsRegion = ReferenceRegion(
@@ -395,6 +449,7 @@ protected class PileUpProcessor
         );
         repeatMask = originalRepeatMask & pileUpContigsRegion;
     }
+
 
     protected void crop()
     {
@@ -412,6 +467,7 @@ protected class PileUpProcessor
         if (pileUpContigs[0].id != croppingPositions[0].contigId)
             swap(pileUpContigs[0], pileUpContigs[1]);
     }
+
 
     protected void adjustRepeatMaskToMakeMappingPossible()
     {
@@ -448,6 +504,7 @@ protected class PileUpProcessor
         }
     }
 
+
     protected void selectAllowedReferenceReadIds()
     {
         // NOTE pileUp is not modified but the read alignments need to be assignable.
@@ -460,6 +517,7 @@ protected class PileUpProcessor
                 .map!(enumRA => cast(id_t) (enumRA.index + 1))
         );
     }
+
 
     protected void computeQVs()
     {
@@ -504,6 +562,7 @@ protected class PileUpProcessor
             "empty pileup alignment after filtering",
         );
     }
+
 
     protected void findReferenceReadCandidates()
     {
@@ -557,6 +616,7 @@ protected class PileUpProcessor
             .array;
     }
 
+
     protected bool selectReferenceRead(in id_t referenceReadTry)
     {
         referenceReadIdx = bestReferenceReadIndex(referenceReadTry);
@@ -574,10 +634,12 @@ protected class PileUpProcessor
         return true;
     }
 
+
     protected @property inout(ReadAlignment) referenceRead() inout
     {
         return pileUp[referenceReadIdx];
     }
+
 
     protected size_t bestReferenceReadIndex(in id_t skip) const pure
     {
@@ -586,6 +648,7 @@ protected class PileUpProcessor
 
         return referenceReadCandidateIndices[skip];
     }
+
 
     protected void computeConsensus()
     {
@@ -607,6 +670,7 @@ protected class PileUpProcessor
             ].toJson,
         );
     }
+
 
     protected void alignConsensusToFlankingContigs()
     {
@@ -686,6 +750,7 @@ protected class PileUpProcessor
         );
     }
 
+
     protected void getInsertionAlignment()
     {
         mixin(traceExecution);
@@ -758,6 +823,7 @@ protected class PileUpProcessor
         );
     }
 
+
     protected void getInsertionSequence()
     {
         if (shouldProcessSingularPileUp())
@@ -775,6 +841,7 @@ protected class PileUpProcessor
             assert(fastaSequence.length == insertionSequence.length);
         }
     }
+
 
     protected Insertion makeInsertion()
     {
@@ -795,6 +862,8 @@ protected class PileUpProcessor
     }
 }
 
+
+// Quickly generate test data
 debug private void printInsertions(in Insertion[] insertions)
 {
     import std.stdio : writefln;

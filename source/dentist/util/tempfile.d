@@ -9,8 +9,6 @@
 */
 module dentist.util.tempfile;
 
-import std.stdio;
-
 version (Posix)
 {
     import std.algorithm : endsWith;
@@ -21,7 +19,7 @@ version (Posix)
     import std.typecons : Tuple, tuple;
 
     /**
-        Generates a uniquely named temporary directory from template.
+        Generates a uniquely named temporary directory from `templateString`.
 
         The last six characters of template must be XXXXXX and these are
         replaced with a string that makes the directory name unique. The
@@ -65,14 +63,19 @@ version (Posix)
         }
     }
 
+
+    // Glibc function since 2.19
+    private extern (C) int mkstemps(char*, int);
+
+
     /**
-        Generate a unique temporary filename from templateString, creates and
-        opens the file, and returns the open file and generated name.
+        Generates a unique temporary filename from `templateString`, creates
+        and opens the file, and returns the open file and generated name.
 
         The last six characters of template must be "XXXXXX" and these are
         replaced with a string that makes the filename unique.
 
-        The optional templateSuffix will be appended to the file name.
+        The optional `templateSuffix` will be appended to the file name.
 
         Returns: The open file and generated name.
     */
@@ -116,8 +119,6 @@ version (Posix)
         tempFile.file.rewind();
         assert(tempFile.file.readln() == "foobar\n");
     }
-
-    private extern (C) int mkstemps(char*, int);
 
     /// ditto
     Tuple!(File, "file", string, "name") mkstemp(in string templateString, in string templateSuffix) @trusted

@@ -1,5 +1,5 @@
 /**
-    This is the `bed2mask` command of `dentist`.
+    The `bed2mask` command creates a Dazzler mask from a BED file.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -75,6 +75,8 @@ void execute(Options)(in Options options)
 }
 
 
+/// Returns an associative array containing an array of `ContigSegment`s for
+/// each scaffold identified by its FASTA header (without leading `>`).
 ContigSegment[][string] getContigsByScaffold(string refDb)
 {
     ContigSegment[][string] contigsByScaffold;
@@ -91,6 +93,9 @@ ContigSegment[][string] getContigsByScaffold(string refDb)
 }
 
 
+/// `ReferenceInterval` with optional supplementary data.
+///
+/// See_also: `parseDataComment`
 alias AugmentedReferenceInterval = Tuple!(
     ReferenceInterval, "interval",
     id_t[], "contigIds",
@@ -98,6 +103,17 @@ alias AugmentedReferenceInterval = Tuple!(
 );
 
 
+/// Main procedure that converts BED entries into an array of
+/// `AugmentedReferenceInterval`s. The returned intervals have Dazzler
+/// coordinates and contain data from the comment column if
+/// `parseDataComments`.
+///
+/// Params:
+///     bedFile = `File` that contains the BED data.
+///     bedFileName = file name that is displayed in error messages
+///     contigsByScaffold = index of Dazzler DB (see `getContigsByScaffold`)
+///     parseDataComments = expected 4th column in BED to be a data comment if true.
+/// See_also: `getContigsByScaffold`, `parseDataComment`
 AugmentedReferenceInterval[] readBedFile(
     File bedFile,
     string bedFileName,
@@ -112,12 +128,16 @@ AugmentedReferenceInterval[] readBedFile(
         .enumerate(1)
         .filter!(enumLine => enumLine.value.length > 0)
         .map!((enumLine) {
+            // Convert BED file line-by-line ...
             auto lineNumber = enumLine.index;
             auto line = enumLine.value;
+            // Split line into columns
             auto fields = line.split('\t');
             scope scaffoldName = cast(string) fields[0];
             auto begin = fields[1].to!coord_t;
             auto end = fields[2].to!coord_t;
+            // Find contigs that overlap with the interval `[begin, end]` in
+            // scaffold coordinates
             auto affectedContigs = contigsByScaffold.getOverlappingContigs(
                 scaffoldName,
                 begin,
@@ -128,11 +148,15 @@ AugmentedReferenceInterval[] readBedFile(
             id_t[] readIds;
 
             if (parseDataComments && fields.length >= 4)
+                // Parse contigIds and readIds from comment column
                 parseDataComment(fields[3], bedFileName, lineNumber, contigIds, readIds);
 
+            // Generate list of `AugmentedReferenceInterval`s
             return affectedContigs.map!(affectedContig => AugmentedReferenceInterval(
+                // Interval with scaffold-global contig ID and scaffold coordinates
                 ReferenceInterval(
                     affectedContig.globalContigId,
+                    // Crop contig interval to `[begin, end]`
                     max(begin, affectedContig.begin) - affectedContig.begin,
                     min(end, affectedContig.end) - affectedContig.begin,
                 ),
@@ -140,11 +164,15 @@ AugmentedReferenceInterval[] readBedFile(
                 readIds,
             )).tee!(interval => assert(&interval));
         })
+        // Concatenate lists from each line
         .joiner
         .array;
 }
 
 
+/// Find contigs that overlap with the interval `[begin, end]` on `scaffold`.
+///
+/// See_also: `getContigsByScaffold`
 ContigSegment[] getOverlappingContigs(
     scope ContigSegment[][string] contigsByScaffold,
     scope string scaffoldName,
@@ -163,6 +191,29 @@ ContigSegment[] getOverlappingContigs(
 }
 
 
+/// Parse data from `comment` into `contigIds` and `readIds`, respectively.
+/// If multiple parts of the same type are given later parts overwrite
+/// previous parts.
+///
+/// Grammar:
+/// ---
+/// <data-comment>   ::== <part> | <part> "|" <data-comment>
+/// <part>           ::== <contigs-part> | <reads-part>
+/// <contigs-part>   ::== "contigs-" <id> "-" <id>
+/// <reads-part>     ::== "reads" <id-list>
+/// <id-list>        ::== "-" <id> | "-" <id> <id-list>
+/// <id>             ::== <positive-digit> | <positive-digit> <digits>
+/// <digits>         ::== <digit> | <digit> <digits>
+/// <positive-digit> ::== "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+/// <digit>          ::== "0" | <positive-digit>
+/// ---
+///
+/// Params:
+///     comment = comment column (4th) from BED file
+///     filename = filename to report in errors
+///     lineNumber = line number to report in errors
+///     contigIds = destination for contig IDs
+///     readIds = destination for read IDs
 void parseDataComment(
     const char[] comment,
     string filename,
@@ -224,6 +275,19 @@ void parseDataComment(
 }
 
 
+/// Create Dazzler mask of intervals in `augmentedMask` adding extra tracks
+/// if `hasDataComments` is true.
+///
+/// Overwrites existing mask without asking.
+///
+/// Params:
+///     refDb = Dazzler DB for which the track is created
+///     maskName = name of the mask
+///     augmentedMask = mask data
+///     hasDataComments = create mask track extras for contig and read IDs
+///
+/// See_also: `dentist.dazzler.writeMask`, `dentist.dazzler.dazzExtra`,
+///     `dentist.dazzler.writeDazzExtra`
 void writeDazzlerMask(
     string refDb,
     string maskName,

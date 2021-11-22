@@ -1,12 +1,25 @@
 /**
-    This is the `chainLocalAlignments` command of `dentist`.
+    This is the `chain-local-alignments` command of DENTIST.
 
+    Command_Summary:
+
+    ---
+    Chain local alignments. Right now this produces just the single
+    best chain per combination of A-read and B-read.
+    ---
+
+    See_also: `dentist.common.alignments.chaining.chainLocalAlignments`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.chainLocalAlignments;
+
+package(dentist) enum summary = "
+    Chain local alignments. Right now this produces just the single
+    best chain per combination of A-read and B-read.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common.alignments :
@@ -25,10 +38,11 @@ import std.range : tee;
 import std.typecons : Yes;
 
 
-/// Options for the `chainLocalAlignments` command.
+/// Options for the `chain-local-alignments` command.
 alias Options = OptionsFor!(DentistCommand.chainLocalAlignments);
 
-/// Execute the `chainLocalAlignments` command with `options`.
+
+/// Execute the `chain-local-alignments` command with `options`.
 void execute(in Options options)
 {
     auto chainer = new CLIChainer(options);

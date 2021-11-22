@@ -1,5 +1,12 @@
 /**
-    This is the `mergeMasks` command of `dentist`.
+    This is the `merge-masks` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Merge several masks into a single one with non-overlapping intervals. This
+    can also be used to merge overlapping intervals in a single mask.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +14,11 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.mergeMasks;
+
+package(dentist) enum summary = "
+    Merge several masks into a single one with non-overlapping intervals. This
+    can also be used to merge overlapping intervals in a single mask.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -23,10 +35,11 @@ import dentist.dazzler :
     writeMask;
 
 
+/// Options for the `merge-masks` command.
 alias Options = OptionsFor!(DentistCommand.mergeMasks);
 
 
-/// Execute the `mergeMasks` command with `options`.
+/// Execute the `merge-masks` command with `options`.
 void execute(in Options options)
 {
     mixin(traceExecution);

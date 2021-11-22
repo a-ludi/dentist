@@ -47,11 +47,13 @@ import std.typecons :
     Yes;
 import transforms : snakeCaseCT;
 
+
 /// Convert a string to `dash-case` at compile time.
 enum dashCaseCT(string camelCase) = camelCase.snakeCaseCT.tr("_", "-");
 
+
 /**
-    Adds one level of indentation for a multi-line string. Adds indentSize
+    Adds one level of indentation for a multi-line string. Adds `indentSize`
     spaces to each non-empty line.
 
     Returns: indented string
@@ -78,13 +80,20 @@ unittest
     assert("a\nb\n".indent(2) == "  a\n  b\n");
 }
 
+
+/// Thrown on errors during sequence alignment.
+///
+/// See_also: `findAlignment`, `SequenceAlignment`
 class AlignmentException : Exception
 {
     ///
     mixin basicExceptionCtors;
 }
 
+
 /// One edit operation of the Needleman-Wunsch algorithm.
+///
+/// See_also: `findAlignment`, `SequenceAlignment`
 enum EditOp: byte
 {
     substitution,
@@ -92,27 +101,54 @@ enum EditOp: byte
     insertion,
 }
 
+
+/// Type used for alignment scores.
 alias score_t = uint;
 
+
+/// Used for partial alignments.
+///
+/// See_also: `SequenceAlignment.partial`
 static enum Strip : byte
 {
+    /// Do not strip anything.
     none = 0b00,
+
+    /// Strip insertions at the end of the alignment.
     back = 0b01,
+
+    /// Strip insertions at the beginning of the alignment.
     front = 0b10,
+
+    /// Strip insertions at the beginning and end of the alignment.
     both = 0b11,
 }
+
 
 /// Represents an alignment of two sequences.
 struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
 {
-    alias getScore = binaryFun!scoreFun;
+    private alias getScore = binaryFun!scoreFun;
 
+    /// Total score of this alignment.
     score_t score;
+
+    /// Edit path.
     EditOp[] editPath;
+
+    /// Reference sequence.
     S reference;
+
+    /// Query sequence.
     S query;
+
+    /// Penalty score for insertions and deletions.
     score_t indelPenalty;
+
+    /// Whether this is a free shift alignment. Indels at the boundaries
+    /// are scored neutrally if true.
     Flag!"freeShift" freeShift;
+
 
     /// Compute alignment score.
     score_t computeScore() const pure
@@ -126,12 +162,15 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return walkResult.computedScore;
     }
 
+
+    /// Check if the edit ops, score and sequences match with each other.
     bool isValid() const pure nothrow
     {
         auto walkResult = walkEditOps();
 
         return isValid(walkResult);
     }
+
 
     private bool isValid(in WalkResult walkResult) const pure nothrow
     {
@@ -140,11 +179,13 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
                walkResult.computedScore == score;
     }
 
+
     private static struct WalkResult
     {
         score_t computedScore;
         size_t i, j;
     }
+
 
     private auto walkEditOps() const pure nothrow
     {
@@ -194,9 +235,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return partial(0, reference.length, strip);
     }
 
-    /**
-        Get a partial alignment with respect to `reference`.
-    */
+    ///  Get a partial alignment with respect to `reference`.
     auto partial(in size_t begin, in size_t end, Strip stripInsertions = Strip.none) inout pure nothrow
     in
     {
@@ -280,11 +319,6 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
         return partialAlignment;
     }
 
-    auto opDollar() const pure nothrow
-    {
-        return reference.length;
-    }
-
     /// ditto
     auto opIndex(in size_t[2] slice) inout pure nothrow
     {
@@ -312,10 +346,19 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
             "-ATTA");
     }
 
+
     size_t[2] opSlice(size_t dim)(in size_t begin, in size_t end) const pure nothrow
     {
         return [begin, end];
     }
+
+
+    /// Returns `reference.length` for use with slicing operator.
+    auto opDollar() const pure nothrow
+    {
+        return reference.length;
+    }
+
 
     /// Get a string representation of this alignment. Visual alignment breaks
     /// unless elements of the sequences convert to single chars via `to!string`.
@@ -404,6 +447,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
     }
 }
 
+
 /**
     Compute an alignment of `query` against `reference` using the
     Needleman-Wunsch algorithm with non-negative scores and constant
@@ -429,7 +473,7 @@ struct SequenceAlignment(S, alias scoreFun = "a == b ? 0 : 1")
     Throws: AlignmentException if the calculation would require more than
             `memoryLimit` bytes.
 
-    See_Also: http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm
+    See_Also: $(LINK http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm)
 */
 SequenceAlignment!(const(S), scoreFun) findAlignment(
     alias scoreFun = "a == b ? 0 : 1",
@@ -706,7 +750,9 @@ unittest
         "acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------");
 }
 
-// Returns the amount of memory required to compute an alignment between reference and query.
+
+/// Returns the amount of memory required to compute an alignment between
+/// `reference` and `query`.
 size_t memoryRequired(S)(in S reference, in S query)
 {
     return score_t.sizeof * (
@@ -717,13 +763,15 @@ size_t memoryRequired(S)(in S reference, in S query)
     );
 }
 
-/// Returns longest query and refernce length possible with memoryLimit.
+
+/// Returns longest `query` and `reference` length possible with `memoryLimit`.
 size_t longestInputsLength(size_t memoryLimit) pure
 {
     return round(sqrt((memoryLimit / score_t.sizeof + 3).to!double) - 2).to!size_t;
 }
 
-// Find edit path of the best alignment
+
+/// Find edit path of the best alignment
 private EditOp[] tracebackScoringMatrix(in DPMatrix!score_t F)
 {
     auto editPath = minimallyInitializedArray!(EditOp[])(F.size[0] + F.size[1]);
@@ -803,6 +851,7 @@ unittest
         EditOp.substitution,
     ]);
 }
+
 
 private struct DPMatrix(T)
 {
@@ -940,8 +989,9 @@ private struct DPMatrix(T)
     `;
 }
 
-/// Convert a floating point number to a base-10 string at compile time.
-/// This function is very crude and will not work in many cases!
+
+/// $(B Experimental!) Convert a floating point number to a base-10 string at
+/// compile time. This function is very crude and will not always work!
 string toString(Float)(in Float value, in uint precision) pure nothrow
     if (isFloatingPoint!Float)
 {

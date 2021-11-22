@@ -85,7 +85,23 @@ class ConfigFileException : Exception
 }
 
 
-/// Retroactively initialize options from config.
+/// Retroactively initialize `options` from `config`.
+///
+/// Note: Since this function has no knowledge about the creation process of
+///     `options` it assumes that fields are not modified if they have their
+///     default value. This means that a CLI option providing the default
+///     value of that option does NOT overrule the config value. Here is a
+///     small example:
+///     ---
+///     // config,yaml:
+///     collectPileUps:
+///       min-spanning-reads: 42
+///
+///     // invocation
+///     dentist collect-pile-ups --config=config.yaml --min-spanning-reads=3 ...
+///
+///     // --> effectivate value of --min-spanning-reads is 42
+///     ---
 Options retroInitFromConfig(Options)(ref Options options, in string configFile)
 {
     enum defaultOptions = Options.init;
@@ -149,7 +165,7 @@ Options retroInitFromConfig(Options)(ref Options options, in string configFile)
 }
 
 
-/// Initialize options using config.
+/// Create `Options` from `configFile`.
 Options parseConfig(Options)(in string configFile)
 {
     enum dentistCommand = Options.commandName;
@@ -157,9 +173,11 @@ Options parseConfig(Options)(in string configFile)
 
     validateConfig(configValues);
 
+    // Extract options passed via `__default__` key
     auto defaultValues = configDefaultKey in configValues
         ? configValues[configDefaultKey]
         : Json.emptyObject;
+    // Extract options passed via command name
     auto commandValues = dentistCommand in configValues
         ? configValues[dentistCommand]
         : Json.emptyObject;
@@ -185,6 +203,26 @@ Options parseConfig(Options)(in string configFile)
 }
 
 
+/// Validates the format and structure of `configFile`. These rules must be
+/// fulfilled:
+/// $(UL
+///     $(LI The document must contain a single object (dict type).)
+///     $(LI The root object may have a `__default__` key with an object as
+///         value.)
+///     $(LI Each key in the `__default__` object must be a valid option
+///         (secondary or short option names are allowed) or argument name
+///         from ANY DENTIST command. The value type must be convertible
+///         to the destination type.)
+///     $(LI The root object may have a key for each DENTIST command
+///         (hyphenated as used in the CLI) with an object as value.)
+///     $(LI Each key in the command objects must be a valid option
+///         (secondary or short option names are allowed) or argument name
+///         from the named DENTIST command. The value type must be convertible
+///         to the destination type.)
+///     $(LI Keys starting with two slashes (`//`) are ignored on all levels.)
+/// )
+///
+/// Throws: `ConfigFileException` if config is invalid.
 void validateConfigFile(in string configFile)
 {
     auto configValues = parseConfigFile(configFile);
@@ -192,6 +230,7 @@ void validateConfigFile(in string configFile)
     validateConfig(configValues);
 }
 
+/// ditto
 protected void validateConfig(Json configValues)
 {
     enforce!ConfigFileException(
@@ -221,7 +260,9 @@ protected void validateConfig(Json configValues)
     }}
 }
 
-void validateConfigDefault(Json defaultConfig)
+
+/// Validate the `__default__` config values.
+private void validateConfigDefault(Json defaultConfig)
 {
     enforce!ConfigFileException(
         defaultConfig.type == Json.Type.object,
@@ -282,6 +323,8 @@ void validateConfigDefault(Json defaultConfig)
     }
 }
 
+
+/// Validate config for `Options.commandName`.
 void validateConfigCommand(Options)(Json commandConfig)
 {
     enum commandName = Options.commandName;
@@ -334,7 +377,13 @@ void validateConfigCommand(Options)(Json commandConfig)
     }
 }
 
-template configNamesOf(alias symbol)
+
+/// Get an array of names that can be used in a config file to reference
+/// `symbol`. If symbol is an argument it will split the argument name by
+/// colon (`:`) and return the last part stripped off its last character
+/// (which should be a `>`). If symbol is an option it will return the list
+/// of names that were provided. Otherwise, an empty array is returned.
+protected template configNamesOf(alias symbol)
 {
     alias optUDAs = getUDAs!(symbol, Option);
     alias argUDAs = getUDAs!(symbol, Argument);
@@ -360,7 +409,26 @@ template configNamesOf(alias symbol)
     }
 }
 
-void assignConfigValue(string member, Options)(ref Options options, Json configValue)
+
+/// Convert and assign `configValue` to `member` in `options`.
+///
+/// Conversion rules:
+/// $(UL
+///     $(LI if `member` has a zero-argument function: $(UL
+///         $(LI call `member` `configValue` times if `configValue` is an integer)
+///         $(LI call `member` once if `configValue` is `true`)
+///         $(LI do not call `member` if `configValue` is `false`)
+///     ))
+///     $(LI if `member` has a single-argument function: $(UL
+///         $(LI call `member` with each value of `configValue` if
+///             `configValue` is a string array)
+///         $(LI call `member` with `configValue` if `configValue` is a string)
+///     ))
+///     $(LI if `member` can be assigned to `configValue` will be converted
+///         to `member`'s type using `getConfigValue`)
+///     $(LI if none of the above applies a `ConfigFileException` will be thrown)
+/// )
+protected void assignConfigValue(string member, Options)(ref Options options, Json configValue)
 {
     alias SymbolType = typeof(__traits(getMember, options, member));
 
@@ -399,7 +467,24 @@ void assignConfigValue(string member, Options)(ref Options options, Json configV
     }
 }
 
-auto getConfigValue(SymbolType)(Json configValue)
+
+/// Convert `configValue` to `SymbolType`.
+///
+/// Conversion_Rules:
+///
+/// The rule (SymbolType ← JsonType) is picked based on `SymbolType` and the
+/// provided JSON type(s) are permitted.
+///
+/// $(UL
+///     $(LI `OptionFlag`|`bool` ← `bool`)
+///     $(LI `enum` ← `string`)
+///     $(LI `float`|`double`|`real` ← `int`|`float`)
+///     $(LI unsigned|signed integer ← `int`)
+///     $(LI `string` ← `string`)
+///     $(LI `T[]`|T[n] ← `array`: apply above rules to each member;
+///         for static arrays the lengths must match)
+/// )
+protected auto getConfigValue(SymbolType)(Json configValue)
 {
     static if (is(SymbolType == OptionFlag))
         return configValue.get!bool.to!SymbolType;
@@ -410,7 +495,7 @@ auto getConfigValue(SymbolType)(Json configValue)
     else static if (isFloatingPoint!SymbolType)
     {
         if (configValue.type == Json.Type.int_)
-            return configValue.get!ulong.to!SymbolType;
+            return configValue.get!long.to!SymbolType;
         else if (configValue.type == Json.Type.float_)
             return configValue.get!double.to!SymbolType;
         else
@@ -454,7 +539,9 @@ auto getConfigValue(SymbolType)(Json configValue)
     }
 }
 
-Json parseConfigFile(in string configFileName)
+
+/// Parse `configFileName` into a `JSON` struct.
+protected Json parseConfigFile(in string configFileName)
 {
     auto configContent = readConfigFile(configFileName);
 
@@ -474,7 +561,10 @@ Json parseConfigFile(in string configFileName)
         throw new ConfigFileException("unknown file type");
 }
 
-string readConfigFile(in string configFileName)
+
+/// Read `configFileName` into a string respecting a maximum file size of
+/// `maxConfigSize` bytes.
+protected string readConfigFile(in string configFileName)
 {
     auto configFile = File(configFileName, "r");
     auto configFileSize = configFile.size;
@@ -489,6 +579,10 @@ string readConfigFile(in string configFileName)
     return cast(string) configContent;
 }
 
+
+/// Convert `yaml` into `Json` as good as possible. Since YAML is a strict
+/// superset of JSON it not always possible BUT every valid config file
+/// can be converted.
 Json toJson(YAML yaml)
 {
     import std.datetime : SysTime;
@@ -536,6 +630,7 @@ Json toJson(YAML yaml)
     }
 }
 
+///
 unittest {
     enum complexJson = `{
     "int": 42,
@@ -553,6 +648,7 @@ unittest {
 }
 
 
+/// Set of size units for `toBytes` and `fromBytes`.
 enum SizeUnit
 {
     B,
@@ -565,13 +661,20 @@ enum SizeUnit
     ZiB,
     YiB,
 }
+
+
+/// Base for size units.
 enum size_t sizeUnitBase = 2^^10;
 
+
+/// Convert `value` with `unit` to bytes.
 auto toBytes(in size_t value, in SizeUnit unit)
 {
     return value * sizeUnitBase^^unit;
 }
 
+/// Convert `bytes` to the smallest unit such that the value is between 0
+/// and 1.
 auto fromBytes(in size_t bytes)
 {
     alias converToUnit = exp => tuple!("value", "unit")(

@@ -22,7 +22,7 @@ import dentist.common.alignments :
     SeededAlignment,
     trace_point_t,
     TracePoint;
-import dentist.common.binio._base :
+import dentist.common.binio.common :
     ArrayStorage,
     CompressedBaseQuad,
     CompressedSequence,
@@ -64,6 +64,7 @@ version (unittest) import dentist.common.binio._testdata.insertiondb :
     numTracePoints;
 
 
+/// Thrown if an error is encountered.
 class InsertionDbException : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
@@ -73,6 +74,8 @@ class InsertionDbException : Exception
     }
 }
 
+
+/// Structure to access insertions stored in a binary file.
 struct InsertionDb
 {
     private alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -90,36 +93,51 @@ struct InsertionDb
     private InsertionDbIndex index;
     private DbSlices slices;
 
+    /// Return the respective `ArrayStorage`s. This is used to report details
+    /// of the DB in command `show-insertions`.
+    ///
+    /// See_also: `dentist.commands.showInsertions`,
+    ///     `dentist.common.binio.common.ArrayStorage`
     @property auto insertions() const pure nothrow
     {
         return index.insertions;
     }
 
+    /// ditto
     @property auto compressedBaseQuads() const pure nothrow
     {
         return index.compressedBaseQuads;
     }
 
+    /// ditto
     @property auto overlaps() const pure nothrow
     {
         return index.overlaps;
     }
 
+    /// ditto
     @property auto localAlignments() const pure nothrow
     {
         return index.localAlignments;
     }
 
+    /// ditto
     @property auto tracePoints() const pure nothrow
     {
         return index.tracePoints;
     }
 
+    /// ditto
     @property auto readIds() const pure nothrow
     {
         return index.readIds;
     }
 
+
+    /// Create an `InsertionDb` from `dbFile`. A lock is placed on `dbFile`
+    /// if possible.
+    ///
+    /// See_also: `dentist.common.binio.common.lockIfPossible`
     static InsertionDb parse(in string dbFile)
     {
         auto file = File(dbFile, "rb");
@@ -130,11 +148,15 @@ struct InsertionDb
         return db;
     }
 
+
+    /// Closes the underlying file.
     void releaseDb()
     {
         file.close();
     }
 
+
+    /// Read the entire DB at once.
     Insertion[] opIndex()
     {
         ensureDbIndex();
@@ -142,6 +164,10 @@ struct InsertionDb
         return readSlice(0, length);
     }
 
+
+    /// Read `Insertion` at index `i`.
+    ///
+    /// Throws: `InsertionDbException` if `i` is out of bounds.
     Insertion opIndex(size_t i)
     {
         ensureDbIndex();
@@ -154,6 +180,10 @@ struct InsertionDb
         return readSlice(i, i + 1)[0];
     }
 
+
+    /// Read a slice of `Insertion`s.
+    ///
+    /// Throws: `InsertionDbException` if `slice` is out of bounds.
     Insertion[] opIndex(size_t[2] slice)
     {
         auto from = slice[0];
@@ -176,6 +206,8 @@ struct InsertionDb
         return [from, to];
     }
 
+
+    /// Return the number of insertions in this DB.
     @property size_t length()
     {
         ensureDbIndex();
@@ -183,7 +215,9 @@ struct InsertionDb
         return index.insertions.length;
     }
 
+    /// ditto
     alias opDollar = length;
+
 
     private void ensureDbIndex()
     {
@@ -192,6 +226,7 @@ struct InsertionDb
 
         index = file.readRecord!InsertionDbIndex();
     }
+
 
     private Insertion[] readSlice(size_t from, size_t to)
     {
@@ -222,6 +257,7 @@ struct InsertionDb
 
         return insertions;
     }
+
 
     private DbSlices getSlices(size_t from, size_t to)
     {
@@ -269,6 +305,7 @@ struct InsertionDb
         );
     }
 
+
     private void parse(
         ref Insertion[] insertions,
         CompressedBaseQuad[] compressedBaseQuads,
@@ -314,6 +351,7 @@ struct InsertionDb
         }
     }
 
+
     private void parse(
         ref CompressedBaseQuad[] compressedBaseQuads,
     )
@@ -323,6 +361,7 @@ struct InsertionDb
         compressedBaseQuads = file.readRecords(compressedBaseQuads);
     }
 
+
     private void parse(
         ref id_t[] readIds,
     )
@@ -331,6 +370,7 @@ struct InsertionDb
         file.seek(slices.readIds.ptr);
         readIds = file.readRecords(readIds);
     }
+
 
     private void parse(
         ref SeededAlignment[] overlaps,
@@ -368,6 +408,7 @@ struct InsertionDb
         }
     }
 
+
     private void parse(
         ref AlignmentChain.LocalAlignment[] localAlignments,
         TracePoint[] tracePoints
@@ -400,6 +441,7 @@ struct InsertionDb
         }
     }
 
+
     private void parse(ref TracePoint[] tracePoints)
     {
         alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -410,6 +452,11 @@ struct InsertionDb
         tracePoints = file.readRecords(tracePoints);
     }
 
+
+    /// Write `insertions` to binary `dbFile`. A lock is placed on the file
+    /// if possible.
+    ///
+    /// See_also: `dentist.common.binio.common.lockIfPossible`
     static void write(R)(in string dbFile, R insertions)
             if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
     {
@@ -462,6 +509,7 @@ unittest
 
     assert(equal!insertionsEq(insertionDb[], insertions));
 }
+
 
 private struct InsertionDbFileWriter(R)
         if (isForwardRange!R && hasLength!R && is(ElementType!R : const(Insertion)))
@@ -686,6 +734,7 @@ private struct InsertionDbFileWriter(R)
     }
 }
 
+
 private struct InsertionDbIndex
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -907,6 +956,7 @@ unittest
     }
 }
 
+
 private template StorageType(T)
 {
     static if (is(T == Insertion))
@@ -933,6 +983,7 @@ private template StorageType(T)
         alias StorageType = ArrayStorage!(StorageType!id_t);
 }
 
+
 private struct InsertionStorage
 {
     ContigNode start;
@@ -944,6 +995,7 @@ private struct InsertionStorage
     StorageType!(SeededAlignment[]) overlaps;
     StorageType!(id_t[]) readIds;
 }
+
 
 private struct SeededAlignmentStorage
 {
@@ -960,6 +1012,7 @@ private struct SeededAlignmentStorage
     AlignmentLocationSeed seed;
 }
 
+
 private struct LocalAlignmentStorage
 {
     coord_t contigABegin;
@@ -969,6 +1022,7 @@ private struct LocalAlignmentStorage
     diff_t numDiffs;
     StorageType!(TracePoint[]) tracePoints;
 }
+
 
 private struct TracePointStorage
 {

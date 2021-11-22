@@ -1,5 +1,13 @@
 /**
-    This is the `findClosableGaps` command of `dentist`.
+    This is the `find-closable-gaps` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Find gaps which are theoretically closable. A gap is deemed closable if
+    the true mapping of the simulated reads provides a sufficient number
+    spanning reads including some amount of anchor sequence.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +15,12 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.findClosableGaps;
+
+package(dentist) enum summary = "
+    Find which gaps are closable, i.e. the true alignment of the reads
+    provides a sufficient number spanning reads including some amount of
+    anchor sequence.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -16,7 +30,7 @@ import dentist.common.alignments :
     AlignmentChain,
     coord_t,
     id_t;
-import dentist.common.commands : TestingCommand;
+import dentist.common.commands : DentistCommand;
 import dentist.dazzler :
     DBdumpOptions,
     DbRecord,
@@ -49,9 +63,10 @@ import vibe.data.json : toJson = serializeToJson, serializeToJsonString;
 
 static if (isTesting):
 
-alias Options = OptionsFor!(TestingCommand.findClosableGaps);
+/// Options for the `find-closable-gaps` command.
+alias Options = OptionsFor!(DentistCommand.findClosableGaps);
 
-/// Execute the `findClosableGaps` command with `options`.
+/// Execute the `find-closable-gaps` command with `options`.
 void execute(in Options options)
 {
     auto finder = ClosableGapsFinder(options);

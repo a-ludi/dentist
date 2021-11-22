@@ -1,6 +1,8 @@
 /**
     Everything to handle local alignments and friends.
 
+    See_also: `dentist.common.alignments.base`,
+        `dentist.common.alignments.chaining`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.

@@ -1,5 +1,6 @@
 /**
-    Subcommands of dentist.
+    Enums with sub-commands of dentist. This is mostly relevant if you are
+    trying to add a new command to DENTIST.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -15,7 +16,7 @@ import dentist.common :
 import dentist.util.string : dashCaseCT;
 
 
-/// Subcommands of dentist.
+/// Sub-commands of dentist.
 mixin("enum DentistCommand {" ~
     "validateConfig," ~
     testingOnly!"translocateGaps," ~
@@ -41,7 +42,8 @@ mixin("enum DentistCommand {" ~
     testingOnly!"checkScaffolding," ~
 "}");
 
-/// Helper for subcommands that are only available in testing version.
+
+/// Helper for sub-commands that are only available in testing version.
 struct TestingCommand
 {
     @disable this();
@@ -55,7 +57,8 @@ struct TestingCommand
     }
 }
 
-/// Tuple of dentist subcommand names.
+
+/// Tuple of dentist sub-command names.
 enum dentistCommands = staticMap!(
     dashCaseCT,
     __traits(allMembers, DentistCommand),

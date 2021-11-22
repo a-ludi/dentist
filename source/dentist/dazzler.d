@@ -1,5 +1,5 @@
 /**
-    Defines bindings and utilities to/for the dazzler commands.
+    Defines bindings to and utilities for the Dazzler tool suite.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -145,10 +145,12 @@ enum dbFileExtension = ".db";
 /// Constant holding the .dam file extension.
 enum damFileExtension = ".dam";
 
-/// The Dazzler tools require sequence of a least minSequenceLength base pairs.
+/// The Dazzler tools require sequence of
+/// at least `minSequenceLength` base pairs.
 enum minSequenceLength = 14;
 
-/// This trace point distance enforces the use of ushort for trace point encoding.
+/// This trace point spacing enforces the use
+/// of `ushort` for trace point encoding.
 enum forceLargeTracePointType = 126;
 
 /// Minimum allowed value for `-e` option of `daligner`/`damapper`
@@ -157,7 +159,9 @@ enum minAverageCorrelationRate = 0.7;
 /// Minimum allowed value for `-n` option of `damapper`
 enum minBestMatches = 0.7;
 
+/// True if `T` is some array of strings.
 enum isOptionsList(T) = isArray!T && isSomeString!(ElementType!T);
+
 
 /**
     Return a list of hidden files associated to every `.dam`/`.db` file. These
@@ -178,6 +182,8 @@ auto getHiddenDbFiles(string dbFile)
 }
 
 
+/// Strip extension of `dbFile` if its is `dbFileExtension`
+/// or `damFileExtension`. Otherwise return `dbFile` untouched.
 string stripDbExtension(in string dbFile) pure nothrow @safe
 {
     if (dbFile.endsWith(dbFileExtension))
@@ -189,6 +195,7 @@ string stripDbExtension(in string dbFile) pure nothrow @safe
 }
 
 
+/// Signal error from the Dazzler bindings.
 class DazzlerCommandException : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
@@ -198,7 +205,11 @@ class DazzlerCommandException : Exception
     }
 }
 
+
+/// Flag used to signal if DB write operations should append to an existing
+/// DB or call `handleExistingDb` instead (default).
 alias Append = Flag!"append";
+
 
 /// This funcion is called if writing to an existing DB is attempted without
 /// passing `Yes.append` or similar to the called function.
@@ -213,13 +224,13 @@ bool lasEmpty(in string lasFile)
     return header.numParts == 0;
 }
 
+
 deprecated("use the one argument version")
 bool lasEmpty(in string lasFile, in string dbA, in string workdir)
 {
     return lasEmpty(lasFile);
 }
 
-/// ditto
 deprecated("use the one argument version")
 bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir)
 {
@@ -227,36 +238,47 @@ bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir
 }
 
 
-/// Returns the number of records in dbFile.
+/// Returns the (trimmed) number of records in `dbFile`.
 id_t numDbRecords(in string dbFile)
 {
     auto dbdumpLines = dbdump(dbFile, []);
-    scope (exit) dbdumpLines.destroy();
+    scope (exit)
+        // Clean up child process
+        dbdumpLines.destroy();
+
     auto recordNumberLine = dbdumpLines.find!(l => l.startsWith("+ R")).front;
     id_t numRecords;
-
     recordNumberLine.formattedRead!"+ R %d"(numRecords);
-    // Clean up child process
 
     return numRecords;
 }
 
-/// Returns true iff dbFile is empty.
+
+/// Returns true iff `dbFile` is empty.
 bool dbEmpty(in string dbFile)
 {
     return numDbRecords(dbFile) == 0;
 }
 
-/**
-    Remove database and hidden files.
-*/
+
+/// Remove database and hidden files.
 @ExternalDependency("DBrm", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
 void removeDB(in string dbFile)
 {
     executeCommand(only("DBrm", dbFile));
 }
 
-/// Build outputDb file by using the given subset of reads in inDbFile.
+
+/// Build DB file by using the given subset of reads in `inDbFile`.
+/// Writes to `outputDB` if given; otherwise a name with the same extenion as
+/// `inDbFile` under `options.tmpdir` is safely generated. The resulting DB
+/// is implictly split using `options.dbsplitOptions`.
+///
+/// Note that the returned DB path always has the same extension as `inDbFile`.
+/// If `outputDb` is given and does not have the expected extension it will be
+/// append.
+///
+/// Returns: path to resulting DB
 string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options, Append append = No.append)
         if (isSomeString!(typeof(options.tmpdir)) &&
             isOptionsList!(typeof(options.dbsplitOptions)))
@@ -272,16 +294,9 @@ string dbSubset(Options, R)(in string inDbFile, R readIds, in Options options, A
     return dbSubset(outDb.name, inDbFile, readIds, options, append);
 }
 
-/**
-    Build `outputDb` by using the given subset of reads in `inDbFile`. If no
-    `outputDb` is given a temporary file with the same extension as `inDbFile`
-    will be created.
-
-    Returns: DB file name
-*/
+/// ditto
 string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, in Options options, Append append = No.append)
-        if (isSomeString!(typeof(options.tmpdir)) &&
-            isOptionsList!(typeof(options.dbsplitOptions)))
+        if (isOptionsList!(typeof(options.dbsplitOptions)))
 {
     auto _outputDb = outputDb.extension == inDbFile.extension
         ? outputDb
@@ -293,6 +308,7 @@ string dbSubset(Options, R)(in string outputDb, in string inDbFile, R readIds, i
     return outputDb;
 }
 
+
 /// Merge given las files.
 @ExternalDependency("LAmerge", "DALIGNER", "https://github.com/thegenemyers/DALIGNER")
 void LAmerge(R)(in string mergedLas, R lasFiles)
@@ -300,31 +316,40 @@ void LAmerge(R)(in string mergedLas, R lasFiles)
     executeCommand(chain(only("LAmerge", mergedLas), lasFiles));
 }
 
-/// ditto
+
+/// Compute local alignments of given DBs using `daligner`. Uses `dbB = dbA`
+/// if `dbB` is omitted.
+///
+/// The resulting LAS file is placed in `options.tmpdir`. Its name can be
+/// retrieved by calling `getLasFile(dbA, dbB, options.tmpdir)`. `daligner`
+/// will not be executed if a file with that name already exists to avoid
+/// redundant computations.
+///
+/// Returns: alignment data
+/// See_also: `getAlignments`, `getLasFile`
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, options.tmpdir))
-    {
         dalign(dbA, options.dalignerOptions, options.tmpdir);
-    }
 
     return getGeneratedAlignments(dbA, null, options);
 }
 
+/// ditto
 AlignmentChain[] getLocalAlignments(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, dbB, options.tmpdir))
-    {
         dalign(dbA, dbB, options.dalignerOptions, options.tmpdir);
-    }
 
     return getGeneratedAlignments(dbA, dbB, options);
 }
 
+
+deprecated("obsolete; will be removed in a future release")
 void computeLocalAlignments(Options)(in string[] dbList, in Options options)
         if (isOptionsList!(typeof(options.dalignerOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
@@ -332,24 +357,35 @@ void computeLocalAlignments(Options)(in string[] dbList, in Options options)
     dalign(dbList, options.dalignerOptions, options.tmpdir);
 }
 
+
+/// Compute local alignments of given DBs using `damapper`.
+///
+/// The resulting LAS file is placed in `options.tmpdir`. Its name can be
+/// retrieved by calling `getLasFile(dbA, dbB, options.tmpdir)`. `damapper`
+/// will not be executed if a file with that name already exists to avoid
+/// redundant computations.
+///
+/// Returns: alignment data
+/// See_also: `getAlignments`, `getLasFile`
 AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     if (!lasFileGenerated(dbA, dbB, options.tmpdir))
-    {
         damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
-    }
 
     return getGeneratedAlignments(dbA, dbB, options);
 }
 
+
+deprecated("obsolete; will be removed in a future release")
 void computeMappings(Options)(in string[] dbList, in Options options)
         if (isOptionsList!(typeof(options.damapperOptions)) &&
             isSomeString!(typeof(options.tmpdir)))
 {
     damapper(dbList, options.damapperOptions, options.tmpdir);
 }
+
 
 private AlignmentChain[] getGeneratedAlignments(Options)(
     in string dbA,
@@ -363,14 +399,30 @@ private AlignmentChain[] getGeneratedAlignments(Options)(
 }
 
 
+/// Control operation of `LocalAlignmentReader`.
 enum AlignmentReaderFlag : uint
 {
+    /// Perform only minimal set of operations.
     none = 0,
+
+    /// Read trace points and include them in the result.
     includeTracePoints = 1 << 0,
+
+    /// Sort the alignments after reading.
     sort = 1 << 1,
 }
 
 
+/// Read all alignment chains from `lasFile`.
+///
+/// Params:
+///     dbA         = A-read DB
+///     dbB         = optional B-read DB; if omitted `dbB = dbA` is used
+///     lasFile     = file with alignment
+///     includeTracePoints = include trace points in output; this signature
+///         implies `AlignmentReaderFlag.sort`. Skipping trace points is
+///         faster and requires less memory.
+///     flags       = specify additional operations (see `AlignmentReaderFlag`)
 AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
@@ -380,6 +432,7 @@ AlignmentChain[] getAlignments(
     return getAlignments(dbA, null, lasFile, includeTracePoints);
 }
 
+/// ditto
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
@@ -395,6 +448,7 @@ AlignmentChain[] getAlignments(
     return getAlignments(dbA, dbB, lasFile, flags);
 }
 
+/// ditto
 AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
@@ -404,6 +458,7 @@ AlignmentChain[] getAlignments(
     return getAlignments(dbA, null, lasFile, flags);
 }
 
+/// ditto
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
@@ -452,7 +507,7 @@ AlignmentChain[] getAlignments(
     return alignmentChainsBuffer;
 }
 
-deprecated("use version without arguments workdir and tracePointDistance 1")
+deprecated("use version without arguments `workdir` and `tracePointDistance`")
 AlignmentChain[] getAlignments(
     in string dbA,
     in string lasFile,
@@ -468,7 +523,7 @@ AlignmentChain[] getAlignments(
     );
 }
 
-deprecated("use version without arguments workdir and tracePointDistance 2")
+deprecated("use version without arguments `workdir` and `tracePointDistance`")
 AlignmentChain[] getAlignments(
     in string dbA,
     in string dbB,
@@ -484,220 +539,6 @@ AlignmentChain[] getAlignments(
         cast(Flag!"includeTracePoints") (tracePointDistance > 0),
     );
 }
-
-
-struct AlignmentChainPacker(R)
-{
-    alias LocalAlignment = AlignmentChain.LocalAlignment;
-
-    R alignments;
-    BufferMode bufferMode;
-    LocalAlignment[] localAlignmentBuffer;
-    size_t numBufferedLocalAlignments;
-    Appender!(LocalAlignment[]) localAlignmentAcc;
-    AlignmentChain currentChain;
-    // used to check if the array is being reused
-    private TracePoint* lastTracePointLocation;
-
-    this(R alignments, BufferMode bufferMode, LocalAlignment[] localAlignmentBuffer = [])
-    {
-        this.alignments = alignments;
-        this.bufferMode = bufferMode;
-        this.localAlignmentBuffer = localAlignmentBuffer;
-
-        if (this.alignments.empty)
-        {
-            setEmpty();
-        }
-        else
-        {
-            popFront();
-            // make sure ids start at zero
-            --currentChain.id;
-        }
-    }
-
-
-    @property bool empty() const pure nothrow @safe
-    {
-        return currentChain.id == id_t.max;
-    }
-
-
-    void popFront()
-    {
-        assert(!empty, "Attempting to popFront an empty AlignmentChainPacker");
-
-        if (alignments.empty)
-            return setEmpty();
-
-        ++currentChain.id;
-        currentChain.contigA = currentFLA.contigA.contig;
-        currentChain.contigB = currentFLA.contigB.contig;
-        currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
-        if (bufferMode != BufferMode.skip && currentFLA.tracePoints.length > 0)
-            currentChain.tracePointDistance = currentFLA.tracePointDistance;
-        else
-            currentChain.tracePointDistance = 0;
-        bufferCurrentLocalAlignment();
-        const chainStartFlags = currentFLA.flags;
-        alignments.popFront();
-
-        if (!chainStartFlags.unchained && !chainStartFlags.chainContinuation)
-        {
-            while (!alignments.empty && currentFLA.flags.chainContinuation)
-            {
-                version (assert)
-                    assertMatchingAlignmentHead();
-                bufferCurrentLocalAlignment();
-                alignments.popFront();
-            }
-        }
-        else
-        {
-            enforce!DazzlerCommandException(chainStartFlags.unchained, "chain is missing a start");
-        }
-
-        currentChain.localAlignments = finishLocalAlignmentBuffer();
-    }
-
-
-    void setEmpty() pure nothrow @safe
-    {
-        currentChain.id = id_t.max;
-    }
-
-
-    @property AlignmentChain front() pure nothrow @safe
-    {
-        assert(!empty, "Attempting to fetch the front of an empty AlignmentChainPacker");
-
-        return currentChain;
-    }
-
-
-    version (assert) private void assertMatchingAlignmentHead() pure nothrow @safe
-    {
-        assert(currentChain.contigA == currentFLA.contigA.contig);
-        assert(currentChain.contigB == currentFLA.contigB.contig);
-        enum ignoredFlags = AlignmentFlags(
-            AlignmentFlag.alternateChain,
-            AlignmentFlag.chainContinuation,
-        );
-        assert((currentChain.flags & ~ignoredFlags) == (currentFLA.flags & ~ignoredFlags));
-        assert(
-            // we don't collect tracePoints -or-
-            currentChain.tracePointDistance == 0 ||
-            // the tracePointDistance must not change
-            currentChain.tracePointDistance == currentFLA.tracePointDistance
-        );
-    }
-
-
-    protected void bufferCurrentLocalAlignment() pure nothrow @safe
-    {
-        final switch (bufferMode)
-        {
-            case BufferMode.overwrite: goto case;
-            case BufferMode.preallocated:
-                localAlignmentBuffer[numBufferedLocalAlignments++] = makeCurrentLocalAlignment();
-                break;
-            case BufferMode.dynamic:
-                localAlignmentAcc ~= makeCurrentLocalAlignment();
-                break;
-            case BufferMode.skip:
-                break;
-        }
-    }
-
-
-    protected LocalAlignment[] finishLocalAlignmentBuffer() pure nothrow @safe
-    {
-        typeof(return) localAlignments;
-
-        final switch (bufferMode)
-        {
-            case BufferMode.overwrite:
-                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
-                numBufferedLocalAlignments = 0;
-                break;
-            case BufferMode.preallocated:
-                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
-                localAlignmentBuffer = localAlignmentBuffer[numBufferedLocalAlignments .. $];
-                numBufferedLocalAlignments = 0;
-                break;
-            case BufferMode.dynamic:
-                localAlignments = localAlignmentAcc.data;
-                localAlignmentAcc = appender!(LocalAlignment[]);
-                break;
-            case BufferMode.skip:
-                break;
-        }
-
-        return localAlignments;
-    }
-
-
-    protected AlignmentChain.LocalAlignment makeCurrentLocalAlignment() pure nothrow @safe
-    {
-        if (currentChain.tracePointDistance > 0)
-        {
-            // we actually collect tracePoints
-            assert(
-                lastTracePointLocation is null || lastTracePointLocation != &currentFLA.tracePoints[0],
-                "tracePoints buffer was reused; trace points will be invalid",
-            );
-            lastTracePointLocation = &currentFLA.tracePoints[0];
-        }
-
-        return AlignmentChain.LocalAlignment(
-            currentFLA.contigA.locus,
-            currentFLA.contigB.locus,
-            currentFLA.tracePoints.map!"a.numDiffs".sum,
-            currentFLA.tracePoints,
-        );
-    }
-
-
-    protected @property auto currentFLA() pure nothrow @safe
-    {
-        return alignments.front;
-    }
-}
-
-
-auto alignmentChainPacker(R)(
-    R localAlignments,
-    BufferMode bufferMode = BufferMode.skip,
-    AlignmentChain.LocalAlignment[] localAlignmentBuffer = [],
-)
-    if (isInputRange!R && is(ElementType!R == FlatLocalAlignment))
-{
-    return AlignmentChainPacker!R(localAlignments, bufferMode, localAlignmentBuffer);
-}
-
-// test empty input
-unittest
-{
-    FlatLocalAlignment[] emptyAlignments;
-
-    assert(emptyAlignments.alignmentChainPacker().empty);
-}
-
-
-/// Returns a tuple of contig IDs and first and last begin/end coords.
-auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
-{
-    return tuple(
-        alignmentChain.contigA.id,
-        alignmentChain.contigB.id,
-        alignmentChain.first.contigA.begin + 0,
-        alignmentChain.first.contigB.begin + 0,
-        alignmentChain.last.contigA.end + 0,
-        alignmentChain.last.contigB.end + 0,
-    );
-}
-
 
 unittest
 {
@@ -877,6 +718,253 @@ unittest
 }
 
 
+/// Transforms a range `R` of `FlatLocalAlignment`s into a range of
+/// `AlignmentChain`s.
+///
+/// See_also: `alignmentChainPacker` for more details.
+struct AlignmentChainPacker(R)
+{
+    private alias LocalAlignment = AlignmentChain.LocalAlignment;
+
+    private R alignments;
+    private BufferMode bufferMode;
+    private LocalAlignment[] localAlignmentBuffer;
+    private size_t numBufferedLocalAlignments;
+    private Appender!(LocalAlignment[]) localAlignmentAcc;
+    private AlignmentChain currentChain;
+    // used to check if the array is being reused
+    private TracePoint* lastTracePointLocation;
+
+
+    protected this(
+        R alignments,
+        BufferMode bufferMode,
+        LocalAlignment[] localAlignmentBuffer = [],
+    )
+    {
+        this.alignments = alignments;
+        this.bufferMode = bufferMode;
+        this.localAlignmentBuffer = localAlignmentBuffer;
+
+        if (this.alignments.empty)
+        {
+            setEmpty();
+        }
+        else
+        {
+            popFront();
+            // make sure ids start at zero
+            --currentChain.id;
+        }
+    }
+
+
+    /// Input range interface.
+    @property bool empty() const pure nothrow @safe
+    {
+        return currentChain.id == id_t.max;
+    }
+
+    /// ditto
+    void popFront()
+    {
+        assert(!empty, "Attempting to popFront an empty AlignmentChainPacker");
+
+        if (alignments.empty)
+            return setEmpty();
+
+        ++currentChain.id;
+        currentChain.contigA = currentFLA.contigA.contig;
+        currentChain.contigB = currentFLA.contigB.contig;
+        currentChain.flags = currentFLA.flags & ~AlignmentFlags(AlignmentFlag.chainContinuation);
+        if (bufferMode != BufferMode.skip && currentFLA.tracePoints.length > 0)
+            currentChain.tracePointDistance = currentFLA.tracePointDistance;
+        else
+            currentChain.tracePointDistance = 0;
+        bufferCurrentLocalAlignment();
+        const chainStartFlags = currentFLA.flags;
+        alignments.popFront();
+
+        if (!chainStartFlags.unchained && !chainStartFlags.chainContinuation)
+        {
+            while (!alignments.empty && currentFLA.flags.chainContinuation)
+            {
+                version (assert)
+                    assertMatchingAlignmentHead();
+                bufferCurrentLocalAlignment();
+                alignments.popFront();
+            }
+        }
+        else
+        {
+            enforce!DazzlerCommandException(chainStartFlags.unchained, "chain is missing a start");
+        }
+
+        currentChain.localAlignments = finishLocalAlignmentBuffer();
+    }
+
+
+    /// ditto
+    @property AlignmentChain front() pure nothrow @safe
+    {
+        assert(!empty, "Attempting to fetch the front of an empty AlignmentChainPacker");
+
+        return currentChain;
+    }
+
+
+    private void setEmpty() pure nothrow @safe
+    {
+        currentChain.id = id_t.max;
+    }
+
+
+    version (assert) private void assertMatchingAlignmentHead() pure nothrow @safe
+    {
+        assert(currentChain.contigA == currentFLA.contigA.contig);
+        assert(currentChain.contigB == currentFLA.contigB.contig);
+        enum ignoredFlags = AlignmentFlags(
+            AlignmentFlag.alternateChain,
+            AlignmentFlag.chainContinuation,
+        );
+        assert((currentChain.flags & ~ignoredFlags) == (currentFLA.flags & ~ignoredFlags));
+        assert(
+            // we don't collect tracePoints -or-
+            currentChain.tracePointDistance == 0 ||
+            // the tracePointDistance must not change
+            currentChain.tracePointDistance == currentFLA.tracePointDistance
+        );
+    }
+
+
+    private void bufferCurrentLocalAlignment() pure nothrow @safe
+    {
+        final switch (bufferMode)
+        {
+            case BufferMode.overwrite: goto case;
+            case BufferMode.preallocated:
+                localAlignmentBuffer[numBufferedLocalAlignments++] = makeCurrentLocalAlignment();
+                break;
+            case BufferMode.dynamic:
+                localAlignmentAcc ~= makeCurrentLocalAlignment();
+                break;
+            case BufferMode.skip:
+                break;
+        }
+    }
+
+
+    private LocalAlignment[] finishLocalAlignmentBuffer() pure nothrow @safe
+    {
+        typeof(return) localAlignments;
+
+        final switch (bufferMode)
+        {
+            case BufferMode.overwrite:
+                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
+                numBufferedLocalAlignments = 0;
+                break;
+            case BufferMode.preallocated:
+                localAlignments = localAlignmentBuffer[0 .. numBufferedLocalAlignments];
+                localAlignmentBuffer = localAlignmentBuffer[numBufferedLocalAlignments .. $];
+                numBufferedLocalAlignments = 0;
+                break;
+            case BufferMode.dynamic:
+                localAlignments = localAlignmentAcc.data;
+                localAlignmentAcc = appender!(LocalAlignment[]);
+                break;
+            case BufferMode.skip:
+                break;
+        }
+
+        return localAlignments;
+    }
+
+
+    private AlignmentChain.LocalAlignment makeCurrentLocalAlignment() pure nothrow @safe
+    {
+        if (currentChain.tracePointDistance > 0)
+        {
+            // we actually collect tracePoints
+            assert(
+                lastTracePointLocation is null || lastTracePointLocation != &currentFLA.tracePoints[0],
+                "tracePoints buffer was reused; trace points will be invalid",
+            );
+            lastTracePointLocation = &currentFLA.tracePoints[0];
+        }
+
+        return AlignmentChain.LocalAlignment(
+            currentFLA.contigA.locus,
+            currentFLA.contigB.locus,
+            currentFLA.tracePoints.map!"a.numDiffs".sum,
+            currentFLA.tracePoints,
+        );
+    }
+
+
+    private @property auto currentFLA() pure nothrow @safe
+    {
+        return alignments.front;
+    }
+}
+
+
+/// Transforms a range `R` of `FlatLocalAlignment`s into a range of
+/// `AlignmentChain`s.
+///
+/// Params:
+///     localAlignments = input range of `FlatLocalAlignment`s
+///     bufferMode      = selects how `LocalAlignment`s are buffered
+///     localAlignmentBuffer = buffer for `LocalAlignment`s. If provided by
+///         the caller it must be adequately sized with respect to
+///         `bufferMode`; otherwise an adequate buffer is allocated.
+/// See_also: `BufferMode`, `getFlatLocalAlignments`
+auto alignmentChainPacker(R)(
+    R localAlignments,
+    BufferMode bufferMode = BufferMode.skip,
+    AlignmentChain.LocalAlignment[] localAlignmentBuffer = [],
+)
+    if (isInputRange!R && is(ElementType!R == FlatLocalAlignment))
+{
+    return AlignmentChainPacker!R(localAlignments, bufferMode, localAlignmentBuffer);
+}
+
+// test empty input
+unittest
+{
+    FlatLocalAlignment[] emptyAlignments;
+
+    assert(emptyAlignments.alignmentChainPacker().empty);
+}
+
+
+/// Returns a tuple of contig IDs and first and last begin/end coords.
+protected auto fingerprint(in ref AlignmentChain alignmentChain) pure nothrow
+{
+    return tuple(
+        alignmentChain.contigA.id,
+        alignmentChain.contigB.id,
+        alignmentChain.first.contigA.begin + 0,
+        alignmentChain.first.contigB.begin + 0,
+        alignmentChain.last.contigA.end + 0,
+        alignmentChain.last.contigB.end + 0,
+    );
+}
+
+
+/// Lazily read individual local alignments from `lasFile`.
+///
+/// Returns: input range of `FlatLocalAlignment` with defined length.
+/// Params:
+///     dbA         = A-read DB used to insert contig lengths if present
+///     dbB         = optional B-read DB; if omitted but `dbA` is given
+///         `dbB = dbA` is used
+///     lasFile     = file with alignment
+///     bufferMode  = select buffer strategy for trace points
+///     tracePointBuffer = buffer for `TracePoint`s. If provided by the caller
+///         it must be adequately sized with respect to `bufferMode`;
+///         otherwise an adequate buffer is allocated.
+/// See_also: `BufferMode`, `FlatLocalAlignment`, `LocalAlignmentReader`
 auto getFlatLocalAlignments(
     in string lasFile,
     BufferMode bufferMode = BufferMode.skip,
@@ -886,6 +974,7 @@ auto getFlatLocalAlignments(
     return getFlatLocalAlignments(null, null, lasFile, bufferMode, tracePointBuffer);
 }
 
+/// ditto
 auto getFlatLocalAlignments(
     in string dbA,
     in string lasFile,
@@ -896,6 +985,7 @@ auto getFlatLocalAlignments(
     return getFlatLocalAlignments(dbA, null, lasFile, bufferMode, tracePointBuffer);
 }
 
+/// ditto
 auto getFlatLocalAlignments(
     in string dbA,
     in string dbB,
@@ -929,7 +1019,6 @@ auto getFlatLocalAlignments(
         tracePointBuffer,
     );
 }
-
 
 version (unittest)
 {
@@ -997,7 +1086,6 @@ version (unittest)
         "   7 105",
     ];
 }
-
 
 unittest
 {
@@ -1142,6 +1230,11 @@ unittest
 }
 
 
+/// Meta information about a set of alignments, e.g. a LAS file.
+///
+/// Usually this is created by reading a LAS file as efficiently as possible
+/// to improve performance of subsequent operations on the LAS file, e.g.
+/// by pre-allocating memory.
 struct AlignmentHeader
 {
     /// Sum of number of alignment chains and number of unchained alignments
@@ -1162,6 +1255,15 @@ struct AlignmentHeader
     /// Trace point distance
     size_t tracePointDistance;
 
+
+    /// Infer header data from a range of alignments with a single pass
+    /// across the data.
+    ///
+    /// The range signatures accepts currently only a range of
+    /// `AlignmentChain`s.
+    ///
+    /// The `lasFile` signature walks through `lasFile` using a
+    /// `LocalAlignmentReader` with `BufferMode.skip`.
     static AlignmentHeader inferFrom(R)(R alignmentChains) if (isInputRange!R)
     {
         AlignmentHeader headerData;
@@ -1207,6 +1309,7 @@ struct AlignmentHeader
     }
 
 
+    /// ditto
     static AlignmentHeader inferFrom(string lasFile)
     {
         AlignmentHeader headerData;
@@ -1264,6 +1367,12 @@ struct AlignmentHeader
     }
 
 
+    /// Infer trace points spacing from `alignments`.
+    ///
+    /// This do NOT advance `alignments`.
+    ///
+    /// Returns: `tracePointDistance` of the first element of `alignments` or
+    ///     `100` if `alignments` is empty.
     static size_t inferTracePointDistanceFrom(R)(R alignments)
         if (isInputRange!R && (
             is(const(ElementType!R) == const(AlignmentChain)) ||
@@ -1379,10 +1488,10 @@ enum BufferMode : ubyte
 {
     /// Keep a single buffer and keep overwriting it with every new record.
     overwrite,
-    /// Allocate a new buffer for every record. Use an `Appender` if the
-    /// number of records is unknown.
+    /// Allocate a new buffer for every record. Use a `std.array.Appender`
+    /// if the number of records is unknown.
     dynamic,
-    /// Write all records to a continuous stretch of memory preallocated by
+    /// Write all records to a continuous stretch of memory pre-allocated by
     /// the caller. The memory may be uninitialized since it will always be
     /// written to before any read occurs.
     preallocated,
@@ -1391,23 +1500,54 @@ enum BufferMode : ubyte
 }
 
 
+/// Read local alignments from a LAS file.
+///
+/// See_also: `getFlatLocalAlignments` for more details
 class LocalAlignmentReader
 {
-    File las;
-    coord_t[] aLengths;
-    coord_t[] bLengths;
-    BufferMode bufferMode;
-    size_t numLocalAlignments;
-    trace_point_t tracePointDistance;
-    bool isLargeTraceType;
+    private File las;
+    private coord_t[] aLengths;
+    private coord_t[] bLengths;
+    private BufferMode bufferMode;
+    private size_t _numLocalAlignments;
+    private trace_point_t _tracePointDistance;
+    private bool isLargeTraceType;
 
-    size_t numLocalAlignmentsLeft;
-    FlatLocalAlignment currentLA;
-    DazzlerOverlap overlapHead;
-    TracePoint[] tracePointBuffer;
-    TracePoint[] fullTracePointBuffer;
+    private size_t numLocalAlignmentsLeft;
+    private FlatLocalAlignment currentLA;
+    private DazzlerOverlap overlapHead;
+    private TracePoint[] tracePointBuffer;
+    private TracePoint[] fullTracePointBuffer;
 
-    this(const string lasFile, BufferMode bufferMode, TracePoint[] tracePointBuffer = [])
+
+    /// Total number of local alignments in the LAS file. This is not affected
+    /// by range operation, e.g. `popFront`.
+    ///
+    /// See_also: `length`
+    @property size_t numLocalAlignments() const pure nothrow @safe @nogc
+    {
+        return _numLocalAlignments;
+    }
+
+    private @property void numLocalAlignments(size_t newValue) pure nothrow @safe @nogc
+    {
+        _numLocalAlignments = newValue;
+    }
+
+
+    /// Trace point spacing of the LAS file.
+    @property trace_point_t tracePointDistance() const pure nothrow @safe @nogc
+    {
+        return _tracePointDistance;
+    }
+
+    private @property void tracePointDistance(trace_point_t newValue) pure nothrow @safe @nogc
+    {
+        _tracePointDistance = newValue;
+    }
+
+
+    protected this(const string lasFile, BufferMode bufferMode, TracePoint[] tracePointBuffer = [])
     {
         this(
             lasFile,
@@ -1419,7 +1559,7 @@ class LocalAlignmentReader
     }
 
 
-    this(
+    protected this(
         const string lasFile,
         string dbA,
         string dbB,
@@ -1494,6 +1634,12 @@ class LocalAlignmentReader
     }
 
 
+    /// Reset the range. This can be used to walk over a LAS file multiple
+    /// times without reopening the `std.stdio.File` or recreating the
+    /// buffers.
+    ///
+    /// This requires a seek-able file as it seeks to the begin of the
+    /// underlying LAS file and adjusts the range state accordingly.
     void reset()
     {
         las.rewind();
@@ -1502,18 +1648,21 @@ class LocalAlignmentReader
     }
 
 
+    /// Range interface.
     @property bool empty() const pure nothrow @safe
     {
         return numLocalAlignmentsLeft == 0;
     }
 
 
+    /// ditto
     @property size_t length() const pure nothrow @safe
     {
         return numLocalAlignmentsLeft;
     }
 
 
+    /// ditto
     void popFront()
     {
         assert(!empty, "Attempting to popFront an empty LocalAlignmentReader");
@@ -1523,6 +1672,8 @@ class LocalAlignmentReader
             readLocalAlignment();
     }
 
+
+    /// ditto
     @property FlatLocalAlignment front() pure nothrow @safe
     {
         assert(!empty, "Attempting to fetch the front of an empty LocalAlignmentReader");
@@ -1531,12 +1682,18 @@ class LocalAlignmentReader
     }
 
 
+    /// Returns whether reading or skipping trace points.
     @property bool skipTracePoints() const pure nothrow @safe
     {
         return bufferMode == BufferMode.skip;
     }
 
 
+    /// Returns the number of trace points in the current local alignment
+    /// even if `skipTracePoints` is true.
+    ///
+    /// This is required because the number of trace points is unavailable in
+    /// the `front` element if `skipTracePoints` is true.
     @property size_t currentNumTracePoints() const pure nothrow @safe
     {
         return overlapHead.path.tlen / 2;
@@ -1562,11 +1719,11 @@ protected:
 
     void readTracePointDistance()
     {
-        int[1] tracePointDistance;
-        auto tpdBuffer = las.rawRead(tracePointDistance[]);
-        unexpectedEOF!"tracePointDistance"(tpdBuffer, tracePointDistance[]);
-        this.tracePointDistance = tracePointDistance[0].to!trace_point_t;
-        this.isLargeTraceType = DazzlerOverlap.isLargeTraceType(tracePointDistance[0]);
+        int tracePointDistance;
+        auto tpdBuffer = las.rawRead((&tracePointDistance)[0 .. 1]);
+        unexpectedEOF!"tracePointDistance"(tpdBuffer, (&tracePointDistance)[0 .. 1]);
+        this.tracePointDistance = tracePointDistance.to!trace_point_t;
+        this.isLargeTraceType = DazzlerOverlap.isLargeTraceType(tracePointDistance);
     }
 
 
@@ -1787,6 +1944,11 @@ unittest
 }
 
 
+/// Write alignments to `lasFile`. This method takes care of the differences
+/// between alignment flags in DENTIST and Dazzler code.
+///
+/// `lasFile` must point to a seek-able file because the LAS header is updated
+/// after writing all data to avoid traversing the data twice.
 void writeAlignments(R)(const string lasFile, R flatLocalAlignments)
     if (isInputRange!R && is(const(ElementType!R) == const(FlatLocalAlignment)))
 {
@@ -1811,7 +1973,7 @@ void writeAlignments(R)(const string lasFile, R flatLocalAlignments)
     las.close();
 }
 
-
+/// ditto
 void writeAlignments(R)(const string lasFile, R alignmentChains)
     if (isInputRange!R && is(const(ElementType!R) == const(AlignmentChain)))
 {
@@ -1861,8 +2023,10 @@ unittest
 }
 
 
+/// Struct `Overlap` from `dalign.h` used for LAS file I/O.
 private struct DazzlerOverlap
 {
+    /// Flags as defined in `dalign.h`
     static enum Flag : uint
     {
         complement = 0x1,
@@ -1872,6 +2036,7 @@ private struct DazzlerOverlap
         disabled = 0x20,
     }
 
+    /// Struct `Path` from `dalign.h`
     static struct Path
     {
         void* trace;
@@ -1889,18 +2054,25 @@ private struct DazzlerOverlap
     int bread;
 
 
+    /// Utility function to determine the type of trace points.
     static bool isLargeTraceType(const int tracePointDistance) pure nothrow @safe
     {
+        // Macro definition from `dalign.h`
         enum TRACE_XOVR = 125u;
 
         return tracePointDistance > TRACE_XOVR;
     }
 
 
+    /// Aliases for trace point types.
     alias largeTraceType = ushort;
+    /// ditto
     alias smallTraceType = ubyte;
 }
 
+
+/// Write a single `AlignmentChain` to `las` taking care of the appropriate
+/// flags for chaining.
 private auto writeAlignmentChain(
     File las,
     const AlignmentChain alignmentChain,
@@ -1950,6 +2122,8 @@ private auto writeAlignmentChain(
 }
 
 
+/// Write a single `AlignmentChain` to `las` taking care of translating flags
+/// from DENTIST to Dazzler.
 private auto writeFlatLocalAlignment(
     File las,
     const FlatLocalAlignment flatLocalAlignment,
@@ -1988,6 +2162,10 @@ private auto writeFlatLocalAlignment(
 }
 
 
+/// Write `dazzlerOverlap` to `las` compressing the trace vector if
+/// `tracePointDistance` is sufficiently small.
+///
+/// See_also: `DazzlerOverlap.isLargeTraceType`
 private void writeDazzlerOverlap(
     File las,
     ref DazzlerOverlap dazzlerOverlap,
@@ -2031,25 +2209,30 @@ private void writeDazzlerOverlap(
 }
 
 
-/// Returns the trace point distance in lasFile.
+/// Returns the trace point distance in `lasFile`.
 trace_point_t getTracePointDistance(in string lasFile)
 {
     return readLasHeader(lasFile).tracePointSpacing;
 }
 
-/// ditto
+deprecated("DBs are not required; use single-argument version")
 trace_point_t getTracePointDistance(in string dbA, in string lasFile)
 {
     return getTracePointDistance(lasFile);
 }
 
-/// ditto
+deprecated("DBs are not required; use single-argument version")
 trace_point_t getTracePointDistance(in string dbA, in string dbB, in string lasFile)
 {
     return getTracePointDistance(lasFile);
 }
 
 
+/// $(RED [Experimental]) Reconstruct the alignment matrix for `ac`
+/// force-filling gaps in the chain. Restrict reconstruction to
+/// `[beginA, endA)` on contig A if given.
+///
+/// The implementation is rather inefficient and should be avoided.
 auto getExactAlignment(
     in string dbA,
     in string dbB,
@@ -2067,6 +2250,7 @@ auto getExactAlignment(
     );
 }
 
+/// ditto
 auto getExactAlignment(
     in string dbA,
     in string dbB,
@@ -2112,7 +2296,8 @@ auto getExactAlignment(
     return paddedAlignment[(beginA - begin.contigA) .. min(endA - begin.contigA, $)];
 }
 
-auto getPaddedAlignment(S, TranslatedTracePoint)(
+
+private auto getPaddedAlignment(S, TranslatedTracePoint)(
     in AlignmentChain ac,
     in TranslatedTracePoint begin,
     in TranslatedTracePoint end,
@@ -2617,10 +2802,13 @@ unittest
     cast(void) exactAlignment[47139 .. 73889];
 }
 
-/**
-    Get the designated records of `dbFile`.
 
-    Throws: DazzlerCommandException if recordNumber is not in dbFile
+/**
+    Get the designated records of `dbFile`. Returns all records unless
+    `recordNumbers` is given.
+
+    Returns: lazy range of designated `DbRecord`s.
+    Throws: `DazzlerCommandException` if `recordNumber` is not in `dbFile`
 */
 auto getDbRecords(in string dbFile, in DBdumpOptions[] dbdumpOptions = [])
 {
@@ -2675,38 +2863,68 @@ private enum DbDumpLineFormat : DbDumpLineFormatTuple
     maskTrack = DbDumpLineFormatTuple('T', '\0', "T%d %d %(%d %d%)"),
 }
 
+
+/// Captures information about a single entry in a Dazzler DB.
 struct DbRecord
 {
     static struct PacBioReadInfo
     {
+        /// ID of the well where the read occurred or zero-based contig index
+        /// in the containing scaffold.
         id_t well;
+        /// ditto
         alias contigIdx = well;
+
+        /// Start of the high-quality region for reads or begin coordinate
+        /// on the scaffold (including gaps) for contigs.
         coord_t pulseStart;
         alias begin = pulseStart;
+
+        /// End of the high-quality region for reads or end coordinate
+        /// on the scaffold (including gaps) for contigs.
         coord_t pulseEnd;
         alias end = pulseEnd;
+
+        /// Read quality in [0, 1] for reads. Does not apply to contigs.
         float readQuality;
 
 
+        /// Length of the high-quality region for reads or length of the
+        /// contig for contigs.
         @property coord_t pulseLength() const pure nothrow @safe
         {
             return pulseEnd - pulseStart;
         }
 
+        /// ditto
         alias length = pulseLength;
     }
 
+    /// One-based read/contig number.
     id_t readNumber;
+    /// ditto
     alias contigId = readNumber;
+
+    /// FASTA header
     string header;
+
+    /// PacBio read information for reads and assembly location for contigs.
     PacBioReadInfo pacBioReadInfo;
+    /// ditto
     alias location = pacBioReadInfo;
+
+    /// Base pair sequence.
     string sequence;
+
+    /// Intrinsic QVs.
     byte[] intrinsicQualityVector;
     alias intrinsicQVs = intrinsicQualityVector;
 
+    /// Maximum allowed QV value.
     enum maxQV = 50;
 
+
+    /// Get numeric QV from character `qv`.
     static byte fromQVChar(const char qv)
     {
         if ('a' <= qv && qv <= 'z')
@@ -2718,6 +2936,7 @@ struct DbRecord
     }
 
 
+    /// Get QV character from numeric `qv` value.
     static char toQVChar(const byte qv)
     {
         if (qv <= 25)
@@ -2728,6 +2947,7 @@ struct DbRecord
             return '\xFF';
     }
 }
+
 
 private struct DbDumpReader(S) if (isInputRange!S && isSomeString!(ElementType!S))
 {
@@ -3173,10 +3393,14 @@ EOF".outdent;
     assert(dbDump.equal(expectedResult));
 }
 
-/**
-    Get the FASTA sequences of the designated records.
 
-    Throws: DazzlerCommandException if recordNumber is not in dbFile
+/**
+    Get the base pair sequences of the designated records. This does NOT
+    include the header.
+
+    Returns sequences from all records if `recordNumbers` is empty.
+
+    Throws: `DazzlerCommandException` if `recordNumber` is not in `dbFile`
 */
 auto getFastaSequences(in string dbFile)
 {
@@ -3221,15 +3445,26 @@ auto getFastaSequences(Range)(in string dbFile, Range recordNumbers)
     return generate!countedSequences.takeExactly(numRecords);
 }
 
-/**
-    Get the FASTA sequence of the designated record with prefetching to reduce `fork`s.
 
+/**
+    Get the base pair sequence of the designated record.
+
+    This methods caches and pre-fetches sequences in order to improve
+    performance and reduce the number of forks. It uses two caches selected
+    by `dbFile` which each hold up to `cacheSize` many read sequence at once.
+    If `recordNumber` is not in the pre-fetched segment the next `cacheSize`
+    many sequences starting with `recordNumber` are fetched.
+
+    Params:
+        dbFile = path to DB
+        recordNumber = one-based number of the desired record
+        cacheSize = maximum number of reads in the cache
     Throws: DazzlerCommandException if recordNumber is not in dbFile
 */
 string getFastaSequence(in string dbFile, id_t recordNumber, in id_t cacheSize = 1024)
 {
-    // FIXME the cache size should limit the number of `char`s retrieved, ie. control the memory
-    // requirements of this function
+    // FIXME the cache size should limit the number of `char`s retrieved,
+    // ie. control the memory requirements of this function
     static uint _dbIdx;
     static id_t[2] _firstRecord;
     static string[2] _dbFile;
@@ -3273,6 +3508,8 @@ string getFastaSequence(in string dbFile, id_t recordNumber, in id_t cacheSize =
     return _cache[_dbIdx][recordNumber - _firstRecord[_dbIdx]];
 }
 
+
+/// Lazily extract sequence from `S` lines in `dbdump`.
 private auto readSequences(R)(R dbdump)
 {
     enum baseLetters = AliasSeq!('A', 'C', 'G', 'N', 'T', 'a', 'c', 'g', 'n', 't');
@@ -3303,14 +3540,15 @@ EOF".outdent;
     ]));
 }
 
+
 /**
-    Get the designated set of records in FASTA format. If recordNumbers is
+    Get the designated set of records in FASTA format. If `recordNumbers` is
     empty the whole DB will be converted.
+
+    Returns: lazy range of strings
 */
-auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in Options options)
-        if (isIntegral!(typeof(options.fastaLineWidth)) &&
-            isSomeString!(typeof(options.tmpdir)) &&
-            isInputRange!Range && is(ElementType!Range : size_t))
+auto getFastaEntries(Range)(in string dbFile, Range recordNumbers, in size_t fastaLineWidth)
+if (isInputRange!Range && is(ElementType!Range : size_t))
 {
     string[] dbdumpOptions = [
         DBdumpOptions.readNumber,
@@ -3321,9 +3559,21 @@ auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in O
     return readDbDumpForFastaEntries(
         dbdump(dbFile, recordNumbers, dbdumpOptions),
         recordNumbers,
-        options.fastaLineWidth,
+        fastaLineWidth,
     );
 }
+
+deprecated("use getFastaEntries(string, Range, size_t) instead")
+auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in Options options)
+        if (is(typeof(options.fastaLineWidth)) &&
+            isIntegral!(typeof(options.fastaLineWidth)) &&
+            is(typeof(options.tmpdir)) &&
+            isSomeString!(typeof(options.tmpdir)) &&
+            isInputRange!Range && is(ElementType!Range : size_t))
+{
+    return getFastaEntries(dbFile, recordNumbers, options.fastaLineWidth);
+}
+
 
 private auto readDbDumpForFastaEntries(S, Range)(S dbDump, Range recordNumbers, in size_t lineLength)
         if (isInputRange!S && isSomeString!(ElementType!S)
@@ -3446,11 +3696,12 @@ EOF".outdent;
     }
 }
 
+
 /**
     Build `outputDb` with the given set of FASTA records. If no `outputDb`
-    is given a temporary `.dam` file will be created.
+    is given a temporary `.dam` file in `tmpdir` will be created.
 
-    Returns: DB file name
+    Returns: path to DB
 */
 string buildDamFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [], Append append = No.append)
         if (isInputRange!Range && isSomeString!(ElementType!Range))
@@ -3510,11 +3761,12 @@ unittest
     }
 }
 
+
 /**
     Build `outputDb` with the given set of FASTA records. If no `outputDb`
-    is given a temporary `.db` file will be created.
+    is given a temporary `.db` file in `tmpdir` will be created.
 
-    Returns: DB file name
+    Returns: path to DB
 */
 string buildDbFile(Range)(Range fastaRecords, in string tmpdir, in string[] dbsplitOptions = [], Append append = No.append)
         if (isInputRange!Range && isSomeString!(ElementType!Range))
@@ -3576,15 +3828,25 @@ unittest
 
 
 
+/// Minimum alignment coverage required to compute intrinsic quality values
+/// (QVs).
 enum id_t minQVCoverage = 4;
 
 
+/// Compute intrinsic quality values (QVs) from the alignments in `lasFile`.
+///
+/// Params:
+///     dbFile = path to DB
+///     lasFile = alignments of entries in `dbFile`
+///     masks = list of soft masks used with `DAScover`
+///     coverage = coverage estimate passed to `DASqv`; estimate from
+///         `DAScover` will be used unless a positive `coverage` is provided.
 void computeQVs(in string dbFile, in string lasFile, id_t coverage = 0)
 {
     computeQVs(dbFile, lasFile, [], coverage);
 }
 
-
+/// ditto
 void computeQVs(in string dbFile, in string lasFile, in string[] masks, id_t coverage = 0)
 {
     dascover(dbFile, lasFile, masks);
@@ -3605,19 +3867,26 @@ enum DBdustOptions : string
     baseCompositionBias = "-b",
 }
 
+
+/// `DBdust` always produces a mask with this name.
 enum dbdustMaskName = "dust";
 
-/// Run DBdust on dbFile.
+
+/// Run `DBdust` on `dbFile`.
 @ExternalDependency("DBdust", "DAZZ_DB", "https://github.com/thegenemyers/DAZZ_DB")
 void dbdust(in string dbFile, in string[] dbdustOptions)
 {
     executeCommand(chain(only("DBdust"), dbdustOptions, only(dbFile.stripDbExtension)));
 }
 
-/**
-    Align DB(s) to each other using `daligner`.
 
-    Returns: path to las-file.
+/**
+    Align DB(s) to each other using `daligner` executed in `outdir`.
+
+    The paths `dbFile`, `referenceDb`, `queryDb` are relative to the current
+    working directory – NOT `outdir`.
+
+    Returns: path to LAS file.
 */
 string getDalignment(in string dbFile, in string[] dalignerOptions, in string outdir)
 {
@@ -3636,10 +3905,14 @@ string getDalignment(in string referenceDb, in string queryDb, in string[] dalig
     return lasFile;
 }
 
-/**
-    Map dbFile.
 
-    Returns: path to las-file.
+/**
+    Align `queryDb` against `refDb` using `damapper` executed in `outdir`.
+
+    The paths `refDb`, `queryDb` are relative to the current working
+    directory – NOT `outdir`.
+
+    Returns: path to LAS file.
 */
 string getDamapping(
     in string refDb,
@@ -3655,11 +3928,22 @@ string getDamapping(
 }
 
 
+/// Filter local alignments in `lasFile` producing a new LAS file.
+///
+/// The `lasFile` is read using `getFlatLocalAlignments` and `pred`
+/// is applied to every `FlatLocalAlignment`. The alignment is kept if `pred`
+/// evaluates to a truthy value and discarded otherwise.
+///
+/// Read/contig lengths are filled in if `dbFile` is provided.
+///
+/// Bugs: LAs files referring to two different DBs cannot makes use of the
+///     fill-in feature for contig lengths.
 string filterLocalAlignments(alias pred)(in string lasFile)
 {
     return filterLocalAlignments!pred(null, lasFile);
 }
 
+/// ditto
 string filterLocalAlignments(alias pred)(in string dbFile, in string lasFile)
 {
     string filteredLasFile = lasFile.stripExtension.to!string ~ "-filtered.las";
@@ -3764,6 +4048,10 @@ unittest
 }
 
 
+/// Chain local alignments in `lasFile` and write back to a LAS file.
+///
+/// Returns: path to LAS file
+/// See_also: `dentist.common.alignments.chaining`
 string chainLocalAlignments(
     in string dbFile,
     in string lasFile,
@@ -3788,6 +4076,28 @@ string chainLocalAlignments(
 }
 
 
+/// Disables alignments that should not appear in a pile up.
+///
+/// If using the `lasFile` signature then this reads `lasFile` with contig
+/// lengths from `dbFile`, applies the filter and writes the result to the
+/// returned LAS file. The resulting LAS file will have the same amount of
+/// data as the input LAS file.
+///
+/// If using the array signature then the disabled flag of the array entries
+/// is modified according to the filter.
+///
+/// Returns: path to LAS file or nothing.
+/// Params:
+///     dbFile = DB of involved reads
+///     lasFile = file of alignments
+///     alignments = array of alignments
+///     properAlignmentAllowance = allowance when determining if an alignment
+///         ends or starts at the tips of a contig.
+///     forceFlat = set alignment flags to make it look unchained and sort
+///         the unchained alignments. This is required if theisValidPileUpAlignment alignments are
+///         chained and sorted as chains. $(I Warning: this changes the passed
+///         array!)
+/// See_also: `isValidPileUpAlignment`
 string filterPileUpAlignments(
     in string dbFile,
     in string lasFile,
@@ -3806,60 +4116,24 @@ string filterPileUpAlignments(
     return filteredLasFile;
 }
 
+/// ditto
 void filterPileUpAlignments(
     ref AlignmentChain[] alignments,
     in coord_t properAlignmentAllowance,
 )
 {
-    /// An alignment in a pile up is valid iff it is proper and the begin/end
-    /// of both reads match.
-    static bool isValidPileUpAlignment(const ref AlignmentChain ac, const coord_t allowance)
-    {
-        alias isLeftAnchored = () =>
-            ac.beginsWith!"contigA"(allowance) && ac.beginsWith!"contigB"(allowance);
-        alias isLeftProper = () =>
-            ac.beginsWith!"contigA"(allowance) || ac.beginsWith!"contigB"(allowance);
-        alias isRightAnchored = () =>
-            ac.endsWith!"contigA"(allowance) && ac.endsWith!"contigB"(allowance);
-        alias isRightProper = () =>
-            ac.endsWith!"contigA"(allowance) || ac.endsWith!"contigB"(allowance);
-
-        return ac.contigA.id != ac.contigB.id && (
-            (isLeftAnchored() && isRightProper()) ||
-            (isRightAnchored() && isLeftProper())
-        );
-    }
-
     foreach (ref alignment; alignments)
         alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
 }
 
 
+/// ditto
 void filterPileUpAlignments(
     ref FlatLocalAlignment[] alignments,
     in coord_t properAlignmentAllowance,
     Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
-    /// An alignment in a pile up is valid iff it is proper and the begin/end
-    /// of both reads match.
-    static bool isValidPileUpAlignment(const ref FlatLocalAlignment fla, const coord_t allowance)
-    {
-        alias isLeftAnchored = () =>
-            fla.contigA.beginsWithin(allowance) && fla.contigB.beginsWithin(allowance);
-        alias isLeftProper = () =>
-            fla.contigA.beginsWithin(allowance) || fla.contigB.beginsWithin(allowance);
-        alias isRightAnchored = () =>
-            fla.contigA.endsWithin(allowance) && fla.contigB.endsWithin(allowance);
-        alias isRightProper = () =>
-            fla.contigA.endsWithin(allowance) || fla.contigB.endsWithin(allowance);
-
-        return fla.contigA.id != fla.contigB.id && (
-            (isLeftAnchored() && isRightProper()) ||
-            (isRightAnchored() && isLeftProper())
-        );
-    }
-
     foreach (ref alignment; alignments)
     {
         alignment.disableIf(!isValidPileUpAlignment(alignment, properAlignmentAllowance));
@@ -3877,9 +4151,69 @@ void filterPileUpAlignments(
 }
 
 
-/**
-    Self-dalign dbFile and build consensus using daccord.
+/// An alignment in a pile up is valid iff it is proper and the begin/end
+/// of both reads match.
+///
+/// Params:
+///     alignment = alignment to investigate
+///     allowance = allowance when determining if an alignment
+///         ends or starts at the tips of a contig.
+/// See_also: `dentist.common.alignments.base.AlignmentChain.beginsWith`,
+///     `dentist.common.alignments.base.AlignmentChain.endsWith`,
+///     `dentist.common.alignments.base.FlatLocalAlignment.FlatLocus.beginsWithin`,
+///     `dentist.common.alignments.base.FlatLocalAlignment.FlatLocus.endsWithin`,
+bool isValidPileUpAlignment(const ref AlignmentChain alignment, const coord_t allowance)
+{
+    alias isLeftAnchored = () =>
+        alignment.beginsWith!"contigA"(allowance) && alignment.beginsWith!"contigB"(allowance);
+    alias isLeftProper = () =>
+        alignment.beginsWith!"contigA"(allowance) || alignment.beginsWith!"contigB"(allowance);
+    alias isRightAnchored = () =>
+        alignment.endsWith!"contigA"(allowance) && alignment.endsWith!"contigB"(allowance);
+    alias isRightProper = () =>
+        alignment.endsWith!"contigA"(allowance) || alignment.endsWith!"contigB"(allowance);
 
+    return alignment.contigA.id != alignment.contigB.id && (
+        (isLeftAnchored() && isRightProper()) ||
+        (isRightAnchored() && isLeftProper())
+    );
+}
+
+/// ditto
+bool isValidPileUpAlignment(const ref FlatLocalAlignment alignment, const coord_t allowance)
+{
+    alias isLeftAnchored = () =>
+        alignment.contigA.beginsWithin(allowance) && alignment.contigB.beginsWithin(allowance);
+    alias isLeftProper = () =>
+        alignment.contigA.beginsWithin(allowance) || alignment.contigB.beginsWithin(allowance);
+    alias isRightAnchored = () =>
+        alignment.contigA.endsWithin(allowance) && alignment.contigB.endsWithin(allowance);
+    alias isRightProper = () =>
+        alignment.contigA.endsWithin(allowance) || alignment.contigB.endsWithin(allowance);
+
+    return alignment.contigA.id != alignment.contigB.id && (
+        (isLeftAnchored() && isRightProper()) ||
+        (isRightAnchored() && isLeftProper())
+    );
+}
+
+
+/**
+    Build consensus using `daccord`.
+
+    If no `filteredLasFile` is provided the reads will be self-aligned using
+    `daligner` and filtered with `filterPileUpAlignments`.
+
+    If `readId` is provided the option `"-I{readId},{readId}"` will be appended
+    to a copy of `options.daccordOptions`. This means the user may not provide
+    `readId` and limit the operation themselves or run `daccord` on all reads.
+
+    Params:
+        dbFile          = DB of reads
+        filteredLasFile = only "true" local alignments, i.e. without
+            repeat-induced alignments –  as good as possible.
+        readId          = the reference read used in the consensus procedure
+        options         = control the various aspects of the process
     Returns: filename of consensus DB.
 */
 string getConsensus(Options)(in string dbFile, in size_t readId, in Options options)
@@ -3977,31 +4311,6 @@ string getConsensus(Options)(in string dbFile, in string filteredLasFile, in Opt
     return consensusDb;
 }
 
-private void computeIntrinsticQualityValuesForConsensus(in string dbFile, in string lasFile)
-{
-    auto readDepth = getNumContigs(dbFile);
-
-    computeIntrinsicQV(dbFile, lasFile, readDepth);
-}
-
-private void computeErrorProfile(Options)(in string dbFile, in string lasFile, in Options options)
-        if (isOptionsList!(typeof(options.daccordOptions)))
-{
-    auto eProfOptions = options
-        .daccordOptions
-        .filter!(option => !option.startsWith(
-            cast(string) DaccordOptions.produceFullSequences,
-            cast(string) DaccordOptions.readsPart,
-            cast(string) DaccordOptions.errorProfileFileName,
-        ))
-        .chain(only(DaccordOptions.computeErrorProfileOnly))
-        .array;
-
-    // Produce error profile
-    silentDaccord(dbFile, lasFile, eProfOptions);
-}
-
-
 unittest
 {
     import dentist.util.tempfile : mkdtemp;
@@ -4038,7 +4347,7 @@ unittest
     string dbName = buildDamFile(fastaRecords[], tmpDir);
     string consensusDb = getConsensus(dbName, options);
     assert(consensusDb !is null);
-    auto consensusFasta = getFastaEntries(consensusDb, cast(size_t[])[], options);
+    auto consensusFasta = getFastaEntries(consensusDb, cast(size_t[])[], options.fastaLineWidth);
     auto expectedSequence = fastaRecords[$ - 1].lineSplitter.drop(1).joiner.array;
     auto consensusSequence = consensusFasta.front.lineSplitter.drop(1).joiner.array;
 
@@ -4046,11 +4355,50 @@ unittest
             format!"expected %s but got %s"(expectedSequence, consensusSequence));
 }
 
+
+// required by `daccord`
+private void computeIntrinsticQualityValuesForConsensus(in string dbFile, in string lasFile)
+{
+    auto readDepth = getNumContigs(dbFile);
+
+    computeIntrinsicQV(dbFile, lasFile, readDepth);
+}
+
+
+// required by `daccord`
+private void computeErrorProfile(Options)(in string dbFile, in string lasFile, in Options options)
+        if (isOptionsList!(typeof(options.daccordOptions)))
+{
+    auto eProfOptions = options
+        .daccordOptions
+        .filter!(option => !option.startsWith(
+            cast(string) DaccordOptions.produceFullSequences,
+            cast(string) DaccordOptions.readsPart,
+            cast(string) DaccordOptions.errorProfileFileName,
+        ))
+        .chain(only(DaccordOptions.computeErrorProfileOnly))
+        .array;
+
+    // Produce error profile
+    silentDaccord(dbFile, lasFile, eProfOptions);
+}
+
+
+/// Generate the LAS file name as `daligner`/`damapper` run in `baseDirectory`
+/// does.
+///
+/// Uses `dbB = dbA` if no `dbB` is provided.
+///
+/// Params:
+///     dbA           = A-read DB
+///     dbB           = B-read DB
+///     baseDirectory = directory where LAS file is/should be located
 string getLasFile(in string dbA, in string baseDirectory)
 {
     return getLasFile(dbA, null, baseDirectory);
 }
 
+/// ditto
 string getLasFile(in string dbA, in string dbB, in string baseDirectory)
 {
     alias dbName = dbFile => dbFile.baseName.stripDbExtension;
@@ -4062,29 +4410,47 @@ string getLasFile(in string dbA, in string dbB, in string baseDirectory)
     return format!fileTemplate(baseDirectory, dbAName, dbBName);
 }
 
+
+/// Check if a LAS file was generated by `daligner`/`damapper` run in
+/// `baseDirectory`.
+///
+/// Uses `dbB = dbA` if no `dbB` is provided.
+///
+/// Params:
+///     dbA           = A-read DB
+///     dbB           = B-read DB
+///     baseDirectory = directory where LAS file is/should be located
+/// See_also: `getLasFile`
 bool lasFileGenerated(in string dbA, in string baseDirectory)
 {
     return lasFileGenerated(dbA, null, baseDirectory);
 }
 
+/// ditto
 bool lasFileGenerated(in string dbA, in string dbB, in string baseDirectory)
 {
     return getLasFile(dbA, dbB, baseDirectory).exists;
 }
 
-id_t getNumBlocks(in string damFile)
+
+/// Return the number of blocks in `dbFile`.
+///
+/// Throws: `DazzlerCommandException` if the DB is not split or the block
+///     count could not be read.
+id_t getNumBlocks(in string dbFile)
 {
-    // see also in dazzler's DB.h:394
+    // see also in Dazzler's DB.h:394
     //     #define DB_NBLOCK "blocks = %9d\n"  //  number of blocks
     enum blockNumFormat = "blocks = %d";
-    enum blockNumFormatStart = blockNumFormat[0 .. 6];
+    enum blockNumFormatPrefix = blockNumFormat[0 .. 6];
     id_t numBlocks;
-    auto matchingLines = File(damFile.stripBlock).byLine.filter!(
-            line => line.startsWith(blockNumFormatStart));
+    auto matchingLines = File(dbFile.stripBlock).byLine.filter!(
+            line => line.startsWith(blockNumFormatPrefix));
 
     if (matchingLines.empty)
     {
-        auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
+        auto errorMessage = format!("could not read the block count in `%s`; " ~
+            "maybe DBsplit is required?")(dbFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
 
@@ -4092,28 +4458,34 @@ id_t getNumBlocks(in string damFile)
 
     if (formattedRead!blockNumFormat(matchingLine, numBlocks) != 1)
     {
-        auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
+        auto errorMessage = format!("could not read the block count in `%s`: " ~
+            "DB header seems to be garbage")(dbFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
 
     return numBlocks;
 }
 
-coord_t getBlockSize(in string damFile)
+
+/// Return the of block size of `dbFile`.
+///
+/// Throws: `DazzlerCommandException` if the DB is not split or the block
+///     size could not be read.
+coord_t getBlockSize(in string dbFile)
 {
     // see also in dazzler's DB.h:434
     //     #define DB_PARAMS "size = %11lld cutoff = %9d all = %1d\n"
     enum blockSizeFormat = "size = %d";
     enum blockSizeFormatStart = blockSizeFormat[0 .. 4];
     coord_t blockSize;
-    auto matchingLines = File(damFile.stripBlock).byLine.filter!(
+    auto matchingLines = File(dbFile.stripBlock).byLine.filter!(
             line => line.startsWith(blockSizeFormatStart));
 
     if (matchingLines.empty)
     {
         auto errorMessage = format!(
             "could not read the block size in `%s`; try using DBsplit to fix"
-        )(damFile.stripBlock);
+        )(dbFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
 
@@ -4121,13 +4493,18 @@ coord_t getBlockSize(in string damFile)
 
     if (formattedRead!blockSizeFormat(matchingLine, blockSize) != 1)
     {
-        auto errorMessage = format!"could not read the block count in `%s`"(damFile.stripBlock);
+        auto errorMessage = format!"could not read the block count in `%s`"(dbFile.stripBlock);
         throw new DazzlerCommandException(errorMessage);
     }
 
     return blockSize;
 }
 
+
+/// Return the contig/read length cutoff of `dbFile`.
+///
+/// Throws: `DazzlerCommandException` if the DB is not split or the cutoff
+///     could not be read.
 coord_t getContigCutoff(in string dbFile)
 {
     // see also in dazzler's DB.h:394
@@ -4158,19 +4535,26 @@ coord_t getContigCutoff(in string dbFile)
     return contigCutoff;
 }
 
-id_t getNumContigs(in string damFile)
+
+/// Get the number of reads/contig in `dbFile`.
+///
+/// Params:
+///     dbFile      = path to DB
+///     untrimmedDb = return count for trimmed/untrimmed DB
+id_t getNumContigs(in string dbFile)
 {
-    return getNumContigs(damFile, No.untrimmedDb);
+    return getNumContigs(dbFile, No.untrimmedDb);
 }
 
-id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb)
+/// ditto
+id_t getNumContigs(in string dbFile, Flag!"untrimmedDb" untrimmedDb = No.untrimmedDb)
 {
     enum contigNumFormat = "+ R %d";
     enum contigNumFormatStart = contigNumFormat[0 .. 4];
     id_t numContigs;
     id_t[] empty;
     string[] options = untrimmedDb ? [DBdumpOptions.untrimmedDatabase] : [];
-    auto dbdumpLines = dbdump(damFile, empty, options);
+    auto dbdumpLines = dbdump(dbFile, empty, options);
     scope (exit) dbdumpLines.destroy();
     auto matchingLine = dbdumpLines
         .filter!(line => line.startsWith(contigNumFormatStart))
@@ -4178,37 +4562,54 @@ id_t getNumContigs(in string damFile, Flag!"untrimmedDb" untrimmedDb = No.untrim
 
     if (!matchingLine)
     {
-        auto errorMessage = format!"could not read the contig count in `%s`"(damFile);
+        auto errorMessage = format!"could not read the contig count in `%s`"(dbFile);
         throw new DazzlerCommandException(errorMessage);
     }
 
     if (formattedRead!contigNumFormat(matchingLine, numContigs) != 1)
     {
-        auto errorMessage = format!"could not read the contig count in `%s`"(damFile);
+        auto errorMessage = format!"could not read the contig count in `%s`"(dbFile);
         throw new DazzlerCommandException(errorMessage);
     }
 
     return numContigs;
 }
 
-auto getScaffoldStructure(in string damFile)
+
+/// Returns a lazy range of `ScaffoldSegment`s describing the scaffold
+/// structure.
+///
+/// Returns: range of alternating `ContigSegment`s and `GapSegment`s packed in
+///     `ScaffoldSegment`s.
+auto getScaffoldStructure(in string dbFile)
 {
     enum string[] dbshowOptions = [DBshowOptions.noSequence];
 
-    auto rawScaffoldInfo = dbshow(damFile, dbshowOptions);
+    auto rawScaffoldInfo = dbshow(dbFile, dbshowOptions);
 
     return ScaffoldStructureReader(rawScaffoldInfo);
 }
 
+
+/// Either `ContigSegment` or `GapSegment`. Used to create a mixed range of
+/// the two base types.
 alias ScaffoldSegment = Algebraic!(ContigSegment, GapSegment);
 
+
+/// Describes the location of a contig inside its scaffold.
 struct ContigSegment
 {
+    /// One-based contig ID in the Dazzler DB.
     size_t globalContigId;
+    /// Zero-based ID of the scaffold.
     size_t scaffoldId;
+    /// Zero-based ID of the contig within the scaffold.
     size_t contigId;
+    /// Begin coordinate within the scaffold.
     size_t begin;
+    /// End coordinate within the scaffold.
     size_t end;
+    /// FASTA header of the scaffold.
     string header;
 
     invariant
@@ -4216,6 +4617,7 @@ struct ContigSegment
         assert(begin < end);
     }
 
+    /// Length of the contig.
     @property size_t length() const pure nothrow
     {
         return end - begin;
@@ -4224,12 +4626,19 @@ struct ContigSegment
 
 struct GapSegment
 {
+    /// One-based contig ID in the Dazzler DB of the contig preceding the gap.
     size_t beginGlobalContigId;
+    /// One-based contig ID in the Dazzler DB of the contig following the gap.
     size_t endGlobalContigId;
+    /// Zero-based ID of the scaffold.
     size_t scaffoldId;
+    /// Zero-based ID of the contig preceding the gap within the scaffold.
     size_t beginContigId;
+    /// Zero-based ID of the contig following the gap within the scaffold.
     size_t endContigId;
+    /// Begin coordinate within the scaffold.
     size_t begin;
+    /// End coordinate within the scaffold.
     size_t end;
 
     invariant
@@ -4237,12 +4646,19 @@ struct GapSegment
         assert(begin < end);
     }
 
+
+    /// Length of the gap.
     @property size_t length() const pure nothrow
     {
         return end - begin;
     }
 }
 
+
+/// Parses the output of `DBshow` to generate `ScaffoldSegment`s.
+///
+/// Bugs: occurrences of `" :: "` in FASTA headers cause an exception. This
+///     can be fixed by relying on `DBdump` instead.
 private struct ScaffoldStructureReader
 {
     static enum scaffoldInfoLineSeparator = " :: ";
@@ -4414,8 +4830,17 @@ EOS";
     ]);
 }
 
+
 /**
     Get the hidden files comprising the designated mask.
+
+    Returns: tuple with fields `header` and `data`
+    Params:
+        dbFile = path to DB
+        maskName = name of the mask. This must not contain dots (`"."`) unless
+            `allowBlock` is true in which case a single dot followed by the
+            block ID is allowed. Slashes (`"/`) are never allowed.
+        allowBlock = whether or not `maskName` contains a block ID
 */
 auto getMaskFiles(in string dbFile, in string maskName, Flag!"allowBlock" allowBlock = No.allowBlock)
 {
@@ -4458,6 +4883,7 @@ auto getMaskFiles(in string dbFile, in string maskName, Flag!"allowBlock" allowB
     return tuple!("header", "data")(maskHeader, maskData);
 }
 
+
 /// Thrown on failure while reading a Dazzler mask.
 ///
 /// See_Also: `readMask`
@@ -4477,13 +4903,19 @@ private
     alias MaskDataEntry = int;
 }
 
-/**
-    Read the `Region`s of a Dazzler mask for `dbFile`.
 
-    Throws: MaskReaderException
+/**
+    Read the `Interval`s of a Dazzler mask for `dbFile`.
+
+    Params:
+        Interval = target type for intervals the is default-constructible
+            and has three fields `tag`, `begin` and `end`.
+        dbFile   = path to DB
+        maskName = name of the mask
+    Throws: `MaskReaderException`
     See_Also: `writeMask`, `getMaskFiles`
 */
-Region[] readMask(Region)(in string dbFile, in string maskName)
+Interval[] readMask(Interval)(in string dbFile, in string maskName)
 {
     alias _enforce = enforce!MaskReaderException;
 
@@ -4491,10 +4923,10 @@ Region[] readMask(Region)(in string dbFile, in string maskName)
     auto maskHeader = readMaskHeader(maskFileNames.header);
     auto maskData = getBinaryFile!MaskDataEntry(maskFileNames.data);
 
-    auto maskRegions = appender!(Region[]);
-    alias RegionContigId = typeof(maskRegions.data[0].tag);
-    alias RegionBegin = typeof(maskRegions.data[0].begin);
-    alias RegionEnd = typeof(maskRegions.data[0].end);
+    auto maskIntervals = appender!(Interval[]);
+    alias IntervalContigId = typeof(maskIntervals.data[0].tag);
+    alias IntervalBegin = typeof(maskIntervals.data[0].begin);
+    alias IntervalEnd = typeof(maskIntervals.data[0].end);
     auto numReads = getNumContigs(dbFile, No.untrimmedDb).to!int;
     id_t[] trimmedDbTranslateTable;
 
@@ -4535,23 +4967,24 @@ Region[] readMask(Region)(in string dbFile, in string maskName)
             enforce!MaskReaderException(interval.length == 2 && 0 <= interval[0]
                     && interval[0] <= interval[1], "corrupted mask: invalid interval");
 
-            Region newRegion;
-            newRegion.tag = currentContig.to!RegionContigId;
-            newRegion.begin = interval[0].to!RegionBegin;
-            newRegion.end = interval[1].to!RegionEnd;
+            Interval newInterval;
+            newInterval.tag = currentContig.to!IntervalContigId;
+            newInterval.begin = interval[0].to!IntervalBegin;
+            newInterval.end = interval[1].to!IntervalEnd;
 
             if (trimmedDbTranslateTable.length > 0)
-                newRegion.tag = trimmedDbTranslateTable[newRegion.tag - 1].to!RegionContigId;
+                newInterval.tag = trimmedDbTranslateTable[newInterval.tag - 1].to!IntervalContigId;
 
-            if (newRegion.tag < id_t.max)
-                maskRegions ~= newRegion;
+            if (newInterval.tag < id_t.max)
+                maskIntervals ~= newInterval;
         }
 
         ++currentContig;
     }
 
-    return maskRegions.data;
+    return maskIntervals.data;
 }
+
 
 private auto readMaskHeader(in string fileName)
 {
@@ -4559,6 +4992,7 @@ private auto readMaskHeader(in string fileName)
 
     return readMaskHeader(headerFile);
 }
+
 
 private auto readMaskHeader(File headerFile, Flag!"readPointers" readPointers = Yes.readPointers)
 {
@@ -4584,11 +5018,14 @@ private auto readMaskHeader(File headerFile, Flag!"readPointers" readPointers = 
             headerBuffer[1], pointerBuffer);
 }
 
+
 private void skipMaskHeader(File headerFile)
 {
     cast(void) readMaskHeader(headerFile, No.readPointers);
 }
 
+
+/// Read the contents of `fileName` into a `T[]`.
 private T[] getBinaryFile(T)(in string fileName)
 {
     auto file = File(fileName, "rb");
@@ -4606,6 +5043,22 @@ private T[] getBinaryFile(T)(in string fileName)
     return dataBuffer;
 }
 
+
+/// Construct an translation table from untrimmed to trimmed DB IDs.
+///
+/// Example:
+/// ---
+/// auto tr = getTrimmedDbTranslateTable(dbFile);
+///
+/// auto untrimmedId = 42;
+/// auto trimmedId = tr[untrimmedId - 1];
+/// auto isContainedInTrimmedDb = trimmedId < id_t.max;
+/// ---
+///
+/// Returns: an array of IDs in the trimmed DB. Excluded contigs/reads are
+///     marked by a value of `id_t.max`.
+/// Bugs: this disregards the `-alm` options to `DBsplit`, i.e. only the
+///     length cutoff `-x` is applied.
 private id_t[] getTrimmedDbTranslateTable(in string dbFile)
 {
     assert(dbFile.endsWith(damFileExtension), "only implemented for DAM files");
@@ -4628,15 +5081,21 @@ private id_t[] getTrimmedDbTranslateTable(in string dbFile)
     return trimmedDbTranslateTable;
 }
 
-/**
-    Write the list of regions to a Dazzler mask for `dbFile`.
 
+/**
+    Write the list of intervals to a Dazzler mask for `dbFile`.
+
+    Params:
+        Intervals = range of intervals the have three fields `tag`, `begin`
+            and `end`.
+        dbFile   = path to DB
+        maskName = name of the mask
     See_Also: `readMask`, `getMaskFiles`
 */
-void writeMask(Regions)(in string dbFile, in string maskName, Regions regions)
-    if (isInputRange!Regions)
+void writeMask(Intervals)(in string dbFile, in string maskName, Intervals intervals)
+    if (isInputRange!Intervals)
 {
-    alias MaskRegion = Tuple!(
+    alias MaskInterval = Tuple!(
         MaskHeaderEntry, "tag",
         MaskDataEntry, "begin",
         MaskDataEntry, "end",
@@ -4646,14 +5105,14 @@ void writeMask(Regions)(in string dbFile, in string maskName, Regions regions)
     auto maskHeader = File(maskFileNames.header, "wb");
     auto maskData = File(maskFileNames.data, "wb");
 
-    auto maskRegions = regions
-        .map!(region => MaskRegion(
-            region.tag.to!MaskHeaderEntry,
-            region.begin.to!MaskDataEntry,
-            region.end.to!MaskDataEntry,
+    auto maskIntervals = intervals
+        .map!(interval => MaskInterval(
+            interval.tag.to!MaskHeaderEntry,
+            interval.begin.to!MaskDataEntry,
+            interval.end.to!MaskDataEntry,
         ))
         .array;
-    maskRegions.sort();
+    maskIntervals.sort();
 
     auto numReads = getNumContigs(dbFile, No.untrimmedDb).to!MaskHeaderEntry;
     MaskHeaderEntry size = 0; // Mark the DAZZ_TRACK as a mask (see DAZZ_DB/DB.c:1183)
@@ -4662,20 +5121,20 @@ void writeMask(Regions)(in string dbFile, in string maskName, Regions regions)
 
     maskHeader.rawWrite([numReads, size]);
     maskHeader.rawWrite([dataPointer]);
-    foreach (maskRegion; maskRegions)
+    foreach (maskInterval; maskIntervals)
     {
-        assert(maskRegion.tag >= currentContig);
+        assert(maskInterval.tag >= currentContig);
 
-        while (maskRegion.tag > currentContig)
+        while (maskInterval.tag > currentContig)
         {
             maskHeader.rawWrite([dataPointer]);
             ++currentContig;
         }
 
-        if (maskRegion.tag == currentContig)
+        if (maskInterval.tag == currentContig)
         {
-            maskData.rawWrite([maskRegion.begin, maskRegion.end]);
-            dataPointer += typeof(maskRegion.begin).sizeof + typeof(maskRegion.end).sizeof;
+            maskData.rawWrite([maskInterval.begin, maskInterval.end]);
+            dataPointer += typeof(maskInterval.begin).sizeof + typeof(maskInterval.end).sizeof;
         }
     }
 
@@ -4686,15 +5145,26 @@ void writeMask(Regions)(in string dbFile, in string maskName, Regions regions)
 }
 
 
+/// Accumulation mode for merging extras of block tracks.
+///
+/// See_also: `DazzExtra`
 enum AccumMode : int
 {
+    /// Extra contents must match exactly for all blocks.
     exact = 0,
+    /// Extra contents are summed like vectors across blocks.
     sum = 1,
 }
 
 
+/// Represents a track extra, i.e. additional data stored alongside a DB track.
+///
+/// Use `dazzExtra` to construct objects.
+///
+/// See_also: `dazzExtra`, `readDazzExtra`, `writeDazzExtra`
 struct DazzExtra(T) if (is(T == long) || is(T == double))
 {
+    /// Dynamic value type representation.
     static if (is(T == long))
         enum int vtype = 0;
     else static if (is(T == double))
@@ -4702,13 +5172,23 @@ struct DazzExtra(T) if (is(T == long) || is(T == double))
     else
         static assert(0);
 
+    /// Extra name.
     string name;
+    /// Extra data. Alias this allows accessing data directly in this
+    /// `DazzExtra`, e.g. `extra[0 .. 10]` returns a slice of the first 10
+    /// elements.
     T[] data;
     alias data this;
+
+    /// Defines how data from a different block-level extras is combined
+    /// in `Catrack`.
     AccumMode accumMode;
 }
 
 
+/// Represents a track extra, i.e. additional data stored alongside a DB track.
+///
+/// See_also: `DazzExtra`, `readDazzExtra`, `writeDazzExtra`
 DazzExtra!T dazzExtra(T)(string name, T[] data, AccumMode accumMode = AccumMode.init)
     if (is(T == long) || is(T == double))
 {
@@ -4728,12 +5208,15 @@ class DazzExtraNotFound : Exception
 
 
 /**
-    Read an extra from Dazzler mask for `dbFile`.
+    Read extra `extraName` of track `maskName` with elements of type `T` from
+    `dbFile`.
 
-    Returns:  fully populated DazzExtra!T.
-    Throws:   MaskReaderException on read errors
-              DazzExtraNotFound if no extra with given name exists
-    See_Also: `writeDazzExtra`, `getMaskFiles`
+    Returns: fully populated `DazzExtra!T`.
+    Throws: $(UL
+        $(LI `MaskReaderException` on read errors)
+        $(LI `DazzExtraNotFound` if no extra with given name exists)
+    )
+    See_Also: `writeDazzExtra`, `DazzExtra`
 */
 DazzExtra!T readDazzExtra(T)(in string dbFile, in string maskName, string extraName)
     if (is(T == long) || is(T == double))
@@ -4808,9 +5291,15 @@ DazzExtra!T readDazzExtra(T)(in string dbFile, in string maskName, string extraN
 
 
 /**
-    Write given extras to an existing Dazzler mask for `dbFile`.
+    Write extra `extraName` of track `maskName` with elements of type `T` from
+    `dbFile`.
 
-    See_Also: `readMask`, `getMaskFiles`
+    Use `dazzExtra` to construct `DazzExtra` objects.
+
+    Note: the extra will be appended to the list of extras regardless of any
+        existing extras. You may use `readDazzExtra` to check for existing
+        extras.
+    See_Also: `dazzExtra`, `readDazzExtra`
 */
 void writeDazzExtra(T)(in string dbFile, in string maskName, DazzExtra!T extra)
     if (is(T == long) || is(T == double))
@@ -4828,7 +5317,6 @@ void writeDazzExtra(T)(in string dbFile, in string maskName, DazzExtra!T extra)
     maskHeader.rawWrite(extra.name);
     maskHeader.rawWrite(extra.data);
 }
-
 
 unittest
 {
@@ -4893,6 +5381,7 @@ auto withOption(R)(R dazzlerOptions, string optionName, OptionModifier mod)
     return dazzlerOptions.withOption(optionName, null, mod);
 }
 
+/// ditto
 auto withOption(R)(
     R dazzlerOptions,
     string optionName,
@@ -4908,7 +5397,7 @@ auto withOption(R)(
     );
 }
 
-/// `replaceOrAdd`
+/// `OptionModifier.replaceOrAdd`
 unittest
 {
     import std.algorithm : equal;
@@ -4943,7 +5432,7 @@ unittest
     ]));
 }
 
-/// `ensurePresent`
+/// `OptionModifier.ensurePresent`
 unittest
 {
     import std.algorithm : equal;
@@ -4980,7 +5469,7 @@ unittest
     ]));
 }
 
-/// `defaultValue`
+/// `OptionModifier.defaultValue`
 unittest
 {
     import std.algorithm : equal;
@@ -5016,7 +5505,7 @@ unittest
     ]));
 }
 
-/// `add` and `remove`
+/// `OptionModifier.add` and `OptionModifier.remove`
 unittest
 {
     import std.algorithm : equal;
@@ -5073,7 +5562,7 @@ unittest
 }
 
 
-struct WithOptionsImpl(R) if (isInputRange!R && is(ElementType!R == string))
+private struct WithOptionsImpl(R) if (isInputRange!R && is(ElementType!R == string))
 {
     private R options;
     private string optionName;
@@ -5272,6 +5761,7 @@ enum DaccordOptions : string
     kmerSize = "-k",
 }
 
+
 /// Options for `daligner`.
 enum DalignerOptions : string
 {
@@ -5366,6 +5856,7 @@ enum DatanderOptions : string
     numThreads = "-T",
 }
 
+
 /// Options for `damapper`.
 enum DamapperOptions : string
 {
@@ -5422,6 +5913,7 @@ enum DamapperOptions : string
     oneDirection = "-N",
 }
 
+
 /// Options for `DBdump`.
 enum DBdumpOptions : string
 {
@@ -5437,6 +5929,7 @@ enum DBdumpOptions : string
     upperCase = "-U",
 }
 
+
 /// Options for `DBshow`.
 enum DBshowOptions : string
 {
@@ -5451,6 +5944,7 @@ enum DBshowOptions : string
     fastaLineWidth = "-w",
 }
 
+
 /// Options for `fasta2DAM` and `fasta2DB`.
 enum Fasta2DazzlerOptions : string
 {
@@ -5460,6 +5954,7 @@ enum Fasta2DazzlerOptions : string
     /// Import data from stdin, use optional name as data source.
     fromStdin = "-i",
 }
+
 
 /// Options for `LAdump`.
 version (LAdump)
@@ -5472,12 +5967,14 @@ enum LAdumpOptions : string
     properOverlapsOnly = "-o",
 }
 
+
 /// Options for `computeintrinsicqv`.
 enum ComputeIntrinsicQVOptions : string
 {
     /// Read depth aka. read coverage. (mandatory)
     readDepth = "-d",
 }
+
 
 /// Options for `DBsplit`.
 enum DbSplitOptions : string
@@ -5495,6 +5992,7 @@ enum DbSplitOptions : string
     /// Set primary read for a well to be the median.
     onlyMedian = "-m",
 }
+
 
 private
 {

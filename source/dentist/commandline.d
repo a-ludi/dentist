@@ -1,6 +1,9 @@
 /**
-    Defines the behavior of the `dentist` command line client.
+    Defines the behavior of the DENTIST command line client. The central
+    component of this file is `OptionsFor` which encapsulates the complete
+    CLI interface.
 
+    See_also: `dentist.commands`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -182,11 +185,12 @@ import vibe.data.json :
 
 version (Posix)
 {
-    version (NoAppMain) { } else
+    version (unittest) { }
+    else version (NoAppMain) { } else
     {
         /// Application entry point.
         ///
-        /// See_also: $(MREF dentist,commandline,run)
+        /// See_also: `run`
         int main(string[] args)
         {
             return cast(int) run(args);
@@ -207,7 +211,7 @@ enum ReturnCode : int
     runtimeError,
 }
 
-/// Start `dentist` with the given set of arguments.
+/// Start DENTIST with the given set of arguments.
 ReturnCode run(in string[] args)
 {
     if (args.length == 1)
@@ -317,7 +321,10 @@ unittest
     assert(run([executableName]) == ReturnCode.commandlineError);
 }
 
-void printExternalDependencies()
+
+/// Print a list of all external dependencies and their availability to
+/// standard output (called by `dentist --dependencies`).
+protected void printExternalDependencies()
 {
     import std.stdio : writefln;
 
@@ -330,6 +337,11 @@ void printExternalDependencies()
         );
 }
 
+
+/// Assert availability of all external dependencies. This is called before
+/// any command is executed.
+///
+/// Throws: `CLIException` if one or more external dependencies are not found.
 void assertExternalToolsAvailable()
 {
     static assert(externalDependencies.length > 0);
@@ -338,7 +350,7 @@ void assertExternalToolsAvailable()
         .filter!(extDep => !isExecutable(extDep.executable))
         .array;
 
-    enforce!CLIException(
+    validate(
         missingExternalDependencies.length == 0,
         format!"missing external tools:\n%-(- %s\n%)\n\nCheck your PATH and/or install the required software."(
             missingExternalDependencies,
@@ -346,6 +358,9 @@ void assertExternalToolsAvailable()
     );
 }
 
+
+/// Print a list of all CLI options formatted using Markdown (called by
+/// `dentist --list-options`).
 void printListOfAllOptions()
 {
     import darg : isArgumentHandler, isOptionHandler;
@@ -488,21 +503,22 @@ private string markdownHtmlUnescape(string str) nothrow @safe
 }
 
 
-string parseCommandName(in string[] args)
+private string parseCommandName(in string[] args)
 {
-    enforce!CLIException(!args[1].startsWith("-"), format!"Missing <command> '%s'"(args[1]));
+    validate(!args[1].startsWith("-"), format!"Missing <command> '%s'"(args[1]));
 
     auto candidates = only(dentistCommands).filter!(cmd => cmd.startsWith(args[1]));
 
-    enforce!CLIException(!candidates.empty, format!"Unkown <command> '%s'"(args[1]));
+    validate(!candidates.empty, format!"Unkown <command> '%s'"(args[1]));
 
     auto dashCaseCommand = candidates.front;
 
     candidates.popFront();
-    enforce!CLIException(candidates.empty, format!"Ambiguous <command> '%s'"(args[1]));
+    validate(candidates.empty, format!"Ambiguous <command> '%s'"(args[1]));
 
     return dashCaseCommand.tr("-", "_").camelCase;
 }
+
 
 private void printBaseHelp()
 {
@@ -513,6 +529,7 @@ private void printBaseHelp()
     stderr.write(helpString!BaseOptions);
 }
 
+
 private void printVersion()
 {
     stderr.writeln(format!"%s %s (commit %s)"(executableName, version_, gitCommit));
@@ -522,7 +539,8 @@ private void printVersion()
     stderr.write(license);
 }
 
-class UsageRequested : Exception
+
+private class UsageRequested : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
             size_t line = __LINE__, Throwable nextInChain = null)
@@ -531,7 +549,14 @@ class UsageRequested : Exception
     }
 }
 
-/// Options for the different commands.
+
+/// Options for the different commands. See the source code,
+/// `dentist <command> --help` or `dentist --list-options` for
+/// a description of the options.
+///
+/// Note, due to a limitation of D's documentation generation the API doc
+/// is rather useless because it does not capture the decorators (`@Option`,
+/// `@Argument`, ...) that actually describe the CLI.
 struct OptionsFor(DentistCommand _command)
 {
     enum command = _command;
@@ -750,7 +775,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<in:gap-closed-vs-reads-alignment>")
         @Help("
-            localalignments of the reads against the gap-closed reference in
+            local alignments of the reads against the gap-closed reference in
             form of a .las file as produced by `damapper` or `daligner`.
             Chains are disregarded, e.i. chained alignments are split into
             local alignments.
@@ -808,7 +833,7 @@ struct OptionsFor(DentistCommand _command)
     ))
     {
         @Argument("<in:mapped-regions-mask>")
-        @Help("read regions that were kept aka. output contigs from the Dazzler mask.")
+        @Help("mask of the contigs in the test assembly.")
         @(Validate!((value, options) => validateInputMask(options.trueAssemblyDb, value)))
         string mappedRegionsMask;
     }
@@ -968,7 +993,7 @@ struct OptionsFor(DentistCommand _command)
         string mergedInsertionsFile;
 
         @Argument("<in:partitioned-insertions>", Multiplicity.oneOrMore)
-        @Help("merge insertion information from <partitioned-insertions>... generated by the `processPileUps` command")
+        @Help("merge insertion information from <partitioned-insertions>... generated by the `process-pile-ups` command")
         @(Validate!validateFilesExist)
         @(Validate!(value => value.length >= 2))
         string[] insertionsFiles;
@@ -995,7 +1020,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<out:test-assembly>", Multiplicity.optional)
         @Help("write output assembly to <test-assembly> (default: stdout)")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        @(Validate!(value => value is null || validateFileWritable(value)))
         string resultFile;
     }
 
@@ -1005,7 +1030,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Argument("<out:result>", Multiplicity.optional)
         @Help("write gap-closed assembly to <result> (default: stdout)")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        @(Validate!(value => value is null || validateFileWritable(value)))
         string resultFile;
     }
 
@@ -1070,7 +1095,7 @@ struct OptionsFor(DentistCommand _command)
             Intrinsic QVs are categorized as \"bad\" if they are greater or equal to the best QV
             of the worst <frac> trace point intervals. (default: %s)
         "(defaultValue!badFraction))
-        @(Validate!(value => enforce!CLIException(
+        @(Validate!(value => validate(
             0.0 <= value && value < 0.5,
             "--bad-fraction must be within [1, 0.5)")
         ))
@@ -1119,7 +1144,7 @@ struct OptionsFor(DentistCommand _command)
             auto from = referenceContigBatch[0];
             auto to = referenceContigBatch[1];
 
-            enforce!CLIException(
+            validate(
                 referenceContigBatch == referenceContigBatch.init ||
                 (0 <= from && from < to && (to == id_t.max || to <= options.numReferenceContigs)),
                 format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
@@ -1219,7 +1244,7 @@ struct OptionsFor(DentistCommand _command)
             auto from = pileUpBatch[0];
             auto to = pileUpBatch[1];
 
-            enforce!CLIException(
+            validate(
                 pileUpBatch == pileUpBatch.init ||
                 (0 <= from && from < to && (to == id_t.max || to <= options.pileUpLength)),
                 format!"invalid batch range; check that 0 <= <from> < <to> <= %d"(
@@ -1239,7 +1264,7 @@ struct OptionsFor(DentistCommand _command)
 
             foreach (i, batch1; pileUpBatches)
                 foreach (j, batch2; pileUpBatches[i + 1 .. $])
-                    enforce!CLIException(
+                    validate(
                         !intersect(batch1, batch2),
                         format!"invalid --batch: <idx-spec>'s at indices %d and %d intersect"(i, j),
                     );
@@ -1284,7 +1309,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("bed")
         @Help("input BED file; fields must be TAB-delimited (default: standard input)")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileExists(value))))
+        @(Validate!(value => value is null || validateFileExists(value)))
         string bedFile;
 
         File openBedFile() const
@@ -1316,7 +1341,7 @@ struct OptionsFor(DentistCommand _command)
             reference assembly marked by `n`s the number reads is multipled by
             --existing-gap-bonus. (default: %s)
         }"(defaultValue!bestPileUpMargin))
-        @(Validate!(value => enforce!CLIException(value > 1.0, "--best-pile-up-margin must be greater than 1.0")))
+        @(Validate!(value => validate(value > 1.0, "--best-pile-up-margin must be greater than 1.0")))
         double bestPileUpMargin = 3.0;
     }
 
@@ -1353,7 +1378,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("cache-only")
         @Help("stop execution after writing the contig alignments cache")
-        @(Validate!((value, options) => enforce!CLIException(
+        @(Validate!((value, options) => validate(
             !value || options.contigAlignmentsCache !is null,
             "requires --cache-contig-alignments",
         )))
@@ -1387,7 +1412,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("config")
         @MetaVar("<config-json>")
         @Help(configHelpString)
-        @(Validate!(value => (value is null).execUnless!(() => validateFileExists(value))))
+        @(Validate!(value => value is null || validateFileExists(value)))
         @(Validate!(value => value is null || value.validateFileExtension!(".json", ".yaml", ".yml")))
         string configFile;
 
@@ -1427,7 +1452,7 @@ struct OptionsFor(DentistCommand _command)
             in the output of the gap closer. Keep this as low as possible, ie. if the contigs are
             not modified use zero. (default: %d)
         }"(defaultValue!cropAlignment))
-        @(Validate!((value, options) => enforce!CLIException(value <= options.cropAmbiguous,
+        @(Validate!((value, options) => validate(value <= options.cropAmbiguous,
                                                             "must be <= --crop-ambiguous")))
         coord_t cropAlignment = 0;
     }
@@ -1571,7 +1596,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("debug-pile-ups")
         @MetaVar("<db-stem>")
         @Help("write pile ups of intermediate steps to `<db-stem>.<state>.db`")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        @(Validate!(value => value is null || validateFileWritable(value)))
         string intermediatePileUpsStem;
     }
 
@@ -1658,7 +1683,7 @@ struct OptionsFor(DentistCommand _command)
             by <double> before conflict resolution
             (see --best-pile-up-margin). (default: %s)
         }"(defaultValue!existingGapBonus))
-        @(Validate!(value => enforce!CLIException(1.0 <= value, "--existing-gap-bonus must be at least 1.0")))
+        @(Validate!(value => validate(1.0 <= value, "--existing-gap-bonus must be at least 1.0")))
         double existingGapBonus = 6.0;
     }
 
@@ -1669,7 +1694,7 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("fasta-line-width", "w")
         @Help(format!"line width for ouput FASTA (default: %d)"(defaultValue!fastaLineWidth))
-        @(Validate!(value => enforce!CLIException(value > 0, "fasta line width must be greater than zero")))
+        @(Validate!(value => validate(value > 0, "fasta line width must be greater than zero")))
         size_t fastaLineWidth = 50;
     }
 
@@ -1680,7 +1705,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("gap-details")
         @MetaVar("<json>")
         @Help("write the summary for all gaps to a JSON file <json>")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        @(Validate!(value => value is null || validateFileWritable(value)))
         string gapDetailsJson;
     }
 
@@ -1774,7 +1799,7 @@ struct OptionsFor(DentistCommand _command)
             local alignments may have an error rate of no more than <double>
             (default: %s)
         "(defaultValue!maxAlignmentError))
-        @(Validate!(value => enforce!CLIException(
+        @(Validate!(value => validate(
             0.0 < value && value <= 0.3,
             "maximum alignment error rate must be in (0, 0.3]"
         )))
@@ -1838,11 +1863,11 @@ struct OptionsFor(DentistCommand _command)
             if (!hasReadsDb)
                 return;
 
-            enforce!CLIException(
+            validate(
                 hasMaxCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --max-coverage-reads",
             );
-            enforce!CLIException(
+            validate(
                 hasMaxCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --max-coverage-reads",
             );
@@ -1918,11 +1943,11 @@ struct OptionsFor(DentistCommand _command)
             if (!hasReadsDb)
                 return;
 
-            enforce!CLIException(
+            validate(
                 hasMaxImproperCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --max-improper-coverage-reads",
             );
-            enforce!CLIException(
+            validate(
                 hasMaxImproperCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --max-improper-coverage-reads",
             );
@@ -1963,7 +1988,7 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!"
             insertion and existing contigs must match with less error than <double> (default: %s)
         "(defaultValue!maxInsertionError))
-        @(Validate!(value => enforce!CLIException(
+        @(Validate!(value => validate(
             0.0 < value && value <= 0.3,
             "maximum insertion error rate must be in (0, 0.3]"
         )))
@@ -1980,7 +2005,7 @@ struct OptionsFor(DentistCommand _command)
             alignment. This must hold for the reference and query.
             (default: %s)
         "(defaultValue!maxRelativeOverlap))
-        @(Validate!(value => enforce!CLIException(
+        @(Validate!(value => validate(
             0.0 < value && value < 1.0,
             "maximum relative overlap must be in (0, 1)"
         )))
@@ -1998,9 +2023,9 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!q"{
             alignment need to have at least this length of unique anchoring sequence (default: %d)
         }"(defaultValue!minAnchorLength))
-        @(Validate!(value => enforce!CLIException(value > 0, "minimum anchor length must be greater than zero")))
+        @(Validate!(value => validate(value > 0, "minimum anchor length must be greater than zero")))
         @(Validate!(
-            (value, options) => enforce!CLIException(
+            (value, options) => validate(
                 value > options.tracePointDistance,
                 "minimum anchor length should be greater than trace point spacing of *.las file"
             ),
@@ -2036,15 +2061,15 @@ struct OptionsFor(DentistCommand _command)
             if (!hasReadsDb)
                 return;
 
-            enforce!CLIException(
+            validate(
                 hasMinCoverageReads || hasReadCoverage,
                 "must provide either --read-coverage or --min-coverage-reads",
             );
-            enforce!CLIException(
+            validate(
                 hasMinCoverageReads ^ hasReadCoverage,
                 "must not provide both --read-coverage and --min-coverage-reads",
             );
-            enforce!CLIException(
+            validate(
                 !hasReadCoverage || ploidy > 0,
                 "must provide --ploidy with --read-coverage",
             );
@@ -2069,7 +2094,7 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!q"{
             extensions must have at least <ulong> bps of consensus to be inserted (default: %d)
         }"(defaultValue!minExtensionLength))
-        @(Validate!(value => enforce!CLIException(value > 0, "minimum extension length must be greater than zero")))
+        @(Validate!(value => validate(value > 0, "minimum extension length must be greater than zero")))
         size_t minExtensionLength = 100;
     }
 
@@ -2105,7 +2130,7 @@ struct OptionsFor(DentistCommand _command)
         @Help(format!q"{
             pile ups must have at least <ulong> reads to be processed (default: %d)
         }"(defaultValue!minReadsPerPileUp))
-        @(Validate!(value => enforce!CLIException(value > 0, "min reads per pile up must be greater than zero")))
+        @(Validate!(value => validate(value > 0, "min reads per pile up must be greater than zero")))
         size_t minReadsPerPileUp = defaultMinSpanningReads;
     }
 
@@ -2119,7 +2144,7 @@ struct OptionsFor(DentistCommand _command)
             chains score will be accepted; a value of 0.0 means that all
             chains will be accepted (default: %s)
         "(defaultValue!minRelativeScore))
-        @(Validate!(value => enforce!CLIException(
+        @(Validate!(value => validate(
             0.0 <= value && value <= 1.0,
             "minimum relative score must be in [0, 1]"
         )))
@@ -2208,7 +2233,7 @@ struct OptionsFor(DentistCommand _command)
         ")
         OnlyFlag onlyFlag;
 
-        enum OnlyFlag
+        enum OnlyFlag : int
         {
             spanning = 1 << 0,
             extending = 1 << 1,
@@ -2454,7 +2479,7 @@ struct OptionsFor(DentistCommand _command)
             }
         }}
 
-        throw new CLIException("invalid value for --revert: unkown option " ~ fullOption);
+        throw new CLIException("invalid value for --revert: unknown option " ~ fullOption);
     }
 
 
@@ -2478,7 +2503,7 @@ struct OptionsFor(DentistCommand _command)
         @Option("scaffolding")
         @MetaVar("<insertions-db>")
         @Help("write the assembly scaffold to <insertions-db>; use `show-insertions` to inspect the result")
-        @(Validate!(value => (value is null).execUnless!(() => validateFileWritable(value))))
+        @(Validate!(value => value is null || validateFileWritable(value)))
         string assemblyGraphFile;
     }
 
@@ -2555,15 +2580,15 @@ struct OptionsFor(DentistCommand _command)
             auto contigA = skipGap[0];
             auto contigB = skipGap[1];
 
-            enforce!CLIException(
+            validate(
                 0 < contigA && contigA <= numReferenceContigs,
                 format!"invalid <gap-spec>: <contigA> == %d is out of bounds [1, %d]"(contigA, numReferenceContigs),
             );
-            enforce!CLIException(
+            validate(
                 0 < contigB && contigB <= numReferenceContigs,
                 format!"invalid <gap-spec>: <contigB> == %d is out of bounds [1, %d]"(contigB, numReferenceContigs),
             );
-            enforce!CLIException(
+            validate(
                 contigA != contigB,
                 "invalid <gap-spec>: <contigA> mut not be equal to <contigB>",
             );
@@ -2668,7 +2693,7 @@ struct OptionsFor(DentistCommand _command)
             {
                 try
                 {
-                    enforce!CLIException(
+                    validate(
                         isDir(tmpdir),
                         "--tmpdir is not a directory",
                     );
@@ -2735,7 +2760,7 @@ struct OptionsFor(DentistCommand _command)
     }
 
     @Option()
-    @(Validate!(value => enforce!CLIException(
+    @(Validate!(value => validate(
         0 <= value && value <= 3,
         "verbosity must used 0-3 times"
     )))
@@ -2779,8 +2804,7 @@ struct OptionsFor(DentistCommand _command)
             sliding windows of --weak-coverage-window base pairs are spanned by less
             than --min-coverage-reads local alignments
         ")
-        @(Validate!((value, options) => (value is null).execUnless!(() =>
-            validateOutputMask(options.refDb, value, Yes.allowBlock))))
+        @(Validate!((value, options) => value is null || validateOutputMask(options.refDb, value, Yes.allowBlock)))
         string weakCoverageMask;
     }
 
@@ -3201,7 +3225,9 @@ unittest
     }
 }
 
-/// This describes the basic, ie. non-command-specific, options of `dentist`.
+
+/// This describes the basic, ie. non-command-specific, options of DENTIST.
+/// See source code or run `dentist --help` for a description of the fields.
 struct BaseOptions
 {
     @Option("dependencies", "d")
@@ -3244,14 +3270,17 @@ struct BaseOptions
     string commandOptions;
 }
 
-class CLIException : Exception
+protected
 {
-    ///
-    mixin basicExceptionCtors;
-}
+    /// Used to signal errors during the processing of CLI arguments.
+    class CLIException : Exception
+    {
+        ///
+        mixin basicExceptionCtors;
+    }
 
-private
-{
+
+    /// Parse args of `command` and execute it.
     ReturnCode runCommand(DentistCommand command)(in string[] args)
     {
         alias Options = OptionsFor!command;
@@ -3316,6 +3345,8 @@ private
 
     enum getUDA(alias symbol, T) = getUDAs!(symbol, T)[0];
 
+    /// Decorate options with validations. Validations shall throw an
+    /// exception if the option value is considered invalid.
     struct Validate(
         alias _validate,
         bool isEnabled = true,
@@ -3332,6 +3363,8 @@ private
         enum sourceLocation = format!"%s:%d"(file, line);
     }
 
+    /// Used to determine execution order of `PreValidate`, `PostValidate` and
+    /// `CleanUp` hooks.
     enum Priority
     {
         low,
@@ -3339,14 +3372,18 @@ private
         high,
     }
 
+    /// Mark method as hook that is executed before validations.
     struct PreValidate {
         Priority priority;
     }
 
+    /// Mark method as hook that is executed after validations.
     struct PostValidate {
         Priority priority;
     }
 
+    /// Mark method as hook that is executed before termination of the
+    /// program.
     struct CleanUp {
         Priority priority;
     }
@@ -3386,6 +3423,9 @@ private
         ));
     }
 
+    /// Implementation of validations and hooks for options processing.
+    ///
+    /// See_also: `Validate`, `Priority`, `PreValidate`, `PostValidate`
     Options processOptions(Options)(Options options)
     {
         alias preValidateQueue = staticSort!(
@@ -3506,6 +3546,12 @@ private
         assertThrown!Exception(processOptions(options));
     }
 
+    /// Run all `CleanUp` hooks of `options`. Use with `scope` statement:
+    ///
+    /// ---
+    /// scope(exit)
+    ///     cleanUp(options);
+    /// ---
     Options cleanUp(Options)(Options options)
     {
         alias cleanUpQueue = staticSort!(
@@ -3556,6 +3602,8 @@ private
         ]);
     }
 
+    /// Parse integer range of form `from..to`. Result is written into `dest`
+    /// or returned.
     void parseRange(alias dest, string msg = "ill-formatted range")(in string rangeString) pure
             if (isStaticArray!(typeof(dest)) && dest.length == 2)
     {
@@ -3569,6 +3617,7 @@ private
         }
     }
 
+    /// ditto
     DestType parseRange(DestType, string msg = "ill-formatted range")(in string rangeString) pure
             if (isStaticArray!DestType && DestType.init.length == 2)
     {
@@ -3586,28 +3635,25 @@ private
         }
     }
 
+
+    /// Throw an exception unless the condition is met.
+    ///
+    /// Throws: `CLIException` if validation fails.
+    /// See_also: `std.exception.enforce`
     alias validate = enforce!CLIException;
 
+
+    /// Validate `value > 0` or
     void validatePositive(string option, V)(V value)
     {
-        enforce!CLIException(
+        validate(
             0 < value,
             option ~ " must be greater than zero",
         );
     }
 
-    void validateCoverageBounds(DestType, string option)(in string coverageBoundsString)
-    {
-        auto coverageBounds = parseRange!DestType(coverageBoundsString);
-        auto from = coverageBounds[0];
-        auto to = coverageBounds[1];
 
-        enforce!CLIException(
-            coverageBounds == coverageBounds.init || 0 <= from && from < to,
-            "invalid coverage bounds (--" ~ option ~ "); check that 0 <= <from> < <to>"
-        );
-    }
-
+    /// Validate that files exist.
     void validateFilesExist(string msg = null)(in string[] files)
     {
         foreach (file; files)
@@ -3619,25 +3665,31 @@ private
         }
     }
 
+    /// ditto
     void validateFileExists(string msg = "cannot open file `%s`")(in string file)
     {
-        enforce!CLIException(file.exists, format!msg(file));
+        validate(file.exists, format!msg(file));
     }
 
-    alias typeOf(alias T) = typeof(T);
 
+    private alias typeOf(alias T) = typeof(T);
+
+
+    /// Validate `file` ends with one of the given `extensions`.
     void validateFileExtension(extensions...)(
         in string file,
         string msg = "expected %-(%s or %) but got %s",
     )
     if (allSatisfy!(isSomeString, staticMap!(typeOf, extensions)))
     {
-        enforce!CLIException(
+        validate(
             file.endsWith(extensions),
             format(msg, [extensions], file)
         );
     }
 
+
+    /// Validate `dbFile` is the stub of a Dazzler DB or DAM.
     void validateDB(string extension = null)(in string dbFile)
         if (extension is null || extension.among(".dam", ".db"))
     {
@@ -3655,43 +3707,49 @@ private
         }
     }
 
+
+    /// Validate `lasFile` looks like a valid LAS file and is not empty unless
+    /// `allowEmpty`.
     void validateLasFile(in string lasFile, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
     {
         auto cwd = getcwd.absolutePath;
 
-        enforce!CLIException(
+        validate(
             lasFile.endsWith(".las"),
             format!"expected .las file, got `%s`"(lasFile),
         );
         validateFileExists(lasFile);
-        enforce!CLIException(
+        validate(
             allowEmpty || !lasEmpty(lasFile),
             format!"empty alignment file `%s`"(lasFile),
         );
     }
 
+
+    /// Validate hidden mask files exist.
     void validateInputMasks(
         in string dbFile,
-        in string[] maskDestinations,
+        in string[] masks,
         Flag!"allowBlock" allowBlock = No.allowBlock,
     )
     {
-        foreach (maskDestination; maskDestinations)
-            validateInputMask(dbFile, maskDestination, allowBlock);
+        foreach (mask; masks)
+            validateInputMask(dbFile, mask, allowBlock);
     }
 
+    /// ditto
     void validateInputMask(
         in string dbFile,
-        in string maskDestination,
+        in string mask,
         Flag!"allowBlock" allowBlock = No.allowBlock,
     )
     {
-        foreach (maskFile; getMaskFiles(dbFile, maskDestination, allowBlock))
-        {
+        foreach (maskFile; getMaskFiles(dbFile, mask, allowBlock))
             validateFileExists!"cannot open hidden mask file `%s`"(maskFile);
-        }
     }
 
+
+    /// Validate hidden mask files can be opened for writing.
     void validateOutputMask(
         in string dbFile,
         in string maskDestination,
@@ -3699,11 +3757,11 @@ private
     )
     {
         foreach (maskFile; getMaskFiles(dbFile, maskDestination, allowBlock))
-        {
             validateFileWritable!"cannot write hidden mask file `%s`: %s"(maskFile);
-        }
     }
 
+
+    /// Validate file can be opened for writing.
     void validateFileWritable(string msg = "cannot open file `%s` for writing: %s")(string fileName)
     {
         auto deleteAfterwards = !fileName.exists;
@@ -3734,12 +3792,22 @@ private
         }
     }
 
+
+    /// Validate `coordString` has the expected format.
+    ///
+    /// See_also: `parseCoordString`
     void validateCoordStrings(string[] coordStrings)
     {
         foreach (coordString; coordStrings)
             cast(void) parseCoordString(coordString);
     }
 
+
+    /// Parse a string of form `[scaffold/<scaff>/][contig/<contig>/]<coord>`
+    /// into an `OutputCoordinate`.
+    ///
+    /// Throws: `CLIException` if the string is ill-formatted or one of
+    ///     <scaff>, <contig> or <coord> is less than or equal to zero.
     OutputCoordinate parseCoordString(string coordString)
     {
         enum coordRegex = ctRegex!`^(scaffold/(?P<scaffoldId>\d+)/)?(contig/(?P<contigId>\d+)/)?(?P<coord>\d+)$`;
@@ -3747,25 +3815,25 @@ private
 
         auto matches = coordString.matchFirst(coordRegex);
 
-        enforce!CLIException(cast(bool) matches, "ill-formatted coord-string");
+        validate(cast(bool) matches, "ill-formatted coord-string");
 
         coord.coord = matches["coord"].to!(typeof(coord.coord));
-        enforce!CLIException(coord.coord > 0, "<coord> is 1-based");
+        validate(coord.coord > 0, "<coord> is 1-based");
 
         if (matches["contigId"] != "")
         {
             coord.contigId = matches["contigId"].to!(typeof(coord.contigId));
-            enforce!CLIException(coord.contigId > 0, "<contig-id> is 1-based");
+            validate(coord.contigId > 0, "<contig-id> is 1-based");
         }
 
         if (matches["scaffoldId"] != "")
         {
             coord.scaffoldId = matches["scaffoldId"].to!(typeof(coord.scaffoldId));
-            enforce!CLIException(coord.scaffoldId > 0, "<scaffold-id> is 1-based");
+            validate(coord.scaffoldId > 0, "<scaffold-id> is 1-based");
         }
 
         version (unittest) { } else
-            enforce!CLIException(
+            validate(
                 coord.originType == OutputCoordinate.OriginType.scaffold,
                 "not yet implemented; use format `scaffold/<uint:scaffold-id>/<uint:coord>`",
             );
@@ -3819,17 +3887,5 @@ private
             assertThrown!CLIException(parseCoordString(`contig/7/0`));
             assertThrown!CLIException(parseCoordString(`0`));
         }
-    }
-
-    void execIf(alias fun)(bool test)
-    {
-        if (test)
-            fun();
-    }
-
-    void execUnless(alias fun)(bool test)
-    {
-        if (!test)
-            fun();
     }
 }

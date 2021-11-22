@@ -1,5 +1,32 @@
 /**
-    This is the `checkResults` command of `dentist`.
+    This is the `check-results` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Check results of some gap closing procedure.
+
+    Walks through the artificially inserted gaps in the test assembly and
+    deduces a `GapState` for each one. First, the two adjacent contigs are
+    searched for in the gap-closed assembly.
+
+    1. `GapState.unknown` if any of the adjacent contigs is absent from or
+       duplicated in the gap-closed assembly.
+    2. `GapState.closed` if the contigs are located on the same contig of the
+       gap-closed assembly in the same orientation and correct order.
+    3. `GapState.partiallyClosed` if the contigs are located on neighboring
+       contigs of a gap-closed scaffold in the same orientation and correct
+       order, and, there is additional sequence that reaches into the gap.
+    4. `GapState.unclosed` if the contigs are located on neighboring contigs
+       of a gap-closed scaffold in the same orientation and correct order,
+       and, there is no additional sequence that reaches into the gap.
+
+    Additionally, the sequence identity between the inserted sequence and the
+    ground-truth sequence is computed using stretcher if a gap is (partially)
+    closed. If a DUST mask is provided, the analysis is broken into DUST and
+    no-DUST to analyze the effect of low complexity sequence on the error
+    rate.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +34,31 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.checkResults;
+
+package(dentist) enum summary = "
+    Check results of some gap closing procedure.
+
+    Walks through the artificially inserted gaps in the test assembly and
+    deduces a `GapState` for each one. First, the two adjacent contigs are
+    searched for in the gap-closed assembly.
+
+    1. `GapState.unknown` if any of the adjacent contigs is absent from or
+       duplicated in the gap-closed assembly.
+    2. `GapState.closed` if the contigs are located on the same contig of the
+       gap-closed assembly in the same orientation and correct order.
+    3. `GapState.partiallyClosed` if the contigs are located on neighboring
+       contigs of a gap-closed scaffold in the same orientation and correct
+       order, and, there is additional sequence that reaches into the gap.
+    4. `GapState.unclosed` if the contigs are located on neighboring contigs
+       of a gap-closed scaffold in the same orientation and correct order,
+       and, there is no additional sequence that reaches into the gap.
+
+    Additionally, the sequence identity between the inserted sequence and the
+    ground-truth sequence is computed using stretcher if a gap is (partially)
+    closed. If a DUST mask is provided, the analysis is broken into DUST and
+    no-DUST to analyze the effect of low complexity sequence on the error
+    rate.
+";
 
 import dentist.common : isTesting;
 
@@ -158,10 +210,11 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson;
 
 
-/// Options for the `collectPileUps` command.
+/// Options for the `check-results` command.
 alias Options = OptionsFor!(TestingCommand.checkResults);
 
-/// Execute the `checkResults` command with `options`.
+
+/// Execute the `check-results` command with `options`.
 void execute(in Options options)
 {
     auto analyzer = ResultAnalyzer(options);
@@ -172,6 +225,7 @@ void execute(in Options options)
     }
     catch (StopExecution)
     {
+        // execution ends here if `options.cacheOnly`
         return;
     }
 
@@ -181,35 +235,120 @@ void execute(in Options options)
         writeln(stats.toTabular());
 }
 
-class StopExecution : Exception
+
+private class StopExecution : Exception
 {
     this() {
         super(null);
     }
 }
 
+
+/// Used to indicate reverse-complementary alignment.
 alias Complement = Flag!"complement";
+
+
+/// Used to indicate that duplicates of the query contig exist.
 alias DuplicateQueryContig = Flag!"duplicateQueryContig";
 
+
+/// Localization of contigs from the test assembly (query) in the gap-closed
+/// assembly (reference).
 struct ContigMapping
 {
+    /// Locus on the gap-closed assembly.
     ReferenceInterval reference;
-    coord_t referenceContigLength;
-    id_t queryContigId;
-    DuplicateQueryContig duplicateQueryContig;
-    Complement complement;
-    double alignmentError;
 
-    T opCast(T)() const pure nothrow if (is(bool : T))
+    /// Length of the contig in the gap-closed assembly.
+    coord_t referenceContigLength;
+
+    /// Test assembly contig that was searched.
+    id_t queryContigId;
+
+    /// Signals whether the query contig has duplicates in the test assembly.
+    DuplicateQueryContig duplicateQueryContig;
+
+    /// Whether the contigs align in reverse-complement.
+    Complement complement;
+
+    /// Observed error rate in the alignment.
+    double alignmentError;
+}
+
+
+/// Deduced state of a gap.
+enum GapState : ubyte
+{
+    /// Unsure what happened; probably due to an assembly error.
+    unknown,
+    /// Flanking contigs could be found but not in the expected configuration.
+    broken,
+    /// Flanking contigs could be found and no sequence was inserted.
+    unclosed,
+    /// Flanking contigs could be found and sequence was inserted but a gap remains.
+    partiallyClosed,
+    /// Flanking contigs could be found and contiguous sequence was inserted.
+    closed,
+    /// This is not a gap – ignore it.
+    ignored,
+}
+
+
+/// Analysis result for a particular gap.
+struct GapSummary
+{
+    /// Contig ID of the contig left of the gap.
+    id_t lhsContigId;
+
+    /// Deduced gap state.
+    GapState state;
+
+    /// Length of the gap in the test assembly.
+    coord_t gapLength;
+
+    /// Alignment as edit path including sequences.
+    StretcherAlignment alignment;
+
+    /// Localization of the left contig in the gap-closed assembly.
+    ContigMapping lhsContigMapping;
+
+    /// Localization of the right contig in the gap-closed assembly.
+    ContigMapping rhsContigMapping;
+
+    private coord_t numDustOps;
+    private coord_t numDustMatches;
+    private coord_t numNoneDustOps;
+    private coord_t numNoneDustMatches;
+
+
+    /// Percent identity in DUST annotated regions.
+    @property double dustPercentIdentity() const pure nothrow
     {
-        return cast(T) queryContigId != 0;
+        return cast(double) numDustMatches / numDustOps;
+    }
+
+
+    /// Percent identity in none-DUST annotated regions.
+    @property double noneDustPercentIdentity() const pure nothrow
+    {
+        return cast(double) numNoneDustMatches / numNoneDustOps;
+    }
+
+
+    /// Contig ID of the contig right of the gap.
+    @property id_t rhsContigId() const pure nothrow
+    {
+        return lhsContigId + 1;
     }
 }
 
-static alias queryOrder = orderLexicographically!(const(ContigMapping),
+
+private alias queryOrder = orderLexicographically!(const(ContigMapping),
     mapping => mapping.queryContigId,
 );
-static alias queryEquiv = (const(ContigMapping) a, const(ContigMapping) b) =>
+
+
+private alias queryEquiv = (const(ContigMapping) a, const(ContigMapping) b) =>
         a.queryContigId == b.queryContigId;
 
 
@@ -227,52 +366,6 @@ private struct ResultAnalyzer
         Complement complement;
     }
 
-    static enum GapState : ubyte
-    {
-        /// Unsure what happened; probably due to an assembly error.
-        unkown,
-        /// Flanking contigs could be found but not in the expected configuration.
-        broken,
-        /// Flanking contigs could be found and no sequence was inserted.
-        unclosed,
-        /// Flanking contigs could be found and sequence was inserted but a gap remains.
-        partiallyClosed,
-        /// Flanking contigs could be found and contiguous sequence was inserted.
-        closed,
-        /// This is not a gap – ignore it.
-        ignored,
-    }
-
-    static struct GapSummary
-    {
-        id_t lhsContigId;
-        GapState state;
-        coord_t gapLength;
-        StretcherAlignment alignment;
-        coord_t numDustOps;
-        coord_t numDustMatches;
-        coord_t numNoneDustOps;
-        coord_t numNoneDustMatches;
-
-
-        @property double dustPercentIdentity() const pure nothrow
-        {
-            return cast(double) numDustMatches / numDustOps;
-        }
-
-        @property double noneDustPercentIdentity() const pure nothrow
-        {
-            return cast(double) numNoneDustMatches / numNoneDustOps;
-        }
-
-        @property id_t rhsContigId() const pure nothrow
-        {
-            return lhsContigId + 1;
-        }
-
-        ContigMapping lhsContigMapping;
-        ContigMapping rhsContigMapping;
-    }
 
     const(Options) options;
     protected const(ScaffoldSegment)[] trueAssemblyScaffoldStructure;
@@ -634,7 +727,7 @@ private struct ResultAnalyzer
                     recoveredAlignments[0].averageErrorRate,
                 )
                 : ContigMapping())
-            .filter!"a"
+            .filter!"a.queryContigId > 0"
             .array;
     }
 
@@ -854,7 +947,7 @@ private struct ResultAnalyzer
             if (lhsContigAlignments.length != 1 || rhsContigAlignments.length != 1)
             {
                 logJsonDiagnostic(
-                    "info", "unkown gap",
+                    "info", "unknown gap",
                     "lhs", [
                         "contigId": lhsContigId.toJson,
                         "numContigAlignments": lhsContigAlignments.length.toJson,
@@ -865,8 +958,8 @@ private struct ResultAnalyzer
                     ].toJson,
                 );
                 // One contig alignment either does not exist or is ambiguous:
-                // the gap state is unkown
-                gapSummary.state = GapState.unkown;
+                // the gap state is unknown
+                gapSummary.state = GapState.unknown;
                 continue;
             }
 
@@ -1364,10 +1457,10 @@ private struct ResultAnalyzer
             )[0 .. end.value];
             auto gapSize = resultGapSize(cast(id_t) begin.contigId);
 
-            enum char unkownBase = 'n';
+            enum char unknownBase = 'n';
             subSequence = chain(
                 leftFlank,
-                unkownBase.repeat(gapSize),
+                unknownBase.repeat(gapSize),
                 rightFlank,
             ).map!(to!(immutable(char))).array;
         }
@@ -1594,13 +1687,30 @@ private struct ResultAnalyzer
     }
 }
 
+
+/// Read/write contig alignments to a cache file to avoid double-computation.
 struct ContigAlignmentsCache
 {
+    /// Path to cache file in JSON format.
     string contigAlignmentsCache;
-    string dbA;
-    string dbB;
-    Json _cachedAlignments = Json.undefined;
 
+    /// Path to A-read DB.
+    ///
+    /// This is used to ensure the selected cache
+    /// matches the DBs used to create it.
+    string dbA;
+
+    /// Path to B-read DB.
+    ///
+    /// This is used to ensure the selected cache
+    /// matches the DBs used to create it.
+    string dbB;
+
+    private Json _cachedAlignments = Json.undefined;
+
+
+    /// Return true if the cache is readable and stored DB paths match with
+    /// the paths in this object.
     @property bool isValid()
     {
         return contigAlignmentsCache !is null &&
@@ -1609,12 +1719,19 @@ struct ContigAlignmentsCache
                cachedAlignments["dbB"] == dbB;
     }
 
+
+    /// Returns true if the cache is not empty and not `isValid`.
+    ///
+    /// The latter conditions ensures a valid cache is not over-written by
+    /// accident.
     @property bool canWrite()
     {
         return contigAlignmentsCache !is null && !isValid;
     }
 
-    @property Json cachedAlignments()
+
+    /// Access the cached data reading it from the cache file on first access.
+    private @property Json cachedAlignments()
     {
         if (_cachedAlignments.type != Json.Type.object)
         {
@@ -1636,6 +1753,9 @@ struct ContigAlignmentsCache
         return _cachedAlignments;
     }
 
+
+    /// Write data to cache file. Does not overwrite existing cache files
+    /// unless `forceOverwrite` is given.
     void write(
         ContigMapping[] contigAlignments,
         NaturalNumberSet duplicateContigIds,
@@ -1662,6 +1782,8 @@ struct ContigAlignmentsCache
         );
     }
 
+
+    /// Read from cache file and reconstruct the contig mappings.
     ContigMapping[] read()
     {
         assert(isValid, "must not read invalid ContigAlignmentsCache");
@@ -1695,6 +1817,7 @@ struct ContigAlignmentsCache
         return contigAlignments;
     }
 }
+
 
 private struct Histogram(value_t)
 {
@@ -1734,10 +1857,13 @@ private struct Histogram(value_t)
     }
 }
 
-auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
+
+/// Construct a histogram with `bucketSize` buckets from `values`.
+private auto histogram(value_t)(in value_t bucketSize, in value_t[] values)
 {
     return Histogram!value_t(bucketSize, values);
 }
+
 
 private struct Stats
 {
@@ -1926,8 +2052,10 @@ private struct Stats
 }
 
 
+/// Sequence alignment generated by stretcher.
 struct StretcherAlignment
 {
+    /// Recognized edit ops.
     static enum EditOp : char
     {
         match = '|',
@@ -1935,6 +2063,7 @@ struct StretcherAlignment
         indel = '-',
     }
 
+    /// Recognized sequence characters.
     static enum SeqChar : char
     {
         a = 'a',
@@ -1945,10 +2074,12 @@ struct StretcherAlignment
         C = 'C',
         G = 'G',
         T = 'T',
-        unkownBase = 'n',
+        unknownBase = 'n',
         indel = '-',
     }
 
+
+    /// True if `c` is a base.
     static bool isBase(in SeqChar c)
     {
         return c.among(
@@ -1963,13 +2094,27 @@ struct StretcherAlignment
         ) != 0;
     }
 
+    /// Number of base pairs in the reference sequence.
     coord_t referenceLength;
+
+    /// Number of base pairs in the query sequence.
     coord_t queryLength;
+
+    /// Whether the sequences align in reverse-complement.
     Complement complement;
+
+    /// Percent identity calculated by stretcher.
     double percentIdentity;
+
+    /// Reference line of the alignment.
     const(SeqChar)[] referenceLine;
+
+    /// Edit ops line of the alignment.
     const(EditOp)[] editOps;
+
+    /// Query line of the alignment.
     const(SeqChar)[] queryLine;
+
 
     invariant
     {
@@ -1979,8 +2124,9 @@ struct StretcherAlignment
         );
     }
 
-    private void triggerInvariant() { }
 
+    /// Crop the alignment on both ends excluding `crop` bases of the
+    /// reference sequence.
     StretcherAlignment cropReference(in coord_t crop) const
     {
         /// Count cropped base pairs and return the position in `alignmentSeq`.
@@ -2008,6 +2154,7 @@ struct StretcherAlignment
         return croppedAlignment;
     }
 
+    ///
     unittest
     {
         enum alignment = StretcherAlignment(
@@ -2033,12 +2180,16 @@ struct StretcherAlignment
         assert(alignment.cropReference(crop) == croppedAlignment);
     }
 
+
+    /// Returns the number of edit ops.
     @property size_t length() const pure nothrow
     {
         return editOps.length;
     }
 
-    int opApply(scope int delegate(size_t, SeqChar, EditOp, SeqChar) dg)
+
+    /// Loop over each triple of reference char, edit op and query char.
+    int opApply(scope int delegate(size_t, SeqChar, EditOp, SeqChar) dg) const
     {
         int result = 0;
 
@@ -2052,8 +2203,96 @@ struct StretcherAlignment
 
         return result;
     }
+
+    /// Count indels.
+    unittest
+    {
+        enum alignment = StretcherAlignment(
+            50,
+            50,
+            No.complement,
+            45.0/51.0,
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatatttata-tcta",
+            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.|||-||||",
+            cast(const(SeqChar)[]) "tatcc-tcaggtgaggcataacaacaaaaatatatatataataataatcta",
+        );
+
+        coord_t numIndels;
+        foreach (i, refChar, editOp, queryChar; alignment)
+            if (editOp == EditOp.indel)
+                ++numIndels;
+
+        assert(numIndels == 2);
+    }
+
+    /// Verify operations.
+    unittest
+    {
+        enum alignment = StretcherAlignment(
+            50,
+            50,
+            No.complement,
+            45.0/51.0,
+            cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatatttata-tcta",
+            cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.|||-||||",
+            cast(const(SeqChar)[]) "tatcc-tcaggtgaggcataacaacaaaaatatatatataataataatcta",
+        );
+
+        bool isValid = true;
+        foreach (i, refChar, editOp, queryChar; alignment)
+        {
+            final switch (editOp)
+            {
+                case EditOp.match:
+                    isValid &= (refChar == queryChar);
+                    break;
+                case EditOp.mismatch:
+                    isValid &= (refChar != queryChar);
+                    break;
+                case EditOp.indel:
+                    isValid &= (
+                        (refChar == SeqChar.indel && queryChar != SeqChar.indel) ||
+                        (refChar != SeqChar.indel && queryChar == SeqChar.indel)
+                    );
+                    break;
+            }
+
+            if (!isValid)
+                break;
+        }
+
+        assert(isValid);
+    }
 }
 
+///
+unittest
+{
+    alias SeqChar = StretcherAlignment.SeqChar;
+    alias EditOp = StretcherAlignment.EditOp;
+
+    auto alignment = StretcherAlignment(
+        50,
+        50,
+        No.complement,
+        45.0/51.0,
+        cast(const(SeqChar)[]) "tatccctcaggtgaggactaacaacaaaaatatatatatatttata-tcta",
+        cast(const(EditOp)[])  "|||||-||||||||||..||||||||||||||||||||||.|.|||-||||",
+        cast(const(SeqChar)[]) "tatcc-tcaggtgaggcataacaacaaaaatatatatataataataatcta",
+    );
+
+    assert(&alignment);
+}
+
+
+/// Compute front-to-end alignment between `refFasta` and `queryFasta` using
+/// stretcher (EMBOSS >=6.0.0).
+///
+/// Params:
+///     refFasta    = FASTA record of the reference sequence
+///     queryFasta  = FASTA record of the query sequence
+///     complement  = align the reverse-complement of the query sequence.
+/// See_also: $(LINK http://emboss.sourceforge.net/apps/)
 @ExternalDependency("stretcher", "EMBOSS >=6.0.0", "http://emboss.sourceforge.net/apps/")
 StretcherAlignment stretcher(in string refFasta, in string queryFasta, Complement complement)
 {
@@ -2102,11 +2341,11 @@ StretcherAlignment stretcher(in string refFasta, in string queryFasta, Complemen
     stretcherResult.stretcherReadPercentIdentity(alignment);
     stretcherResult.stretcherReadAlignmentString(alignment);
 
-    version (assert)
-        alignment.triggerInvariant();
+    assert(&alignment);
 
     return alignment;
 }
+
 
 private void stretcherReadPercentIdentity(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
 {
@@ -2129,6 +2368,7 @@ private void stretcherReadPercentIdentity(StretcherResult)(ref StretcherResult s
     else
         alignment.percentIdentity = double.nan;
 }
+
 
 private void stretcherReadAlignmentString(StretcherResult)(ref StretcherResult stretcherResult, ref StretcherAlignment alignment)
 {

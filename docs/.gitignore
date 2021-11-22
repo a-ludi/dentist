@@ -1,6 +1,18 @@
+# Generic documents
+*.png
+*.pdf
+*.html
+
+# GitHub pages
 /.jekyll-cache
 /_site
 /.bundle
 /vendor
-*.png
-*.pdf
+
+# DDox
+/file_hashes.json
+/prettify/
+/scripts/
+/sitemap.xml
+/styles/
+/symbols.js

@@ -1,5 +1,11 @@
 /**
-    This is the `maskRepetitiveRegions` command of `dentist`.
+    This is the `mask-repetitive-regions` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Mask regions that have a alignment coverage that is out of bounds.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +13,8 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.maskRepetitiveRegions;
+
+package(dentist) enum summary = "Mask regions that have a alignment coverage that is out of bounds.";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -50,10 +58,12 @@ import std.range.primitives :
 import std.typecons : Flag, No, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
-/// Options for the `collectPileUps` command.
+
+/// Options for the `mask-repetitive-regions` command.
 alias Options = OptionsFor!(DentistCommand.maskRepetitiveRegions);
 
-/// Execute the `collectPileUps` command with `options`.
+
+/// Execute the `mask-repetitive-regions` command with `options`.
 void execute(in Options options)
 {
     auto assessor = new RepeatMaskAssessor(options);
@@ -67,7 +77,7 @@ enum AlignmentType : ubyte
     reads,
 }
 
-/// This class comprises the `collectPileUps` step of the `dentist` algorithm
+/// This class comprises the `maskRepetitiveRegions` step of the DENTIST algorithm
 class RepeatMaskAssessor
 {
     protected const Options options;

@@ -1,5 +1,11 @@
 /**
-    This is the `translocateGaps` command of `dentist`.
+    This is the `translocate-gaps` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Translocate gaps from first assembly to second assembly.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +13,8 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.translocateGaps;
+
+package(dentist) enum summary = "Translocate gaps from first assembly to second assembly.";
 
 import dentist.common : isTesting;
 
@@ -29,10 +37,11 @@ import std.algorithm :
 import std.array : array;
 
 
-/// Options for the `translocateGaps` command.
+/// Options for the `translocate-gaps` command.
 alias Options = OptionsFor!(TestingCommand.translocateGaps);
 
-/// Execute the `translocateGaps` command with `options`.
+
+/// Execute the `translocate-gaps` command with `options`.
 void execute(in Options options)
 {
     auto translocator = GapTranslocator(options);

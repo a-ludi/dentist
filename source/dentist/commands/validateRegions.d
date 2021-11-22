@@ -1,5 +1,5 @@
 /**
-    This is the `validateRegions` command of `dentist`.
+    This is the `validate-regions` command of DENTIST.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -65,11 +65,11 @@ import std.typecons : Tuple;
 import vibe.data.json : toJson = serializeToJson;
 
 
-/// Options for the `validateRegions` command.
+/// Options for the `validate-regions` command.
 alias Options = OptionsFor!(DentistCommand.validateRegions);
 
 
-/// Execute the `validateRegions` command with `options`.
+/// Execute the `validate-regions` command with `options`.
 void execute(in Options options)
 {
     auto validator = new RegionsValidator(options);
@@ -78,13 +78,13 @@ void execute(in Options options)
 }
 
 
-bool byContigAId(const FlatLocalAlignment lhs, const FlatLocalAlignment rhs) pure nothrow @safe
+private bool byContigAId(const FlatLocalAlignment lhs, const FlatLocalAlignment rhs) pure nothrow @safe
 {
     return lhs.contigA.id < rhs.contigA.id;
 }
 
 
-class RegionsValidator
+private class RegionsValidator
 {
     protected const Options options;
     protected ContigSegment[] contigs;
@@ -294,7 +294,7 @@ class RegionsValidator
 }
 
 
-struct RegionValidator
+private struct RegionValidator
 {
     protected const Options options;
     protected const(FlatLocalAlignment)[] alignments;

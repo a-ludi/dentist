@@ -1,6 +1,20 @@
 /**
     This is a collection of helpers for the alignment filtering.
 
+    Filter_Pipeline:
+
+    See `dentist.commands.collectPileUps.PileUpCollector.filterAlignments`
+    for the definite implementation.
+
+    $(OL
+        $(LI `LQAlignmentChainsFilter`)
+        $(LI `ImproperAlignmentChainsFilter`)
+        $(LI `WeaklyAnchoredAlignmentChainsFilter`)
+        $(LI `ContainedAlignmentChainsFilter`)
+        $(LI `AmbiguousAlignmentChainsFilter`)
+        $(LI `RedundantAlignmentChainsFilter`)
+    )
+
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -49,20 +63,35 @@ import std.range :
 import std.typecons : Flag, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
+
+/// Common interface for alignment chain filters.
 interface AlignmentChainFilter
 {
+    /// Returns a filtered list of `alignmentChains`.
     AlignmentChain[] opCall(AlignmentChain[] alignmentChains);
 }
 
+
+/// Common interface for read filters, i.e. filters that remove all alignments
+/// associated to a set of read IDs.
+///
+/// This comes at a greater cost because (1) another sort-order may be
+/// required and (2) the list of alignments must be passed twice: first
+/// determine read IDs that should be discarded and then remove associated
+/// alignments.
 abstract class ReadFilter : AlignmentChainFilter
 {
     NaturalNumberSet* unusedReads;
 
+    /// Construct a read filter that keeps track of the read IDs that were
+    /// not removed.
     this(NaturalNumberSet* unusedReads)
     {
         this.unusedReads = unusedReads;
     }
 
+    /// Default implementation that relies on `getDiscardedReadIds` to return
+    /// a list of read IDs that should be discarded.
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
         NaturalNumberSet discardedReadIds;
@@ -88,6 +117,7 @@ abstract class ReadFilter : AlignmentChainFilter
     InputRange!(AlignmentChain) getDiscardedReadIds(AlignmentChain[] alignmentChains);
 }
 
+
 /// Discard alignments with low quality.
 class LQAlignmentChainsFilter : AlignmentChainFilter
 {
@@ -106,6 +136,7 @@ class LQAlignmentChainsFilter : AlignmentChainFilter
         return alignmentChains;
     }
 }
+
 
 /// Discard improper alignments.
 class ImproperAlignmentChainsFilter : AlignmentChainFilter
@@ -128,6 +159,7 @@ class ImproperAlignmentChainsFilter : AlignmentChainFilter
     }
 }
 
+
 /// Discard read if it has an alignment that – extended with the
 /// exceeding read sequence on either end – is fully contained in
 /// a single contig.
@@ -144,9 +176,8 @@ class RedundantAlignmentChainsFilter : ReadFilter
     }
 }
 
-alias groupByRead = (lhs, rhs) => lhs.contigB.id == rhs.contigB.id;
 
-/// Discard contained alignments.
+/// Discard alignments that are contained in other alignments.
 class ContainedAlignmentChainsFilter : AlignmentChainFilter
 {
     this() { }
@@ -179,6 +210,7 @@ class ContainedAlignmentChainsFilter : AlignmentChainFilter
     }
 }
 
+
 AlignmentChain[] filterContainedAlignmentChains(AlignmentChain[] alignmentChains)
 {
     auto filter = new ContainedAlignmentChainsFilter();
@@ -186,16 +218,19 @@ AlignmentChain[] filterContainedAlignmentChains(AlignmentChain[] alignmentChains
     return filter(alignmentChains);
 }
 
-bool groupByRead(const AlignmentChain lhs, const AlignmentChain rhs) pure nothrow @safe @nogc
+
+private bool groupByRead(const AlignmentChain lhs, const AlignmentChain rhs) pure nothrow @safe @nogc
 {
     return lhs.contigB.id == rhs.contigB.id;
 }
 
-alias orderByReadAndErrorRate = orderLexicographically!(
+
+private alias orderByReadAndErrorRate = orderLexicographically!(
     AlignmentChain,
     ac => ac.contigB.id,
     ac => ac.averageErrorRate,
 );
+
 
 /// Discard read if part of it aligns to multiple loci in the reference.
 class AmbiguousAlignmentChainsFilter : AlignmentChainFilter
@@ -285,6 +320,9 @@ class AmbiguousAlignmentChainsFilter : AlignmentChainFilter
 
 }
 
+
+/// Discard alignments that are insufficiently anchored, i.e. include less
+/// than `minAnchorLength` unmasked reference base pairs.
 class WeaklyAnchoredAlignmentChainsFilter : AlignmentChainFilter
 {
     size_t minAnchorLength;

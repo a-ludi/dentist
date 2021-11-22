@@ -30,8 +30,8 @@ template saturatedMinusInfinity(T) if (isNumeric!T)
 }
 
 
-/// Computes the result of `a + b` limited to the natural min/max value of T.
-/// Additionally the min/max value of T are treated as -/+infinity,
+/// Computes the result of `a + b` limited to the natural min/max value of `T`.
+/// Additionally the min/max value of `T` are treated as -/+infinity,
 /// respectively.
 T saturatedAdd(T)(T a, T b) if (isFloatingPoint!T)
 {

@@ -1,5 +1,5 @@
 /**
-    This is the `translateCoords` command of `dentist`.
+    This is the `translate-coords` command of DENTIST.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -54,10 +54,11 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson;
 
 
-/// Options for the `translateCoords` command.
+/// Options for the `translate-coords` command.
 alias Options = OptionsFor!(DentistCommand.translateCoords);
 
-/// Execute the `translateCoords` command with `options`.
+
+/// Execute the `translate-coords` command with `options`.
 void execute(in Options options)
 {
     auto translator = new CoordinateTranslator(options);
@@ -65,14 +66,15 @@ void execute(in Options options)
     translator.run();
 }
 
-enum SequenceType
+
+private enum SequenceType
 {
     existing,
     insertion,
-    unkown,
+    unknown,
 }
 
-struct ReferenceCoordinate
+private struct ReferenceCoordinate
 {
     id_t contigId;
     arithmetic_t contigCoord;
@@ -82,7 +84,7 @@ struct ReferenceCoordinate
     SequenceType sequenceType;
 }
 
-class CoordinateTranslator
+private class CoordinateTranslator
 {
     alias OriginType = OutputCoordinate.OriginType;
 
@@ -189,6 +191,7 @@ class CoordinateTranslator
         ]));
     }
 }
+
 
 private struct Walker
 {
@@ -301,7 +304,7 @@ private struct Walker
         else if (insertion.isOutputGap)
         {
             length = getInfoForGap(insertion).length;
-            lastWalkedSequenceType = SequenceType.unkown;
+            lastWalkedSequenceType = SequenceType.unknown;
         }
         else
         {

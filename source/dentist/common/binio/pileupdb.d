@@ -22,7 +22,7 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment,
     trace_point_t;
-import dentist.common.binio._base :
+import dentist.common.binio.common :
     ArrayStorage,
     DbIndex,
     lockIfPossible,
@@ -44,6 +44,8 @@ version (unittest) import dentist.common.binio._testdata.pileupdb :
     numSeededAlignments,
     numTracePoints;
 
+
+/// Thrown if an error is encountered.
 class PileUpDbException : Exception
 {
     pure nothrow @nogc @safe this(string msg, string file = __FILE__,
@@ -53,6 +55,8 @@ class PileUpDbException : Exception
     }
 }
 
+
+/// Structure to access pile ups stored in a binary file.
 struct PileUpDb
 {
     private alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -69,27 +73,50 @@ struct PileUpDb
     private PileUpDbIndex dbIndex;
     private DbSlices dbSlices;
 
+
+    /// Return the respective `ArrayStorage`s. This is used to report details
+    /// of the DB in command `show-pile-ups`.
+    ///
+    /// See_also: `dentist.commands.showPileUps`,
+    ///     `dentist.common.binio.common.ArrayStorage`
     @property auto pileUps() const pure nothrow
     {
         return dbIndex.pileUps;
     }
+
+
+    /// ditto
     @property auto readAlignments() const pure nothrow
     {
         return dbIndex.readAlignments;
     }
+
+
+    /// ditto
     @property auto seededAlignments() const pure nothrow
     {
         return dbIndex.seededAlignments;
     }
+
+
+    /// ditto
     @property auto localAlignments() const pure nothrow
     {
         return dbIndex.localAlignments;
     }
+
+
+    /// ditto
     @property auto tracePoints() const pure nothrow
     {
         return dbIndex.tracePoints;
     }
 
+
+    /// Create a `PileUpDb` from `dbFile`. A lock is placed on `dbFile`
+    /// if possible.
+    ///
+    /// See_also: `dentist.common.binio.common.lockIfPossible`
     static PileUpDb parse(in string dbFile)
     {
         auto pileUpDb = File(dbFile, "rb");
@@ -101,11 +128,15 @@ struct PileUpDb
         return db;
     }
 
+
+    /// Closes the underlying file.
     void releaseDb()
     {
         pileUpDb.close();
     }
 
+
+    /// Read the entire DB at once.
     PileUp[] opIndex()
     {
         ensureDbIndex();
@@ -113,6 +144,10 @@ struct PileUpDb
         return readSlice(0, length);
     }
 
+
+    /// Read `PileUp` at index `i`.
+    ///
+    /// Throws: `InsertionDbException` if `i` is out of bounds.
     PileUp opIndex(size_t i)
     {
         ensureDbIndex();
@@ -125,6 +160,10 @@ struct PileUpDb
         return readSlice(i, i + 1)[0];
     }
 
+
+    /// Read a slice of `PileUp`s.
+    ///
+    /// Throws: `InsertionDbException` if `slice` is out of bounds.
     PileUp[] opIndex(size_t[2] slice)
     {
         auto from = slice[0];
@@ -139,6 +178,7 @@ struct PileUpDb
         return readSlice(from, to);
     }
 
+
     size_t[2] opSlice(size_t dim)(size_t from, size_t to)
             if (dim == 0)
     {
@@ -147,6 +187,8 @@ struct PileUpDb
         return [from, to];
     }
 
+
+    /// Return the number of pile ups in this DB.
     @property size_t length()
     {
         ensureDbIndex();
@@ -154,7 +196,9 @@ struct PileUpDb
         return dbIndex.pileUps.length;
     }
 
+    /// ditto
     alias opDollar = length;
+
 
     private void ensureDbIndex()
     {
@@ -163,6 +207,7 @@ struct PileUpDb
 
         dbIndex = pileUpDb.readRecord!PileUpDbIndex();
     }
+
 
     private PileUp[] readSlice(size_t from, size_t to)
     {
@@ -191,6 +236,7 @@ struct PileUpDb
 
         return pileUps;
     }
+
 
     private DbSlices getDbSlices(size_t from, size_t to)
     {
@@ -233,6 +279,7 @@ struct PileUpDb
         );
     }
 
+
     private void parse(ref PileUp[] pileUps, ReadAlignment[] readAlignments)
     {
         static assert(PileUp.sizeof == StorageType!PileUp.sizeof);
@@ -249,6 +296,7 @@ struct PileUpDb
             pileUp = readAlignments[pileUpSlice[0] .. pileUpSlice[1]];
         }
     }
+
 
     private void parse(
         ref SeededAlignment[] seededAlignments,
@@ -286,6 +334,7 @@ struct PileUpDb
         }
     }
 
+
     private void parse(ref ReadAlignment[] readAlignments, SeededAlignment[] seededAlignments)
     {
         pileUpDb.seek(dbSlices.readAlignments.ptr);
@@ -303,6 +352,7 @@ struct PileUpDb
             );
         }
     }
+
 
     private void parse(
         ref AlignmentChain.LocalAlignment[] localAlignments,
@@ -336,6 +386,7 @@ struct PileUpDb
         }
     }
 
+
     private void parse(ref AlignmentChain.LocalAlignment.TracePoint[] tracePoints)
     {
         alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -347,6 +398,10 @@ struct PileUpDb
     }
 }
 
+/// Write `pileUps` to binary `dbFile`. A lock is placed on the file
+/// if possible.
+///
+/// See_also: `dentist.common.binio.common.lockIfPossible`
 void writePileUpsDb(in PileUp[] pileUps, in string dbFile)
 {
     auto pileUpDb = File(dbFile, "wb");
@@ -355,6 +410,7 @@ void writePileUpsDb(in PileUp[] pileUps, in string dbFile)
     writePileUpsDb(pileUps, pileUpDb);
 }
 
+/// ditto
 void writePileUpsDb(in PileUp[] pileUps, File pileUpDb)
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -406,6 +462,7 @@ unittest
 
     assert(pileUpDb[] == pileUps);
 }
+
 
 private PileUpDbIndex buildPileUpDbIndex(in PileUp[] pileUps) nothrow pure
 {
@@ -468,7 +525,8 @@ unittest
             StorageType!TracePoint.sizeof * numTracePoints);
 }
 
-void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
+
+private void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == PileUp))
 {
     auto readAlignments = ArrayStorage!(StorageType!ReadAlignment)(dbIndex.beginPtr!ReadAlignment);
@@ -494,7 +552,8 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     }
 }
 
-void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
+
+private void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == ReadAlignment))
 {
     auto seededAlignments = ArrayStorage!(StorageType!SeededAlignment)(dbIndex.beginPtr!SeededAlignment);
@@ -523,7 +582,8 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     }
 }
 
-void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
+
+private void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == SeededAlignment))
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -567,7 +627,8 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     }
 }
 
-void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
+
+private void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == AlignmentChain.LocalAlignment))
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -612,7 +673,8 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
     }
 }
 
-void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
+
+private void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbIndex dbIndex)
     if (is(T == AlignmentChain.LocalAlignment.TracePoint))
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -643,6 +705,7 @@ void writePileUpsDbBlock(T)(ref File pileUpDb, in PileUp[] pileUps, in PileUpDbI
         }
     }
 }
+
 
 private struct PileUpDbIndex
 {
@@ -778,6 +841,7 @@ unittest
     }
 }
 
+
 private template StorageType(T)
 {
     static if (is(T == PileUp))
@@ -796,6 +860,7 @@ private template StorageType(T)
         alias StorageType = TracePointStorage;
 }
 
+
 private struct SeededAlignmentStorage
 {
     alias LocalAlignment = AlignmentChain.LocalAlignment;
@@ -811,6 +876,7 @@ private struct SeededAlignmentStorage
     AlignmentLocationSeed seed;
 }
 
+
 private struct LocalAlignmentStorage
 {
     alias TracePoint = AlignmentChain.LocalAlignment.TracePoint;
@@ -822,6 +888,7 @@ private struct LocalAlignmentStorage
     diff_t numDiffs;
     StorageType!(TracePoint[]) tracePoints;
 }
+
 
 private struct TracePointStorage
 {

@@ -40,70 +40,73 @@ import std.string : indexOf, lineSplitter, outdent;
 import std.traits : isSomeChar, isSomeString;
 import std.typecons : tuple, Tuple;
 
+
 /**
     Gives access to FASTA data. Does not copy the input sequence.
 */
-template Fasta(T) if (isSomeString!T)
+struct Fasta(T) if (isSomeString!T)
 {
-    struct Fasta
+    /// FASTA headers start with this character.
+    static enum headerIndicator = '>';
+    /// FASTA data.
+    const T data;
+    private size_t[] recordIndex;
+
+    alias data this;
+
+    /**
+        Build an index in order to give fast access to individual records.
+        This is called implicitly when accessing individual records using
+        `opIndex` or `length`.
+    */
+    void buildIndex()
     {
-        static enum headerIndicator = '>';
-        const T data;
-        private size_t[] recordIndex;
+        if ((data.length > 0 && recordIndex.length > 0) || (data.length == 0
+                && recordIndex.length == 0))
+            return;
 
-        alias data this;
+        recordIndex.reserve(data.count(headerIndicator) + 1);
+        long currIdx = data.indexOf(headerIndicator);
 
-        /**
-            Build an index in order to give fast access to individual records.
-            This is called implicitly when accessing individual records using
-            `opIndex` or `length`.
-        */
-        void buildIndex()
+        while (currIdx >= 0)
         {
-            if ((data.length > 0 && recordIndex.length > 0) || (data.length == 0
-                    && recordIndex.length == 0))
-                return;
-
-            recordIndex.reserve(data.count(headerIndicator) + 1);
-            long currIdx = data.indexOf(headerIndicator);
-
-            while (currIdx >= 0)
-            {
-                recordIndex ~= currIdx.to!size_t;
-                currIdx = data.indexOf(headerIndicator, currIdx + 1);
-            }
-
-            recordIndex ~= data.length;
+            recordIndex ~= currIdx.to!size_t;
+            currIdx = data.indexOf(headerIndicator, currIdx + 1);
         }
 
-        /**
-            Get the FASTA record at idx (zero-based).
+        recordIndex ~= data.length;
+    }
 
-            Returns: `FastaRecord!T` at index idx.
-        */
-        FastaRecord!T opIndex(size_t idx)
-        {
-            assert(0 <= idx && idx < length, "index out of bounds");
-            buildIndex();
-            auto recordBegin = recordIndex[idx];
-            auto recordEnd = recordIndex[idx + 1];
 
-            return data[recordBegin .. recordEnd].parseFastaRecord();
-        }
+    /**
+        Get the FASTA record at idx (zero-based).
 
-        /// Get the number of FASTA records.
-        @property size_t length()
-        {
-            buildIndex();
+        Returns: `FastaRecord!T` at index idx.
+    */
+    FastaRecord!T opIndex(size_t idx)
+    {
+        assert(0 <= idx && idx < length, "index out of bounds");
+        buildIndex();
+        auto recordBegin = recordIndex[idx];
+        auto recordEnd = recordIndex[idx + 1];
 
-            return recordIndex.length - 1;
-        }
+        return data[recordBegin .. recordEnd].parseFastaRecord();
+    }
 
-        /// Returns true iff line starts with '>'.
-        static bool isHeaderLine(in T line) pure
-        {
-            return line.startsWith(only(headerIndicator));
-        }
+
+    /// Get the number of FASTA records.
+    @property size_t length()
+    {
+        buildIndex();
+
+        return recordIndex.length - 1;
+    }
+
+
+    /// Returns true iff line starts with '>'.
+    static bool isHeaderLine(in T line) pure
+    {
+        return line.startsWith(only(headerIndicator));
     }
 }
 
@@ -135,6 +138,7 @@ EOF".outdent.parseFastaRecord,
     assert(fasta1[0] == fasta1Records[0]);
     assert(fasta1[1] == fasta1Records[1]);
 }
+
 
 /// Convenience wrapper around `Fasta!T(T data)`.
 Fasta!T parseFasta(T)(T data)
@@ -172,92 +176,101 @@ EOF".outdent),
     assert(fasta[1] == fastaRecords[1]);
 }
 
+
 /**
     Gives access to a single FASTA record. Does not copy the input sequence.
 */
-template FastaRecord(T) if (isSomeString!T)
+struct FastaRecord(T) if (isSomeString!T)
 {
-    struct FastaRecord
+    /// Unix line separator.
+    static enum lineSep = "\n";
+
+    private alias Slice = Tuple!(int, int);
+
+    /// FASTA data.
+    const T data;
+
+    alias data this;
+
+
+    /// Get this record in FASTA format.
+    auto toFasta(in size_t lineWidth = 50) pure const
     {
-        static enum lineSep = "\n";
-        alias Slice = Tuple!(int, int);
+        auto formattedBody = this[].chunks(lineWidth).joiner(lineSep);
 
-        const T data;
+        return chain(header, lineSep, formattedBody, lineSep);
+    }
 
-        alias data this;
 
-        /// Get this record in FASTA format.
-        auto toFasta(in size_t lineWidth = 50) pure const
-        {
-            auto formattedBody = this[].chunks(lineWidth).joiner(lineSep);
+    /// Get the complete header line including the leading `>`.
+    @property auto header() pure const
+    {
+        return data.lineSplitter.front;
+    }
 
-            return chain(header, lineSep, formattedBody, lineSep);
-        }
 
-        /// Get the complete header line.
-        @property auto header() pure const
-        {
-            return data.lineSplitter.front;
-        }
+    /// Get the length of the sequence (in characters).
+    @property size_t length() pure const
+    {
+        return this[].walkLength;
+    }
 
-        /// Get the length of the sequence (in characters).
-        @property size_t length() pure const
-        {
-            return this[].walkLength;
-        }
+    /// ditto
+    @property size_t opDollar(size_t dim : 0)()
+    {
+        return length;
+    }
 
-        @property size_t opDollar(size_t dim : 0)()
-        {
-            return length;
-        }
 
-        /// Get the sequence of this FASTA record without newlines.
-        auto opIndex() pure const
-        {
-            return data.lineSplitter.drop(1).joiner;
-        }
+    /// Get the sequence of this FASTA record without newlines.
+    auto opIndex() pure const
+    {
+        return data.lineSplitter.drop(1).joiner;
+    }
 
-        /// Get the sequence character at index `i` of this FASTA record.
-        auto opIndex(int i) pure const
-        {
-            i = normalizeIndex(i);
-            assert(0 <= i && i < length,
-                    format!"index out of bounds: %d not in [-%d, %d)"(i, length, length));
 
-            return this[].drop(i).front;
-        }
+    /// Get the sequence character at index `i` of this FASTA record.
+    auto opIndex(int i) pure const
+    {
+        i = normalizeIndex(i);
+        assert(0 <= i && i < length,
+                format!"index out of bounds: %d not in [-%d, %d)"(i, length, length));
 
-        auto opIndex(in Slice slice) pure const
-        {
-            auto i = normalizeIndex(slice[0]);
-            auto j = normalizeIndex(slice[1]);
-            assert(0 <= i && i <= j && j <= length,
-                    format!"index out of bounds: [%d, %d) not in [-%d, %d)"(i, j, length, length));
+        return this[].drop(i).front;
+    }
 
-            return this[].drop(i).take(j - i);
-        }
 
-        /// Get sub-sequence from `i` to `j` (exclusive) of this FASTA record.
-        auto opSlice(size_t dim : 0)(int i, int j)
-        {
-            return tuple(i, j);
-        }
+    /// Get sub-sequence from `i` to `j` (exclusive) of this FASTA record.
+    auto opIndex(in Slice slice) pure const
+    {
+        auto i = normalizeIndex(slice[0]);
+        auto j = normalizeIndex(slice[1]);
+        assert(0 <= i && i <= j && j <= length,
+                format!"index out of bounds: [%d, %d) not in [-%d, %d)"(i, j, length, length));
 
-        /// ditto
-        auto opSlice(size_t dim : 0)(size_t i, size_t j)
-        {
-            return tuple(i.to!int, j.to!int);
-        }
+        return this[].drop(i).take(j - i);
+    }
 
-        private int normalizeIndex(int i) const
-        {
-            auto length = this.length;
 
-            while (i < 0)
-                i += length;
+    auto opSlice(size_t dim : 0)(int i, int j)
+    {
+        return tuple(i, j);
+    }
 
-            return i;
-        }
+    auto opSlice(size_t dim : 0)(size_t i, size_t j)
+    {
+        return tuple(i.to!int, j.to!int);
+    }
+
+
+    private int normalizeIndex(int i) const
+    {
+        auto length = this.length;
+
+        while (i < 0)
+            i += length;
+
+        return i;
     }
 }
 
@@ -302,6 +315,7 @@ EOF".outdent.parseFastaRecord;
 EOF".outdent));
 }
 
+
 /// Convenience wrapper around `FastaRecord!T(T data)`.
 FastaRecord!T parseFastaRecord(T)(T data)
 {
@@ -323,9 +337,10 @@ EOF".outdent;
     assert(fastaRecord[0 .. 5].equal("CTAAC"));
 }
 
+
 /**
-    Calculate the sequence length of the first record in fastaFile. Returns
-    the length of the next record in fastaFile if it is a File object.
+    Calculate the sequence length of the first record in `fastaFile`. Returns
+    the length of the next record in `fastaFile` if it is a File object.
 */
 size_t getFastaLength(in string fastaFile)
 {
@@ -432,59 +447,71 @@ unittest
     assertThrown(getFastaLength(fastaFile.readEnd));
 }
 
-template PacBioHeader(T) if (isSomeString!T)
+
+/// Represents standard PacBio header format:
+/// `>{smrtId}/{well}/{hqBegin}_{hqEnd} {readQuality}`
+struct PacBioHeader(T) if (isSomeString!T)
 {
-    struct PacBioHeader
+    static private enum headerFormat = ">%s/%d/%d_%d %s";
+
+    /// Name of the SMRT© Cell.
+    T name;
+
+    /// Index of the well where the read occurred.
+    size_t well;
+
+    /// Begin of the high quality region.
+    size_t qualityRegionBegin;
+
+    /// End of the high quality region.
+    size_t qualityRegionEnd;
+
+    /// More information, usually `RQ=0.xx`
+    string additionalInformation;
+
+
+    /// Construct a `PacBioHeader!T` from `header`.
+    this(T header)
     {
-        static enum headerFormat = ">%s/%d/%d_%d %s";
+        this.parse(header);
+    }
 
-        T name;
-        size_t well;
-        size_t qualityRegionBegin;
-        size_t qualityRegionEnd;
-        string additionalInformation;
 
-        /// Construct a `PacBioHeader!T` from `header`.
-        this(T header)
-        {
-            this.parse(header);
-        }
+    /// Assign new `header` data.
+    void opAssign(T header)
+    {
+        this.parse(header);
+    }
 
-        /// Assign new `header` data.
-        void opAssign(T header)
-        {
-            this.parse(header);
-        }
 
-        /// Builds the header string.
-        S to(S : T)() const
-        {
-            return buildHeader();
-        }
+    /// Builds the header string.
+    S to(S : T)() const
+    {
+        return buildHeader();
+    }
 
-        private T buildHeader() const
-        {
-            return format!headerFormat(
-                name,
-                well,
-                qualityRegionBegin,
-                qualityRegionEnd,
-                additionalInformation,
-            );
-        }
+    private T buildHeader() const
+    {
+        return format!headerFormat(
+            name,
+            well,
+            qualityRegionBegin,
+            qualityRegionEnd,
+            additionalInformation,
+        );
+    }
 
-        private void parse(in T header)
-        {
-            auto numMatches = header[].formattedRead!headerFormat(
-                name,
-                well,
-                qualityRegionBegin,
-                qualityRegionEnd,
-                additionalInformation,
-            );
+    private void parse(in T header)
+    {
+        auto numMatches = header[].formattedRead!headerFormat(
+            name,
+            well,
+            qualityRegionBegin,
+            qualityRegionEnd,
+            additionalInformation,
+        );
 
-            assert(numMatches == 5);
-        }
+        assert(numMatches == 5);
     }
 }
 
@@ -506,6 +533,7 @@ unittest
     assert(pbHeader2 == pbHeader1);
 }
 
+
 /// Convenience wrapper around `PacBioHeader!T(T header)`.
 PacBioHeader!T parsePacBioHeader(T)(T header)
 {
@@ -526,10 +554,11 @@ unittest
     assert(pbHeader1.additionalInformation == "RQ=0.75");
 }
 
+
 /**
-    Get the complement of a DNA base. Only bases A, T, C, G will be translated;
-    all other characters are left as is. Replacement preserves casing of
-    the characters.
+    Get the complement of a DNA base. Only bases A, T, C, G (case-insensitive)
+    will be translated; all other characters are left as is. Replacement
+    preserves casing of the characters.
 */
 C complement(C)(C base) if (isSomeChar!C)
 {
@@ -550,10 +579,11 @@ C complement(C)(C base) if (isSomeChar!C)
     }
 }
 
+
 /**
     Compute the reverse complement of a DNA sequence. Only bases A, T, C, G
-    will be translated; all other characters are left as is. Replacement
-    preserves casing of the characters.
+    (case-insensitive) will be translated; all other characters are left as
+    is. Replacement preserves casing of the characters.
 */
 auto reverseComplementer(Range)(Range sequence)
         if (isBidirectionalRange!Range && isSomeChar!(ElementType!Range))
@@ -574,6 +604,8 @@ T reverseComplement(T)(in T sequence) if (isSomeString!T)
     return sequence[].reverseComplementer.array.to!T;
 }
 
+
+/// Return a copy of `fastaRecord` with reverse-complemented sequence.
 FastaRecord!T reverseComplement(T)(in FastaRecord!T fastaRecord) if (isSomeString!T)
 {
     enum lineSep = FastaRecord!T.lineSep;

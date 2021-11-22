@@ -1,5 +1,20 @@
 /**
-    This is the `output` command of `dentist`.
+    This is the `output` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Generate the output assembly by closing gaps.
+
+    Uses the previously generated insertions to actually close the gaps.
+    The set of insertions can be further restricted by --max-insertion-error,
+    --join-policy, --skip-gaps, --min-extension-length and --only. Since this
+    step is fairly quick, different combinations of these options can be tried
+    to get optimal results.
+
+    Usually it is advisable to use the --agp option to generate an AGP file
+    that describes the parts of the gap-closed assembly.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +22,20 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.output;
+
+package(dentist) enum summary = "
+    Generate the output assembly by closing gaps.
+
+    Uses the previously generated insertions to actually close the gaps.
+    The set of insertions can be further restricted by --max-insertion-error,
+    --join-policy, --skip-gaps, --min-extension-length and --only. Since this
+    step is fairly quick, different combinations of these options can be tried
+    to get optimal results.
+
+    Usually it is advisable to use the --agp and/or --closed-gaps-bed
+    option(s) to generate an AGP/BED file that describes the parts of the
+    gap-closed assembly.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -58,9 +87,7 @@ import dentist.common.scaffold :
     isGap,
     linearWalk,
     normalizeUnkownJoins,
-    removeBlacklisted,
-    removeExtensions,
-    removeSpanning;
+    removeBlacklisted;
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
@@ -122,7 +149,7 @@ alias Options = OptionsFor!(DentistCommand.output);
 
 
 /// Execute the `output` command with `options`.
-void execute(Options)(in Options options)
+void execute(in Options options)
 {
     auto writer = new AssemblyWriter(options);
 
@@ -130,6 +157,7 @@ void execute(Options)(in Options options)
 }
 
 
+/// Valid values for the component column (5th) of an AGP file.
 enum AGPComponentType : string
 {
     /// Active Finishing
@@ -153,6 +181,7 @@ enum AGPComponentType : string
 }
 
 
+/// Valid values for the linkage evidence column (10th) of an AGP file.
 enum AGPLinkageEvidence : string
 {
     /// used when no linkage is being asserted (column 8b is ‘no’)
@@ -182,7 +211,7 @@ enum AGPLinkageEvidence : string
 }
 
 
-class AssemblyWriter
+private class AssemblyWriter
 {
     alias FastaWriter = typeof(wrapLines(stdout.lockingTextWriter, 0));
 
@@ -330,7 +359,7 @@ class AssemblyWriter
 
     protected void appendUnkownJoins()
     {
-        auto unkownJoins = scaffoldStructure[]
+        auto unknownJoins = scaffoldStructure[]
             .filter!(part => part.peek!GapSegment !is null)
             .map!(gapPart => gapPart.get!GapSegment)
             .map!(gapPart => getUnkownJoin(
@@ -338,7 +367,7 @@ class AssemblyWriter
                 gapPart.endGlobalContigId,
                 InsertionInfo(CompressedSequence(), gapPart.length, []),
             ));
-        assemblyGraph.bulkAddForce(unkownJoins);
+        assemblyGraph.bulkAddForce(unknownJoins);
     }
 
     protected Flag!"keepInsertion" skipShortExtension(size_t insertionId, Insertion insertion) const
@@ -725,8 +754,8 @@ class AssemblyWriter
             "end", insertion.end.toJson,
         );
 
-        enum char unkownBase = 'n';
-        unkownBase
+        enum char unknownBase = 'n';
+        unknownBase
             .repeat
             .takeExactly(insertionInfo.length)
             .copy(writer);

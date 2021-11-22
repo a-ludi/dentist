@@ -15,12 +15,16 @@ import std.range.primitives;
 import std.traits : rvalueOf;
 import std.typecons : tuple, Tuple;
 
-/**
-    This range iterates over fixed-sized chunks of size chunkSize of a source
-    range. Source must be an input range. chunkSize must be greater than zero.
 
+/**
+    This range iterates over fixed-sized chunks of size `chunkSize` of a
+    source `range`.
+
+    Params:
+        source = input range
+        chunkSize = integer greater than zero.
     See Also: `std.range.chunks`
-    Returns: Range of chunks, ie. `ElementType!Source[]`.
+    Returns: Range of chunk arrays, ie. `ElementType!Source[]`.
 */
 auto arrayChunks(Source)(Source range, in size_t chunkSize) if (isInputRange!Source)
 {
@@ -92,7 +96,8 @@ unittest
     assert(chunks.array == [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]);
 }
 
-/// Generate a tuple of tuples of chunkSize.
+
+/// Generate a tuple of tuples of `chunkSize`.
 template chunks(size_t chunkSize)
 {
     auto chunks(T...)(T args) pure nothrow @safe if (args.length >= chunkSize)
@@ -128,7 +133,8 @@ unittest
     static assert(c4 == tuple(tuple(false, "1", 2.0, 3), tuple('4', 5)));
 }
 
-/// Split a list of aliases into chunks.
+
+/// Split a list of aliases into chunks of `chunkSize`.
 template Chunks(size_t chunkSize, T...)
 {
     static if (T.length >= chunkSize)
@@ -149,14 +155,6 @@ template Chunks(size_t chunkSize, T...)
     }
 }
 
-template Chunk(T...)
-{
-    struct Chunk
-    {
-        alias chunks = T;
-    }
-}
-
 ///
 unittest
 {
@@ -172,9 +170,17 @@ unittest
     }
 }
 
-/*
-    Build a comparator according to `pred`.
-*/
+
+private template Chunk(T...)
+{
+    struct Chunk
+    {
+        alias chunks = T;
+    }
+}
+
+
+/// Build a comparator according to `pred`.
 template Comparator(pred...) if (pred.length == 1)
 {
     /// Return comparison value akin to `opCmp`.
@@ -260,10 +266,13 @@ unittest
     assert(!eqSquared(1, 2));
 }
 
+
 /// Take exactly `n` element from range. Throws an exception if range has not
-/// enough  elements.
+/// enough elements.
 ///
-/// Throws: Exception if range has less than `n` elements.
+/// This works without allocating heap memory.
+///
+/// Throws: `Exception` if range has less than `n` elements.
 ElementType!R[n] takeExactly(size_t n, R)(R range) if (isInputRange!R)
 {
     import std.exception : enforce;
@@ -294,7 +303,8 @@ unittest
     assertThrown!Exception(iota(2).takeExactly!5);
 }
 
-class WrapLinesImpl(R)
+
+private class WrapLinesImpl(R)
 {
     R output;
     size_t lineWidth;
@@ -335,6 +345,8 @@ class WrapLinesImpl(R)
     }
 }
 
+
+/// Wrap an output range `output` wrapping lines at `lineWidth`.
 auto wrapLines(R)(R output, size_t lineWidth)
 {
     return new WrapLinesImpl!R(output, lineWidth);
@@ -351,6 +363,7 @@ unittest
 
     assert(outputBuffer == "hello worl\nd");
 }
+
 
 /// Return a tuple of `fun` applied to each value of `tuple`.
 auto tupleMap(alias fun, Types...)(in Types values)

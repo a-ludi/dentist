@@ -1,5 +1,40 @@
 /**
-    This is the `showPileUps` command of `dentist`.
+    This is the `show-pile-ups` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Show a short summary of the pile ups DB. Can also be used to convert a
+    pile υpsDB to JSON by increasing verbosity two times.
+    ---
+
+    Example:
+
+    Table output (default).
+
+    ---
+    totalDbSize:         55226580 bytes
+    numPileUps:              5616
+    numReadAlignments:      74414
+    numSeededAlignments:   117943
+    numLocalAlignments:    148366
+    numTracePoints:      10587537
+    ---
+
+    Example:
+
+    JSON output (`--json`, `-j`).
+
+    ---
+    {
+        "totalDbSize": 55226580,
+        "numPileUps": 5616,
+        "numReadAlignments": 74414,
+        "numSeededAlignments": 117943,
+        "numLocalAlignments": 148366,
+        "numTracePoints": 10587537
+    }
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -8,8 +43,15 @@
 */
 module dentist.commands.showPileUps;
 
-import dentist.common.binio : PileUpDb;
+package(dentist) enum summary = "
+    Show a short summary of the pile ups. Can also be used to convert pile υps
+    to JSON by increasing verbosity two times.
+";
+
+import dentist.commandline : OptionsFor;
 import dentist.common.alignments : getType;
+import dentist.common.binio : PileUpDb;
+import dentist.common.commands : DentistCommand;
 import dentist.util.log;
 import std.algorithm : map, max;
 import std.array : array;
@@ -23,8 +65,13 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson,
     serializeToJsonString;
 
-/// Execute the `showPileUps` command with `options`.
-void execute(Options)(in Options options)
+
+/// Options for the `show-pile-ups` command.
+alias Options = OptionsFor!(DentistCommand.showPileUps);
+
+
+/// Execute the `show-pile-ups` command with `options`.
+void execute(in Options options)
 {
     size_t totalDbSize = options.pileUpsFile.getSize();
     auto pileUpDb = PileUpDb.parse(options.pileUpsFile);

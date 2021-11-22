@@ -20,6 +20,7 @@ import std.traits : isDynamicArray;
 import std.typecons : Yes;
 import std.range.primitives;
 
+
 /**
     Order `a` and `b` lexicographically by applying each `fun` to them. For
     unary functions compares `fun(a) < fun(b)`.
@@ -41,6 +42,25 @@ bool orderLexicographically(T, fun...)(T a, T b)
 
     return false;
 }
+
+///
+unittest
+{
+    struct Version
+    {
+        int major;
+        int minor;
+    }
+
+    alias lexOrder = orderLexicographically!(Version,
+        "a.major",
+        a => a.minor,
+    );
+
+    assert(lexOrder(Version(1, 2), Version(2, 0)));
+    assert(lexOrder(Version(1, 2), Version(1, 5)));
+}
+
 
 /**
     Compare `a` and `b` lexicographically by applying each `fun` to them. For
@@ -68,6 +88,30 @@ int cmpLexicographically(T, fun...)(T a, T b)
     return 0;
 }
 
+///
+unittest
+{
+    struct Version
+    {
+        int major;
+        int minor;
+        string build;
+    }
+
+    alias lexCompare = cmpLexicographically!(Version,
+        "a.major",
+        a => a.minor,
+    );
+
+    assert(lexCompare(Version(1, 2), Version(2, 0)) < 0);
+    assert(lexCompare(Version(1, 2), Version(1, 2)) == 0);
+    assert(lexCompare(Version(1, 2), Version(1, 0)) > 0);
+
+    // `build` attribute is disregarded by `lexCompare`
+    assert(lexCompare(Version(1, 2, "debug"), Version(1, 2, "optimized")) == 0);
+}
+
+
 /**
     Slices an input array into slices of equivalent adjacent elements.
     In other languages this is often called `partitionBy`, `groupBy`
@@ -85,7 +129,7 @@ int cmpLexicographically(T, fun...)(T a, T b)
 
     Params:
      pred = Predicate for determining equivalence.
-     r = An array to be sliced.
+     array = An array to be sliced.
 
     Returns: With a binary predicate, a range of slices is returned in which
     all elements in a given slice are equivalent under the given predicate.
@@ -96,6 +140,8 @@ int cmpLexicographically(T, fun...)(T a, T b)
     appear in separate subranges; this function only considers adjacent
     equivalence. Elements in the subranges will always appear in the same order
     they appear in the original range.
+
+    See_also: `std.algorithm.iteration.chunkBy`
 */
 auto sliceBy(alias pred, Array)(Array array) pure nothrow
         if (isDynamicArray!Array)
@@ -180,7 +226,10 @@ private struct SliceByImpl(alias pred, Array)
     }
 }
 
+
 /// Return the prefix of `haystack` where `pred` is not satisfied.
+///
+/// See_also: `std.algorithm.searching.until`
 Array sliceUntil(alias pred = "a == b", Array, Needle)(
     Array haystack,
     Needle needle,
@@ -224,7 +273,14 @@ unittest
     assert(a.sliceUntil(7, No.openRight) == [1, 2, 4, 7]);
 }
 
-/// Returns array filtered in-place.
+
+/// Returns `array` filtered in-place by `pred`.
+///
+/// This is a shorthand for:
+/// ---
+/// auto bufferRest = array.filter!pred.copy(array);
+/// array.length -= bufferRest.length;
+/// ---
 auto ref Array filterInPlace(alias pred = "a", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
     import std.algorithm : filter;
@@ -250,7 +306,14 @@ unittest
     assert(filterInPlace!isEven([1, 2, 2, 2, 3, 3, 4]) == [2, 2, 2, 4]);
 }
 
+
 /// Returns array `uniq`ified in-place.
+///
+/// This is a shorthand for:
+/// ---
+/// auto bufferRest = array.uniq.copy(array);
+/// array.length -= bufferRest.length;
+/// ---
 auto ref Array uniqInPlace(alias pred = "a == b", Array)(auto ref Array array) if (isDynamicArray!Array)
 {
     auto bufferRest = array.uniq.copy(array);
@@ -273,8 +336,9 @@ unittest
     assert(uniqInPlace([1, 2, 2, 2, 3, 3, 4]) == [1, 2, 3, 4]);
 }
 
+
 /// Replaces the first occurrence of `needle` by `replacement` in `array` if
-/// present. Modifies array.
+/// present. Modifies `array`.
 Array replaceInPlace(alias pred = "a == b", Array, E)(auto ref Array array, E needle, E replacement)
         if (isDynamicArray!Array)
 {
@@ -303,6 +367,7 @@ unittest
     assert([1, 2, 3].replaceInPlace(2, 7) == [1, 7, 3]);
 }
 
+
 /// Get the first element in range assuming it to be non-empty.
 ElementType!Range first(Range)(Range range) if (isInputRange!Range)
 {
@@ -317,6 +382,7 @@ unittest
     assert(first([1, 2, 3]) == 1);
     assert(first("abcd") == 'a');
 }
+
 
 /// Get the last element in range assuming it to be non-empty.
 ElementType!Range last(Range)(Range range) if (isInputRange!Range)
@@ -402,6 +468,7 @@ unittest
     assert(last(PowersOfTwo!false(1).take(5)) == 16);
 }
 
+
 /// Returns one of a collection of expressions based on the value of the
 /// switch expression.
 template staticPredSwitch(T...)
@@ -440,10 +507,8 @@ unittest
     static assert("many" == numberName(4));
 }
 
-/**
-    Find an optimal solution using backtracking.
-*/
-T[] backtracking(alias isFeasible, alias score, T)(
+
+deprecated T[] backtracking(alias isFeasible, alias score, T)(
     T[] candidates,
     T[] solution = [],
 )

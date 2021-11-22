@@ -1,5 +1,5 @@
 /**
-    Defines a Region and common operation with these. A Region is a set of
+    Defines `Region` and common operation with these. A `Region` is a set of
     tagged intervals where differently tagged intervals are distinct.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -17,6 +17,7 @@ import std.functional : unaryFun;
 import std.range : assumeSorted, dropExactly, ElementType, isInputRange, only, retro;
 import std.traits : isNumeric, Unqual;
 
+
 /// Returns the type of the property `tag` of `T`.
 template TagType(T)
 {
@@ -25,12 +26,25 @@ template TagType(T)
     alias TagType = typeof(instance.tag);
 }
 
+///
+unittest
+{
+    struct Taggable
+    {
+        int tag;
+    }
+
+    static assert(is(TagType!Taggable == int));
+}
+
+
 /// Checks if T has a property `tag` implicitly convertible to `Tag` – if given.
 template isTaggable(T)
 {
     enum isTaggable = is(TagType!T);
 }
 
+///
 unittest
 {
     struct Taggable
@@ -42,16 +56,6 @@ unittest
     static assert(!isTaggable!int);
 }
 
-unittest
-{
-    struct Taggable
-    {
-        int tag;
-    }
-
-    static assert(isTaggable!Taggable);
-    static assert(!isTaggable!int);
-}
 
 /// Thrown if two operands require the same tag but different were provided.
 static class MismatchingTagsException(Tag) : Exception
@@ -66,21 +70,21 @@ static class MismatchingTagsException(Tag) : Exception
     }
 }
 
+
 /*
     Throws an exception if tags do not match.
 
-    Throws: MismatchingTagsException if tags do not match.
+    Throws: `MismatchingTagsException` if tags do not match.
 */
 void enforceMatchingTags(Taggable)(in Taggable taggableA, in Taggable taggableB) pure
-        if (isTaggable!Taggable)
+if (isTaggable!Taggable)
 {
     alias Tag = TagType!Taggable;
 
     if (taggableA.tag != taggableB.tag)
-    {
         throw new MismatchingTagsException!Tag(taggableA.tag, taggableB.tag);
-    }
 }
+
 
 /// Thrown if regions is unexpectedly empty.
 static class EmptyRegionException : Exception
@@ -91,18 +95,18 @@ static class EmptyRegionException : Exception
     }
 }
 
+
 /*
     Throws an exception if region is empty.
 
-    Throws: EmptyRegionException if region is empty.
+    Throws: `EmptyRegionException` if region is empty.
 */
 void enforceNonEmpty(R)(in R region) if (is(R : Region!Args, Args...))
 {
     if (region.empty)
-    {
         throw new EmptyRegionException();
-    }
 }
+
 
 /**
     A Region is a set of tagged intervals where differently tagged intervals are distinct.
@@ -111,27 +115,29 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
 {
     static assert(isNumeric!Number, "interval limits must be numeric");
 
+    /// Supremum of `Number` values.
     static if (__traits(compiles, Number.infinity))
-    {
         static enum numberSup = Number.infinity;
-    }
     else
-    {
         static enum numberSup = Number.max;
-    }
 
     /**
         This represents a single tagged point.
     */
     static struct TaggedPoint
     {
+        /// Tag of this point.
         Tag tag = emptyTag;
-        Number value;
-        static if (!(tagAlias is null) && tagAlias != "tag")
-        {
-            mixin("alias " ~ tagAlias ~ " = tag;");
-        }
 
+        /// ditto
+        static if (!(tagAlias is null) && tagAlias != "tag")
+            mixin("alias " ~ tagAlias ~ " = tag;");
+
+        /// Value of this point.
+        Number value;
+
+
+        /// True if both points have the same `tag` and `value`.
         bool opBinary(string op)(auto ref const TaggedPoint other) const pure nothrow
                 if (op == "==")
         {
@@ -139,6 +145,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                    this.value == other.value;
         }
 
+
+        /// Compare two points by `tag` and `value`.
         int opCmp(in TaggedPoint other) const pure nothrow
         {
             return cmp(
@@ -161,6 +169,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TP(0, 10) < TP(0, 25));
             assert(TP(0, 10) < TP(1, 25));
         }
+
 
         /// Returns true iff `this` is in `interval`.
         bool opBinary(string op)(in TaggedInterval interval) const pure nothrow if (op == "in")
@@ -186,6 +195,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         }
     }
 
+
     /**
         This is a right-open interval `[begin, end)` tagged with `tag`.
         If `tagAlias` is given then the tag may be access as a property of
@@ -193,18 +203,25 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
     */
     static struct TaggedInterval
     {
+        /// Tag of this interval.
         Tag tag = emptyTag;
-        Number begin;
-        Number end;
+
         static if (!(tagAlias is null) && tagAlias != "tag")
-        {
+            /// ditto
             mixin("alias " ~ tagAlias ~ " = tag;");
-        }
+
+        /// Begin of this interval (inclusive).
+        Number begin;
+
+        /// End of this interval (exclusive).
+        Number end;
+
 
         invariant
         {
             assert(begin <= end, "begin must be less than or equal to end");
         }
+
 
         /// Returns the size of this interval.
         @property Number size() pure const nothrow
@@ -220,6 +237,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TaggedInterval(2, 20, 40).size == 20);
             assert(TaggedInterval(3, 30, 60).size == 30);
         }
+
 
         /// Returns true iff the interval is empty. An interval is empty iff
         /// `begin == end`.
@@ -237,6 +255,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TaggedInterval(3, 60, 60).empty);
         }
 
+
+        /// True if `tag`, `begin` and `end` of both intervals are equal.
         bool opBinary(string op)(auto ref const TaggedInterval other) const pure nothrow
                 if (op == "==")
         {
@@ -247,10 +267,11 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             );
         }
 
+
         /**
             Returns the convex hull of the intervals.
 
-            Throws: MismatchingTagsException if `tag`s differ.
+            Throws: `MismatchingTagsException` if `tag`s differ.
         */
         static TaggedInterval convexHull(in TaggedInterval[] intervals...) pure
         {
@@ -300,6 +321,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assertThrown!(MismatchingTagsException!int)(TI.convexHull(TI(0, 10, 20), TI(1, 25, 30)));
         }
 
+
         /// Returns the intersection of both intervals; empty if `tag`s differ.
         TaggedInterval opBinary(string op)(in TaggedInterval other) const pure nothrow
                 if (op == "&")
@@ -337,6 +359,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
                 return this;
             }
         }
+
         ///
         unittest
         {
@@ -351,6 +374,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert((TI(0, 10, 20) & TI(0, 25, 30)).empty);
             assert((TI(0, 10, 20) & TI(1, 25, 30)).empty);
         }
+
 
         /// Returns the difference of both intervals.
         Region opBinary(string op)(in TaggedInterval other) const if (op == "-")
@@ -393,6 +417,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TI(0, 10, 20) - TI(1, 25, 30) == R([TI(0, 10, 20)]));
         }
 
+
         /// Returns the symmetric difference of both intervals.
         Region opBinary(string op)(in TaggedInterval other) const if (op == "^")
         {
@@ -419,6 +444,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert((TI(0, 10, 20) ^ TI(1, 25, 30)) == R([TI(0, 10, 20), TI(1, 25, 30)]));
         }
 
+
+        /// Compare both intervals by `tag`, `begin` and `end`.
         int opCmp(in TaggedInterval other) const pure nothrow
         {
             return cmp(
@@ -442,6 +469,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TI(0, 10, 20) < TI(1, 25, 30));
         }
 
+
         /// Returns true iff the tagged intervals intersect.
         bool intersects(in TaggedInterval other) const pure nothrow
         {
@@ -462,6 +490,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(!TI(0, 10, 20).intersects(TI(0, 25, 30)));
             assert(!TI(0, 10, 20).intersects(TI(1, 25, 30)));
         }
+
 
         /// Returns true iff this interval contains other.
         bool contains(in TaggedInterval other) const pure nothrow
@@ -484,6 +513,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(!TI(0, 10, 20).contains(TI(1, 25, 30)));
         }
 
+
         /// Returns true iff `this` is a subset of `other`, ie. fully included _in_.
         bool opBinary(string op)(in TaggedInterval other) const pure nothrow if (op == "in")
         {
@@ -505,6 +535,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TI(1, 12, 18) !in TI(0, 10, 20));
         }
 
+
         /// Returns true iff the tagged intervals do not intersect and `this < other`.
         bool isStrictlyBefore(in TaggedInterval other) const pure nothrow
         {
@@ -525,6 +556,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
             assert(TI(0, 10, 20).isStrictlyBefore(TI(0, 25, 30)));
             assert(TI(0, 10, 20).isStrictlyBefore(TI(1, 25, 30)));
         }
+
 
         /// Returns true iff the tagged intervals do not intersect and `this > other`.
         bool isStrictlyAfter(in TaggedInterval other) const pure nothrow
@@ -577,8 +609,14 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert((ti1 & ti3).empty);
     }
 
-    TaggedInterval[] _intervals;
 
+    private TaggedInterval[] _intervals;
+
+
+    /// Construct a region from `intervals`.
+    ///
+    /// The newly constructed `Region` assumes ownership over `intervals`.
+    /// Modifying them outside of the struct leads to undefined behavior.
     this(TaggedInterval[] intervals)
     {
         this._intervals = intervals;
@@ -597,6 +635,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region.intervals == [TI(0, 0, 10), TI(0, 15, 20)]);
     }
 
+
+    /// Construct a region from a single `interval`.
     this(TaggedInterval interval)
     {
         this._intervals = [interval];
@@ -613,6 +653,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region.intervals == [TI(0, 15, 20)]);
     }
 
+    /// ditto
     this(Tag tag, Number begin, Number end)
     {
         this._intervals = [TaggedInterval(tag, begin, end)];
@@ -646,6 +687,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region != regionDup);
     }
 
+
     /// Return a list of the tagged intervals in this region.
     @property const(TaggedInterval)[] intervals() const pure nothrow
     {
@@ -667,7 +709,11 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region2.intervals == [TI(0, 5, 10), TI(0, 15, 20)]);
     }
 
-    /// Return a list of the tagged intervals in this region.
+
+    /// Release the list of the tagged intervals in this region.
+    ///
+    /// This returns the internal intervals array and removes all references
+    /// to it.
     TaggedInterval[] releaseIntervals() pure nothrow
     {
         auto intervals = _intervals;
@@ -676,6 +722,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
 
         return intervals;
     }
+
 
     /// Returns the size of this region.
     Number size() pure const nothrow
@@ -700,6 +747,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region3.size == 30);
     }
 
+
     /// Returns true iff the region is empty.
     bool empty() pure const nothrow
     {
@@ -723,6 +771,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(!region1.empty);
     }
 
+
+    /// Merge overlapping or touching intervals.
     protected void normalize()
     {
         if (_intervals.length == 0)
@@ -803,6 +853,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(region == normalizedRegion);
     }
 
+
     /// Computes the union of all tagged intervals.
     Region opBinary(string op)(in Region other) const if (op == "|")
     {
@@ -829,6 +880,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert((R(0, 10, 20) | R(0, 25, 30)) == R([TI(0, 10, 20), TI(0, 25, 30)]));
         assert((R(0, 10, 20) | R(1, 25, 30)) == R([TI(0, 10, 20), TI(1, 25, 30)]));
     }
+
 
     /// Computes the intersection of the two regions.
     Region opBinary(string op)(in Region other) const if (op == "&")
@@ -931,6 +983,8 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         ]));
     }
 
+
+    /// Computes the difference of the two regions.
     Region opBinary(string op)(in TaggedInterval interval) const if (op == "-")
     {
         if (interval.empty)
@@ -960,6 +1014,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         return Region(differenceAcc.data);
     }
 
+    /// ditto
     Region opBinary(string op)(in Region other) const if (op == "-")
     {
         if (other.empty)
@@ -1012,6 +1067,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert((R(0, 10, 20) - R(1, 25, 30)) == R(0, 10, 20));
     }
 
+
     private auto getDifferenceCandidates(in Region other) const pure nothrow
     {
         auto otherIntervals = other._intervals.assumeSorted!"a.isStrictlyBefore(b)";
@@ -1028,6 +1084,10 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         }
     }
 
+
+    /// Compute the operation and place the result in this region.
+    ///
+    /// See_also: `opBinary!"|"`, `opBinary!"&"`, `opBinary!"-"`
     Region opOpAssign(string op, T)(in T other)
             if (is(T : Region) || is(T : TaggedInterval))
     {
@@ -1089,6 +1149,7 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert((inputRegion1 | inputRegion2) == expectedResult);
     }
 
+
     /// Returns true iff point is in this region.
     bool opBinaryRight(string op)(in TaggedPoint point) const pure nothrow
             if (op == "in")
@@ -1140,15 +1201,18 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
     }
 }
 
+
+// Instantiate `Region` to trigger contained unit tests.
 unittest
 {
     Region!(int, int) r;
 }
 
-/**
-    Returns true iff `thing` is empty
 
-    See_Also: Region.empty, Region.TaggedInterval.empty
+/**
+    Returns true iff `thing` is empty.
+
+    See_Also: `Region.empty`, `Region.TaggedInterval.empty`
 */
 bool empty(T)(in T thing) pure nothrow
         if (is(T : Region!Args, Args...) || is(T : Region!Args.TaggedInterval, Args...))
@@ -1173,10 +1237,11 @@ unittest
     assert(!empty(ti));
 }
 
+
 /**
     Returns the union of all elements.
 
-    See_Also: Region.opBinary!"|", Region.TaggedInterval.opBinary!"|"
+    See_Also: `Region.opBinary!"|"`, `Region.TaggedInterval.opBinary!"|"`
 */
 auto union_(Range)(Range regions)
         if (isInputRange!Range && is(ElementType!Range : Region!Args, Args...))
@@ -1205,37 +1270,56 @@ unittest
     assert(!empty(ti));
 }
 
-/**
-    Returns the minimum/supremum point or convex hull of the intervals. Both
-    minimum and supremum are undefined for empty regions but the convex hull
-    is not.
 
-    Throws: MismatchingTagsException if `tag`s differ.
-    Throws: EmptyRegionException if region is empty.
+/**
+    Returns the minimum/supremum point of the region. Both minimum and
+    supremum are undefined for empty regions.
+
+    Throws: `MismatchingTagsException` if `tag`s differ.
+    Throws: `EmptyRegionException` if `region` is empty.
 */
 auto min(R)(R region) if (is(R : Region!Args, Args...))
 {
-    alias TI = R.TaggedInterval;
-
     enforceNonEmpty(region);
-    auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
 
-    return convexHull.begin;
+    // The call to `convexHull` enforces equal tag
+    return convexHull(region).begin;
 }
 
 /// ditto
 auto sup(R)(R region) if (is(R : Region!Args, Args...))
 {
-    alias TI = R.TaggedInterval;
-
     enforceNonEmpty(region);
-    auto convexHull = TI.convexHull(region.intervals[0], region.intervals[$ - 1]);
 
-    return convexHull.end;
+    // The call to `convexHull` enforces equal tag
+    return convexHull(region).end;
 }
 
-/// ditto
-auto convexHull(R)(R region) if (is(R : Region!Args, Args...))
+///
+unittest
+{
+    alias R = Region!(int, int);
+    alias TI = R.TaggedInterval;
+
+    R emptyRegion;
+    auto region1 = R([TI(0, 0, 10), TI(0, 20, 30)]);
+    auto region2 = R([TI(0, 0, 10), TI(1, 0, 10)]);
+
+    assert(min(region1) == 0);
+    assert(sup(region1) == 30);
+    assertThrown!EmptyRegionException(min(emptyRegion));
+    assertThrown!EmptyRegionException(sup(emptyRegion));
+    assertThrown!(MismatchingTagsException!int)(min(region2));
+    assertThrown!(MismatchingTagsException!int)(sup(region2));
+}
+
+
+/**
+    Returns convex hull of the region.
+
+    Throws: `MismatchingTagsException` if `tag`s differ.
+*/
+R.TaggedInterval convexHull(R)(R region) if (is(R : Region!Args, Args...))
 {
     alias TI = R.TaggedInterval;
 
@@ -1257,21 +1341,40 @@ unittest
     auto region1 = R([TI(0, 0, 10), TI(0, 20, 30)]);
     auto region2 = R([TI(0, 0, 10), TI(1, 0, 10)]);
 
-    assert(min(region1) == 0);
-    assert(sup(region1) == 30);
-    assertThrown!EmptyRegionException(min(emptyRegion));
-    assertThrown!EmptyRegionException(sup(emptyRegion));
-    assertThrown!(MismatchingTagsException!int)(min(region2));
-    assertThrown!(MismatchingTagsException!int)(sup(region2));
+    assert(convexHull(region1) == TI(0, 0, 30));
+    assert(convexHull(emptyRegion).empty);
+    assertThrown!(MismatchingTagsException!int)(convexHull(region2));
 }
 
+
+/// Tiling solution.
+///
+/// See_also: `findTilings`
 struct Tiling(R, N, T)
 {
+    /// Region covered by the tiling.
     R region;
+
+    /// Sum of all overlaps.
     N totalOverlap;
+
+    /// Elements included in the tiling.
     T[] elements;
 }
 
+
+/// Find all valid tilings of elements.
+///
+/// A tiling of `elements` is a sub-sequence of `elements` such that the
+/// pair-wise overlap is no more than `maxLocalOverlap` and the sum of
+/// overlaps is no more than `maxGlobalOverlap`.
+///
+/// This uses a depth-first search of the solution space pruning (greedily)
+/// if one of the tiling conditions is violated. `elements` are translated
+/// to intervals by `toInterval` which is potentially called `O(n!)` times
+/// where `n = elements.length` .
+///
+/// Returns: `Tiling[]` of all valid tilings.
 auto findTilings(alias toInterval, T, N)(T[] elements, in N maxLocalOverlap, in N maxGlobalOverlap = N.max)
 {
     alias interval = unaryFun!toInterval;
@@ -1324,6 +1427,7 @@ auto findTilings(alias toInterval, T, N)(T[] elements, in N maxLocalOverlap, in 
     return tilingsAcc.data;
 }
 
+///
 unittest
 {
     alias R = Region!(int, int);
@@ -1390,5 +1494,5 @@ unittest
             0,
             [[1, 10]],
         ),
-]);
+    ]);
 }

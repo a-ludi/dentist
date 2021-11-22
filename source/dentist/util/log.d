@@ -1,5 +1,5 @@
 /**
-    Central logging facility for dentist.
+    Central logging facility for DENTIST.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -16,10 +16,12 @@ import std.range;
 import std.stdio;
 import core.thread;
 
+
 private
 {
     __gshared LogLevel minLevel = LogLevel.info;
 }
+
 
 /// Sets the minimum log level to be printed.
 void setLogLevel(LogLevel level) nothrow
@@ -28,18 +30,47 @@ void setLogLevel(LogLevel level) nothrow
         minLevel = level;
 }
 
+
+/// Get the minimum log level to be printed. Use `shouldLog` for conditionals.
 LogLevel getLogLevel()
 {
     return minLevel;
 }
 
-bool shouldLog(LogLevel level)
+
+/// Check whether message of `logLevel` should be logged.
+bool shouldLog(LogLevel logLevel)
 {
-    return level >= minLevel;
+    return logLevel >= minLevel;
 }
 
+
 /**
-    Logs a message in JSON format.
+    Logs a message in compressed single-line JSON format.
+
+    Produces a JSON object with the key-value pairs given as `args` and
+    default fields `"thread"`, `"timestamp"` and `"logLevel"`.
+
+
+    Example:
+    ---
+    logJsonInfo(
+        "action", "findTheTruth",
+        "answer", 42,
+        "elapsedSecs", 1337,
+    );
+
+    // --> (real output is compressed in a single line)
+    // {
+    //     "action": "findTheTruth",
+    //     "answer": 42,
+    //     "elapsedSecs": 1337
+    //     "thread": 123467890,
+    //     "timestamp", 123467890
+    //     "logLevel", "info"
+    // }
+    ---
+
     Params:
         args = pairs of `name` (`string`) and `value`
 */
@@ -133,7 +164,10 @@ unittest
         stderr = origStderr;
     }
 
-    logJsonError("error", "mysterious observation", "secret", 42);
+    logJsonError(
+        "error", "mysterious observation",
+        "secret", 42,
+    );
 
     stderr.rewind();
     auto observed = parseJsonString(stderr.readln);
@@ -146,9 +180,10 @@ unittest
 
 /**
     Logs a message.
+
     Params:
         level = The log level for the logged message
-        fmt = See http://dlang.org/phobos/std_format.html#format-string
+        fmt = See $(LINK http://dlang.org/phobos/std_format.html#format-string)
 */
 void logDebug(T...)(string fmt, lazy T args) nothrow
 {
@@ -224,6 +259,8 @@ enum LogLevel
     none
 }
 
+
+/// Do not use directly. Use `mixin(traceExecution)` instead.
 struct ExecutionTracer(LogLevel logLevel = LogLevel.diagnostic)
 {
     import std.datetime.stopwatch : StopWatch;
@@ -258,6 +295,46 @@ struct ExecutionTracer(LogLevel logLevel = LogLevel.diagnostic)
     }
 }
 
+
+/// Print JSON log entries upon entering and leaving the function reporting
+/// the execution time.
+///
+/// Example:
+/// ---
+/// void foo()
+/// {
+///     mixin(traceExecution);
+///
+///     logJsonInfo("info", "working on foo()")
+/// }
+///
+/// void main()
+/// {
+///     foo();
+///     // --> (real output is compressed in a single line)
+///     // {
+///     //     "function": "foo",
+///     //     "state": "enter",
+///     //     "thread": 123467890,
+///     //     "timestamp", 123467890
+///     //     "logLevel", "info"
+///     // }
+///     // {
+///     //     "info": "working on foo()",
+///     //     "thread": 123467890,
+///     //     "timestamp", 123467890
+///     //     "logLevel", "info"
+///     // }
+///     // {
+///     //     "function": "foo",
+///     //     "state": "exit",
+///     //     "timeElapsed": 1234567890,
+///     //     "thread": 123467890,
+///     //     "timestamp", 123467890
+///     //     "logLevel", "info"
+///     // }
+/// }
+/// ---
 string traceExecution(LogLevel logLevel = LogLevel.diagnostic)()
 {
     import std.conv : to;
@@ -316,6 +393,11 @@ unittest
 }
 
 
+/// Tracks progress and outputs information regularly.
+///
+/// `ProgressMeter.Format` can be used to choose a format suitable for
+/// terminals (`ProgressMeter.Format.human`) or for log files
+/// (`ProgressMeter.Format.json`).
 struct ProgressMeter
 {
     import std.datetime.stopwatch : StopWatch;
@@ -329,9 +411,10 @@ struct ProgressMeter
         Tuple,
         Yes;
 
-    alias UnitSpec = Tuple!(size_t, "multiplier", char, "name");
+    private alias UnitSpec = Tuple!(size_t, "multiplier", char, "name");
 
 
+    /// Available display units for the progress meter.
     enum Unit : UnitSpec
     {
         auto_ = UnitSpec(0, '\0'),
@@ -345,26 +428,50 @@ struct ProgressMeter
     }
 
 
+    /// Display format of the progress meter.
     enum Format : ubyte
     {
+        /// Displays a single line that is updated regularly. This is suitable
+        /// for terminal output.
         human,
+
+        /// Produces a series of compressed, single-line JSON object
+        /// describing the progress. This is suitable for output to a regular
+        /// file.
         json,
     }
 
 
+    /// Wait at least the amount of milliseconds before updating the status.
     size_t printEveryMsecs = 500;
+
+    /// Display ticks in this unit.
     Unit unit;
+
+    /// Use `precision` digits after the decimal point.
     size_t precision = 3;
+
+    /// Specifies the 100% mark if given. No percentage is displayed if this
+    /// is zero.
     size_t totalTicks;
+
+    /// Number of ticks until now.
     size_t numTicks;
+
+    /// Suppress output but still track the progress.
     Flag!"silent" silent;
+
+    /// Choose display format.
     Format format;
+
     private File _output;
     private bool hasOutput;
     private StopWatch timer;
     private StopWatch lastPrint;
 
 
+    /// Set the output file to write status updates to. Default it to use
+    /// `std.stdio.stderr`.
     @property void output(File output)
     {
         hasOutput = true;
@@ -372,6 +479,7 @@ struct ProgressMeter
     }
 
 
+    /// Get a reference to the output file.
     @property auto ref File output()
     {
         if (!hasOutput)
@@ -381,6 +489,9 @@ struct ProgressMeter
     }
 
 
+    /// Start the timer.
+    ///
+    /// This implicitly resets the timer and tick count.
     void start()
     {
         numTicks = 0;
@@ -395,6 +506,7 @@ struct ProgressMeter
     }
 
 
+    /// Add a single tick.
     void tick()
     {
         ++numTicks;
@@ -404,6 +516,7 @@ struct ProgressMeter
     }
 
 
+    /// Stop the timer and print a last status update.
     void stop()
     {
         timer.stop();
@@ -413,22 +526,28 @@ struct ProgressMeter
     }
 
 
+    /// Check if `timeUnit` is allowed by `std.datetime.stopwatch.StopWatch.peek.total`.
     static enum isValidTimeUnit(string timeUnit) = is(typeof(timer.peek.total!timeUnit));
     static assert(isValidTimeUnit!"msecs");
 
 
+    /// Get the number of elapsed `timeUnit`s.
     @property auto elapsed(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
     {
         return timer.peek.total!timeUnit;
     }
 
 
+    /// Get the average throughput in ticks per `timeUnit`.
+    ///
+    /// Bugs: this will cause an arithmetic error if no time has elapsed.
     @property auto ticksPer(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
     {
         return cast(double) numTicks / elapsed!timeUnit;
     }
 
 
+    /// True if the estimated time of arrival (ETA) can be calculated.
     @property auto hasETA() const nothrow @safe
     {
         return totalTicks > 0 && numTicks > 0;
@@ -437,14 +556,21 @@ struct ProgressMeter
     alias hasEstimatedTimeOfArrival = hasETA;
 
 
+    /// Calculate the estimated time of arrival (ETA).
+    ///
+    /// This simply assumes that the current average throughput
+    /// (`ticksPer!timeUnit`) will not change.
     @property auto eta(string timeUnit)() const nothrow @safe if (isValidTimeUnit!timeUnit)
     {
         return (totalTicks - numTicks)/ticksPer!timeUnit;
     }
 
+    /// ditto
     alias estimatedTimeOfArrival = eta;
 
 
+    /// Select the smallest unit such that the number of decimal digits
+    /// is up to three.
     static Unit selectUnitFor(size_t number) pure nothrow @safe
     {
         import std.traits : EnumMembers;
@@ -453,6 +579,14 @@ struct ProgressMeter
             if (unit.multiplier > 0 && number / unit.multiplier < 1000)
                 return unit;
         return Unit.max;
+    }
+
+    ///
+    unittest
+    {
+        assert(selectUnitFor(1) == Unit.one);
+        assert(selectUnitFor(25 * 1024) == Unit.kilo);
+        assert(selectUnitFor(13 * 1024*1024) == Unit.mega);
     }
 
 

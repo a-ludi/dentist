@@ -1,14 +1,49 @@
 /**
-    This is he algorithm for building pile ups.
+    This is the algorithm for building pile ups.
+
+    Pipeline:
+
+    See `build` for the implementation.
+
+    $(OL
+        $(LI Group alignments by read ID and deduce graph edges
+            $(SEE_ALSO `collectScaffoldJoins!collectReadAlignments(candidates)`))
+        $(LI Create edges for `inputGaps` (`makeScaffoldJoin!GapSegment`))
+        $(LI $(STAGE raw) Build the scaffold graph from previously created
+            edges and the "default" edges for the contigs
+            $(SEE_ALSO `buildScaffold`))
+        $(LI $(STAGE resolvedBubbles) Detect small cycles (bubbles) and try to
+            resolve them by identifying "skipping" edges
+            $(SEE_ALSO `resolveBubbles`, `options.maxBubbleResolverIterations`,
+                `options.maxBubbleSize`))
+        $(LI $(STAGE unambiguous) Resolve forks in the graph by selecting
+            either one edge that has a significantly larger pile up than all
+            others or remove all conflicting edges.
+            $(SEE_ALSO `options.bestPileUpMargin`, `options.existingGapBonus`))
+        $(LI $(STAGE minSpanningEnforced) Removes edges with insufficient
+            number of spanning reads
+            $(SEE_ALSO `enforceMinSpanningReads`, `options.minSpanningReads`))
+        $(LI $(STAGE inputGapsRemoved) Remove input gaps from the graph as
+            they are no longer required
+            $(SEE_ALSO `removeInputGaps`))
+        $(LI $(STAGE extensionsMerged) Merge extending pile ups with adjacent
+            spanning pile ups if requested
+            $(SEE_ALSO `options.mergeExtensions`, `mergeExtensionsWithGaps`))
+        $(LI Collect the pile ups from the scaffold graph and return them.
+            $(SEE_ALSO `collectPileUps`))
+    )
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
+    Macros:
+        STAGE = $(I Stage `"$0"`:)
+        SEE_ALSO = $(BR)See also: $0
 */
 module dentist.commands.collectPileUps.pileups;
 
-import dentist.commandline : OptionsFor;
+import dentist.commands.collectPileUps : Options;
 import dentist.common :
     ReadInterval,
     ReadRegion,
@@ -31,7 +66,6 @@ import dentist.common.alignments :
     ReadAlignment,
     SeededAlignment;
 import dentist.common.binio : writePileUpsDb;
-import dentist.common.commands : DentistCommand;
 import dentist.common.scaffold :
     buildScaffold,
     ContigNode,
@@ -51,7 +85,6 @@ import dentist.dazzler :
     getDamapping,
     GapSegment;
 import dentist.util.algorithm :
-    backtracking,
     orderLexicographically,
     uniqInPlace;
 import dentist.util.math :
@@ -114,166 +147,29 @@ import std.typecons :
     Yes;
 import vibe.data.json : Json, toJson = serializeToJson;
 
-private auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
-{
-    return scaffold
-        .edges
-        .map!"a.payload"
-        .filter!(payload => payload.types.pileUp)
-        .map!(payload => payload.readAlignments)
-        .filter!(pileUp => pileUp.length > 0)
-        .filter!(pileUp => pileUp.isValid);
-}
 
-private void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold, in string dbStem)
-{
-    if (dbStem !is null)
-        writePileUpsDb(collectPileUps(scaffold).array, format!"%s.%s.db"(dbStem, state));
 
-    logJsonDebug(
-        "state", state,
-        "joins", scaffold
-            .edges
-            .map!joinToJson
-            .array
-            .toJson,
-        "pileUps", collectPileUps(scaffold)
-            .map!(pileUp => [
-                "type": pileUp.getType.to!string.toJson,
-                "readAlignments": pileUp.map!"a[]".array.toJson,
-            ].toJson)
-            .array
-            .toJson,
-    );
-}
-
-struct ScaffoldPayload
-{
-    static enum Type : ubyte
-    {
-        pileUp = 1 << 0,
-        inputGap = 1 << 1,
-    }
-
-    BitFlags!Type types;
-    ReadAlignment[] readAlignments;
-
-    private this(Type type, ReadAlignment[] readAlignments = []) pure nothrow
-    {
-        this.types |= type;
-        if (types.pileUp)
-            this.readAlignments = readAlignments;
-    }
-
-    private this(BitFlags!Type types, ReadAlignment[] readAlignments) pure nothrow
-    {
-        this.types = types;
-        this.readAlignments = readAlignments;
-    }
-
-    @property bool empty() const pure nothrow
-    {
-        return 0 == cast(ubyte) types;
-    }
-
-    static ScaffoldPayload pileUp(ReadAlignment[] readAlignments) pure nothrow
-    {
-        return ScaffoldPayload(Type.pileUp, readAlignments);
-    }
-
-    void remove(Type type)() pure nothrow if (type == Type.pileUp)
-    {
-        types.pileUp = false;
-        readAlignments = [];
-    }
-
-    static ScaffoldPayload inputGap() pure nothrow
-    {
-        return ScaffoldPayload(Type.inputGap);
-    }
-
-    void remove(Type type)() pure nothrow if (type == Type.inputGap)
-    {
-        types.inputGap = false;
-    }
-
-    static ScaffoldPayload merge(R)(R payloads)
-        if (isForwardRange!R && is(ElementType!R == ScaffoldPayload))
-    {
-        static size_t cacheSize = 1000;
-        static ReadAlignment[] readAlignmentsCache;
-
-        if (payloads.save.walkLength(2) == 1)
-            return payloads.front;
-
-        auto numReadAlignments = payloads.save.map!"a.readAlignments.length".sum;
-
-        if (readAlignmentsCache.length < numReadAlignments)
-        {
-            readAlignmentsCache = new ReadAlignment[cacheSize];
-            cacheSize = (13 * cacheSize) / 10;
-        }
-
-        auto mergedReadAlignments = readAlignmentsCache[0 .. numReadAlignments];
-        readAlignmentsCache = readAlignmentsCache[numReadAlignments .. $];
-
-        auto bufferRest = payloads
-            .save
-            .map!"a.readAlignments"
-            .joiner
-            .copy(mergedReadAlignments);
-        assert(bufferRest.length == 0);
-
-        return ScaffoldPayload(
-            payloads.save.map!"a.types".fold!"a | b",
-            mergedReadAlignments,
-        );
-    }
-
-    static ScaffoldPayload merge(ScaffoldPayload[] payloads...)
-    {
-        return merge!(ScaffoldPayload[])(payloads);
-    }
-
-    /// Return the number of set types in this payload.
-    size_t numTypes() const pure nothrow
-    {
-        return bitsSet(cast(ubyte) types).walkLength;
-    }
-
-    Json toJson() const
-    {
-        return [
-            "types": types.to!string.toJson,
-            "pileUpType": types.pileUp && readAlignments.length > 0
-                ? readAlignments.getType.to!string.toJson
-                : Json(null),
-            "readAlignments": shouldLog(LogLevel.debug_)
-                ? readAlignments.map!"a[]".array.toJson
-                : readAlignments.length.toJson,
-        ].toJson;
-    }
-}
-
-Join!ScaffoldPayload mergeJoins(Join!ScaffoldPayload[] joins...)
-{
-    assert(joins.length > 0);
-
-    auto mergedJoin = joins[0];
-
-    mergedJoin.payload = ScaffoldPayload.merge(joins.map!"a.payload");
-
-    return mergedJoin;
-}
-
-static Join!ScaffoldPayload selectMeanest(Join!ScaffoldPayload[] joins...)
-{
-    return joins.minElement!"a.payload.numTypes";
-}
-
-/// Options for the `collectPileUps` command.
-alias Options = OptionsFor!(DentistCommand.collectPileUps);
-
+/// Build and process a scaffold graph and collect the pile ups.
+///
+/// Params:
+///     numReferenceContigs = number of reference contigs used to construct
+///         the base graph which has four nodes for each contig. Contigs are
+///         assumed to have IDs `1 .. numReferenceContigs + 1`.
+///     candidates = alignment chains that are deemed reliable
+///     inputGaps = list of intra-scaffold gaps that connect contigs of the
+///         input assembly
+///     options = additional parameters (see CLI options for further information):
+///         $(UL
+///             $(LI `<in:reads>`)
+///             $(LI `<in:reference>`)
+///             $(LI `--best-pile-up-margin`)
+///             $(LI `--existing-gap-bonus`)
+///             $(LI `--debug-pile-ups`)
+///             $(LI `--no-merge-extension`)
+///             $(LI `--min-spanning-reads`)
+///             $(LI `--proper-alignment-allowance`)
+///             $(LI `--tmpdir`)
+///         )
 PileUp[] build(
     in size_t numReferenceContigs,
     AlignmentChain[] candidates,
@@ -532,6 +428,225 @@ unittest
         }
 }
 
+
+/// Traverse the edges in `scaffold` and collect attached pile ups.
+///
+/// Returns: range of valid, non-empty pile ups contained in `scaffold`.
+auto collectPileUps(Scaffold!ScaffoldPayload scaffold)
+{
+    return scaffold
+        .edges
+        .map!"a.payload"
+        .filter!(payload => payload.types.pileUp)
+        .map!(payload => payload.readAlignments)
+        .filter!(pileUp => pileUp.length > 0)
+        .filter!(pileUp => pileUp.isValid);
+}
+
+
+/// Handle debugging output for `scaffold`.
+///
+/// Writes a pile ups DB for `scaffold` if `dbStem !is null` and issues
+/// a `LogLevel.debug_` log message describing `scaffold`.
+///
+/// Params:
+///     state = a descriptive string used to identify the state in which the
+///         scaffold is, e.g. `"raw"` or `"resolvedBubbles"`. This string
+///         may be part a file name.
+///     scaffold = the scaffold graph
+///     dbStem = write pile ups DB `{dbStem}.{state}.db` of the current pile
+///         ups in `scaffold` unless `dbStem is null`.
+void debugLogPileUps(string state, Scaffold!ScaffoldPayload scaffold, in string dbStem)
+{
+    if (dbStem !is null)
+        writePileUpsDb(collectPileUps(scaffold).array, format!"%s.%s.db"(dbStem, state));
+
+    logJsonDebug(
+        "state", state,
+        "joins", scaffold
+            .edges
+            .map!joinToJson
+            .array
+            .toJson,
+        "pileUps", collectPileUps(scaffold)
+            .map!(pileUp => [
+                "type": pileUp.getType.to!string.toJson,
+                "readAlignments": pileUp.map!"a[]".array.toJson,
+            ].toJson)
+            .array
+            .toJson,
+    );
+}
+
+
+/// Struct to handle different types of payloads.
+///
+/// See_also: `ScaffoldPayload.Type`
+struct ScaffoldPayload
+{
+    /// Possible type of a payload. A single payload may have several types a
+    /// once.
+    static enum Type : ubyte
+    {
+        /// Payload contains a list of `ReadAlignment`s – the pile up.
+        pileUp = 1 << 0,
+
+        /// The edge represents a gap in the input assembly.
+        inputGap = 1 << 1,
+    }
+
+    /// Current types of this payload.
+    BitFlags!Type types;
+
+    /// Pile up associated with this payload.
+    ReadAlignment[] readAlignments;
+
+
+    private this(Type type, ReadAlignment[] readAlignments = []) pure nothrow
+    {
+        this.types |= type;
+        if (types.pileUp)
+            this.readAlignments = readAlignments;
+    }
+
+
+    private this(BitFlags!Type types, ReadAlignment[] readAlignments) pure nothrow
+    {
+        this.types = types;
+        this.readAlignments = readAlignments;
+    }
+
+
+    /// Returns true if no type is set.
+    @property bool empty() const pure nothrow
+    {
+        return 0 == cast(ubyte) types;
+    }
+
+
+    /// Construct a payload of type `Type.pileUp` from `readAlignments.
+    static ScaffoldPayload pileUp(ReadAlignment[] readAlignments) pure nothrow
+    {
+        return ScaffoldPayload(Type.pileUp, readAlignments);
+    }
+
+
+    /// Construct a payload of type `Type.inputGap`.
+    static ScaffoldPayload inputGap() pure nothrow
+    {
+        return ScaffoldPayload(Type.inputGap);
+    }
+
+
+    /// Remove `type` from this payload's types and reset data fields
+    /// appropriately.
+    void remove(Type type)() pure nothrow if (type == Type.pileUp)
+    {
+        types.pileUp = false;
+        readAlignments = [];
+    }
+
+    /// ditto
+    void remove(Type type)() pure nothrow if (type == Type.inputGap)
+    {
+        types.inputGap = false;
+    }
+
+
+    /// Merge a range of payloads into one.
+    ///
+    /// Returns: payload with the union of all `types` in `payloads` and the
+    ///     concatenation of all the `readAlignments`.
+    static ScaffoldPayload merge(R)(R payloads)
+        if (isForwardRange!R && is(ElementType!R == ScaffoldPayload))
+    {
+        static size_t cacheSize = 1000;
+        static ReadAlignment[] readAlignmentsCache;
+
+        if (payloads.save.walkLength(2) == 1)
+            return payloads.front;
+
+        auto numReadAlignments = payloads.save.map!"a.readAlignments.length".sum;
+
+        while (readAlignmentsCache.length < numReadAlignments)
+        {
+            readAlignmentsCache = new ReadAlignment[cacheSize];
+            cacheSize = (13 * cacheSize) / 10;
+        }
+
+        auto mergedReadAlignments = readAlignmentsCache[0 .. numReadAlignments];
+        readAlignmentsCache = readAlignmentsCache[numReadAlignments .. $];
+
+        auto bufferRest = payloads
+            .save
+            .map!"a.readAlignments"
+            .joiner
+            .copy(mergedReadAlignments);
+        assert(bufferRest.length == 0);
+
+        return ScaffoldPayload(
+            payloads.save.map!"a.types".fold!"a | b",
+            mergedReadAlignments,
+        );
+    }
+
+    /// ditto
+    static ScaffoldPayload merge(ScaffoldPayload[] payloads...)
+    {
+        return merge!(ScaffoldPayload[])(payloads);
+    }
+
+
+    /// Return the number of set types in this payload.
+    size_t numTypes() const pure nothrow
+    {
+        return bitsSet(cast(ubyte) types).walkLength;
+    }
+
+
+    /// Convert to a `Json` object.
+    Json toJson() const
+    {
+        return [
+            "types": types.to!string.toJson,
+            "pileUpType": types.pileUp && readAlignments.length > 0
+                ? readAlignments.getType.to!string.toJson
+                : Json(null),
+            "readAlignments": shouldLog(LogLevel.debug_)
+                ? readAlignments.map!"a[]".array.toJson
+                : readAlignments.length.toJson,
+        ].toJson;
+    }
+}
+
+
+/// Merge joins by creating a single join that has all payloads merged.
+///
+/// See_also: `ScaffoldPayload.merge`
+Join!ScaffoldPayload mergeJoins(Join!ScaffoldPayload[] joins...)
+{
+    assert(joins.length > 0);
+
+    auto mergedJoin = joins[0];
+
+    mergedJoin.payload = ScaffoldPayload.merge(joins.map!"a.payload");
+
+    return mergedJoin;
+}
+
+
+/// Select the (first) join with the smallest number of types.
+///
+/// See_also: `ScaffoldPayload.numTypes`
+static Join!ScaffoldPayload selectMeanest(Join!ScaffoldPayload[] joins...)
+{
+    return joins.minElement!"a.payload.numTypes";
+}
+
+
+/// Group alignments by read ID and deduce graph edges using `collect`.
+///
+/// See_also: `makeScaffoldJoin`
 auto collectScaffoldJoins(alias collect)(AlignmentChain[] alignments)
 {
     alias isSameRead = (a, b) => a.contigB.id == b.contigB.id;
@@ -550,7 +665,8 @@ auto collectScaffoldJoins(alias collect)(AlignmentChain[] alignments)
     return scaffoldJoins;
 }
 
-/// Generate join from read alignment.
+
+/// Generate join from `readAlignment`.
 Join!ScaffoldPayload makeScaffoldJoin(ReadAlignment readAlignment)
 {
     auto join = makeJoin!(typeof(return))(readAlignment);
@@ -675,7 +791,8 @@ unittest
     assert(join4.payload == ScaffoldPayload.inputGap());
 }
 
-/// Generate join from inputGap.
+
+/// Generate join from `inputGap`.
 Join!ScaffoldPayload makeScaffoldJoin(GapSegment inputGap)
 {
     return typeof(return)(
@@ -691,7 +808,16 @@ Join!ScaffoldPayload makeScaffoldJoin(GapSegment inputGap)
     );
 }
 
-// Not meant for public usage.
+
+/// Create `ReadAlignment`s from the all alignments of a single read.
+///
+/// Not meant for public usage but must be public or the compiler would
+/// complain.
+///
+/// Params:
+///     sameReadAlignments = input range of all alignments of a single read
+///     reasonForEmpty = set to a human-readable reason for an empty return
+///         value unless `reasonForEmpty is null`
 ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments, string* reasonForEmpty = null)
 {
     alias beginRelToContigB = (alignment) => alignment.complement
@@ -971,16 +1097,37 @@ unittest
     }
 }
 
+
 /// This find bubbles in the graph and tries to linearize them. Bubbles are
-/// cyclic subgraphs of at most maxBubbleSize nodes and can be sueezed into a
-/// linear subgraph iff they comprise two linear subgraphs being parallel wrt.
-/// the underlying genome.
+/// cyclic subgraphs of at most `options.maxBubbleSize` nodes and can be
+/// squeezed into a linear subgraph iff they comprise two linear subgraphs
+/// being parallel wrt. the underlying genome.
+///
+/// Example:
+/// ---
+/// ━━━━━ = reference contigs
+/// └───┘ = pile ups
+///
+///
+///        contig A         contig B         contig C
+///      ━━━━━━━━━━━━     ━━━━━━━━━━━━     ━━━━━━━━━━━━
+///                │└─╴X╶─┘          └─╴Y╶─┘│
+///                └───────────╴Z╶──────────┘
+///
+/// Pile up Z can be combined with X and Y by aligning the skipping reads to
+/// contig B without repeat mask:
+///
+///        contig A          contig B          contig C
+///      ━━━━━━━━━━━━      ━━━━━━━━━━━━      ━━━━━━━━━━━━
+///                 └╴X+Z'╶┘          └╴Y+Z"╶┘
+/// ---
 Scaffold!ScaffoldPayload resolveBubbles(Scaffold!ScaffoldPayload scaffold, in Options options)
 {
     auto resolver = new BubbleResolver(scaffold, options);
 
     return resolver.run();
 }
+
 
 private class BubbleResolver
 {
@@ -1438,7 +1585,10 @@ private class BubbleResolver
     }
 }
 
-/// This removes ambiguous gap insertions.
+
+/// This removes ambiguous gap insertions, i.e. forks in the graph.
+///
+/// See_also: `findCorrectGapJoin`
 Scaffold!ScaffoldPayload discardAmbiguousJoins(
     Scaffold!ScaffoldPayload scaffold,
     in double bestPileUpMargin,
@@ -1578,8 +1728,9 @@ unittest
     assert(scaffold.get(J(CN(1, CP.end), CN(1, CP.post))).payload == getDummyPayload(2)); // e1
 }
 
-// Not meant for public usage.
-auto joinToJson(in Join!ScaffoldPayload join)
+
+/// Convert `join` to `Json`.
+Json joinToJson(in Join!ScaffoldPayload join)
 {
     return [
         "start": join.start.toJson,
@@ -1588,6 +1739,18 @@ auto joinToJson(in Join!ScaffoldPayload join)
     ].toJson;
 }
 
+
+/// This selects the outstanding best pile up or none at all.
+///
+/// If the join with the most reads supporting it if it has significantly
+/// more reads (`bestPileUpMargin`) than all other joins it is deemed "best";
+/// otherwise there is no "correct" gap join.
+///
+/// Joins that are supported by an existing gap in the input assembly get a
+/// multiplicative bonus of `existingGapBonus`. This reflects the assumption
+/// that the input scaffolding is reliable to a certain extent.
+///
+/// Returns: index of "correct" gap join or `size_t.max` if none was found.
 size_t findCorrectGapJoin(
     Join!ScaffoldPayload[] incidentGapJoins,
     in double bestPileUpMargin,
@@ -1639,6 +1802,8 @@ size_t findCorrectGapJoin(
     }
 }
 
+
+/// Remove joins with an insufficient number of spanning reads for removal.
 Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffold, size_t minSpanningReads)
 {
     auto enforceMinSpanningReadsOnJoin(ref Join!ScaffoldPayload join)
@@ -1670,9 +1835,11 @@ Scaffold!ScaffoldPayload enforceMinSpanningReads(Scaffold!ScaffoldPayload scaffo
     return removeNoneJoins!ScaffoldPayload(scaffold);
 }
 
+
+/// Remove the information on input gaps from the graph.
 Scaffold!ScaffoldPayload removeInputGaps(Scaffold!ScaffoldPayload scaffold)
 {
-    auto removeInputGapsOnJoin(ref Join!ScaffoldPayload join)
+    static auto removeInputGapsOnJoin(ref Join!ScaffoldPayload join)
     {
         join.payload.remove!(ScaffoldPayload.Type.inputGap)();
 

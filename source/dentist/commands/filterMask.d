@@ -1,5 +1,16 @@
 /**
-    This is the `filterMask` command of `dentist`.
+    This is the `filter-mask` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Filter a Dazzler mask.
+
+    The following filters are applied in the given order:
+
+    1. `--min-gap-size`: removes small gaps by merging the adjacent intervals.
+    2. `-min-interval-size`: removes small mask intervals.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +18,15 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.filterMask;
+
+package(dentist) enum summary = "
+    Filter a Dazzler mask.
+
+    The following filters are applied in the given order:
+
+    1. `--min-gap-size`: removes small gaps by merging the adjacent intervals.
+    2. `-min-interval-size`: removes small mask intervals.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -47,10 +67,11 @@ import std.typecons : No;
 import vibe.data.json : toJson = serializeToJson;
 
 
-/// Options for the `filterMask` command.
+/// Options for the `filter-mask` command.
 alias Options = OptionsFor!(DentistCommand.filterMask);
 
-/// Execute the `filterMask` command with `options`.
+
+/// Execute the `filter-mask` command with `options`.
 void execute(in Options options)
 {
     auto builder = PartialAssemblyBuilder(options);

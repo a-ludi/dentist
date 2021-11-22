@@ -10,12 +10,15 @@ dependency        "vibe-d:data"        version="~>0.9.3"
 dependency        "dyaml"              version="~>0.8.4"
 
 targetType        "executable"
-mainSourceFile    "source/dentist/commandline.d"
 stringImportPaths "scripts"
 
 buildRequirements "allowWarnings"
 
 preBuildCommands  "./update-swinfo.sh" "./update-modules.sh"
+
+x:ddoxFilterArgs  "--min-protection=Protected" \
+    "--ex" "dentist.swinfo" "--ex" "dentist.modules" \
+    "--ex" "dentist.common.binio._testdata"
 
 configuration "default" {
     buildRequirements "requireBoundsCheck" "requireContracts"

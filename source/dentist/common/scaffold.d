@@ -1,6 +1,26 @@
 /**
-    Work with scaffold graphs.
+    Work with scaffold graphs. A scaffold graph is an undirected graph with
+    optional edge payloads.
 
+    For each contig of the input assembly there exist four nodes in the graph:
+    `ContigPart.pre`, `ContigPart.begin`, `ContigPart.end` and
+    `ContigPart.post`. These represent four locations relative to the contig.
+
+    Canonical edges are categorized by `isDefault` (the contig itself),
+    `isUnkown` (a gap marked by `n`s), `isGap` (pile up or insertion that
+    connects two contigs), `isFrontExtension` or ` isBackExtension` (pile up
+    or insertion that extends beyond the begin/end of a contig).
+
+    Gap edges are further categorized as `isParallel` or `isAntiParallel`
+    depending on weather the involved contigs are connected in the same
+    (parallel) or opposite (anti-parallel) orientation.
+
+    The scaffold graph is used to collect pile ups of read alignments and
+    represent the final assembly.
+
+
+    See_also: `dentist.commands.collectPileUps`,
+        `dentist.commands.output`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -52,6 +72,7 @@ debug
     import std.stdio : writeln;
 }
 
+
 /// Each contig has four designated parts where joins can start or end.
 static enum ContigPart : ubyte
 {
@@ -67,27 +88,44 @@ static enum ContigPart : ubyte
     post,
 }
 
+
+/// True for the two real locations `begin` and `end`.
 bool isReal(in ContigPart contigPart) pure nothrow
 {
     return contigPart == ContigPart.begin || contigPart == ContigPart.end;
 }
 
+
+/// True for the two symbolic locations `pre` and `post`.
 bool isTranscendent(in ContigPart contigPart) pure nothrow
 {
     return contigPart == ContigPart.pre || contigPart == ContigPart.post;
 }
 
-/**
-    A contig is represented by four `ContigNodes` in the scaffold graph.
 
-    See_Also: ContigPart
-*/
+/// A contig is represented by four `ContigNodes` in the scaffold graph: one
+/// for each `ContigPart`.
 alias ContigNode = Tuple!(size_t, "contigId", ContigPart, "contigPart");
-/// Represents a set of joins which conclude possibly several scaffolding
-/// variants.
+
+
+/// Data structure for the scaffold graph described in the module
+/// documentation.
+///
+/// See_also: `dentist.util.math.Graph`
 alias Scaffold(T) = Graph!(ContigNode, void, No.isDirected, T);
+
+
+/// An edge of the scaffold graph.
 alias Join(T) = Scaffold!T.Edge;
 
+
+/// `IncidentEdgesCache` for `Scaffold!T`.
+alias IncidentEdgesCache(T) = Scaffold!T.IncidentEdgesCache;
+
+
+/// Combine joins by summing their payloads.
+///
+/// This is used in unit tests.
 Join!T sumPayloads(T)(Join!T[] joins...) nothrow
 {
     assert(joins.length > 0);
@@ -101,6 +139,8 @@ Join!T sumPayloads(T)(Join!T[] joins...) nothrow
     return mergedJoin;
 }
 
+
+/// Combine joins by concatenating their payloads.
 Join!T concatenatePayloads(T)(Join!T[] joins...) nothrow
 {
     assert(joins.length > 0);
@@ -115,6 +155,8 @@ Join!T concatenatePayloads(T)(Join!T[] joins...) nothrow
     return mergedJoin;
 }
 
+
+deprecated("obsolete; will be removed in a future release")
 J dontJoin(J)(J j1, J j2) pure nothrow
 {
     j1.payload = T.init;
@@ -122,13 +164,15 @@ J dontJoin(J)(J j1, J j2) pure nothrow
     return j1;
 }
 
-/// Returns true iff join is a default edge of the scaffold graph.
+
+/// Returns true iff join is a default/contig edge of the scaffold graph.
 bool isDefault(J)(in J join) pure nothrow
 {
     return join.start.contigPart == ContigPart.begin &&
            join.end.contigPart == ContigPart.end &&
            join.start.contigId == join.end.contigId;
 }
+
 
 /// Returns true iff join is a unknown edge, ie. an edge for unknown sequence
 /// (`n`s) of the scaffold graph.
@@ -140,6 +184,7 @@ bool isUnkown(J)(in J join) pure nothrow
         join.end.contigPart.isTranscendent;
 }
 
+
 /// Returns true iff join is a gap edge of the scaffold graph.
 bool isGap(J)(in J join) pure nothrow
 {
@@ -148,11 +193,13 @@ bool isGap(J)(in J join) pure nothrow
         (join.end.contigPart.isReal);
 }
 
+
 /// Returns true iff join is a gap edge and anti-parallel.
 bool isAntiParallel(J)(in J join) pure nothrow
 {
     return join.isGap && join.start.contigPart == join.end.contigPart;
 }
+
 
 /// Returns true iff join is a gap edge and parallel.
 bool isParallel(J)(in J join) pure nothrow
@@ -160,11 +207,13 @@ bool isParallel(J)(in J join) pure nothrow
     return join.isGap && join.start.contigPart != join.end.contigPart;
 }
 
+
 /// Returns true iff join is an extension edge of the scaffold graph.
 bool isExtension(J)(in J join) pure nothrow
 {
     return isFrontExtension(join) ^ isBackExtension(join);
 }
+
 
 /// Returns true iff join is a front extension edge of the scaffold graph.
 bool isFrontExtension(J)(in J join) pure nothrow
@@ -174,6 +223,7 @@ bool isFrontExtension(J)(in J join) pure nothrow
         join.end.contigPart == ContigPart.begin;
 }
 
+
 /// Returns true iff join is a back extension edge of the scaffold graph.
 bool isBackExtension(J)(in J join) pure nothrow
 {
@@ -182,14 +232,17 @@ bool isBackExtension(J)(in J join) pure nothrow
         join.end.contigPart == ContigPart.post;
 }
 
-/// Returns true iff join is a valid edge of the scaffold graph.
+
+/// Returns true iff join is a valid canonical edge of the scaffold graph.
 bool isValid(J)(in J join) pure nothrow
 {
     return isDefault(join) ^ isGap(join) ^ isExtension(join) ^ isUnkown(join);
 }
 
-/// Build a scaffold graph using `rawJoins`. This creates default edges and
-/// inserts the rawJoins.
+
+/// Build a scaffold graph using `rawJoins`. This creates default edges for
+/// contigs `1 .. numReferenceContigs + 1` and inserts the `rawJoins`.
+/// Multi-edges are merged using `mergeMultiEdges`.
 Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceContigs, R rawJoins)
 {
     auto scaffold = initScaffold!T(numReferenceContigs)
@@ -199,10 +252,12 @@ Scaffold!T buildScaffold(alias mergeMultiEdges, T, R)(in size_t numReferenceCont
     return scaffold;
 }
 
+
 /// Build a scaffold graph using `rawJoins`. The nodes are deduced from
-/// rawJoins.
+/// `rawJoins`.
 ///
-/// Throws: EdgeExistsException if rawJoins contains duplicate joins.
+/// Throws: `dentist.util.math.EdgeExistsException` if `rawJoins` contains
+///     duplicate joins.
 auto buildScaffold(R)(R rawJoins)
 {
     alias T = typeof(rawJoins.front.payload);
@@ -226,8 +281,10 @@ auto buildScaffold(R)(R rawJoins)
     return scaffold;
 }
 
-/// Creates a scaffold with all the default edges. Optionally specify a
-/// function that produces the payloads.
+
+/// Creates a scaffold the default edges for contigs
+/// `1 .. numReferenceContigs + 1`. Optionally specify
+/// a function that produces the payloads.
 ///
 /// See_Also: `getDefaultJoin`
 Scaffold!T initScaffold(alias getPayload, T)(in size_t numReferenceContigs)
@@ -264,10 +321,9 @@ Scaffold!T initScaffold(T)(in size_t numReferenceContigs)
     return initScaffold!(null, T)(numReferenceContigs);
 }
 
-/**
-    Get the default join for contigId. Initialize payload with
-    `getPayload(contigId)` if given.
-*/
+
+/// Construct the default join for `contigId`. Initialize `payload` with
+/// `getPayload(contigId)` if given.
 Join!T getDefaultJoin(T)(size_t contigId) pure nothrow
 {
     return Join!T(
@@ -286,7 +342,13 @@ Join!T getDefaultJoin(alias getPayload, T)(size_t contigId) pure nothrow
     );
 }
 
-private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R rawJoins) if (isForwardRange!R)
+
+/// Add `rawJoins` to `scaffold` merging multi-edges with `mergeMultiEdges`.
+/// Asserts that the inserted are valid and non-default.
+private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(
+    Scaffold!T scaffold,
+    R rawJoins,
+) if (isForwardRange!R)
 {
     version (assert)
     {
@@ -301,6 +363,7 @@ private Scaffold!T addJoins(alias mergeMultiEdges, T, R)(Scaffold!T scaffold, R 
     return scaffold;
 }
 
+
 /// Get join for a stretch of unknown sequence (`n`s).
 Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure nothrow
 {
@@ -312,8 +375,10 @@ Join!T getUnkownJoin(T)(size_t preContigId, size_t postContigId, T payload) pure
     );
 }
 
+
 /// Normalizes unknown joins such that they join contigs or are removed as
-/// applicable.
+/// applicable. Afterwards the gap joins may not be canonical anymore, i.e.
+/// `isUnkown` may be false.
 Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
 {
     mixin(traceExecution);
@@ -325,22 +390,22 @@ Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
     removalAcc.reserve(numUnkownJoins);
     auto degreesCache = scaffold.allDegrees();
 
-    foreach (unkownJoin; scaffold.edges.filter!isUnkown)
+    foreach (unknownJoin; scaffold.edges.filter!isUnkown)
     {
-        auto preContigId = unkownJoin.start.contigId;
+        auto preContigId = unknownJoin.start.contigId;
         auto preContigEnd = ContigNode(preContigId, ContigPart.end);
-        auto postContigId = unkownJoin.end.contigId;
+        auto postContigId = unknownJoin.end.contigId;
         auto postContigBegin = ContigNode(postContigId, ContigPart.begin);
 
         bool isPreContigUnconnected = degreesCache[preContigEnd] == 1;
         bool hasPreContigExtension = scaffold.has(Join!T(
             preContigEnd,
-            unkownJoin.start,
+            unknownJoin.start,
         ));
         bool hasPreContigGap = !isPreContigUnconnected && !hasPreContigExtension;
         bool isPostContigUnconnected = degreesCache[postContigBegin] == 1;
         bool hasPostContigExtension = scaffold.has(Join!T(
-            unkownJoin.end,
+            unknownJoin.end,
             postContigBegin,
         ));
         bool hasPostContigGap = !isPostContigUnconnected && !hasPostContigExtension;
@@ -350,38 +415,38 @@ Scaffold!T normalizeUnkownJoins(T)(Scaffold!T scaffold)
             newJoins ~= Join!T(
                 preContigEnd,
                 postContigBegin,
-                unkownJoin.payload,
+                unknownJoin.payload,
             );
 
-            unkownJoin.payload = T.init;
-            removalAcc ~= unkownJoin;
+            unknownJoin.payload = T.init;
+            removalAcc ~= unknownJoin;
         }
         else if (isPreContigUnconnected && hasPostContigExtension)
         {
             newJoins ~= Join!T(
                 preContigEnd,
-                unkownJoin.end,
-                unkownJoin.payload,
+                unknownJoin.end,
+                unknownJoin.payload,
             );
 
-            unkownJoin.payload = T.init;
-            removalAcc ~= unkownJoin;
+            unknownJoin.payload = T.init;
+            removalAcc ~= unknownJoin;
         }
         else if (hasPreContigExtension && isPostContigUnconnected)
         {
             newJoins ~= Join!T(
-                unkownJoin.start,
+                unknownJoin.start,
                 postContigBegin,
-                unkownJoin.payload,
+                unknownJoin.payload,
             );
 
-            unkownJoin.payload = T.init;
-            removalAcc ~= unkownJoin;
+            unknownJoin.payload = T.init;
+            removalAcc ~= unknownJoin;
         }
         else if (hasPreContigGap || hasPostContigGap)
         {
-            unkownJoin.payload = T.init;
-            removalAcc ~= unkownJoin;
+            unknownJoin.payload = T.init;
+            removalAcc ~= unknownJoin;
         }
     }
 
@@ -564,6 +629,7 @@ unittest
     assert(scaffold9.edges.walkLength == 5);
 }
 
+
 /// Determine which kinds of joins are allowed.
 enum JoinPolicy
 {
@@ -577,7 +643,11 @@ enum JoinPolicy
     contigs,
 }
 
-/// Enforce joinPolicy in scaffold.
+
+/// Enforce `joinPolicy` in `scaffold`. Write discarded joins to
+/// `forbiddenJoins` if given.
+///
+/// See_also: `JoinPolicy`
 Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy)
 {
     Join!T[] unused;
@@ -660,7 +730,9 @@ Scaffold!T enforceJoinPolicy(T)(Scaffold!T scaffold, in JoinPolicy joinPolicy, o
     return scaffold;
 }
 
-/// Remove blacklisted gap joins.
+
+/// Remove blacklisted gap joins. Write discarded joins to
+/// `forbiddenJoins` if given.
 Scaffold!T removeBlacklisted(T)(Scaffold!T scaffold, in bool[size_t[2]] blacklist)
 {
     Join!T[] unused;
@@ -704,7 +776,9 @@ Scaffold!T removeBlacklisted(T)(Scaffold!T scaffold, in bool[size_t[2]] blacklis
     return scaffold;
 }
 
-/// Enforce joinPolicy in scaffold.
+
+/// Remove extension joins from `scaffold`.
+deprecated("use `enforceJoinPolicy` instead")
 Scaffold!T removeExtensions(T)(Scaffold!T scaffold)
 {
     auto extensionJoins = scaffold.edges.filter!isExtension;
@@ -718,7 +792,8 @@ Scaffold!T removeExtensions(T)(Scaffold!T scaffold)
     return removeNoneJoins!T(scaffold);
 }
 
-/// Enforce joinPolicy in scaffold.
+/// Remove spanning joins from `scaffold`.
+deprecated("use `enforceJoinPolicy` instead")
 Scaffold!T removeSpanning(T)(Scaffold!T scaffold)
 {
     auto spanningJoins = scaffold.edges.filter!isGap;
@@ -732,6 +807,7 @@ Scaffold!T removeSpanning(T)(Scaffold!T scaffold)
     return removeNoneJoins!T(scaffold);
 }
 
+
 /// Remove marked edges from the graph. This always keeps the default edges.
 Scaffold!T removeNoneJoins(T)(Scaffold!T scaffold)
 {
@@ -740,13 +816,15 @@ Scaffold!T removeNoneJoins(T)(Scaffold!T scaffold)
     return scaffold;
 }
 
-bool noneJoinFilter(T)(Join!T join)
+
+private bool noneJoinFilter(T)(Join!T join)
 {
     return isDefault(join) || join.payload != T.init;
 }
 
+
 /// Remove extension edges were they coincide with a gap edge combining their
-/// payload. This is intended to build pile ups with all reads that contribute
+/// payloads. This is intended to build pile ups with all reads that contribute
 /// to each gap.
 Scaffold!T mergeExtensionsWithGaps(alias mergePayloads, T)(Scaffold!T scaffold)
 {
@@ -819,14 +897,15 @@ unittest
     assert(scaffold.get(J(CN(1, CP.end), CN(2, CP.begin))).payload == 4); // merged 2 * e1 + e2 + e3
 }
 
+
 /**
-    Performs a linear walk through a scaffold graph starting in startNode.
+    Performs a linear walk through a scaffold graph starting in `startNode`.
     A linear walk is a sequence of adjacent joins where no node is visited
     twice unless the graph is cyclic in which case the first node will appear
     twice. The implementation requires the graph to have linear components,
-    ie. for every node the degree must be at most two. If the component of
-    `startNode` is cyclic then the walk will in `startNode` and the `isCyclic`
-    flag will be set.
+    i.e. for every node the degree must be at most two. If the component of
+    `startNode` is cyclic then the walk will end in `startNode` and the
+    `isCyclic` flag will be set.
 
     The direction of the walk can be influenced by giving `firstJoin`.
 
@@ -834,13 +913,13 @@ unittest
     `std.range.refRange` in most cases.
 
     Returns: range of joins in the scaffold graph.
-    Throws: MissingNodeException if any node is encountered that is not part
+    Throws: `MissingNodeException` if any node is encountered that is not part
             of the graph.
 */
 LinearWalk!T linearWalk(T)(
     Scaffold!T scaffold,
     ContigNode startNode,
-    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+    IncidentEdgesCache!T incidentEdgesCache = IncidentEdgesCache!T.init,
 )
 {
     return LinearWalk!T(scaffold, startNode, incidentEdgesCache);
@@ -851,7 +930,7 @@ LinearWalk!T linearWalk(T)(
     Scaffold!T scaffold,
     ContigNode startNode,
     Join!T firstJoin,
-    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+    IncidentEdgesCache!T incidentEdgesCache = IncidentEdgesCache!T.init,
 )
 {
     return LinearWalk!T(scaffold, startNode, firstJoin, incidentEdgesCache);
@@ -978,29 +1057,33 @@ unittest
     }
 }
 
+
+/// Range that walks linearly through its scaffold graph.
 struct LinearWalk(T)
 {
-    alias IncidentEdgesCache = Scaffold!T.IncidentEdgesCache;
-    static enum emptyIncidentEdgesCache = IncidentEdgesCache.init;
+    static enum emptyIncidentEdgesCache = IncidentEdgesCache!T.init;
 
     private Scaffold!T scaffold;
-    private IncidentEdgesCache incidentEdgesCache;
+    private IncidentEdgesCache!T incidentEdgesCache;
     private size_t currentNodeIdx;
     private Join!T currentJoin;
     private bool isEmpty = false;
     private Flag!"isCyclic" _isCyclic = No.isCyclic;
     private NaturalNumberSet visitedNodes;
 
+
+    /// Set to `Yes.isCyclic` if a cycle was detected.
     @property Flag!"isCyclic" isCyclic() const pure nothrow @safe
     {
         return _isCyclic;
     }
 
-    /// Start linear walk through a scaffold graph in startNode.
-    this(
+
+    /// See `linearWalk` instead.
+    private this(
         Scaffold!T scaffold,
         ContigNode startNode,
-        IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache,
+        IncidentEdgesCache!T incidentEdgesCache = emptyIncidentEdgesCache,
     )
     {
         this.scaffold = scaffold;
@@ -1013,12 +1096,13 @@ struct LinearWalk(T)
         this.popFront();
     }
 
-    /// Start linear walk through a scaffold graph in startNode.
-    this(
+
+    /// ditto
+    private this(
         Scaffold!T scaffold,
         ContigNode startNode,
         Join!T firstJoin,
-        IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache,
+        IncidentEdgesCache!T incidentEdgesCache = emptyIncidentEdgesCache,
     )
     {
         this.scaffold = scaffold;
@@ -1033,6 +1117,8 @@ struct LinearWalk(T)
         this.markVisited(this.currentNodeIdx);
     }
 
+
+    /// Input range interface.
     void popFront()
     {
         assert(!empty, "Attempting to popFront an empty LinearWalk");
@@ -1070,16 +1156,21 @@ struct LinearWalk(T)
         markVisited(currentNodeIdx);
     }
 
+
+    /// ditto
     @property Join!T front()
     {
         assert(!empty, "Attempting to fetch the front of an empty LinearWalk");
         return currentJoin;
     }
 
+
+    /// ditto
     @property bool empty()
     {
         return isEmpty;
     }
+
 
     private void lastEdgeOfCycle()
     {
@@ -1091,21 +1182,25 @@ struct LinearWalk(T)
             .front;
     }
 
+
     private void endOfWalk()
     {
         currentNodeIdx = scaffold.nodes.length;
         isEmpty = true;
     }
 
+
     private @property ContigNode currentNode()
     {
         return scaffold.nodes[currentNodeIdx];
     }
 
+
     private @property void currentNode(ContigNode node)
     {
         this.currentNodeIdx = this.scaffold.indexOf(node);
     }
+
 
     private void markVisited(size_t nodeIdx)
     {
@@ -1113,13 +1208,14 @@ struct LinearWalk(T)
     }
 }
 
+
 /// Use `linearWalk` to determine if `startNode` is part of a cycle.
 ///
 /// See_also: `linearWalk`
 Flag!"isCyclic" isCyclic(T)(
     Scaffold!T scaffold,
     ContigNode startNode,
-    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+    IncidentEdgesCache!T incidentEdgesCache = IncidentEdgesCache!T.init,
 )
 {
     scope walk = LinearWalk!T(scaffold, startNode, incidentEdgesCache);
@@ -1132,7 +1228,7 @@ Flag!"isCyclic" isCyclic(T)(
     Scaffold!T scaffold,
     ContigNode startNode,
     Join!T firstJoin,
-    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+    IncidentEdgesCache!T incidentEdgesCache = IncidentEdgesCache!T.init,
 )
 {
     scope walk = LinearWalk!T(scaffold, startNode, firstJoin, incidentEdgesCache);
@@ -1150,24 +1246,23 @@ private Flag!"isCyclic" isCyclic(T)(ref LinearWalk!T walk)
 }
 
 
-/// Get a range of `ContigNode`s where full contig walks should start.
+/// Returns a range of `ContigNode`s where full contig walks should start.
 auto scaffoldStarts(T)(
     Scaffold!T scaffold,
-    Scaffold!T.IncidentEdgesCache incidentEdgesCache = Scaffold!T.IncidentEdgesCache.init,
+    IncidentEdgesCache!T incidentEdgesCache = IncidentEdgesCache!T.init,
 )
 {
     static struct ContigStarts
     {
-        alias IncidentEdgesCache = Scaffold!T.IncidentEdgesCache;
-        static enum emptyIncidentEdgesCache = IncidentEdgesCache.init;
+        static enum emptyIncidentEdgesCache = IncidentEdgesCache!T.init;
 
         Scaffold!T scaffold;
-        IncidentEdgesCache incidentEdgesCache;
+        IncidentEdgesCache!T incidentEdgesCache;
         bool _empty = false;
         NaturalNumberSet unvisitedNodes;
         ContigNode currentContigStart;
 
-        this(Scaffold!T scaffold, IncidentEdgesCache incidentEdgesCache = emptyIncidentEdgesCache)
+        this(Scaffold!T scaffold, IncidentEdgesCache!T incidentEdgesCache = emptyIncidentEdgesCache)
         {
             this.scaffold = scaffold;
             this.incidentEdgesCache = incidentEdgesCache == emptyIncidentEdgesCache

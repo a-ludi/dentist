@@ -8,7 +8,10 @@
 */
 module dentist.util.math;
 
-import dentist.util.algorithm : cmpLexicographically, sliceBy;
+import dentist.util.algorithm :
+    cmpLexicographically,
+    sliceBy,
+    uniqInPlace;
 import std.algorithm :
     all,
     among,
@@ -54,7 +57,8 @@ import std.typecons :
 
 debug import std.stdio : writeln;
 
-/// Calculate the mean of range.
+
+/// Calculate the mean of `values`.
 ElementType!Range mean(Range)(Range values) if (isForwardRange!Range)
 {
     auto sum = values.save.sum;
@@ -63,6 +67,7 @@ ElementType!Range mean(Range)(Range values) if (isForwardRange!Range)
     return sum / length;
 }
 
+///
 unittest
 {
     {
@@ -75,7 +80,8 @@ unittest
     }
 }
 
-/// Calculate the weighted mean of values.
+
+/// Calculate the weighted mean of `values`.
 double mean(Values, Weights)(Values values, Weights weights)
     if (isInputRange!Values && isForwardRange!Weights)
 {
@@ -89,6 +95,7 @@ double mean(Values, Weights)(Values values, Weights weights)
     return weightedSum / totalWeight;
 }
 
+///
 unittest
 {
     {
@@ -107,7 +114,8 @@ unittest
     }
 }
 
-/// Calculate the median of range.
+
+/// Calculate the median of `values`.
 ElementType!Range median(Range)(Range values) if (__traits(compiles, sort(values)))
 {
     assert(values.length > 0, "median is undefined for empty set");
@@ -121,6 +129,7 @@ ElementType!Range median(Range)(Range values) if (__traits(compiles, sort(values
         return values[middleIdx];
 }
 
+///
 unittest
 {
     {
@@ -149,7 +158,8 @@ unittest
     }
 }
 
-/// Calculate the Nxx (e.g. N50) of values.
+
+/// Calculate the N`xx` (e.g. N50) of `values`.
 ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__traits(compiles, sort(values)))
 {
     static assert(0 < xx && xx < 100, "N" ~ xx.to!string ~ " is undefined");
@@ -167,6 +177,7 @@ ElementType!Range N(real xx, Range, Num)(Range values, Num totalSize) if (__trai
         return sortedValues[$ - targetIndex - 1];
 }
 
+///
 unittest
 {
     {
@@ -187,18 +198,24 @@ unittest
     }
 }
 
+
+/// Specify a rounding mode.
 enum RoundingMode : byte
 {
+    /// Round towards `-inf`.
     floor,
+    /// Round towards the nearest integer; `0.5` is rounded up.
     round,
+    /// Round towards `+inf`.
     ceil,
 }
 
-/**
-    Round x upward according to base, ie. returns the next integer larger or
-    equal to x which is divisible by base.
 
-    Returns: x rounded upward according to base.
+/**
+    Round `x` towards `+inf` according to `base`, i.e. returns the next
+    integer larger or equal to `x` which is divisible by `base`.
+
+    Returns: `x` rounded towards `+inf` according to `base`.
 */
 Integer ceil(Integer)(in Integer x, in Integer base) pure nothrow
         if (isIntegral!Integer)
@@ -216,11 +233,12 @@ unittest
     assert(ceil(101, 100) == 200);
 }
 
-/**
-    Round x downward according to base, ie. returns the next integer smaller or
-    equal to x which is divisible by base.
 
-    Returns: x rounded downward according to base.
+/**
+    Round `x` towards `-inf` according to `base`, i.e. returns the next
+    integer smaller or equal to `x` which is divisible by `base`.
+
+    Returns: `x` rounded towards `-inf` according to `base`.
 */
 Integer floor(Integer)(in Integer x, in Integer base) pure nothrow
         if (isIntegral!Integer)
@@ -235,6 +253,7 @@ unittest
     assert(floor(32, 16) == 32);
     assert(floor(101, 100) == 100);
 }
+
 
 /// Returns the absolute difference between two numbers.
 Num absdiff(Num)(in Num a, in Num b) pure nothrow if (isNumeric!Num)
@@ -251,6 +270,7 @@ unittest
     assert(absdiff(-42, 13) == 55);
     assert(absdiff(2.5, 5) == 2.5);
 }
+
 
 /// Returns the result of `ceil(a / b)` but uses integer arithmetic only.
 Integer ceildiv(Integer)(in Integer a, in Integer b) pure nothrow if (isIntegral!Integer)
@@ -274,6 +294,8 @@ unittest
     assert(ceildiv(-4, 3) == -1);
 }
 
+
+/// Thrown if attempting to insert an edge into a `Graph` that already exists.
 class EdgeExistsException : Exception
 {
     pure nothrow @nogc @safe this(
@@ -286,6 +308,8 @@ class EdgeExistsException : Exception
     }
 }
 
+
+/// Thrown if attempting to access an edge from a `Graph` that does not exist.
 class MissingEdgeException : Exception
 {
     pure nothrow @nogc @safe this(
@@ -298,6 +322,8 @@ class MissingEdgeException : Exception
     }
 }
 
+
+/// Thrown if attempting to access a node from a `Graph` that does not exist.
 class MissingNodeException : Exception
 {
     pure nothrow @nogc @safe this(
@@ -310,10 +336,14 @@ class MissingNodeException : Exception
     }
 }
 
-/// This structure represents a graph with optional edge
-/// payloads. The graph is represented as a list of edges which is
-/// particularly suited for sparse graphs. While the set of nodes is fixed the
-/// set of edges is mutable.
+
+/// This structure represents a graph with optional edge payloads. The graph
+/// is represented as a list of edges which is particularly suited for sparse
+/// graphs. While the set of nodes is fixed the set of edges is mutable.
+///
+/// A graph may have directed or undirected edges. The edges may have weight
+/// and/or payloads associated with them. This difference between the two is
+/// that weights are considered in comparisons whereas payloads are not.
 struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, EdgePayload = void)
 {
     static assert(
@@ -321,22 +351,37 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         "Node must not be size_t as this leads to conflicting overloads"
     );
 
+    /// True if edges have weights.
     static enum isWeighted = !is(Weight == void);
+
+    /// True if edges have payloads.
     static enum hasEdgePayload = !is(EdgePayload == void);
 
 
+    /// An edge in the graph.
+    ///
+    /// Edges may be directed or undirected, weighted or unweighted and have
+    /// an additional payload or not.
     static struct Edge
     {
         protected Node _start;
         protected Node _end;
 
         static if (isWeighted)
+            /// Weight associated with this edge. This is taken into account
+            /// in comparisons between edges.
             Weight weight;
 
         static if (hasEdgePayload)
+            /// Payload associated with this edge. This is NOT taken into
+            /// account in comparisons between edges.
             EdgePayload payload;
 
+
         /// Construct an edge.
+        ///
+        /// `start` and `end` will be stored such that `start <= end` for
+        /// undirected edges.
         this(Node start, Node end)
         {
             this._start = start;
@@ -382,6 +427,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             }
         }
 
+
         /// Get the start of this edge. For undirected graphs this is the
         /// smaller of both incident nodes.
         @property Node start() const pure nothrow
@@ -400,7 +446,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             Get target of this edge beginning at node `from`. For undirected
             graphs returns the other node of this edge.
 
-            Throws: MissingNodeException if this edge does not start in node `from`.
+            Throws: `MissingNodeException` if this edge does not start in
+                node `from`.
         */
         Node target(Node from) const
         {
@@ -432,11 +479,13 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             }
         }
 
+
         /**
             Get source of this edge beginning at node `from`. For undirected
             graphs returns the other node of this edge.
 
-            Throws: MissingNodeException if this edge does not end in node `from`.
+            Throws: `MissingNodeException` if this edge does not end in
+                node `from`.
         */
         static if (isDirected)
         {
@@ -457,6 +506,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             alias source = target;
         }
 
+
         /// Two edges are equal iff their incident nodes (and weight) are the
         /// same.
         bool opEquals(in Edge other) const pure nothrow
@@ -471,6 +521,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return this.start == other.start && this.end == other.end;
             }
         }
+
 
         /// Orders edge lexicographically by `start`, `end`(, `weight`).
         int opCmp(in Edge other) const pure nothrow
@@ -494,6 +545,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             }
         }
 
+
         private int compareNodes(in Edge other) const pure nothrow
         {
             return cmpLexicographically!(
@@ -503,13 +555,14 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             )(this, other);
         }
 
-        /**
-            Returns the node that is connects this edge with other edge. In
-            case of undirected graphs this is just the common node of both
-            edges; in directed case this is the end node of this edge if it
-            matches the start node of other edge.
 
-            Throws: MissingNodeException if the connecting node is undefined.
+        /**
+            Returns the node that connects `this` edge with `other` edge. In
+            case of undirected graphs this is just the common node of both
+            edges; in directed case this is the end node of `this` edge if it
+            matches the start node of `other` edge.
+
+            Throws: `MissingNodeException` if the connecting node is undefined.
         */
         Node getConnectingNode(in Edge other) const
         {
@@ -536,15 +589,20 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         }
     }
 
+
+    /// Same as `a < b` but disregards the weight in weighted graphs.
     static bool orderByNodes(in Edge a, in Edge b) nothrow pure
     {
         return a.compareNodes(b) < 0;
     }
 
+
+    /// Same as `a == b` but disregards the weight in weighted graphs.
     static bool groupByNodes(in Edge a, in Edge b) nothrow pure
     {
         return a.compareNodes(b) == 0;
     }
+
 
     /// Construct an edge for this graph.
     static Edge edge(T...)(T args)
@@ -552,8 +610,10 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         return Edge(args);
     }
 
+
     protected Node[] _nodes;
     protected Appender!(Edge[]) _edges;
+
 
     /// The set (ordered list) of nodes.
     @property const(Node[]) nodes() const nothrow pure
@@ -563,31 +623,35 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
     private @property void nodes(Node[] nodes)
     {
-        nodes.sort();
-
-        this._nodes = nodes.uniq.array;
+        this._nodes = nodes.dup;
+        this._nodes.sort();
+        this._nodes.uniqInPlace();
     }
+
 
     /// Get the set (ordered list) of edges in this graph.
     @property auto edges() nothrow pure
     {
+        // `chain` is used to hide the underling array from the caller
         return chain(_edges.data);
     }
 
     /// ditto
     @property auto edges() const nothrow pure
     {
+        // `chain` is used to hide the underling array from the caller
         return chain(_edges.data);
     }
 
-    /**
-        Construct a graph from a set of nodes (and edges). Modifies `nodes`
-        while sorting but releases it after construction.
 
-        Throws: MissingNodeException if an edge has a node that is not present
-                in this graph .
-        Throws: EdgeExistsException if an edge already exists when trying
-                inserting it.
+    /**
+        Construct a graph from a set of nodes (and edges). Makes a copy
+        `nodes` and removes duplicates.
+
+        Throws: `MissingNodeException` if an edge has a node that is not
+            present in this graph .
+        Throws: `EdgeExistsException` if an edge already exists when trying
+            inserting it, i.e. an edge occurs twice or more in `edges`.
     */
     this(Node[] nodes)
     {
@@ -611,19 +675,27 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         _nodes = _nodes.dup;
     }
 
+
     /// Add a set of edges to this graph without any checks.
+    ///
+    /// This is intended to speed up construction of the graph if it is known
+    /// that `edges` does not contain duplicates. Results in  undefined
+    /// behavior if `edges` contains duplicate edges.
     void bulkAddForce(R)(R edges) if (isInputRange!R && is(ElementType!R == Edge))
     {
         this._edges ~= edges;
         _edges.data.sort;
     }
 
-    /// Add an edge to this graph.
-    /// See_Also: `Edge add(Graph, Edge)`
+
+    /// Add an `edge` to this graph.
+    ///
+    /// See_Also: `add`
     void opOpAssign(string op)(Edge edge) if (op == "~")
     {
         add(this, edge);
     }
+
 
     /// Some pre-defined conflict handlers for `add`.
     static struct ConflictStrategy
@@ -670,7 +742,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             assertThrown!EdgeExistsException(g1.add!(CS.error)(g1.edge(1, 2)));
         }
 
-        /// Replace the existingEdge by newEdge.
+        /// Replace the `existingEdge` by `newEdge`.
         static inout(Edge) replace(inout(Edge) existingEdge, inout(Edge) newEdge)
         {
             return newEdge;
@@ -689,7 +761,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             assert(addedEdge.weight == 2);
         }
 
-        /// Keep existingEdge – discard newEdge.
+
+        /// Keep `existingEdge` – discard `newEdge`.
         static inout(Edge) keep(inout(Edge) existingEdge, inout(Edge) newEdge)
         {
             return existingEdge;
@@ -709,7 +782,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         }
     }
 
-    /// Forcibly add an edge to this graph.
+
+    /// Forcibly add `edge` to this graph.
+    ///
+    /// This is intended to speed up construction of a graph. Results in
+    /// undefined behavior if `edge` is already contained in this graph.
     protected Edge forceAdd(Edge edge)
     {
         _edges ~= edge;
@@ -717,6 +794,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
 
         return edge;
     }
+
 
     /// Replace an edge in this graph.
     protected Edge replaceEdge(in size_t edgeIdx, Edge newEdge)
@@ -733,7 +811,9 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         return newEdge;
     }
 
-    /// Check if edge/node exists in this graph. Ignores the weight if weighted.
+
+    /// Check if edge/node exists in this graph. Ignores the edge weight
+    /// if weighted.
     bool opBinaryRight(string op)(in Node node) const pure nothrow if (op == "in")
     {
         auto sortedNodes = assumeSorted(nodes);
@@ -747,8 +827,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         return node in this;
     }
 
-    /// Check if edge exists in this graph. Only the `start` and `end` node
-    /// will be compared.
+    /// ditto
     bool opBinaryRight(string op)(in Edge edge) const pure nothrow if (op == "in")
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
@@ -762,7 +841,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         return edge in this;
     }
 
-    /// Get the designated edge from this graph. Only the `start` and `end`
+
+    /// Get the designated `edge` from this graph. Only the `start` and `end`
     /// node will be compared.
     auto ref get(in Edge edge)
     {
@@ -792,7 +872,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         assertThrown!MissingEdgeException(g1.get(g1.edge(1, 1)));
     }
 
+
     /// Returns the index of node `n` in the list of nodes.
+    ///
+    /// Uses `std.range.SortedRange.trisect`to locate `n` in the list of
+    /// nodes.
     size_t indexOf(in Node n) const
     {
         auto sortedNodes = assumeSorted(nodes);
@@ -816,7 +900,11 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         assertThrown!MissingNodeException(g1.indexOf(3));
     }
 
-    /// Returns the index of node `n` in the list of nodes.
+
+    /// Returns the index of edge `n` in the list of edges.
+    ///
+    /// Uses `std.range.SortedRange.trisect`to locate `n` in the list of
+    /// nodes.
     size_t indexOf(in Edge edge) const
     {
         auto sortedEdges = assumeSorted!orderByNodes(edges);
@@ -842,6 +930,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         assert(g1.indexOf(g1.edge(1, 2)) == 0);
         assertThrown!MissingEdgeException(g1.indexOf(g1.edge(1, 1)));
     }
+
 
     static if (isDirected)
     {
@@ -978,22 +1067,29 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             ]));
         }
 
+
+        /// Create a cache object for efficient access to incident edges.
+        ///
+        /// This drastically speeds up operations that traverse the graph.
         IncidentEdgesCache allIncidentEdges()
         {
             return IncidentEdgesCache(this);
         }
 
+        /// ditto
         static struct IncidentEdgesCache
         {
-            alias G = Graph!(Node, Weight, isDirected, EdgePayload);
-            G graph;
-            Edge[][] incidentEdges;
+            private alias G = Graph!(Node, Weight, isDirected, EdgePayload);
+            private G graph;
+            private Edge[][] incidentEdges;
+
 
             this(G graph)
             {
                 this.graph = graph;
                 collectAllIncidentEdges();
             }
+
 
             private void collectAllIncidentEdges()
             {
@@ -1019,7 +1115,8 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 }
             }
 
-            void preallocateMemory()
+
+            private void preallocateMemory()
             {
                 auto degreesCache = graph.allDegrees();
                 Edge[] buffer;
@@ -1038,16 +1135,24 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 }
             }
 
+
+            /// Lookup incident edges of the designated node.
+            ///
+            /// The node index of `node` will be implicitly determined by
+            /// `Graph.indexOf`.
             ref inout(Edge[]) opIndex(in Node node) inout
             {
                 return incidentEdges[graph.indexOf(node)];
             }
 
+            /// ditto
             ref inout(Edge[]) opIndex(in size_t nodeIdx) inout
             {
                 return incidentEdges[nodeIdx];
             }
 
+
+            /// Iterate over the nodes and their incident edges.
             int opApply(scope int delegate(Edge[]) yield)
             {
                 int result = 0;
@@ -1062,6 +1167,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return result;
             }
 
+            /// ditto
             int opApply(scope int delegate(Node, Edge[]) yield)
             {
                 int result = 0;
@@ -1076,6 +1182,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return result;
             }
         }
+
 
         /// Get the `adjacencyList` of this graph where nodes are represented
         /// by their index in the nodes list.
@@ -1120,6 +1227,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
             ]);
         }
 
+
         /// Get the degree of node `n`.
         size_t degree(Node n) const nothrow pure
         {
@@ -1132,18 +1240,22 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
         /// ditto
         alias outDegree = degree;
 
+
+        /// Efficiently calculate the list of all degrees.
         DegreesCache allDegrees() const
         {
             return DegreesCache(this);
         }
 
+
+        /// A list of all degrees.
         static struct DegreesCache
         {
-            alias G = Graph!(Node, Weight, isDirected, EdgePayload);
-            const(G) graph;
-            size_t[] degrees;
+            private alias G = Graph!(Node, Weight, isDirected, EdgePayload);
+            private const(G) graph;
+            private size_t[] degrees;
 
-            this(in G graph)
+            private this(in G graph)
             {
                 this.graph = graph;
                 collectAllDegrees();
@@ -1173,16 +1285,24 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 }
             }
 
+
+            /// Lookup the degree of the designated node.
+            ///
+            /// The node index of `node` will be implicitly determined by
+            /// `Graph.indexOf`.
             size_t opIndex(in Node node) const
             {
                 return degrees[graph.indexOf(node)];
             }
 
+            /// ditto
             size_t opIndex(in size_t nodeIdx) const
             {
                 return degrees[nodeIdx];
             }
 
+
+            /// Iterate over the nodes and their degrees.
             int opApply(scope int delegate(size_t) yield) const
             {
                 int result = 0;
@@ -1197,6 +1317,7 @@ struct Graph(Node, Weight = void, Flag!"isDirected" isDirected = No.isDirected, 
                 return result;
             }
 
+            /// ditto
             int opApply(scope int delegate(Node, size_t) yield) const
             {
                 int result = 0;
@@ -1391,8 +1512,12 @@ unittest
     ]);
 }
 
-/// Add an edge to this graph and handle existing edges with `handleConflict`.
+
+/// Add `edge` to `graph` and handle existing edges with `handleConflict`.
+///
 /// The handler must have this signature `Edge handleConflict(Edge, Edge)`.
+///
+/// See_also: `Graph.ConflictStrategy`
 G.Edge add(alias handleConflict = 1337, G)(ref G graph, G.Edge edge)
         if (is(G : Graph!Params, Params...))
 {
@@ -1451,6 +1576,8 @@ unittest
     }
 }
 
+
+/// Filter edges of `graph` by `pred` in-place.
 void filterEdges(alias pred, G)(ref G graph) if (is(G : Graph!Params, Params...))
 {
     auto bufferRest = graph
@@ -1461,6 +1588,11 @@ void filterEdges(alias pred, G)(ref G graph) if (is(G : Graph!Params, Params...)
     graph._edges.shrinkTo(graph._edges.data.length - bufferRest.length);
 }
 
+
+/// Modify edges of `graph` with `fun` in-place.
+///
+/// The resulting list of edges will be sorted but not checked for duplicates.
+/// Introducing duplicate edges results in undefined behavior.
 void mapEdges(alias fun, G)(ref G graph) if (is(G : Graph!Params, Params...))
 {
     foreach (ref edge; graph._edges.data)
@@ -1469,6 +1601,10 @@ void mapEdges(alias fun, G)(ref G graph) if (is(G : Graph!Params, Params...))
     graph._edges.data.sort();
 }
 
+
+/// Thrown if set operations the require elements are called.
+///
+/// See_also: `NaturalNumberSet.minElement`, `NaturalNumberSet.maxElement`
 class EmptySetException : Exception
 {
     this(string msg)
@@ -1477,6 +1613,10 @@ class EmptySetException : Exception
     }
 }
 
+
+/// A set of natural numbers represented as a variable-length bit vector.
+///
+/// Additional space is allocated as required.
 struct NaturalNumberSet
 {
     private static enum partSize = 8 * size_t.sizeof;
@@ -1488,6 +1628,11 @@ struct NaturalNumberSet
     private size_t[] parts;
     private size_t nMax;
 
+
+    /// Create a new set that can hold `initialNumElements` without resizing.
+    ///
+    /// If `addAll` is given the first `initialNumElements` will be
+    /// efficiently inserted into the set.
     this(size_t initialNumElements, Flag!"addAll" addAll = No.addAll)
     {
         reserveFor(initialNumElements);
@@ -1501,6 +1646,8 @@ struct NaturalNumberSet
         }
     }
 
+
+    /// Efficiently create a new set from `initialElements`.
     static NaturalNumberSet create(size_t[] initialElements...)
     {
         if (initialElements.length == 0)
@@ -1514,21 +1661,26 @@ struct NaturalNumberSet
         return set;
     }
 
+
     this(this)
     {
         parts = parts.dup;
     }
+
 
     private this(size_t[] parts)
     {
         this.parts = parts;
     }
 
+
     private bool inBounds(in size_t n) const pure nothrow
     {
         return n < nMax;
     }
 
+
+    /// Make sure the set can hold `n` without resizing.
     void reserveFor(in size_t n)
     {
         if (parts.length == 0)
@@ -1544,31 +1696,43 @@ struct NaturalNumberSet
         }
     }
 
+
+    /// Return the largest integer that can be inserted without resizing.
     @property size_t capacity() pure const nothrow
     {
         return nMax;
     }
+
 
     private size_t partIdx(in size_t n) const pure nothrow
     {
         return n / partSize;
     }
 
+
     private size_t idxInPart(in size_t n) const pure nothrow
     {
         return n % partSize;
     }
+
 
     private size_t itemMask(in size_t n) const pure nothrow
     {
         return firstBit << idxInPart(n);
     }
 
-    static size_t inverse(in size_t n) pure nothrow
+
+
+    private static size_t inverse(in size_t n) pure nothrow
     {
         return n ^ fullPart;
     }
 
+
+    /// Add `n` to this set regardless whether it was present or not.
+    ///
+    /// Additional memory will be allocated if the set is not large enough to
+    /// hold `n`;
     void add(in size_t n)
     {
         reserveFor(n);
@@ -1576,6 +1740,8 @@ struct NaturalNumberSet
         parts[partIdx(n)] |= itemMask(n);
     }
 
+
+    /// Remove `n` from this set regardless whether it was present or not.
     void remove(in size_t n)
     {
         if (!inBounds(n))
@@ -1586,6 +1752,8 @@ struct NaturalNumberSet
         parts[partIdx(n)] &= inverse(itemMask(n));
     }
 
+
+    /// Return whether `n` is in this set.
     bool has(in size_t n) const pure nothrow
     {
         if (!inBounds(n))
@@ -1596,22 +1764,32 @@ struct NaturalNumberSet
         return (parts[partIdx(n)] & itemMask(n)) != emptyPart;
     }
 
+    /// ditto
     bool opBinaryRight(string op)(in size_t n) const pure nothrow if (op == "in")
     {
         return this.has(n);
     }
 
+
+    /// Returns true if this set is empty.
     bool empty() const pure nothrow
     {
         return parts.all!(part => part == emptyPart);
     }
 
+
+    /// Remove all elements from this set.
     void clear() pure nothrow
     {
         foreach (ref part; parts)
             part = emptyPart;
     }
 
+
+    /// Compare sets for equality.
+    ///
+    /// Two sets are equal if they contain the same elements. The length of
+    /// the underlying bit vector is ignored.
     bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "==")
     {
         auto numCommonParts = min(this.parts.length, other.parts.length);
@@ -1639,6 +1817,11 @@ struct NaturalNumberSet
         return true;
     }
 
+
+    /// Compare sets for containment.
+    ///
+    /// This set is contained in `other` if `other` contains every element
+    /// from this set. The length of the underlying bit vector is ignored.
     bool opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op == "in")
     {
         auto numCommonParts = min(this.parts.length, other.parts.length);
@@ -1662,6 +1845,15 @@ struct NaturalNumberSet
         return true;
     }
 
+
+    /// Perform set operation.
+    ///
+    /// Operations: $(UL
+    ///     $(LI `|` – set union)
+    ///     $(LI `&` – set intersection)
+    ///     $(LI `-` – set difference)
+    ///     $(LI `^` – symmetric set difference)
+    /// )
     NaturalNumberSet opBinary(string op)(in NaturalNumberSet other) const pure nothrow if (op.among("|", "^", "&", "-"))
     {
         enum enlargeResult = op.among("|", "^");
@@ -1697,6 +1889,8 @@ struct NaturalNumberSet
         return result;
     }
 
+
+    /// Return true if `this` and `other` share at least one element.
     bool intersects(in NaturalNumberSet other) const pure nothrow
     {
         auto numCommonParts = min(this.parts.length, other.parts.length);
@@ -1710,6 +1904,8 @@ struct NaturalNumberSet
         return false;
     }
 
+
+    /// Return the number of elements in this set.
     @property size_t size() const pure nothrow
     {
         size_t numSetBits;
@@ -1730,6 +1926,10 @@ struct NaturalNumberSet
         return numSetBits;
     }
 
+
+    /// Return the smallest element in this set.
+    ///
+    /// Throws: `EmptySetException` if set is empty.
     size_t minElement() const
     {
         foreach (i, part; parts)
@@ -1750,6 +1950,10 @@ struct NaturalNumberSet
         throw new EmptySetException("empty set has no minElement");
     }
 
+
+    /// Return the largest element in this set.
+    ///
+    /// Throws: `EmptySetException` if set is empty.
     size_t maxElement() const
     {
         foreach (i, part; parts.retro.enumerate)
@@ -1783,6 +1987,7 @@ struct NaturalNumberSet
             assert(set.maxElement() == i + 7);
         }
     }
+
 
     private static struct ElementsRange(Set)
     {
@@ -1888,9 +2093,11 @@ struct NaturalNumberSet
         }
     }
 
-    /// Returns a range of the elements in this set. The elements are ordered
-    /// ascending. The elements are guaranteed to fulfill `fromElement <= front`
-    /// and `front < toElement`.
+
+    /// Returns a range of the elements in this set.
+    ///
+    /// The elements are ordered ascending. The elements are guaranteed to
+    /// fulfill `fromElement <= front` and `front < toElement`.
     @property auto elements(size_t fromElement = 0, size_t toElement = size_t.max) const pure nothrow
     in (fromElement <= toElement, "illegal range")
     {
@@ -1962,9 +2169,19 @@ struct NaturalNumberSet
         ));
     }
 
+
+    /// Generate a string representation of this set.
     string toString() const pure
     {
         return format("[%(%d,%)]", this.elements);
+    }
+
+    ///
+    unittest
+    {
+        auto set = NaturalNumberSet.create([1, 2, 3, 5, 8, 13]);
+
+        assert(set.toString == "[1,2,3,5,8,13]");
     }
 }
 
@@ -2008,19 +2225,20 @@ unittest
     }
 }
 
-/**
-    Find all maximal connected components of a graph-like structure. The
-    predicate `isConnected` will be evaluated `O(n^^2)` times in the
-    worst-case and `Ω(n)` in the best case. In expectation it will be
-    evaluated `θ(n*log(n))`.
 
+/**
+    Find all maximally connected components of a graph. The predicate
+    `isConnected` will be evaluated `O(n^^2)` times in the worst-case
+    and `Ω(n)` in the best case. In expectation it will be evaluated
+    `θ(n*log(n))`.
+
+    Returns: lazy range of maximally connected components represented as
+        `NaturalNumberSet`s
     Params:
         isConnected =   binary predicate that evaluates to true iff two nodes,
                         represented as indices, are connected
         numNodes    =   total number of nodes in the graph
 
-    Returns:    range of maxmimally connected components represented as
-                `NaturalNumberSet`s
 */
 auto findMaximallyConnectedComponents(alias isConnected)(in size_t numNodes)
 {
@@ -2086,6 +2304,7 @@ unittest
     ));
 }
 
+
 private struct MaximalConnectedComponents(alias isConnected)
 {
 
@@ -2140,20 +2359,21 @@ private struct MaximalConnectedComponents(alias isConnected)
     }
 }
 
+
 /**
     Find a cycle base of an undirected graph using the Paton's
     algorithm.
 
     The algorithm is described in
 
-    > K. Paton, An algorithm for finding a fundamental set of cycles
-    > for an undirected linear graph, Comm. ACM 12 (1969), pp. 514-518.
+    $(I K. Paton, An algorithm for finding a fundamental set of cycles
+    for an undirected linear graph, Comm. ACM 12 (1969), pp. 514-518.)
 
-    and the implementation is adapted from the [Java implementation][1] of
-    K. Paton originally licensed under [Apache License 2.0][2].
+    and the implementation is adapted from the Java implementation of
+    K. Paton [1] originally licensed under Apache License 2.0 [2].
 
-    [1]: https://code.google.com/archive/p/niographs/
-    [2]: http://www.apache.org/licenses/LICENSE-2.0
+    [1]: $(LINK https://code.google.com/archive/p/niographs/)$(BR)
+    [2]: $(LINK http://www.apache.org/licenses/LICENSE-2.0)
 
     Returns: range of cycles in the graph represented as arrays of node indices
 */
@@ -2301,13 +2521,14 @@ unittest
     ]));
 }
 
+
 /**
     Find all maximal cliques in a graph represented by `adjacencyList`.
     The implementation is based on version 1 of the Bron-Kerbosch algorithm [1].
 
-    [1]: Bron, C.; Kerbosch, J. (1973), "Algorithm 457: finding all cliques
+    [1]: $(I Bron, C.; Kerbosch, J. (1973), "Algorithm 457: finding all cliques
          of an undirected graph", Communications of the ACM, 16 (9): 575–577,
-         doi:10.1145/362342.362367.
+         doi:10.1145/362342.362367.)
 
     Returns: list of sets of nodes each representing a maximal clique
 */
@@ -2346,6 +2567,7 @@ unittest
         [9],
     ]);
 }
+
 
 private struct BronKerboschVersion1
 {
@@ -2405,12 +2627,13 @@ private struct BronKerboschVersion1
     }
 }
 
+
 /**
     Calculate a longest increasing subsequence of `sequence`. This subsequence
     is not necessarily contiguous, or unique. Given a `sequence` of `n`
     elements the algorithm uses `O(n log n)` evaluation of `pred`.
 
-    See_Also: https://en.wikipedia.org/wiki/Longest_increasing_subsequence
+    See_Also: $(LINK https://en.wikipedia.org/wiki/Longest_increasing_subsequence)
 */
 auto longestIncreasingSubsequence(alias pred = "a < b", Range)(Range sequence)
         if (isRandomAccessRange!Range)

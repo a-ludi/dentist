@@ -28,19 +28,32 @@ import std.typecons : Flag, No, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
-auto pipeLines(Flag!"isBuffered" isBuffered = No.isBuffered, Range)(Range command, in string workdir = null)
-        if (isInputRange!Range && isSomeString!(ElementType!Range))
+/// Execute `command` and return a range of output lines.
+///
+/// Params:
+///     command = range of `string`s that is executed directly. `null` values
+///         are automatically removed before execution.
+///     workdir = change working directory for `command`
+///     isBuffered = allocate memory for each line or use a single buffer
+/// See_also: `LinesPipe`
+auto pipeLines(Flag!"isBuffered" isBuffered = No.isBuffered, Range)(
+    Range command,
+    in string workdir = null,
+)
+if (isInputRange!Range && isSomeString!(ElementType!Range))
 {
     auto sanitizedCommand = command.filter!"a != null".array;
 
     return new LinesPipe!(ProcessInfo, isBuffered)(ProcessInfo(sanitizedCommand, workdir));
 }
 
+/// ditto
 auto pipeLines(Flag!"isBuffered" isBuffered = No.isBuffered)(in string shellCommand, in string workdir = null)
 {
     return new LinesPipe!(ShellInfo, isBuffered)(ShellInfo(shellCommand, workdir));
 }
 
+///
 unittest
 {
     import std.algorithm : equal;
@@ -71,10 +84,15 @@ private struct ShellInfo
     const(string) workdir;
 }
 
-static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
+
+/// Range of output lines from an external command. Construct using
+/// `pipeLines`.
+final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
 {
+    /// Only Linux-line endings supported.
     static enum lineTerminator = "\n";
 
+    /// Type of lines. Depends on `isBuffered`.
     static if (isBuffered)
         alias line_t = char[];
     else
@@ -85,7 +103,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
     private line_t currentLine;
 
 
-    this(CommandInfo processInfo)
+    private this(CommandInfo processInfo)
     {
         this.processInfo = processInfo;
     }
@@ -96,6 +114,10 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
             releaseProcess();
     }
 
+
+    /// Close pipe and kill process.
+    ///
+    /// Blocks until the process is killed.
     void releaseProcess()
     {
         if (!process.stdout.isOpen)
@@ -117,6 +139,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
         process.pid.wait();
     }
 
+
     private void ensureInitialized()
     {
         if (!(process.pid is null))
@@ -135,8 +158,9 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
             popFront();
     }
 
+
     static if (is(CommandInfo == ProcessInfo))
-        ProcessPipes launchProcess()
+        private ProcessPipes launchProcess()
         {
             return pipeProcess(
                 processInfo.command,
@@ -147,7 +171,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
             );
         }
     else static if (is(CommandInfo == ShellInfo))
-        ProcessPipes launchProcess()
+        private ProcessPipes launchProcess()
         {
             return pipeShell(
                 processInfo.command,
@@ -158,6 +182,8 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
             );
         }
 
+
+    /// Range interface.
     void popFront()
     {
         ensureInitialized();
@@ -182,6 +208,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
             currentLine = currentLine[0 .. $ - lineTerminator.length];
     }
 
+    /// ditto
     @property line_t front()
     {
         ensureInitialized();
@@ -190,6 +217,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
         return currentLine;
     }
 
+    /// ditto
     @property bool empty()
     {
         ensureInitialized();
@@ -206,6 +234,7 @@ static final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
         }
     }
 }
+
 
 /**
     Returns true iff `name` can be executed via the process function in
@@ -228,6 +257,7 @@ version (Posix) bool isExecutable(scope string name, Flag!"searchPath" searchPat
         return searchPathFor(name) !is null;
 }
 
+///
 version (Posix) unittest
 {
     assert(isExecutable("/bin/sh", No.searchPath));

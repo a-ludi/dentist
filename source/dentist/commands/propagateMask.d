@@ -1,5 +1,17 @@
 /**
-    This is the `propagateMask` command of `dentist`.
+    This is the `propagate-mask` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Propagate masked regions through the provided alignment. That means the
+    mask is transferred to the B-contigs/reads according to the given
+    alignments.
+
+    The default workflow is to first propagate from the reference assembly to
+    the reads and then back again to the reference. Propagating, once again,
+    to the reads will produce a complete repeat mask on the reads.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +19,16 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.propagateMask;
+
+package(dentist) enum summary = "
+    Propagate masked regions through the provided alignment. That means the
+    mask is transferred to the B-contigs/reads according to the given
+    alignments.
+
+    The default workflow is to first propagate from the reference assembly to
+    the reads and then back again to the reference. Propagating, once again,
+    to the reads will produce a complete repeat mask on the reads.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :
@@ -50,12 +72,17 @@ import std.typecons :
 import vibe.data.json : toJson = serializeToJson;
 
 
+/// Options for the `propagate-mask` command.
 alias Options = OptionsFor!(DentistCommand.propagateMask);
+
+
+/// Alias for readbility.
 alias QueryInterval = ReferenceInterval;
+/// ditto
 alias QueryRegion = ReferenceRegion;
 
 
-/// Execute the `propagateMask` command with `options`.
+/// Execute the `propagate-mask` command with `options`.
 void execute(in Options options)
 {
     return new MaskPropagator(options).run();

@@ -1,5 +1,13 @@
 /**
-    This is the `buildPartialAssembly` command of `dentist`.
+    This is the `build-partial-assembly` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Build a partial assembly by turning the contigs of the "true" assembly
+    into scaffolds with the same sequence but gaps in unmasked regions. In
+    other words, the provided mask marks the contigs in the created assembly.
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -7,6 +15,12 @@
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.buildPartialAssembly;
+
+package(dentist) enum summary = "
+    Build a partial assembly by turning the contigs of the \"true\" assembly
+    into scaffolds with the same sequence but gaps in unmasked regions. In
+    other words, the provided mask marks the contigs in the created assembly.
+";
 
 import dentist.common : isTesting;
 
@@ -37,10 +51,11 @@ import std.stdio : File, stdout;
 import std.typecons : No;
 
 
-/// Options for the `buildPartialAssembly` command.
+/// Options for the `build-partial-assembly` command.
 alias Options = OptionsFor!(TestingCommand.buildPartialAssembly);
 
-/// Execute the `buildPartialAssembly` command with `options`.
+
+/// Execute the `build-partial-assembly` command with `options`.
 void execute(in Options options)
 {
     auto translocator = Translocator(options);

@@ -1,6 +1,26 @@
 /**
     This package contains methods for cropping a pile up.
 
+    Example:
+
+    ---
+    ▂▂▂▂▂ = repeat mask
+    ━━━━┯ = reference contigs with trace points (top row)
+    ──┾━━ = aligned reads with removed (thin) and kept (thick) parts
+    ◊     = cropping positions
+
+
+                 ◊ ▂▂▂▂▂▂▂▂▂▂▂▂▂▂                ▂▂▂▂▂▂▂▂▂▂▂▂    ◊
+    ┄━━┯━━━━┯━━━━┯━━━━┯━━━━┯━━━━┑            ┍━━━━┯━━━━┯━━━━┯━━━━┯━━━━┯━━┅
+       ╎    ╎    │    ╎    ╎    ╎            ╎    ╎    ╎    ╎    │    ╎
+       ╎    ╎    │    ╎    ╎    ╎            ╎    ╎    ╎    ╎    │    ╎
+       ╎ ───┬────┾━━━━┯━━━━┯━━━━┯━━━━━━━━━━━━┯━━━━┯━━━━┯━━━━┯━━━━┽────┬─
+     ──┬────┬────┾━━━━┯━━━━┯━━━━┯━━━━━━━━━━━━┯━━━━┯━━━━┯━━━━┯━━━━┽──  ╎
+       ╎   ─┬────┾━━━━┯━━━━┯━━━━┯━━━         ╎    ╎    ╎    ╎    │    ╎
+       ╎    ╎    │    ╎    ╎    ╎        ━━━━┯━━━━┯━━━━┯━━━━┯━━━━┽─   ╎
+       ╎    ╎    │    ╎    ╎    ╎  ━━━━━━━━━━┯━━━━┯━━━━┯━━━━┯━━━━┥    ╎
+    ---
+
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -63,23 +83,41 @@ import std.range :
     zip;
 import std.typecons : tuple;
 import vibe.data.json : toJson = serializeToJson;
+import vibe.data.serialization : ignore;
 
 
+/// Options for the cropping algorithm.
 struct CropOptions
 {
+    /// Reference assembly.
     string refDb;
+
+    /// Reads database with all reads.
     string readsDb;
+
+    /// Minimum number of base pairs required for successful alignment of the
+    /// cropped reads.
+    ///
+    /// In order to ensure the minimum overlap, the algorithm will insert
+    /// sequence from the reference contig to the end(s) of the cropped read
+    /// if the overlap after cropping is too small. (see `fetchSupportPatches`)
     coord_t minAnchorLength;
-    string tmpdir;
+
+    /// Output directory where the DB of cropped reads is placed.
+    string outputDir;
 }
 
-auto cropPileUp(PileUp pileUp, in ReferenceRegion mask, in CropOptions options)
+
+/// Crop the reads in `pileUp` to a common trace point on the reference
+/// contig(s) which is not covered by `repeatMask`.
+auto cropPileUp(PileUp pileUp, in ReferenceRegion repeatMask, in CropOptions options)
 {
-    auto cropper = PileUpCropper(pileUp, mask, options);
+    auto cropper = PileUpCropper(pileUp, repeatMask, options);
     cropper.buildDb();
 
     return cropper.result;
 }
+
 
 private struct PileUpCropper
 {
@@ -91,6 +129,7 @@ private struct PileUpCropper
     private string[] supportPatches;
     private string[] supportPatchesRevComp;
     private string croppedDb;
+
 
     @property auto result()
     {
@@ -104,6 +143,7 @@ private struct PileUpCropper
             croppingSeeds,
         );
     }
+
 
     void buildDb()
     {
@@ -126,13 +166,14 @@ private struct PileUpCropper
                 croppingRefPositions[1].contigId,
                 croppingSeeds[1].toChar,
             );
-        croppedDb = buildPath(options.tmpdir, croppedDb);
+        croppedDb = buildPath(options.outputDir, croppedDb);
 
         buildDbFile(
             croppedDb,
             croppedSequences,
         );
     }
+
 
     private void fetchCroppingRefPositions()
     {
@@ -174,6 +215,7 @@ private struct PileUpCropper
             }
         }
     }
+
 
     /// Fetch pieces of the flanking contig(s) that can be appended to the
     /// cropped reads in case the sequence remaining after cropping is
@@ -219,6 +261,8 @@ private struct PileUpCropper
         supportPatchesRevComp = contigSequences.map!reverseComplement.array;
     }
 
+
+    /// Returns a lazy range of `tuple(index, pileUp, sequence)`.
     private auto pileUpWithSequence()
     {
         auto readIds = pileUp.map!"a[0].contigB.id + 0".array;
@@ -230,10 +274,11 @@ private struct PileUpCropper
         );
     }
 
-    /**
-        Get points on the reference where the pileUp should be cropped. Returns
-        one common trace point for each involved contig.
 
+    /**
+        Get points on the reference where the `pileUp` should be cropped.
+
+        Returns: one common trace point for each involved contig.
         See_Also: `getCommonTracePoint`
     */
     private auto getCroppingRefPositions()
@@ -267,6 +312,7 @@ private struct PileUpCropper
         );
     }
 
+
     private string getCroppedSequence(
         in size_t croppedDbIdx,
         in ReadAlignment readAlignment,
@@ -288,6 +334,7 @@ private struct PileUpCropper
         );
     }
 
+
     private auto getReadCroppingSlice(in ReadAlignment readAlignment)
     {
         auto readCroppingSlice = readAlignment[]
@@ -297,6 +344,7 @@ private struct PileUpCropper
 
         return readCroppingSlice;
     }
+
 
     private auto getReadPatches(in ReadAlignment readAlignment)
     {
@@ -314,6 +362,7 @@ private struct PileUpCropper
             return tuple!("pre", "post")("", readPatches[0].sequence);
     }
 
+
     auto getSingleReadPatch(in SeededAlignment alignment)
     {
         auto contigA = alignment.contigA.id;
@@ -329,6 +378,7 @@ private struct PileUpCropper
 
         return tuple!("readSeed", "sequence")(readSeed, sequence);
     }
+
 
     private string getCroppedReadAsFasta(
         string readSequence,
@@ -371,6 +421,7 @@ private struct PileUpCropper
     }
 }
 
+
 /// Sort alignment chains of pileUp into groups with the same `contigA.id`.
 private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
 {
@@ -390,11 +441,9 @@ private SeededAlignment[][] splitAlignmentsByContigA(PileUp pileUp)
     return array(alignmentsByContig);
 }
 
-/// Returns a common trace points wrt. contigA that is not in mask.
-private long getCommonTracePoint(
-    in SeededAlignment[] alignments,
-    in ReferenceRegion mask,
-)
+
+/// Returns a common trace points wrt. contigA that is not in `repeatMask`.
+private long getCommonTracePoint(in SeededAlignment[] alignments, in ReferenceRegion repeatMask)
 {
     static long _getCommonTracePoint(R)(R tracePointCandidates, ReferenceRegion tracePointRegion) pure
     {
@@ -410,7 +459,7 @@ private long getCommonTracePoint(
     auto commonAlignmentRegion = alignments
         .map!(to!(ReferenceRegion, "contigA"))
         .fold!"a & b";
-    auto unmaskedTracePointRegion = commonAlignmentRegion - mask;
+    auto unmaskedTracePointRegion = commonAlignmentRegion - repeatMask;
 
     assert(alignments.all!(a => a.contigA == contigA && a.seed == locationSeed));
     debug logJsonDebug(
@@ -450,6 +499,7 @@ private long getCommonTracePoint(
     return -1;
 }
 
+
 private ReadInterval getCroppingSlice(
     in SeededAlignment alignment,
     in ReferencePoint[] croppingRefPoints,
@@ -481,7 +531,7 @@ private ReadInterval getCroppingSlice(
         break;
     }
 
-    if (alignment.complement)
+    if (alignment.flags.complement)
     {
         swap(readBeginIdx, readEndIdx);
         readBeginIdx = read.length - readBeginIdx;

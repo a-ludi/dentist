@@ -1,5 +1,72 @@
 /**
-    This is the `showMask` command of `dentist`.
+    This is the `show-mask` command of DENTIST.
+
+    Command_Summary:
+
+    ---
+    Show a short summary of a mask. Can also be used to convert a mask to JSON
+    by increasing verbosity two times.
+    ---
+
+    Example:
+
+    Table output (default).
+
+    ---
+    name:                      dust
+    numIntervals:           3043971
+    numMaskedBases:       141388227
+
+    name:                     tan-H
+    numIntervals:             27765
+    numMaskedBases:       124147972
+
+    name:            dentist-self-H
+    numIntervals:            212770
+    numMaskedBases:       532462661
+
+    name:           dentist-reads-H
+    numIntervals:             31679
+    numMaskedBases:        35656876
+
+    name:                __merged__
+    numIntervals:           2612751
+    numMaskedBases:       759305412
+    ---
+
+    Example:
+
+    JSON output (`--json`, `-j`).
+
+    ---
+    [
+        {
+            "name": "dust",
+            "numIntervals": 3043971,
+            "numMaskedBases": 141388227
+        },
+        {
+            "name": "tan-H",
+            "numIntervals": 27765,
+            "numMaskedBases": 124147972
+        },
+        {
+            "name": "dentist-self-H",
+            "numIntervals": 212770,
+            "numMaskedBases": 532462661
+        },
+        {
+            "name": "dentist-reads-H",
+            "numIntervals": 31679,
+            "numMaskedBases": 35656876
+        },
+        {
+            "name": "__merged__",
+            "numIntervals": 2612751,
+            "numMaskedBases": 759305412
+        }
+    ]
+    ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -8,9 +75,16 @@
 */
 module dentist.commands.showMask;
 
+package(dentist) enum summary = "
+    Show a short summary of a mask. Can also be used to convert a mask to JSON
+    by increasing verbosity two times.
+";
+
+import dentist.commandline : OptionsFor;
 import dentist.common :
     ReferenceInterval,
     ReferenceRegion;
+import dentist.common.commands : DentistCommand;
 import dentist.util.log;
 import dentist.dazzler : readMask;
 import std.algorithm :
@@ -25,8 +99,13 @@ import vibe.data.json :
     toJson = serializeToJson,
     toJsonString = serializeToPrettyJson;
 
-/// Execute the `showMask` command with `options`.
-void execute(Options)(in Options options)
+
+/// Options for the `show-mask` command.
+alias Options = OptionsFor!(DentistCommand.showMask);
+
+
+/// Execute the `show-mask` command with `options`.
+void execute(in Options options)
 {
     auto masks = options.masks;
     ReferenceRegion mergedMask;

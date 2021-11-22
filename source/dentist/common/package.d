@@ -1,5 +1,5 @@
 /**
-    This package holds common code for the `dentist` algorithm.
+    This package holds common code for the DENTIST algorithm.
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
@@ -37,6 +37,7 @@ version (DentistTesting)
 else
     enum isTesting = false;
 
+
 /// Evaluate to `value` if building with testing command;
 /// otherwise to `typeof(value).init`.
 template testingOnly(alias value)
@@ -47,38 +48,17 @@ template testingOnly(alias value)
         enum testingOnly = typeof(value).init;
 }
 
-/// Thrown if some runtime error in the `dentist` algorithm occurs.
+
+/// Thrown if some runtime error in the DENTIST algorithm occurs.
 class DentistException : Exception
 {
+    /// Auxiliary data describing the circumstances under which the exception
+    /// occurred.
     Json payload;
 
     /**
-        Params:
-            msg  = The message for the exception.
-            file = The file where the exception occurred.
-            line = The line number where the exception occurred.
-            next = The previous exception in the chain of exceptions, if any.
-    */
-    this(string msg, string file = __FILE__, size_t line = __LINE__,
-         Throwable next = null) @nogc @safe pure nothrow
-    {
-        super(msg, file, line, next);
-    }
+        Construct a new `DentistException`.
 
-    /**
-        Params:
-            msg  = The message for the exception.
-            next = The previous exception in the chain of exceptions.
-            file = The file where the exception occurred.
-            line = The line number where the exception occurred.
-    */
-    this(string msg, Throwable next, string file = __FILE__,
-         size_t line = __LINE__) @nogc @safe pure nothrow
-    {
-        super(msg, file, line, next);
-    }
-
-    /**
         Params:
             msg      = The message for the exception.
             payload  = Additional information for the exception.
@@ -86,6 +66,20 @@ class DentistException : Exception
             line     = The line number where the exception occurred.
             next     = The previous exception in the chain of exceptions, if any.
     */
+    this(string msg, string file = __FILE__, size_t line = __LINE__,
+         Throwable next = null) @nogc @safe pure nothrow
+    {
+        super(msg, file, line, next);
+    }
+
+    /// ditto
+    this(string msg, Throwable next, string file = __FILE__,
+         size_t line = __LINE__) @nogc @safe pure nothrow
+    {
+        super(msg, file, line, next);
+    }
+
+    /// ditto
     this(string msg, Json payload, string file = __FILE__, size_t line = __LINE__,
          Throwable next = null) @nogc @safe pure nothrow
     {
@@ -93,14 +87,7 @@ class DentistException : Exception
         this.payload = payload;
     }
 
-    /**
-        Params:
-            msg      = The message for the exception.
-            payload  = Additional information for the exception.
-            next     = The previous exception in the chain of exceptions.
-            file     = The file where the exception occurred.
-            line     = The line number where the exception occurred.
-    */
+    /// ditto
     this(string msg, Json payload, Throwable next, string file = __FILE__,
          size_t line = __LINE__) @nogc @safe pure nothrow
     {
@@ -109,11 +96,18 @@ class DentistException : Exception
     }
 }
 
+
 /**
     Enforces that the given value is true. If the given value is false, a
     `DentistException` is thrown.
 
-    See_also: std.exception.enforce
+    Params:
+        value    = Test value.
+        msg      = The message for the exception.
+        payload  = Additional information for the exception.
+        file     = The file where the exception occurred.
+        line     = The line number where the exception occurred.
+    See_also: `std.exception.enforce`
     Returns:  `value`, if `cast(bool) value` is true. Otherwise,
               `new DentistException(message, payload)` is thrown.
 */
@@ -133,39 +127,71 @@ T dentistEnforce(T)(
     ));
 }
 
-/// A region of the reference aka. mask.
+/// A region, interval or point of the reference/read.
+///
+/// A point is a zero-based coordinate (property `value`) on the contig/read
+/// specified by `contigId`/`readId`.
+///
+/// An interval is a pair of zero-based coordinates describing the right-open
+/// interval `[begin, end)` on the contig/read specified by
+/// `contigId`/`readId`.
+///
+/// A region is a collection of disjunctive intervals. When creating or
+/// expanding a region the intervals are normalized, i.e. merged if they
+/// overlap. This is the internal representation of masks.
+///
+/// See_also: `dentist.util.region.Region`,
+///     `dentist.util.region.Region.TaggedInterval`,
+///     `dentist.util.region.Region.TaggedPoint`
 alias ReferenceRegion = Region!(size_t, size_t, "contigId");
-/// An interval of a reference contig.
+/// ditto
 alias ReferenceInterval = ReferenceRegion.TaggedInterval;
-/// A point on the reference.
+/// ditto
 alias ReferencePoint = ReferenceRegion.TaggedPoint;
-/// A region of a read aka. mask.
+/// ditto
 alias ReadRegion = Region!(size_t, size_t, "readId");
-/// An interval of a read contig.
+/// ditto
 alias ReadInterval = ReadRegion.TaggedInterval;
-/// A point on a read.
+/// ditto
 alias ReadPoint = ReadRegion.TaggedPoint;
 
-/// A point on the output assembly.
+
+/// A point on the output assembly. This is used in the `translate-coords`
+/// command.
+///
+/// See_also: `dentist.commands.translateCoords`
 struct OutputCoordinate
 {
+    /// Type of the coordinate origin or reference system.
     static enum OriginType : ubyte
     {
+        /// Not implemented. Global base pair position counting all ACGTN's.
         global,
+        /// Not implemented. Position on a specific contig (only ACGT).
         contig,
+        /// Position on specific contig counting all ACGTN's.
         scaffold,
+        /// Not implemented. Position on a specific contig of a specific
+        /// scaffold (only ACGT).
         scaffoldContig,
     }
 
+    /// One-based scaffold ID; a value of zero signifies absence.
     id_t scaffoldId;
+    /// One-based contig ID; a value of zero signifies absence.
     id_t contigId;
+    /// One-based coordinate.
     coord_t coord;
 
+
+    /// Zero-based coordinate.
     @property coord_t idx() const pure nothrow
     {
         return coord - 1;
     }
 
+
+    /// Return the origin type or reference system of this coordinate.
     @property OriginType originType() const pure nothrow
     {
         if (scaffoldId == 0 && contigId == 0)
@@ -178,6 +204,9 @@ struct OutputCoordinate
             return OriginType.scaffoldContig;
     }
 
+
+    /// Encode this coordinate in a string with format
+    /// `[scaffold/<scaff>/][contig/<contig>/]<coord>`.
     string toString() const
     {
         final switch(originType)
@@ -194,7 +223,8 @@ struct OutputCoordinate
     }
 }
 
-/// Returns the alignment region of alignmentChain.
+
+/// Returns the alignment region of `alignmentChain`.
 R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
         if (__traits(isSame, TemplateOf!R, Region))
 {
@@ -210,6 +240,7 @@ R to(R, string contig = "contigA")(in AlignmentChain alignmentChain) pure
         .array
     );
 }
+
 
 /**
     Get the interval that the alignment covers. This method does returns a
