@@ -8,7 +8,7 @@
 */
 module dentist.util.containers;
 
-import std.algorithm : all, count, filter, map;
+import std.algorithm : any, count, filter, map;
 import std.range.primitives;
 
 
@@ -54,7 +54,7 @@ struct HashSet(T)
     /// Returns true if this set is empty.
     bool empty() const pure
     {
-        return _hash.values.all;
+        return !_hash.values.any;
     }
 
 
