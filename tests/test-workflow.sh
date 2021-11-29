@@ -101,8 +101,7 @@ function _test_assembly()
 
 function _reads()
 {
-    _reference_assembly \
-    | simulator "${SIMULATOR_ARGS[@]}" "$@"
+    simulator "${SIMULATOR_ARGS[@]}" "$@"
 }
 
 
