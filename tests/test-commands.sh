@@ -129,6 +129,16 @@ function _output_checksums()
 }
 
 
+function dentist()
+(
+    [[ -v DENTIST_BINARY ]] \
+    || DENTIST_BINARY="$(command which dentist)" \
+    || DENTIST_BINARY="$REPO_ROOT/dentist"
+
+    command "$DENTIST_BINARY" "$@"
+)
+
+
 function setup_workdir()
 {
     EXECDIR="$PWD"
