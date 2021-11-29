@@ -1199,6 +1199,25 @@ struct Region(Number, Tag, string tagAlias = null, Tag emptyTag = Tag.init)
         assert(TP(1, 10) !in region);
         assert(TP(1, 20) !in region);
     }
+
+
+    import vibe.data.json : Json;
+
+    /// Convert to/from `vibed.data.json.Json`.
+    Json toJson() const @safe
+    {
+        import vibe.data.json : serializeToJson;
+
+        return serializeToJson(intervals);
+    }
+
+    /// ditto
+    static typeof(this) fromJson(Json json) @safe
+    {
+        import vibe.data.json : deserializeJson;
+
+        return typeof(this)(deserializeJson!(TaggedInterval[])(json));
+    }
 }
 
 
