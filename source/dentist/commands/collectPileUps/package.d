@@ -1,34 +1,12 @@
 /**
-    This is the `collect-pile-ups` command of DENTIST.
+    This is the `collectPileUps` command of DENTIST.
 
     Command_Summary:
 
     ---
     Build and collect pile ups of reads that are candidates for gap closing.
-
-    This is a pipeline with the following steps:
-
-    1. Filter read alignments to get a set of reliable alignments that could
-       be used for gap closing. (see `dentist.commands.collectPileUps.filter`
-       in the API docs for more details)
-    2. Group alignments by read yielding evidence for gap closing.
-    3. Build a scaffold graph from the read alignments. The read alignments
-       are attached to the edges as a payload called "pile ups".
-    4. Detect small cycles in the graph and try to resolve them as a
-       "skipping" event.
-    5. Resolve forks in the graph by selecting either one edge that has a
-       significantly larger pile up than all others or remove all.
-    6. Remove spanning edges that have an insufficient number of spanning
-       reads.
-    7. Merge extension edges with incident spanning edges to collect as much
-       sequence as possible.
-    8. Collect all pile ups and write them to the pile ups DB. Note, that the
-       graph is linear by now, that means it already describes a preliminary
-       gap-closed assembly.
     ---
 
-    See_also: `dentist.commands.collectPileUps.filter`,
-        `dentist.commands.collectPileUps.pileups`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -79,11 +57,11 @@ import std.typecons : tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
-/// Options for the `collect-pile-ups` command.
+/// Options for the `collectPileUps` command.
 alias Options = OptionsFor!(DentistCommand.collectPileUps);
 
 
-/// Execute the `collect-pile-ups` command with `options`.
+/// Execute the `collectPileUps` command with `options`.
 void execute(in Options options)
 {
     auto collector = new PileUpCollector(options);
@@ -91,8 +69,8 @@ void execute(in Options options)
     collector.run();
 }
 
-
-private class PileUpCollector
+/// This class comprises the `collectPileUps` step of the DENTIST algorithm
+class PileUpCollector
 {
     protected const Options options;
     protected size_t numReferenceContigs;

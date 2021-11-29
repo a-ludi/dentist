@@ -1,12 +1,24 @@
 /**
     The `bed2mask` command creates a Dazzler mask from a BED file.
 
+    Command_Summary:
+
+    ---
+    Convert a BED file to a Dazzler mask. Implements 'data comments' -- a
+    special feature for DENTIST.
+    ---
+
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.bed2mask;
+
+package(dentist) enum summary = "
+    Convert a BED file to a Dazzler mask. Implements 'data comments' -- a
+    special feature for DENTIST.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common : ReferenceInterval;
@@ -55,7 +67,7 @@ alias Options = OptionsFor!(DentistCommand.bed2mask);
 
 
 /// Execute the `bed2mask` command with `options`.
-void execute(Options)(in Options options)
+void execute(in Options options)
 {
     auto contigsByScaffold = getContigsByScaffold(options.refDb);
     auto bedFile = options.openBedFile;

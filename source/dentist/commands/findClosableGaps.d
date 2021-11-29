@@ -1,12 +1,12 @@
 /**
-    This is the `find-closable-gaps` command of DENTIST.
+    This is the `findClosableGaps` command of DENTIST.
 
     Command_Summary:
 
     ---
-    Find gaps which are theoretically closable. A gap is deemed closable if
-    the true mapping of the simulated reads provides a sufficient number
-    spanning reads including some amount of anchor sequence.
+    Find which gaps are closable, i.e. the true alignment of the reads
+    provides a sufficient number spanning reads including some amount of
+    anchor sequence.
     ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -63,10 +63,10 @@ import vibe.data.json : toJson = serializeToJson, serializeToJsonString;
 
 static if (isTesting):
 
-/// Options for the `find-closable-gaps` command.
+/// Options for the `findClosableGaps` command.
 alias Options = OptionsFor!(DentistCommand.findClosableGaps);
 
-/// Execute the `find-closable-gaps` command with `options`.
+/// Execute the `findClosableGaps` command with `options`.
 void execute(in Options options)
 {
     auto finder = ClosableGapsFinder(options);

@@ -1,5 +1,5 @@
 /**
-    This is the `merge-masks` command of DENTIST.
+    This is the `mergeMasks` command of DENTIST.
 
     Command_Summary:
 
@@ -35,11 +35,11 @@ import dentist.dazzler :
     writeMask;
 
 
-/// Options for the `merge-masks` command.
+/// Options for the `mergeMasks` command.
 alias Options = OptionsFor!(DentistCommand.mergeMasks);
 
 
-/// Execute the `merge-masks` command with `options`.
+/// Execute the `mergeMasks` command with `options`.
 void execute(in Options options)
 {
     mixin(traceExecution);

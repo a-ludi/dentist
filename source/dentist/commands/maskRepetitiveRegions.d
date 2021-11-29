@@ -1,5 +1,5 @@
 /**
-    This is the `mask-repetitive-regions` command of DENTIST.
+    This is the `maskRepetitiveRegions` command of DENTIST.
 
     Command_Summary:
 
@@ -59,11 +59,11 @@ import std.typecons : Flag, No, Tuple, Yes;
 import vibe.data.json : toJson = serializeToJson;
 
 
-/// Options for the `mask-repetitive-regions` command.
+/// Options for the `maskRepetitiveRegions` command.
 alias Options = OptionsFor!(DentistCommand.maskRepetitiveRegions);
 
 
-/// Execute the `mask-repetitive-regions` command with `options`.
+/// Execute the `maskRepetitiveRegions` command with `options`.
 void execute(in Options options)
 {
     auto assessor = new RepeatMaskAssessor(options);

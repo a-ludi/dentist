@@ -5,15 +5,6 @@
 
     ---
     Generate the output assembly by closing gaps.
-
-    Uses the previously generated insertions to actually close the gaps.
-    The set of insertions can be further restricted by --max-insertion-error,
-    --join-policy, --skip-gaps, --min-extension-length and --only. Since this
-    step is fairly quick, different combinations of these options can be tried
-    to get optimal results.
-
-    Usually it is advisable to use the --agp option to generate an AGP file
-    that describes the parts of the gap-closed assembly.
     ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -25,16 +16,6 @@ module dentist.commands.output;
 
 package(dentist) enum summary = "
     Generate the output assembly by closing gaps.
-
-    Uses the previously generated insertions to actually close the gaps.
-    The set of insertions can be further restricted by --max-insertion-error,
-    --join-policy, --skip-gaps, --min-extension-length and --only. Since this
-    step is fairly quick, different combinations of these options can be tried
-    to get optimal results.
-
-    Usually it is advisable to use the --agp and/or --closed-gaps-bed
-    option(s) to generate an AGP/BED file that describes the parts of the
-    gap-closed assembly.
 ";
 
 import dentist.commandline : OptionsFor;
@@ -157,7 +138,6 @@ void execute(in Options options)
 }
 
 
-/// Valid values for the component column (5th) of an AGP file.
 enum AGPComponentType : string
 {
     /// Active Finishing
@@ -181,7 +161,6 @@ enum AGPComponentType : string
 }
 
 
-/// Valid values for the linkage evidence column (10th) of an AGP file.
 enum AGPLinkageEvidence : string
 {
     /// used when no linkage is being asserted (column 8b is ‘no’)
@@ -211,7 +190,7 @@ enum AGPLinkageEvidence : string
 }
 
 
-private class AssemblyWriter
+class AssemblyWriter
 {
     alias FastaWriter = typeof(wrapLines(stdout.lockingTextWriter, 0));
 
@@ -359,7 +338,7 @@ private class AssemblyWriter
 
     protected void appendUnkownJoins()
     {
-        auto unknownJoins = scaffoldStructure[]
+        auto unkownJoins = scaffoldStructure[]
             .filter!(part => part.peek!GapSegment !is null)
             .map!(gapPart => gapPart.get!GapSegment)
             .map!(gapPart => getUnkownJoin(
@@ -367,7 +346,7 @@ private class AssemblyWriter
                 gapPart.endGlobalContigId,
                 InsertionInfo(CompressedSequence(), gapPart.length, []),
             ));
-        assemblyGraph.bulkAddForce(unknownJoins);
+        assemblyGraph.bulkAddForce(unkownJoins);
     }
 
     protected Flag!"keepInsertion" skipShortExtension(size_t insertionId, Insertion insertion) const
@@ -754,8 +733,8 @@ private class AssemblyWriter
             "end", insertion.end.toJson,
         );
 
-        enum char unknownBase = 'n';
-        unknownBase
+        enum char unkownBase = 'n';
+        unkownBase
             .repeat
             .takeExactly(insertionInfo.length)
             .copy(writer);

@@ -1,41 +1,11 @@
 /**
-    This is the `show-insertions` command of DENTIST.
+    This is the `showInsertions` command of DENTIST.
 
     Command_Summary:
 
     ---
-    Show a short summary of the insertions DB. Can also be used to convert
-    a insertions DB to JSON by increasing verbosity two times.
-    ---
-
-    Example:
-
-    Table output (default).
-
-    ---
-    totalDbSize:            6437750 bytes
-    numInsertions:             4395
-    numCompressedBaseQuads: 4390418
-    numOverlaps:               8790
-    numLocalAlignments:        8790
-    numTracePoints:          136232
-    numReadIds:               67937
-    ---
-
-    Example:
-
-    JSON output (`--json`, `-j`).
-
-    ---
-    {
-        "totalDbSize": 6437750,
-        "numInsertions": 4395,
-        "numCompressedBaseQuads": 4390418,
-        "numOverlaps": 8790,
-        "numLocalAlignments": 8790,
-        "numTracePoints": 136232,
-        "numReadIds": 67937
-    }
+    Show a short summary of the insertions. Can also be used to convert
+    insertions to JSON by increasing verbosity two times.
     ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -46,8 +16,8 @@
 module dentist.commands.showInsertions;
 
 package(dentist) enum summary = "
-    Show a short summary of the insertions DB. Can also be used to convert
-    a insertions DB to JSON by increasing verbosity two times.
+    Show a short summary of the insertions. Can also be used to convert
+    insertions to JSON by increasing verbosity two times.
 ";
 
 import dentist.commandline : OptionsFor;
@@ -66,11 +36,11 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson;
 
 
-/// Options for the `show-insertions` command.
+/// Options for the `showInsertions` command.
 alias Options = OptionsFor!(DentistCommand.showInsertions);
 
 
-/// Execute the `show-insertions` command with `options`.
+/// Execute the `showInsertions` command with `options`.
 void execute(in Options options)
 {
     size_t totalDbSize = options.insertionsFile.getSize();

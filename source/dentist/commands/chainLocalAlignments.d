@@ -1,5 +1,5 @@
 /**
-    This is the `chain-local-alignments` command of DENTIST.
+    This is the `chainLocalAlignments` command of DENTIST.
 
     Command_Summary:
 
@@ -8,7 +8,6 @@
     best chain per combination of A-read and B-read.
     ---
 
-    See_also: `dentist.common.alignments.chaining.chainLocalAlignments`
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
@@ -38,11 +37,11 @@ import std.range : tee;
 import std.typecons : Yes;
 
 
-/// Options for the `chain-local-alignments` command.
+/// Options for the `chainLocalAlignments` command.
 alias Options = OptionsFor!(DentistCommand.chainLocalAlignments);
 
 
-/// Execute the `chain-local-alignments` command with `options`.
+/// Execute the `chainLocalAlignments` command with `options`.
 void execute(in Options options)
 {
     auto chainer = new CLIChainer(options);

@@ -1,5 +1,5 @@
 /**
-    This is the `validate-config` command of DENTIST.
+    This is the `validateConfig` command of DENTIST.
 
     Command_Summary:
 
@@ -29,11 +29,11 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson;
 
 
-/// Options for the `validate-config` command.
+/// Options for the `validateConfig` command.
 alias Options = OptionsFor!(DentistCommand.validateConfig);
 
 
-/// Execute the `validate-config` command with `options`.
+/// Execute the `validateConfig` command with `options`.
 void execute(in Options options)
 {
     validateConfigFile(options.configFile);

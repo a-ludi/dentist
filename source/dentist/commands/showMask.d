@@ -1,71 +1,11 @@
 /**
-    This is the `show-mask` command of DENTIST.
+    This is the `showMask` command of DENTIST.
 
     Command_Summary:
 
     ---
     Show a short summary of a mask. Can also be used to convert a mask to JSON
     by increasing verbosity two times.
-    ---
-
-    Example:
-
-    Table output (default).
-
-    ---
-    name:                      dust
-    numIntervals:           3043971
-    numMaskedBases:       141388227
-
-    name:                     tan-H
-    numIntervals:             27765
-    numMaskedBases:       124147972
-
-    name:            dentist-self-H
-    numIntervals:            212770
-    numMaskedBases:       532462661
-
-    name:           dentist-reads-H
-    numIntervals:             31679
-    numMaskedBases:        35656876
-
-    name:                __merged__
-    numIntervals:           2612751
-    numMaskedBases:       759305412
-    ---
-
-    Example:
-
-    JSON output (`--json`, `-j`).
-
-    ---
-    [
-        {
-            "name": "dust",
-            "numIntervals": 3043971,
-            "numMaskedBases": 141388227
-        },
-        {
-            "name": "tan-H",
-            "numIntervals": 27765,
-            "numMaskedBases": 124147972
-        },
-        {
-            "name": "dentist-self-H",
-            "numIntervals": 212770,
-            "numMaskedBases": 532462661
-        },
-        {
-            "name": "dentist-reads-H",
-            "numIntervals": 31679,
-            "numMaskedBases": 35656876
-        },
-        {
-            "name": "__merged__",
-            "numIntervals": 2612751,
-            "numMaskedBases": 759305412
-        }
-    ]
     ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -100,11 +40,11 @@ import vibe.data.json :
     toJsonString = serializeToPrettyJson;
 
 
-/// Options for the `show-mask` command.
+/// Options for the `showMask` command.
 alias Options = OptionsFor!(DentistCommand.showMask);
 
 
-/// Execute the `show-mask` command with `options`.
+/// Execute the `showMask` command with `options`.
 void execute(in Options options)
 {
     auto masks = options.masks;

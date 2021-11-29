@@ -3100,130 +3100,24 @@ unittest
     }
 }
 
-/// A short summary for each command to be output underneath the usage.
-template commandSummary(DentistCommand command)
-{
-    static if (command == DentistCommand.validateConfig)
-        enum commandSummary = q"{
-            Validate config file. Exit with non-zero status if errors are
-            found.
-        }".wrap;
-    else static if (command == TestingCommand.translocateGaps)
-        enum commandSummary = q"{
-            Translocate gaps from first assembly to second assembly.
-        }".wrap;
-    else static if (command == DentistCommand.filterMask)
-        enum commandSummary = q"{
-            Filter a Dazzler mask.
-        }".wrap;
-    else static if (command == TestingCommand.buildPartialAssembly)
-        enum commandSummary = q"{
-            Build a partial assembly from a mask.
-        }".wrap;
-    else static if (command == TestingCommand.findClosableGaps)
-        enum commandSummary = q"{
-            Find which gaps are closable, ie. the true alignment of the reads
-            provides sufficient spanning reads.
-        }".wrap;
-    else static if (command == DentistCommand.generateDazzlerOptions)
-        enum commandSummary = q"{
-            Outputs advice on how to produce the required alignments.
-        }".wrap;
-    else static if (command == DentistCommand.maskRepetitiveRegions)
-        enum commandSummary = q"{
-            Mask regions that have a alignment coverage that is out of bounds.
-        }".wrap;
-    else static if (command == DentistCommand.propagateMask)
-        enum commandSummary = "
-            Propagate masked regions through the provided alignment. That
-            means the mask is first transferred to the B-contigs/reads
-            according to the given alignments.
-        ".wrap ~ "\n" ~ "
-            The default workflow is to first propagate from the reference
-            assembly to the reads and then back again to the reference.
-            Propagating, once again, to the reads will produce a complete
-            repeat mask on the reads.
-        ".wrap;
-    else static if (command == DentistCommand.mergeMasks)
-        enum commandSummary = "
-            Merge several masks into a single one
-        ".wrap;
-    else static if (command == DentistCommand.showMask)
-        enum commandSummary = q"{
-            Show a short summary of the mask.
-        }".wrap;
-    else static if (command == DentistCommand.bed2mask)
-        enum commandSummary = "
-            Convert a BED file to a Dazzler mask.
-        ".wrap;
-    else static if (command == DentistCommand.chainLocalAlignments)
-        enum commandSummary = q"{
-            Chain local alignments. Right now this produces just the single
-            best chain per combination of A-read and B-read.
-        }".wrap;
-    else static if (command == DentistCommand.collectPileUps)
-        enum commandSummary = q"{
-            Build pile ups.
-        }".wrap;
-    else static if (command == DentistCommand.showPileUps)
-        enum commandSummary = q"{
-            Show a short summary of the pile ups.
-        }".wrap;
-    else static if (command == DentistCommand.processPileUps)
-        enum commandSummary = q"{
-            Process pile ups.
-        }".wrap;
-    else static if (command == DentistCommand.showInsertions)
-        enum commandSummary = q"{
-            Show a short summary of the insertions.
-        }".wrap;
-    else static if (command == DentistCommand.mergeInsertions)
-        enum commandSummary = q"{
-            Merge multiple insertions files into a single one.
-        }".wrap;
-    else static if (command == DentistCommand.output)
-        enum commandSummary = q"{
-            Write output.
-        }".wrap;
-    else static if (command == DentistCommand.translateCoords)
-        enum commandSummary = q"{
-            Translate coordinates of result assembly to coordinates of
-            input assembly.
-        }".wrap;
-    else static if (command == DentistCommand.validateRegions)
-        enum commandSummary = "
-            Validates that given regions look proper, in particular, this may
-            be used to validate closed gaps. Any given region is valid if the
-            following criteria apply to the region extended by
-            --region-context on both sides:
-        ".wrap ~ "\n" ~ "
-            a) Every sliding window of  size --weak-coverage-window must be
-               spanned by at least --min-coverage-reads local alignments. This
-               is a stricter definition of alignment coverage that circumvents
-               issues with interleaved improper alignments.
-        ".wrap(80, null, "   ") ~ "
-            b) The region without context must be spanned by at least
-               --min-spanning-reads properly aligned reads.
-        ".wrap(80, null, "   ");
-    else static if (command == TestingCommand.checkResults)
-        enum commandSummary = q"{
-            Check results of some gap closing procedure.
-        }".wrap;
-    else static if (command == TestingCommand.checkScaffolding)
-        enum commandSummary = q"{
-            Check results of some scaffolding + gap closing procedure.
-        }".wrap;
-    else
-        static assert(0, "missing commandSummary for " ~ command.to!string);
-}
 
-unittest
-{
-    static foreach (command; EnumMembers!DentistCommand)
-    {
-        static assert(is(typeof(commandSummary!command)));
-    }
-}
+/// A short summary for each command to be output underneath the usage.
+enum commandSummary(DentistCommand command) = () {
+    enum commandString = command.to!string;
+
+    mixin(`import dentist.commands.` ~ commandString ~ ` : summary;`);
+
+    enum formattedSummary = summary
+        .strip("\n")
+        .outdent;
+
+    assert(
+        formattedSummary.length > 0,
+        "blank summary for command `" ~ commandString ~ "` is not allowed",
+    );
+
+    return formattedSummary;
+}();
 
 
 /// This describes the basic, ie. non-command-specific, options of DENTIST.

@@ -1,5 +1,5 @@
 /**
-    This is the `translocate-gaps` command of DENTIST.
+    This is the `translocateGaps` command of DENTIST.
 
     Command_Summary:
 
@@ -37,11 +37,11 @@ import std.algorithm :
 import std.array : array;
 
 
-/// Options for the `translocate-gaps` command.
+/// Options for the `translocateGaps` command.
 alias Options = OptionsFor!(TestingCommand.translocateGaps);
 
 
-/// Execute the `translocate-gaps` command with `options`.
+/// Execute the `translocateGaps` command with `options`.
 void execute(in Options options)
 {
     auto translocator = GapTranslocator(options);

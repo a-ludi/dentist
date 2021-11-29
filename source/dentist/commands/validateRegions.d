@@ -1,12 +1,40 @@
 /**
     This is the `validate-regions` command of DENTIST.
 
+    Command_Summary:
+
+    ---
+    Validates that given regions look proper, in particular, this may be used
+    to validate closed gaps. Any given region is valid if the following
+    criteria apply to the region extended by --region-context on both sides:
+
+    a) Every sliding window of size --weak-coverage-window must be spanned
+       by at least --min-coverage-reads local alignments. This is a stricter
+       definition of alignment coverage that circumvents issues with
+       interleaved improper alignments.
+    b) The region without context must be spanned by at least
+       --min-spanning-reads properly aligned reads.
+    ---
+
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.validateRegions;
+
+package(dentist) enum summary = "
+    Validates that given regions look proper, in particular, this may be used
+    to validate closed gaps. Any given region is valid if the following
+    criteria apply to the region extended by --region-context on both sides:
+
+    a) Every sliding window of size --weak-coverage-window must be spanned
+       by at least --min-coverage-reads local alignments. This is a stricter
+       definition of alignment coverage that circumvents issues with
+       interleaved improper alignments.
+    b) The region without context must be spanned by at least
+       --min-spanning-reads properly aligned reads.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.commands.maskRepetitiveRegions :

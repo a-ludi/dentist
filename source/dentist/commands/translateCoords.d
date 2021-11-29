@@ -1,12 +1,26 @@
 /**
     This is the `translate-coords` command of DENTIST.
 
+    Command_Summary:
+
+    ---
+    Translate coordinates of result assembly to coordinates of
+    input assembly. This can be used to lift annotations from the input
+    assembly to the resulting assembly.
+    ---
+
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
     License: Subject to the terms of the MIT license, as written in the
              included LICENSE file.
     Authors: Arne Ludwig <arne.ludwig@posteo.de>
 */
 module dentist.commands.translateCoords;
+
+package(dentist) enum summary = "
+    Translate coordinates of result assembly to coordinates of
+    input assembly. This can be used to lift annotations from the input
+    assembly to the resulting assembly.
+";
 
 import dentist.commandline : OptionsFor;
 import dentist.common :

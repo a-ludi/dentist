@@ -1,39 +1,11 @@
 /**
-    This is the `show-pile-ups` command of DENTIST.
+    This is the `showPileUps` command of DENTIST.
 
     Command_Summary:
 
     ---
-    Show a short summary of the pile ups DB. Can also be used to convert a
-    pile υpsDB to JSON by increasing verbosity two times.
-    ---
-
-    Example:
-
-    Table output (default).
-
-    ---
-    totalDbSize:         55226580 bytes
-    numPileUps:              5616
-    numReadAlignments:      74414
-    numSeededAlignments:   117943
-    numLocalAlignments:    148366
-    numTracePoints:      10587537
-    ---
-
-    Example:
-
-    JSON output (`--json`, `-j`).
-
-    ---
-    {
-        "totalDbSize": 55226580,
-        "numPileUps": 5616,
-        "numReadAlignments": 74414,
-        "numSeededAlignments": 117943,
-        "numLocalAlignments": 148366,
-        "numTracePoints": 10587537
-    }
+    Show a short summary of the pile ups. Can also be used to convert pile υps
+    to JSON by increasing verbosity two times.
     ---
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -66,11 +38,11 @@ import vibe.data.json :
     serializeToJsonString;
 
 
-/// Options for the `show-pile-ups` command.
+/// Options for the `showPileUps` command.
 alias Options = OptionsFor!(DentistCommand.showPileUps);
 
 
-/// Execute the `show-pile-ups` command with `options`.
+/// Execute the `showPileUps` command with `options`.
 void execute(in Options options)
 {
     size_t totalDbSize = options.pileUpsFile.getSize();
