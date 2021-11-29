@@ -425,7 +425,7 @@ struct AlignmentChain
 
 
     /// Return a minimal `AlignmentChain` with the disabled flag set.
-    static @property AlignmentChain disabledInstance()
+    static @property AlignmentChain disabledInstance() pure nothrow @safe @nogc
     {
         AlignmentChain ac;
 
@@ -514,7 +514,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto firstLA = LocalAlignment(Locus(1, 9), Locus(1, 9), 0);
                 auto otherLA = LocalAlignment(Locus(9, 10), Locus(9, 10), 0);
@@ -532,7 +532,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto lastLA = LocalAlignment(Locus(1, 9), Locus(1, 9), 0);
                 auto otherLA = LocalAlignment(Locus(9, 10), Locus(9, 10), 0);
@@ -546,12 +546,12 @@ struct AlignmentChain
     /// Set the disable flag if `disable == true` unless it is already set.
     ///
     /// This does not evaluate `disable` if `flags.disabled` is already set.
-    PhobosFlag!"disabled" disableIf(lazy bool disable) pure
+    PhobosFlag!"disabled" disableIf(lazy bool disable) pure @safe
     {
         if (!flags.disabled)
             flags.disabled = disable;
 
-        return disabled;
+        return cast(typeof(return)) flags.disabled;
     }
 
 
@@ -582,7 +582,7 @@ struct AlignmentChain
 
     /// Returns true iff this alignment covers `contig` completely within
     /// `allowance`.
-    @property bool completelyCovers(string contig)(coord_t allowance = 0) const pure nothrow
+    @property bool completelyCovers(string contig)(coord_t allowance = 0) const pure nothrow @safe
         if (contig.among("contigA", "contigB"))
     {
         return beginsWith!contig(allowance) && endsWith!contig(allowance);
@@ -609,7 +609,7 @@ struct AlignmentChain
         y = va + (lb - vb)
         ---
     */
-    bool isFullyContained() const
+    bool isFullyContained() const @safe
     {
         if (first.contigB.begin > first.contigA.begin)
         {
@@ -625,7 +625,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(30, 35), Locus(5, 10), 1);
                 auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
@@ -634,7 +634,7 @@ struct AlignmentChain
                 assert(ac.isFullyContained);
             }
 
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(10, 20), Locus(5, 10), 1);
                 auto la2 = LocalAlignment(Locus(30, 40), Locus(5, 10), 1);
@@ -644,7 +644,7 @@ struct AlignmentChain
                 assert(ac.isFullyContained);
             }
 
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 10), Locus(5, 10), 1);
                 auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
@@ -653,7 +653,7 @@ struct AlignmentChain
                 assert(!ac.isFullyContained);
             }
 
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(40, 50), Locus(5, 10), 1);
                 auto ac = AlignmentChain(0, Contig(1, 50), Contig(1, 15), Flags(), [la]);
@@ -662,7 +662,7 @@ struct AlignmentChain
                 assert(!ac.isFullyContained);
             }
 
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(0, 20), Locus(5, 10), 1);
                 auto la2 = LocalAlignment(Locus(30, 50), Locus(5, 10), 1);
@@ -675,7 +675,7 @@ struct AlignmentChain
 
 
     deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t totalLength() const pure
+    @property size_t totalLength() const pure @safe
     {
         return last.contigA.end - first.contigA.begin;
     }
@@ -683,14 +683,14 @@ struct AlignmentChain
 
     /// Sum of bases covered by each local alignment on contig A. Some bases
     /// may be counted multiple times.
-    @property size_t coveredBases(string contig)() const pure
+    @property size_t coveredBases(string contig)() const pure @safe
     {
         return localAlignments.map!("a." ~ contig ~ ".end - a." ~ contig ~ ".begin").sum;
     }
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -702,14 +702,14 @@ struct AlignmentChain
 
 
     /// Sum of differences in each local alignment.
-    @property size_t totalDiffs() const pure
+    @property size_t totalDiffs() const pure @safe
     {
         return localAlignments.map!"a.numDiffs".sum;
     }
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -721,7 +721,7 @@ struct AlignmentChain
 
 
     deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t totalGapLength() const pure
+    @property size_t totalGapLength() const pure @safe
     {
         return localAlignments
             .chunks(2)
@@ -731,7 +731,7 @@ struct AlignmentChain
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -743,14 +743,14 @@ struct AlignmentChain
 
 
     deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t numMatchingBps() const pure
+    @property size_t numMatchingBps() const pure @safe
     {
         return totalLength - (totalDiffs + totalGapLength);
     }
 
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -762,14 +762,15 @@ struct AlignmentChain
 
 
     deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t score() const pure
+    @property size_t score() const pure @safe
     {
         return numMatchingBps * maxScore / totalLength;
     }
 
+    deprecated
     unittest
     {
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
@@ -781,7 +782,7 @@ struct AlignmentChain
 
 
     /// Average diffs per base pair over all local alignments.
-    @property double averageErrorRate() const pure
+    @property double averageErrorRate() const pure @safe
     {
         return totalDiffs.to!double / coveredBases!"contigA".to!double;
     }
@@ -800,7 +801,7 @@ struct AlignmentChain
 
 
     /// Compare this alignment chain to other only by contig IDs.
-    int compareIds(ref const AlignmentChain other) const pure nothrow
+    int compareIds(ref const AlignmentChain other) const pure nothrow @safe
     {
         return cmpLexicographically!(
             typeof(this),
@@ -852,7 +853,7 @@ struct AlignmentChain
     /// )
     ///
     /// Note, this is incompatible with `FlatLocalAlignment.opCmp`.
-    int opCmp(ref const AlignmentChain other) const pure nothrow
+    int opCmp(ref const AlignmentChain other) const pure nothrow @safe
     {
         return cmpLexicographically!(
             typeof(this),
@@ -868,7 +869,7 @@ struct AlignmentChain
     unittest
     {
         // see `compareIds`
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto la = LocalAlignment(Locus(0, 1), Locus(0, 1), 1);
                 auto acs = [
@@ -895,7 +896,7 @@ struct AlignmentChain
             }
 
         // test non-id-related comparison
-        with (Complement) with (LocalAlignment)
+        with (Flag) with (LocalAlignment)
             {
                 auto acs = [
                     AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [
@@ -1388,6 +1389,31 @@ struct AlignmentChain
                 tracePointDistance,
                 enumLa.value.tracePoints,
             ));
+    }
+
+
+    /// Convert to/from `vibed.data.json.Json`.
+    Json toJson() const @safe
+    {
+        auto json = Json.emptyObject;
+
+        foreach (alias field; this.tupleof)
+            json[__traits(identifier, field)] = .toJson(field);
+
+        return json;
+    }
+
+    /// ditto
+    static AlignmentChain fromJson(Json json) @safe
+    {
+        import vibe.data.json : deserializeJson;
+
+        AlignmentChain ac;
+
+        foreach (alias field; ac.tupleof)
+            field = deserializeJson!(typeof(field))(json[__traits(identifier, field)]);
+
+        return ac;
     }
 }
 
