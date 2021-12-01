@@ -31,3 +31,8 @@ configuration "testing" {
 configuration "read-las-test" {
     versions      "NoAppMain" "ReadLasTest"
 }
+
+buildType "unittest" {
+    buildOptions "unittests" "debugMode" "debugInfo"
+    dflags "-main"
+}
