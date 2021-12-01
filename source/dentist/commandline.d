@@ -233,6 +233,12 @@ ReturnCode run(in string[] args)
         printBaseHelp();
 
         return ReturnCode.ok;
+    case "-c":
+        goto case;
+    case "--commands":
+        printCommandsSummary();
+
+        return ReturnCode.ok;
     case "-d":
         goto case;
     case "--dependencies":
@@ -527,6 +533,12 @@ private void printBaseHelp()
     stderr.writeln(description);
     stderr.writeln();
     stderr.write(helpString!BaseOptions);
+}
+
+
+private void printCommandsSummary()
+{
+    stderr.writeln(commandsSummary);
 }
 
 
@@ -3102,7 +3114,10 @@ unittest
 
 
 /// A short summary for each command to be output underneath the usage.
-enum commandSummary(DentistCommand command) = () {
+enum commandSummary(DentistCommand command) = makeCommandSummary!command;
+
+private string makeCommandSummary(DentistCommand command)() pure @safe
+{
     enum commandString = command.to!string;
 
     mixin(`import dentist.commands.` ~ commandString ~ ` : summary;`);
@@ -3117,13 +3132,52 @@ enum commandSummary(DentistCommand command) = () {
     );
 
     return formattedSummary;
-}();
+}
+
+
+/// A summary of all commands with a short description.
+enum commandsSummary = makeCommandsSummary();
+
+private string makeCommandsSummary() pure @safe
+{
+    import dentist.util.algorithm : sliceUntil;
+    import std.array : appender, replicate;
+
+    enum lineWidth = 80;
+    enum summaryLine(DentistCommand command) = () {
+        enum padding = 16;
+        enum indent = " ".replicate(padding + 3);
+        enum commandName = dashCaseCT!(to!string(command));
+        enum shortSummary = commandSummary!command
+            .sliceUntil("\n\n", Yes.openRight)
+            .sliceUntil(". ", No.openRight)
+            .wrap(lineWidth, indent, indent);
+
+        if (commandName.length <= padding)
+            return commandName ~ shortSummary[commandName.length .. $];
+        else
+            return commandName ~ "\n" ~ shortSummary;
+    }();
+
+    auto summaryAcc = appender!string;
+    summaryAcc ~= "Available commands:\n";
+    static foreach (command; EnumMembers!DentistCommand)
+        summaryAcc ~= summaryLine!command;
+    summaryAcc ~= "\n";
+    summaryAcc ~= "Use `dentist <command> --help` for more information about a command.";
+
+    return summaryAcc[];
+}
 
 
 /// This describes the basic, ie. non-command-specific, options of DENTIST.
 /// See source code or run `dentist --help` for a description of the fields.
 struct BaseOptions
 {
+    @Option("commands", "c")
+    @Help("Print a list of available commands.")
+    OptionFlag listCommands;
+
     @Option("dependencies", "d")
     @Help("
         Print a list of external binaries and if they are on PATH.
@@ -3151,12 +3205,10 @@ struct BaseOptions
     OptionFlag version_;
 
     @Argument("<command>")
-    @Help(format!q"{
-        Execute <command>. Available commands are: %-(%s, %). Use
-        `dentist <command> --help` to get help for a specific command.
-        <command> may be abbreviated by using a unique prefix of the full
-        command string.
-    }"([dentistCommands]))
+    @Help("
+        Execute <command>. Use `dentist --commands` to get a summary of
+        available commands.
+    ")
     DentistCommand command;
 
     @Argument("<options...>", Multiplicity.optional)
