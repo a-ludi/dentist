@@ -209,7 +209,7 @@ function run_workflow()
     dentist collect --config=dentist.json  --threads=1 --auxiliary-threads=1 --mask=dentist-self-H,tan-H,dentist-reads-H workdir/assembly-test.dam workdir/reads.db workdir/assembly-test.reads.las workdir/pile-ups.db
     dentist process --config=dentist.json  --threads=1 --auxiliary-threads=1 --mask=dentist-self-H,tan-H,dentist-reads-H --batch=0..2 workdir/assembly-test.dam workdir/reads.db workdir/pile-ups.db workdir/insertions/batch.0.db
     dentist merge-insertions workdir/insertions.db workdir/insertions/batch.0.db
-    dentist output --config=dentist.json  --agp=workdir/gap-closed-preliminary.closed-gaps.agp --closed-gaps-bed=workdir/gap-closed-preliminary.closed-gaps.bed --revert=scaffolding,skip-gaps,skip-gaps-file,cache-contig-alignments workdir/assembly-test.dam workdir/insertions.db workdir/gap-closed-preliminary.fasta
+    dentist output --config=dentist.json  --agp=workdir/gap-closed-preliminary.closed-gaps.agp --closed-gaps-bed=workdir/gap-closed-preliminary.closed-gaps.bed --revert=scaffolding,skip-gaps,skip-gaps-file workdir/assembly-test.dam workdir/insertions.db workdir/gap-closed-preliminary.fasta
     fasta2DAM workdir/gap-closed-preliminary.dam workdir/gap-closed-preliminary.fasta && DBsplit -x20 workdir/gap-closed-preliminary.dam
     dentist bed2mask --config=dentist.json  --data-comments --bed=workdir/gap-closed-preliminary.closed-gaps.bed workdir/gap-closed-preliminary.dam closed-gaps
     ( cd workdir && datander '-T1' -s126 -l500 -e0.7 gap-closed-preliminary.1 )
