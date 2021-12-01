@@ -227,6 +227,13 @@ validate_config()
 }
 
 
+run_integration_tests()
+{
+    ./tests/test-commands.sh
+    ./tests/test-workflow.sh
+}
+
+
 if [ "$num_new_commits" -gt 0 ];
 then
     create_testdir
@@ -238,4 +245,5 @@ then
     dub build --config=testing
     dub test --config=testing
     validate_config ./snakemake/dentist.greedy.yml ./snakemake/dentist.yml
+    run_integration_tests
 fi
