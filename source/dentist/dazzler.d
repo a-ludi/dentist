@@ -225,19 +225,6 @@ bool lasEmpty(in string lasFile)
 }
 
 
-deprecated("use the one argument version")
-bool lasEmpty(in string lasFile, in string dbA, in string workdir)
-{
-    return lasEmpty(lasFile);
-}
-
-deprecated("use the one argument version")
-bool lasEmpty(in string lasFile, in string dbA, in string dbB, in string workdir)
-{
-    return lasEmpty(lasFile);
-}
-
-
 /// Returns the (trimmed) number of records in `dbFile`.
 id_t numDbRecords(in string dbFile)
 {
@@ -349,15 +336,6 @@ AlignmentChain[] getLocalAlignments(Options)(in string dbA, in string dbB, in Op
 }
 
 
-deprecated("obsolete; will be removed in a future release")
-void computeLocalAlignments(Options)(in string[] dbList, in Options options)
-        if (isOptionsList!(typeof(options.dalignerOptions)) &&
-            isSomeString!(typeof(options.tmpdir)))
-{
-    dalign(dbList, options.dalignerOptions, options.tmpdir);
-}
-
-
 /// Compute local alignments of given DBs using `damapper`.
 ///
 /// The resulting LAS file is placed in `options.tmpdir`. Its name can be
@@ -375,15 +353,6 @@ AlignmentChain[] getMappings(Options)(in string dbA, in string dbB, in Options o
         damapper(dbA, dbB, options.damapperOptions, options.tmpdir);
 
     return getGeneratedAlignments(dbA, dbB, options);
-}
-
-
-deprecated("obsolete; will be removed in a future release")
-void computeMappings(Options)(in string[] dbList, in Options options)
-        if (isOptionsList!(typeof(options.damapperOptions)) &&
-            isSomeString!(typeof(options.tmpdir)))
-{
-    damapper(dbList, options.damapperOptions, options.tmpdir);
 }
 
 
@@ -505,39 +474,6 @@ AlignmentChain[] getAlignments(
         alignmentChainsBuffer.sort!("a < b", SwapStrategy.stable);
 
     return alignmentChainsBuffer;
-}
-
-deprecated("use version without arguments `workdir` and `tracePointDistance`")
-AlignmentChain[] getAlignments(
-    in string dbA,
-    in string lasFile,
-    in string workdir,
-    in trace_point_t tracePointDistance = 0,
-)
-{
-    return getAlignments(
-        dbA,
-        null,
-        lasFile,
-        cast(Flag!"includeTracePoints") (tracePointDistance > 0),
-    );
-}
-
-deprecated("use version without arguments `workdir` and `tracePointDistance`")
-AlignmentChain[] getAlignments(
-    in string dbA,
-    in string dbB,
-    in string lasFile,
-    in string workdir,
-    in trace_point_t tracePointDistance = 0,
-)
-{
-    return getAlignments(
-        dbA,
-        dbB,
-        lasFile,
-        cast(Flag!"includeTracePoints") (tracePointDistance > 0),
-    );
 }
 
 unittest
@@ -2215,18 +2151,6 @@ trace_point_t getTracePointDistance(in string lasFile)
     return readLasHeader(lasFile).tracePointSpacing;
 }
 
-deprecated("DBs are not required; use single-argument version")
-trace_point_t getTracePointDistance(in string dbA, in string lasFile)
-{
-    return getTracePointDistance(lasFile);
-}
-
-deprecated("DBs are not required; use single-argument version")
-trace_point_t getTracePointDistance(in string dbA, in string dbB, in string lasFile)
-{
-    return getTracePointDistance(lasFile);
-}
-
 
 /// $(RED [Experimental]) Reconstruct the alignment matrix for `ac`
 /// force-filling gaps in the chain. Restrict reconstruction to
@@ -3561,17 +3485,6 @@ if (isInputRange!Range && is(ElementType!Range : size_t))
         recordNumbers,
         fastaLineWidth,
     );
-}
-
-deprecated("use getFastaEntries(string, Range, size_t) instead")
-auto getFastaEntries(Options, Range)(in string dbFile, Range recordNumbers, in Options options)
-        if (is(typeof(options.fastaLineWidth)) &&
-            isIntegral!(typeof(options.fastaLineWidth)) &&
-            is(typeof(options.tmpdir)) &&
-            isSomeString!(typeof(options.tmpdir)) &&
-            isInputRange!Range && is(ElementType!Range : size_t))
-{
-    return getFastaEntries(dbFile, recordNumbers, options.fastaLineWidth);
 }
 
 

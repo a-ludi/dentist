@@ -156,15 +156,6 @@ Join!T concatenatePayloads(T)(Join!T[] joins...) nothrow
 }
 
 
-deprecated("obsolete; will be removed in a future release")
-J dontJoin(J)(J j1, J j2) pure nothrow
-{
-    j1.payload = T.init;
-
-    return j1;
-}
-
-
 /// Returns true iff join is a default/contig edge of the scaffold graph.
 bool isDefault(J)(in J join) pure nothrow
 {
@@ -774,37 +765,6 @@ Scaffold!T removeBlacklisted(T)(Scaffold!T scaffold, in bool[size_t[2]] blacklis
         .toJson);
 
     return scaffold;
-}
-
-
-/// Remove extension joins from `scaffold`.
-deprecated("use `enforceJoinPolicy` instead")
-Scaffold!T removeExtensions(T)(Scaffold!T scaffold)
-{
-    auto extensionJoins = scaffold.edges.filter!isExtension;
-
-    foreach (extensionJoin; extensionJoins)
-    {
-        extensionJoin.payload = T.init;
-        scaffold.add!(scaffold.ConflictStrategy.replace)(extensionJoin);
-    }
-
-    return removeNoneJoins!T(scaffold);
-}
-
-/// Remove spanning joins from `scaffold`.
-deprecated("use `enforceJoinPolicy` instead")
-Scaffold!T removeSpanning(T)(Scaffold!T scaffold)
-{
-    auto spanningJoins = scaffold.edges.filter!isGap;
-
-    foreach (spanningJoin; spanningJoins)
-    {
-        spanningJoin.payload = T.init;
-        scaffold.add!(scaffold.ConflictStrategy.replace)(spanningJoin);
-    }
-
-    return removeNoneJoins!T(scaffold);
 }
 
 

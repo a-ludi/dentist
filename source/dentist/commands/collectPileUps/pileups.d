@@ -244,7 +244,7 @@ unittest
             id_t alignmentChainId = 0;
             id_t contReadId = 0;
             ReadAlignment getDummyRead(id_t beginContigId, arithmetic_t beginIdx,
-                    id_t endContigId, arithmetic_t endIdx, Complement complement)
+                    id_t endContigId, arithmetic_t endIdx, bool complement)
             {
                 static enum contigLength = 16;
                 static enum gapLength = 9;
@@ -367,30 +367,30 @@ unittest
             ];
             auto pileUps = [
                 [
-                    getDummyRead(c1,  5, c1, 18, Complement.no),  //  #1
-                    getDummyRead(c1,  5, c1, 18, Complement.yes), //  #2
-                    getDummyRead(c1,  5, c1, 20, Complement.no),  //  #3
-                    getDummyRead(c1, 10, c1, 20, Complement.no),  //  #4
-                    getDummyRead(c1, 10, c2,  5, Complement.no),  //  #5
-                    getDummyRead(c1, 10, c2,  5, Complement.yes), //  #6
-                    getDummyRead(c1, 13, c2,  8, Complement.no),  //  #7
-                    getDummyRead(c2, -5, c2,  8, Complement.no),  //  #8
-                    getDummyRead(c2, -5, c2,  8, Complement.yes), //  #9
-                    getDummyRead(c2, -5, c2, 10, Complement.no),  // #10
-                    getDummyRead(c2, -1, c2, 10, Complement.no),  // #11
+                    getDummyRead(c1,  5, c1, 18, false), //  #1
+                    getDummyRead(c1,  5, c1, 18, true),  //  #2
+                    getDummyRead(c1,  5, c1, 20, false), //  #3
+                    getDummyRead(c1, 10, c1, 20, false), //  #4
+                    getDummyRead(c1, 10, c2,  5, false), //  #5
+                    getDummyRead(c1, 10, c2,  5, true),  //  #6
+                    getDummyRead(c1, 13, c2,  8, false), //  #7
+                    getDummyRead(c2, -5, c2,  8, false), //  #8
+                    getDummyRead(c2, -5, c2,  8, true),  //  #9
+                    getDummyRead(c2, -5, c2, 10, false), // #10
+                    getDummyRead(c2, -1, c2, 10, false), // #11
                 ],
                 [
-                    getDummyRead(c2,  5, c2, 18, Complement.no),  // #12
-                    getDummyRead(c2,  5, c2, 18, Complement.yes), // #13
-                    getDummyRead(c2,  5, c2, 20, Complement.no),  // #14
-                    getDummyRead(c2, 10, c2, 20, Complement.no),  // #15
-                    getDummyRead(c2, 10, c3,  5, Complement.no),  // #16
-                    getDummyRead(c2, 10, c3,  5, Complement.yes), // #17
-                    getDummyRead(c2, 13, c3,  8, Complement.no),  // #18
-                    getDummyRead(c3, -5, c3,  8, Complement.no),  // #19
-                    getDummyRead(c3, -5, c3,  8, Complement.yes), // #20
-                    getDummyRead(c3, -5, c3, 10, Complement.no),  // #21
-                    getDummyRead(c3, -1, c3, 10, Complement.no),  // #22
+                    getDummyRead(c2,  5, c2, 18, false), // #12
+                    getDummyRead(c2,  5, c2, 18, true),  // #13
+                    getDummyRead(c2,  5, c2, 20, false), // #14
+                    getDummyRead(c2, 10, c2, 20, false), // #15
+                    getDummyRead(c2, 10, c3,  5, false), // #16
+                    getDummyRead(c2, 10, c3,  5, true),  // #17
+                    getDummyRead(c2, 13, c3,  8, false), // #18
+                    getDummyRead(c3, -5, c3,  8, false), // #19
+                    getDummyRead(c3, -5, c3,  8, true),  // #20
+                    getDummyRead(c3, -5, c3, 10, false), // #21
+                    getDummyRead(c3, -1, c3, 10, false), // #22
                 ],
             ];
             auto alignmentChains = pileUps
@@ -820,13 +820,13 @@ Join!ScaffoldPayload makeScaffoldJoin(GapSegment inputGap)
 ///         value unless `reasonForEmpty is null`
 ReadAlignment[] collectReadAlignments(Chunk)(Chunk sameReadAlignments, string* reasonForEmpty = null)
 {
-    alias beginRelToContigB = (alignment) => alignment.complement
+    alias beginRelToContigB = (alignment) => alignment.flags.complement
         ? alignment.contigB.length - alignment.last.contigB.end
         : alignment.first.contigB.begin;
-    alias endRelToContigB = (alignment) => alignment.complement
+    alias endRelToContigB = (alignment) => alignment.flags.complement
         ? alignment.contigB.length - alignment.first.contigB.begin
         : alignment.last.contigB.end;
-    alias seedRelToContigB = (alignment) => alignment.complement
+    alias seedRelToContigB = (alignment) => alignment.flags.complement
         ? 0 - alignment.seed
         : 0 + alignment.seed;
     alias orderByLocusAndSeed = orderLexicographically!(

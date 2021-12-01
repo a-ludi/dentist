@@ -638,7 +638,7 @@ private struct ResultAnalyzer
                     recoveredAlignments[0].contigA.length,
                     recoveredAlignments[0].contigB.id,
                     DuplicateQueryContig.no,
-                    recoveredAlignments[0].complement,
+                    cast(Complement) recoveredAlignments[0].flags.complement,
                     recoveredAlignments[0].averageErrorRate,
                 )
                 : ContigMapping())

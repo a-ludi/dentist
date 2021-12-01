@@ -413,9 +413,6 @@ struct AlignmentChain
         }
     }
 
-    deprecated("obsolete; will be removed in future version without replacement")
-    static enum maxScore = 2 ^^ 16;
-
     size_t id;
     Contig contigA;
     Contig contigB;
@@ -432,26 +429,6 @@ struct AlignmentChain
         ac.flags |= Flag.disabled;
 
         return ac;
-    }
-
-    static foreach(flagName; __traits(allMembers, Flag))
-    {
-        mixin(format!(q"<
-            deprecated("will be removed in future version without replacement")
-            static alias %1$s = PhobosFlag!"%2$s";
-
-            deprecated("will be removed in future version; use `flags.%2$s`")
-            @property PhobosFlag!"%2$s" %2$s() pure const nothrow @trusted
-            {
-                return cast(PhobosFlag!"%2$s") flags.%2$s;
-            }
-
-            deprecated("will be removed in future version; use `flags.%2$s`")
-            @property void %2$s(PhobosFlag!"%2$s" %2$s) pure nothrow
-            {
-                flags.%2$s = %2$s;
-            }
-        >")(flagName.capitalize, flagName));
     }
 
     invariant
@@ -496,12 +473,12 @@ struct AlignmentChain
                 auto acFine = AlignmentChain(5, Contig(1, 10), Contig(1, 10),
                         Flags(), [LocalAlignment(Locus(1, 9), Locus(1, 9), 0)]);
 
-                assertThrown!AssertError(acZeroLength.totalLength);
-                assertThrown!AssertError(ac1.totalLength);
-                assertThrown!AssertError(ac2.totalLength);
-                assertThrown!AssertError(ac3.totalLength);
-                assertThrown!AssertError(ac4.totalLength);
-                assertNotThrown!AssertError(acFine.totalLength);
+                assertThrown!AssertError(acZeroLength.first);
+                assertThrown!AssertError(ac1.first);
+                assertThrown!AssertError(ac2.first);
+                assertThrown!AssertError(ac3.first);
+                assertThrown!AssertError(ac4.first);
+                assertNotThrown!AssertError(acFine.first);
             }
     }
 
@@ -674,13 +651,6 @@ struct AlignmentChain
     }
 
 
-    deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t totalLength() const pure @safe
-    {
-        return last.contigA.end - first.contigA.begin;
-    }
-
-
     /// Sum of bases covered by each local alignment on contig A. Some bases
     /// may be counted multiple times.
     @property size_t coveredBases(string contig)() const pure @safe
@@ -696,7 +666,8 @@ struct AlignmentChain
                 auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
                 auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
-                assert(ac.totalLength == 9);
+                assert(ac.coveredBases!"contigA" == 7);
+                assert(ac.coveredBases!"contigB" == 7);
             }
     }
 
@@ -716,67 +687,6 @@ struct AlignmentChain
                 auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
 
                 assert(ac.totalDiffs == 3);
-            }
-    }
-
-
-    deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t totalGapLength() const pure @safe
-    {
-        return localAlignments
-            .chunks(2)
-            .map!(las => las.length < 2 ? 0 : absdiff(las[1].contigA.begin, las[0].contigA.end))
-            .sum;
-    }
-
-    unittest
-    {
-        with (Flag) with (LocalAlignment)
-            {
-                auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
-                auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
-
-                assert(ac.totalGapLength == 2);
-            }
-    }
-
-
-    deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t numMatchingBps() const pure @safe
-    {
-        return totalLength - (totalDiffs + totalGapLength);
-    }
-
-    unittest
-    {
-        with (Flag) with (LocalAlignment)
-            {
-                auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
-                auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
-
-                assert(ac.numMatchingBps == 9 - (3 + 2));
-            }
-    }
-
-
-    deprecated("obsolete; will be removed in future version without replacement")
-    @property size_t score() const pure @safe
-    {
-        return numMatchingBps * maxScore / totalLength;
-    }
-
-    deprecated
-    unittest
-    {
-        with (Flag) with (LocalAlignment)
-            {
-                auto la1 = LocalAlignment(Locus(1, 3), Locus(1, 3), 1);
-                auto la2 = LocalAlignment(Locus(5, 10), Locus(5, 10), 2);
-                auto ac = AlignmentChain(0, Contig(1, 10), Contig(1, 10), Flags(), [la1, la2]);
-
-                assert(ac.score == 4 * maxScore / 9);
             }
     }
 
@@ -2707,13 +2617,6 @@ struct ReadAlignment
             assert(expIsAntiParallel == readAlignment.isAntiParallel,
                     getFailureMessage(testCase, "isAntiParallel", expIsAntiParallel));
         }
-    }
-
-
-    deprecated("obsolete; will be removed in future version without replacement")
-    double meanScore() const pure
-    {
-        return this[].map!"a.score".mean;
     }
 }
 
