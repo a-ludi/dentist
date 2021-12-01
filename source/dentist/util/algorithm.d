@@ -235,13 +235,33 @@ Array sliceUntil(alias pred = "a == b", Array, Needle)(
     Needle needle,
     OpenRight openRight = Yes.openRight,
 )
-        if (isDynamicArray!Array)
+        if (isDynamicArray!Array && !is(const(Needle) == const(Array)))
 {
     alias predFun = binaryFun!pred;
 
     foreach (i, ref e; haystack)
         if (predFun(e, needle))
             return haystack[0 .. (openRight ? i : i + 1)];
+
+    return haystack[0 .. $];
+}
+
+/// ditto
+Array sliceUntil(alias pred = "equal(a, b)", Array, Needle)(
+    Array haystack,
+    Needle needle,
+    OpenRight openRight = Yes.openRight,
+)
+        if (isDynamicArray!Array && is(const(Needle) == const(Array)))
+{
+    alias predFun = binaryFun!pred;
+
+    foreach (i; 0 .. haystack.length - needle.length)
+        if (predFun(
+            haystack[i .. i + needle.length],
+            needle,
+        ))
+            return haystack[0 .. (openRight ? i : i + needle.length)];
 
     return haystack[0 .. $];
 }
@@ -271,6 +291,7 @@ unittest
     assert(a.sliceUntil(7) == [1, 2, 4]);
     assert(a.sliceUntil!"a == 7" == [1, 2, 4]);
     assert(a.sliceUntil(7, No.openRight) == [1, 2, 4, 7]);
+    assert(a.sliceUntil([7, 7]) == [1, 2, 4]);
 }
 
 
