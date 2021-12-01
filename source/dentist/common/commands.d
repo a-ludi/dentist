@@ -19,7 +19,6 @@ import dentist.util.string : dashCaseCT;
 /// Sub-commands of dentist.
 mixin("enum DentistCommand {" ~
     "validateConfig," ~
-    testingOnly!"translocateGaps," ~
     testingOnly!"buildPartialAssembly," ~
     testingOnly!"findClosableGaps," ~
     "generateDazzlerOptions," ~

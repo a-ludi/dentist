@@ -637,7 +637,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
         TestingCommand.buildPartialAssembly,
         TestingCommand.findClosableGaps,
         TestingCommand.checkResults,
@@ -648,16 +647,6 @@ struct OptionsFor(DentistCommand _command)
         @Help("the 'true' assembly in .dam format")
         @(Validate!(validateDB!".dam"))
         string trueAssemblyDb;
-    }
-
-    static if (command.among(
-        TestingCommand.translocateGaps,
-    ))
-    {
-        @Argument("<in:short-read-assembly>")
-        @Help("short-read assembly in .dam format")
-        @(Validate!(validateDB!".dam"))
-        string shortReadAssemblyDb;
     }
 
     static if (command.among(
@@ -741,19 +730,6 @@ struct OptionsFor(DentistCommand _command)
         @Help("result assembly in .dam format")
         @(Validate!(validateDB!".dam"))
         string resultDb;
-    }
-
-    static if (command.among(
-        TestingCommand.translocateGaps,
-    ))
-    {
-        @Argument("<in:short-vs-true-alignment>")
-        @Help(q"{
-            locals alignments of the short-read assembly against the 'true'
-            assembly in form of a .las file as produced by `daligner`
-        }")
-        @(Validate!validateLasFile)
-        string shortReadAssemblyAlignmentFile;
     }
 
     static if (command.among(
@@ -922,16 +898,6 @@ struct OptionsFor(DentistCommand _command)
             foreach (i, coordString; coordStrings)
                 outputCoordinates[i] = parseCoordString(coordString);
         }
-    }
-
-    static if (command.among(
-        TestingCommand.translocateGaps,
-    ))
-    {
-        @Argument("<out:mapped-regions-mask>")
-        @Help("write regions that were kept aka. output contigs into a Dazzler mask.")
-        @(Validate!((value, options) => validateOutputMask(options.trueAssemblyDb, value)))
-        string mappedRegionsMask;
     }
 
     static if (command.among(
@@ -2314,7 +2280,6 @@ struct OptionsFor(DentistCommand _command)
     }
 
     static if (command.among(
-        TestingCommand.translocateGaps,
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
@@ -2336,10 +2301,7 @@ struct OptionsFor(DentistCommand _command)
             if (properAlignmentAllowance > 0)
                 return;
 
-            static if (command == TestingCommand.translocateGaps)
-                properAlignmentAllowance = 1_000;
-            else
-                properAlignmentAllowance = tracePointDistance;
+            properAlignmentAllowance = tracePointDistance;
         }
     }
 

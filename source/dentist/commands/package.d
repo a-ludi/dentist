@@ -32,7 +32,6 @@
         $(LI `dentist.commands.checkResults`)
         $(LI `dentist.commands.checkScaffolding`)
         $(LI `dentist.commands.findClosableGaps`)
-        $(LI `dentist.commands.translocateGaps`)
     )
 
     Copyright: © 2018 Arne Ludwig <arne.ludwig@posteo.de>
@@ -61,6 +60,5 @@ public import dentist.commands.showInsertions : showInsertions = execute;
 public import dentist.commands.showMask : showMask = execute;
 public import dentist.commands.showPileUps : showPileUps = execute;
 public import dentist.commands.translateCoords : translateCoords = execute;
-public import dentist.commands.translocateGaps : translocateGaps = execute;
 public import dentist.commands.validateConfig : validateConfig = execute;
 public import dentist.commands.validateRegions : validateRegions = execute;
