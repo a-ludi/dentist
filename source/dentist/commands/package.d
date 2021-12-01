@@ -41,14 +41,13 @@
 */
 module dentist.commands;
 
+import dentist.common : isTesting;
+
+
 public import dentist.commands.bed2mask : bed2mask = execute;
-public import dentist.commands.buildPartialAssembly : buildPartialAssembly = execute;
 public import dentist.commands.chainLocalAlignments : chainLocalAlignments = execute;
-public import dentist.commands.checkResults : checkResults = execute;
-public import dentist.commands.checkScaffolding : checkScaffolding = execute;
 public import dentist.commands.collectPileUps : collectPileUps = execute;
 public import dentist.commands.filterMask : filterMask = execute;
-public import dentist.commands.findClosableGaps : findClosableGaps = execute;
 public import dentist.commands.generateDazzlerOptions : generateDazzlerOptions = execute;
 public import dentist.commands.maskRepetitiveRegions : maskRepetitiveRegions = execute;
 public import dentist.commands.mergeInsertions : mergeInsertions = execute;
@@ -62,3 +61,11 @@ public import dentist.commands.showPileUps : showPileUps = execute;
 public import dentist.commands.translateCoords : translateCoords = execute;
 public import dentist.commands.validateConfig : validateConfig = execute;
 public import dentist.commands.validateRegions : validateRegions = execute;
+
+
+static if (isTesting):
+
+public import dentist.commands.buildPartialAssembly : buildPartialAssembly = execute;
+public import dentist.commands.checkResults : checkResults = execute;
+public import dentist.commands.checkScaffolding : checkScaffolding = execute;
+public import dentist.commands.findClosableGaps : findClosableGaps = execute;
