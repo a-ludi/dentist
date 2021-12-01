@@ -1808,7 +1808,9 @@ struct FlatLocalAlignment
         Generate a cartoon of this alignment relative to `contig`.
 
         Params:
-            bpsPerChar =    Number of base pairs that one char represents.
+            contig     = Which contig to show; either `"contigA"` or  `"contigB"`
+            bpsPerChar = Number of base pairs that one char represents.
+            localAlignments = Local alignments to include in the cartoon.
 
         Returns: a cartoon of this alignment
     */

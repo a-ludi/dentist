@@ -4999,10 +4999,10 @@ private id_t[] getTrimmedDbTranslateTable(in string dbFile)
     Write the list of intervals to a Dazzler mask for `dbFile`.
 
     Params:
-        Intervals = range of intervals the have three fields `tag`, `begin`
-            and `end`.
         dbFile   = path to DB
         maskName = name of the mask
+        intervals = range of intervals the have three fields `tag`, `begin`
+            and `end`
     See_Also: `readMask`, `getMaskFiles`
 */
 void writeMask(Intervals)(in string dbFile, in string maskName, Intervals intervals)

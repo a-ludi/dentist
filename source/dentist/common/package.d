@@ -109,18 +109,18 @@ class DentistException : Exception
         line     = The line number where the exception occurred.
     See_also: `std.exception.enforce`
     Returns:  `value`, if `cast(bool) value` is true. Otherwise,
-              `new DentistException(message, payload)` is thrown.
+              `new DentistException(msg, payload)` is thrown.
 */
 T dentistEnforce(T)(
     T value,
-    lazy string message,
+    lazy string msg,
     lazy Json payload = Json(),
     string file = __FILE__,
     size_t line = __LINE__,
 )
 {
     return enforce(value, new DentistException(
-        message,
+        msg,
         payload,
         file,
         line,

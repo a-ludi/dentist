@@ -21,7 +21,7 @@ import std.typecons : tuple, Tuple;
     source `range`.
 
     Params:
-        source = input range
+        range = input range
         chunkSize = integer greater than zero.
     See Also: `std.range.chunks`
     Returns: Range of chunk arrays, ie. `ElementType!Source[]`.
