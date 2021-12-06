@@ -36,3 +36,7 @@ buildType "unittest" {
     buildOptions "unittests" "debugMode" "debugInfo"
     dflags "-main"
 }
+
+buildType "release" {
+    buildOptions "optimize" "inline"
+}
