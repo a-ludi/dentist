@@ -142,7 +142,7 @@ function dentist()
 function setup_workdir()
 {
     EXECDIR="$PWD"
-    WORKDIR="$(realpath "$(mktemp -d ".test-commands-XXXXXX")")"
+    WORKDIR="$(realpath "$(mktemp --tmpdir -d ".test-commands-XXXXXX")")"
     trap clean_up exit
     (( ${DEBUG:-0} == 0 )) || trap save_workdir err
 
