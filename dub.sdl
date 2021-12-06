@@ -40,3 +40,8 @@ buildType "unittest" {
 buildType "release" {
     buildOptions "optimize" "inline"
 }
+
+buildType "docs-json" {
+    buildOptions "syntaxOnly"
+    dflags "-c" "-D" "-Xfdocs.json"
+}
