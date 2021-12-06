@@ -183,28 +183,8 @@ import vibe.data.json :
     toJson = serializeToJson;
 
 
-version (Posix)
-{
-    version (unittest) { }
-    else version (NoAppMain) { } else
-    {
-        /// Application entry point.
-        ///
-        /// See_also: `run`
-        int main(string[] args)
-        {
-            return cast(int) run(args);
-        }
-    }
-}
-else
-{
-    static assert(0, "not compatible with non-POSIX systems.");
-}
-
-
 /// Possible returns codes of the command line execution.
-enum ReturnCode : int
+enum ReturnCode
 {
     ok,
     commandlineError,

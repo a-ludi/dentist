@@ -10,6 +10,7 @@ dependency        "vibe-d:data"        version="~>0.9.3"
 dependency        "dyaml"              version="~>0.8.4"
 
 targetType        "executable"
+mainSourceFile    "source/app.d"
 stringImportPaths "scripts"
 
 buildRequirements "allowWarnings"
@@ -30,11 +31,6 @@ configuration "testing" {
 
 configuration "read-las-test" {
     versions      "NoAppMain" "ReadLasTest"
-}
-
-buildType "unittest" {
-    buildOptions "unittests" "debugMode" "debugInfo"
-    dflags "-main"
 }
 
 buildType "release" {
