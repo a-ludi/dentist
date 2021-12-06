@@ -1,4 +1,5 @@
 {% set name = "DENTIST" %}
+{% set git_url = "https://github.com/a-ludi/dentist.git" %}
 {% set git_rev = "v2.0.0" %}
 
 {% set version = environ['GIT_DESCRIBE_TAG'] %}
@@ -23,7 +24,7 @@ package:
 
 source:
   git_rev: "{{ git_rev }}"
-  git_url: https://github.com/a-ludi/dentist.git
+  git_url: "{{ git_url }}"
 
 build:
   script_env:
@@ -43,9 +44,12 @@ requirements:
     - dazz_db==1.0.20200727+commit.d22ae58
 
 test:
+  source_files:
+    - tests/test-commands.sh
   commands:
-    - dentist-unittest
     - dentist -d
+    - dentist-unittest
+    - tests/test-commands.sh
 
 about:
   home: https://a-ludi.github.io/dentist/

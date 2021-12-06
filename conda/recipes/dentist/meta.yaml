@@ -34,9 +34,11 @@ requirements:
 test:
   source_files:
     - snakemake
+    - tests/test-workflow.sh
   commands:
     - "dentist -d"
-    - "cd snakemake && snakemake --lint --configfile=snakemake.yml || true"
+    - "( cd snakemake && snakemake --lint --configfile=snakemake.yml || true )"
+    - "tests/test-workflow.sh"
 
 about:
   home: https://a-ludi.github.io/dentist/
