@@ -23,6 +23,9 @@ insertions_batch = None
 custom_auxiliary_threads = None
 batch_size = None
 dentist_container = None
+dentist_env = None
+singularity_image = None
+conda_env = None
 
 
 #-----------------------------------------------------------------------------
@@ -31,7 +34,9 @@ dentist_container = None
 
 
 def prefetch_singularity_image(container_url):
-    if not workflow.use_singularity:
+    global singularity_image
+
+    if not workflow.use_singularity or not singularity_image is None:
         return
 
     from snakemake.deployment.singularity import Image
@@ -42,15 +47,42 @@ def prefetch_singularity_image(container_url):
                 persistence=Persistence(singularity_prefix=workflow.singularity_prefix)
             ))))
 
-    image = None
+    singularity_image = None
     try:
-        image = Image(container_url, dag, is_containerized=True)
+        singularity_image = Image(container_url, dag, is_containerized=True)
     except TypeError:
-        image = Image(container_url, dag)
+        singularity_image = Image(container_url, dag)
 
-    if not exists(image.path):
+    if not exists(singularity_image.path):
         logger.info("Pre-fetching singularity image...")
-        image.pull()
+        singularity_image.pull()
+
+
+def prefetch_conda_env(env_file):
+    global conda_env
+
+    if not workflow.use_conda or not conda_env is None:
+        return
+
+    from snakemake.deployment.conda import Env
+    from snakemake.persistence import Persistence
+
+    print(dir(workflow))
+    dag = type('FakeDAG', (object,), dict(
+        workflow=type('FakeWorkflow', (object,), dict(
+                persistence=Persistence(conda_prefix=workflow.conda_prefix),
+                conda_frontend=workflow.conda_frontend,
+                singularity_args=workflow.singularity_args,
+                sourcecache=workflow.sourcecache
+            ))))
+
+    conda_env = Env(
+        env_file,
+        dag.workflow,
+        container_img=singularity_image,
+        cleanup=workflow.conda_cleanup_pkgs,
+    )
+    conda_env.create()
 
 
 def shellcmd(cmd):
@@ -60,6 +92,13 @@ def shellcmd(cmd):
         return singularity.shellcmd(dentist_container, cmd,
                                     workflow.singularity_args,
                                     container_workdir=workflow.singularity_prefix)
+    elif workflow.use_conda:
+        from snakemake.deployment.conda import Conda
+
+        conda = Conda(singularity_image, prefix_path=workflow.conda_base_path)
+        conda_cmd = conda.shellcmd(conda_env.path, cmd)
+
+        return conda_cmd
     else:
         return cmd
 
@@ -675,38 +714,6 @@ def replace_env_rec(obj, envdict=environ):
     return obj
 
 
-def multi_json_loads(s, **kwargs):
-    """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
-       containing whitespace-separated JSON documents) to a list of Python
-       objects.
-    """
-
-    decoder = json.JSONDecoder(**kwargs)
-
-    start = len(s) - len(s.lstrip())
-    docs = list()
-    while start < len(s):
-        doc, pos = decoder.raw_decode(s, idx=start)
-        docs.append(doc)
-        lsep = len(s[pos:]) - len(s[pos:].lstrip())
-
-        if lsep == 0:
-            raise json.JSONDecodeError("Extra data", s, pos)
-
-        start = pos + lsep
-
-    return docs
-
-
-def multi_json_load(fp, **kwargs):
-    """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
-       containing whitespace-separated JSON documents) to a list of Python
-       objects.
-    """
-
-    return multi_json_loads(fp.read(), **kwargs)
-
-
 #-----------------------------------------------------------------------------
 # END functions
 #-----------------------------------------------------------------------------
@@ -760,9 +767,13 @@ validation_blocks = config["validation_blocks"]
 workflow_flags_names = ["full_validation", "no_purge_output"]
 workflow_flags = dict(((flag, config.get(flag, False))  for flag in workflow_flags_names))
 dentist_container = config.get("dentist_container", "docker://aludi/dentist:v2.0.0")
+dentist_env = "envs/dentist.yml"
 
 if workflow.use_singularity:
     prefetch_singularity_image(dentist_container)
+
+if workflow.use_conda:
+    prefetch_conda_env(dentist_env)
 
 
 # workflow files
@@ -907,7 +918,9 @@ rule ALL:
 
 rule validate_dentist_config:
     input: dentist_config_file
-    run: full_validate_dentist_config(str(input))
+    container: dentist_container
+    conda: dentist_env
+    script: "scripts/validate_dentist_config.py"
 
 
 _fast2dam_checkpoint[reference] = "reference2dam"
@@ -915,6 +928,7 @@ checkpoint reference2dam:
     input: reference_fasta
     output: *db_files(reference)
     container: dentist_container
+    conda: dentist_env
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
@@ -925,6 +939,7 @@ checkpoint reference2dam:
 #         input: db_files(reference_fasta)
 #         output: *db_files(reference)
 #         container: dentist_container
+#         conda: dentist_env
 #         shell:
 #             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 # else:
@@ -932,6 +947,7 @@ checkpoint reference2dam:
 #         input: reference_fasta
 #         output: *db_files(reference)
 #         container: dentist_container
+#         conda: dentist_env
 #         shell:
 #             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
@@ -946,6 +962,7 @@ checkpoint preliminary_gap_closed2dam:
     input: preliminary_gap_closed_fasta
     output: *db_files(preliminary_gap_closed)
     container: dentist_container
+    conda: dentist_env
     shell:
         "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
@@ -964,6 +981,7 @@ rule mask_dust:
     params:
         dustcmd = prepare_flags(lambda : generate_options_for("DBdust reference", dentist_config_file)),
     container: dentist_container
+    conda: dentist_env
     shell:
         "{params.dustcmd} {workdir_}/{wildcards.dam}"
 
@@ -985,6 +1003,7 @@ rule self_alignment_block:
     threads: threads_per_process
     log: log_file("self-alignment.{dam}.{block_ref}.{block_reads}")
     container: dentist_container
+    conda: dentist_env
     shell:
         """
             {{
@@ -1005,6 +1024,7 @@ rule self_alignment:
         dbs = lambda _, input: input.db[0]
     log: log_file("self-alignment.{dam}")
     container: dentist_container
+    conda: dentist_env
     shell: LAmerge()
 
 
@@ -1019,6 +1039,7 @@ rule mask_self:
         mask_files(join(workdir_, "{dam}.dam"), self_mask)
     log: log_file("mask-self.{dam}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist mask --config={dentist_config_file} {dentist_flags} {input.dam[0]} {input.alignment} {self_mask} 2> {log}"
 
@@ -1036,6 +1057,7 @@ rule tandem_alignment_block:
     log: log_file("tandem-alignment.{dam}.{block}")
     threads: threads_per_process
     container: dentist_container
+    conda: dentist_env
     shell:
         """
             {{
@@ -1056,6 +1078,7 @@ rule tandem_alignment:
         dbs = lambda _, input: input.db[0]
     log: log_file("tandem-alignment.{dam}")
     container: dentist_container
+    conda: dentist_env
     shell: LAmerge()
 
 
@@ -1071,6 +1094,7 @@ rule mask_tandem_block:
         tanmask_options = prepare_flags(additional_tanmask_options)
     log: log_file("mask-tandem.{dam}.{block}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "TANmask {params[tanmask_options]} {params.reference_stub} {input[alignment]} &> {log}"
 
@@ -1085,6 +1109,7 @@ rule mask_tandem:
         mask_files(join(workdir_, "{dam}.dam"), tandem_mask)
     log: log_file("mask-tandem.{dam}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "Catrack -v {input.db[0]} {tandem_mask} &> {log}"
 
@@ -1096,6 +1121,7 @@ checkpoint reads2db:
     params:
         fasta2dazz = fasta2dazz_command(reads)
     container: dentist_container
+    conda: dentist_env
     shell:
         "{params.fasta2dazz} {output[0]} {input} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
 
@@ -1125,6 +1151,7 @@ rule ref_vs_reads_alignment_block:
     threads: threads_per_process
     log: log_file("ref-vs-reads-alignment.{block_reads}")
     container: dentist_container
+    conda: dentist_env
     shell:
         """
             {{
@@ -1145,6 +1172,7 @@ rule ref_vs_reads_alignment:
         dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("ref-vs-reads-alignment")
     container: dentist_container
+    conda: dentist_env
     shell: LAmerge()
 
 
@@ -1159,6 +1187,7 @@ rule reads_vs_ref_alignment:
         dbs = lambda _, input: (input.readsdb[0], input.refdb[0])
     log: log_file("reads-vs-ref-alignment")
     container: dentist_container
+    conda: dentist_env
     shell: LAmerge()
 
 
@@ -1172,6 +1201,7 @@ rule mask_reads:
         mask_files(reference, reads_mask)
     log: log_file("mask-reads")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist mask --config={dentist_config_file} {dentist_flags} {reference} {reads} {ref_vs_reads_alignment} {reads_mask} 2> {log}"
 
@@ -1191,6 +1221,7 @@ rule propagate_mask_to_reads_block:
     log: log_file("propagate-mask-to-reads.{mask}.{block_reads}")
     group: "propagate_mask"
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reference} {reads} {input[alignment]} {params[outmask]} 2> {log}"
 
@@ -1210,6 +1241,7 @@ rule propagate_mask_back_to_reference_block:
     log: log_file("propagate-mask-back-to-reference-block.{mask}.{block_reads}")
     group: "propagate_mask"
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist propagate-mask --config={dentist_config_file} {dentist_flags} -m {params[inmask]} {reads} {reference} {input[alignment]} {params[outmask]} 2> {log}"
 
@@ -1240,6 +1272,7 @@ rule propagate_mask_back_to_reference:
         block_masks = ["{mask}"] + pseudo_block_masks(homogenized_mask("{mask}"), reads)
     log: log_file("propagate-mask-back-to-reference.{mask}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {reference} {params[merged_mask]} {params[block_masks]} 2> {log}"
 
@@ -1265,6 +1298,7 @@ checkpoint collect:
     threads: threads_per_process
     log: log_file("collect")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist collect --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {output} 2> {log}"
 
@@ -1286,6 +1320,7 @@ rule process:
     threads: threads_per_process
     log: log_file("process.{batch_id}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist process --config={input.config} {dentist_flags} --threads={params.main_threads} --auxiliary-threads={params.auxiliary_threads} --mask={params.masks} --batch={params.batch_range} {input.refdb[0]} {input.readsdb[0]} {input.pile_ups} {output} 2> {log}"
 
@@ -1295,15 +1330,9 @@ rule make_merge_config:
         insertions_batches = lambda _: insertions_batches()
     output:
         temp(dentist_merge_config_file)
-    run:
-        merge_config = dict()
-        merge_config["merge-insertions"] = dict()
-        merge_config["merge-insertions"]["partitioned-insertions"] = insertions_batches()
-
-        with open(output[0], 'w') as merge_config_file:
-            json.dump(merge_config, merge_config_file)
-
-        dentist_validate_file(output[0])
+    container: dentist_container
+    conda: dentist_env
+    script: "scripts/make_merge_config.py"
 
 
 rule merge_insertions:
@@ -1315,6 +1344,7 @@ rule merge_insertions:
         protected(insertions)
     log: log_file("merge-insertions")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist merge-insertions --config={input.config} {dentist_flags} {output} - 2> {log}"
 
@@ -1332,6 +1362,7 @@ rule preliminary_output:
         revert_options = "--revert={}".format(",".join(preliminary_output_revert_options))
     log: log_file("preliminary-output")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist output --config={input.config} {dentist_flags} --agp={output[agp]} --closed-gaps-bed={output[bed]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[fasta]} 2> {log}"
 
@@ -1356,6 +1387,7 @@ rule preliminary_gap_closed_vs_reads_alignment_block:
     threads: threads_per_process
     log: log_file("gap-closed-vs-reads-alignment.{block_reads}")
     container: dentist_container
+    conda: dentist_env
     shell:
         """
             {{
@@ -1376,6 +1408,7 @@ rule preliminary_gap_closed_vs_reads_alignment:
         dbs = lambda _, input: (input.refdb[0], input.readsdb[0])
     log: log_file("gap-closed-vs-reads-alignment")
     container: dentist_container
+    conda: dentist_env
     shell: LAmerge()
 
 
@@ -1386,6 +1419,7 @@ rule split_preliminary_gap_closed_vs_reads_alignment:
         split_alignment = alignment_file(preliminary_gap_closed, reads, block_a="@")
     log: log_file("split-gap-closed-vs-reads-alignment")
     container: dentist_container
+    conda: dentist_env
     shell:
         "LAsplit {params.split_alignment} {validation_blocks} < {input} &> {log}"
 
@@ -1398,6 +1432,7 @@ rule preliminary_closed_gaps_bed2mask:
         mask_files(preliminary_gap_closed, closed_gaps_mask)
     log: log_file("closed-gaps-bed2mask")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist bed2mask --config={dentist_config_file} {dentist_flags} --data-comments --bed={input.bed} {input.db[0]} {closed_gaps_mask} 2> {log}"
 
@@ -1416,6 +1451,7 @@ rule validate_regions_block:
     threads: threads_per_process
     log: log_file("validate-regions-block.{block_ref}")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist validate-regions --config={dentist_config_file} --threads={threads} --weak-coverage-mask={params.block_mask} {input.refdb[0]} {input.readsdb[0]} {input.alignment} {closed_gaps_mask} > {output[0]} 2> {log}"
 
@@ -1439,6 +1475,7 @@ rule weak_coverage_mask:
         block_masks = expand(block_mask(weak_coverage_mask, "{block_ref}"), block_ref=range(1, validation_blocks + 1))
     log: log_file("weak-coverage-mask")
     container: dentist_container
+    conda: dentist_env
     shell:
         "dentist merge-masks --config={dentist_config_file} {dentist_flags} {input.db[0]} {weak_coverage_mask} {params.block_masks} 2> {log}"
 
@@ -1446,16 +1483,9 @@ rule weak_coverage_mask:
 rule skip_gaps:
     input: validation_report
     output: skip_gaps
-    run:
-        validations = None
-        with open(validation_report, 'r') as validation_report_file:
-            validations = multi_json_load(validation_report_file)
-
-        with open(output[0], 'w') as skip_gaps_file:
-            for validation in validations:
-                if not validation.get("isValid", False):
-                    gap_spec = "-".join((str(cid) for cid in validation["contigIds"]))
-                    print(gap_spec, file=skip_gaps_file)
+    container: dentist_container
+    conda: dentist_env
+    script: "scripts/skip_gaps.py"
 
 if workflow_flags["no_purge_output"]:
     rule unpurged_output:
@@ -1469,6 +1499,7 @@ if workflow_flags["no_purge_output"]:
             agp = gap_closed_agp
         log: log_file("unpurged-output")
         container: dentist_container
+        conda: dentist_env
         shell:
             "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
 else:
@@ -1484,6 +1515,7 @@ else:
             agp = gap_closed_agp
         log: log_file("purged-output")
         container: dentist_container
+        conda: dentist_env
         shell:
             "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} --skip-gaps-file={input.skip_gaps} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
 

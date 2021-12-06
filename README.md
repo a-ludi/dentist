@@ -37,6 +37,23 @@ Table of Contents
 Install
 -------
 
+### Use Conda (recommended)
+
+Make sure [Conda][conda] is installed on your system. You can then use DENTIST like so:
+
+```sh
+# run the whole workflow on a cluster using Singularity
+snakemake --configfile=snakemake.yml --use-conda -jall
+snakemake --configfile=snakemake.yml --use-conda --profile=slurm
+```
+
+The last command is explained in more detail below in
+[the usage section](#usage).
+
+
+[conda]: https://docs.conda.io/projects/conda/
+
+
 ### Use a Singularity Container (recommended)
 
 Make sure [Singularity][singularity] is installed on your system. You can then use the container like so:
