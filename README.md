@@ -356,17 +356,16 @@ workflow configuration (`snakemake/snakemake.yml`).
   `--min-coverage-reads`. See below how their values are derived from
   `--read-coverage`.
 
-    Ideally, the user provides the haploid read coverage
-    which, for example, may be inferred using a histogram of the alignment
-    coverage across the genome. Alternatively, the average raw read coverage can
-    be used which is the number of base pairs in the reads divided by the number
-    of base pairs in the assembly.
+    Ideally, the user provides the haploid read coverage which, can be
+    inferred using a histogram of the alignment coverage across the assembly.
+    Alternatively, the average raw read coverage can be used which is the
+    number of base pairs in the reads divided by the number of base pairs
+    in the assembly.
 
-- `--ploidy`: This combined with `--read-coverage` is the preferred way of
-    providing `--min-coverage-reads`. 
+- `--ploidy`: Combined with `--read-coverage`, this parameters is the preferred
+    way of providing `--min-coverage-reads`.
 
-    > Ploidy (/ˈplɔɪdi/) is the number of complete sets of chromosomes in a
-    > cell [...]. (https://en.wikipedia.org/wiki/Ploidy)
+    We use the Wikipedia definition of ploidy, as "the number of complete sets of chromosomes in a cell" (https://en.wikipedia.org/wiki/Ploidy)
 
 - `--max-coverage-reads`, `--max-improper-coverage-reads`: 
   These parameters are used to derive a repeat mask from the ref vs. reads
