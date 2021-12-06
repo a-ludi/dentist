@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y git curl patch \
 ADD activate-conda.sh /app/activate-conda.sh
 RUN . /app/activate-conda.sh && \
     conda update conda && \
-    conda install conda-build git
+    conda install conda-build git conda-verify
 
 VOLUME /recipe
 ADD ./entrypoint.sh /app/entrypoint.sh
