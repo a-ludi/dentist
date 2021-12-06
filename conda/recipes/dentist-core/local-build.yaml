@@ -1,0 +1,11 @@
+package:
+  version:  "local"
+
+source:
+  git_rev: HEAD
+  git_url: ../../..
+
+build:
+  script_env:
+    - DENTIST_BUILD=debug
+    - DENTIST_BUILD_CONFIG=default

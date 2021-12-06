@@ -1,0 +1,12 @@
+package:
+  version:  "local"
+
+source:
+  git_rev: HEAD
+  git_url: ../../..
+
+requirements:
+  run:
+    - dentist-core==local
+    - snakemake==6.10.0
+    - pygraphviz==1.7 # NOTE: fixes some bug in the dependency solver
