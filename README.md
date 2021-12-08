@@ -8,6 +8,16 @@ DENTIST Homepage
 Head over to https://github.com/a-ludi/dentist if you are interested in DENTIST.
 
 
+Usage
+-----
+
+```sh
+make
+bundle install
+bundle exec jekyll serve
+```
+
+
 Maintainer
 ----------
 

@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Unofficial Bash Strict Mode (http://redsymbol.net/articles/unofficial-bash-strict-mode/)
+set -euo pipefail
+IFS=$'\n\t'
+# shellcheck disable=SC2034
+PROG="$0"
+SCRIPTROOT="$(dirname "$0")"
+
+
+function error()
+{
+    if (( $# > 0 ));
+    then
+        echo "$PROG: error:" "$@"
+    else
+        echo
+    fi
+} >&2
+
+
+function bail_out()
+{
+    error "$@"
+    exit 1
+}
+
+
+function bail_out_usage()
+{
+    error "$@"
+    error
+    print_usage
+    exit 1
+}
+
+
+function log()
+{
+    echo "--" "$@"
+} >&2
+
+
+function remove_logo()
+{
+    sed -E '/docs\/logo\.png/ { N; d }'
+}
+
+
+function remove_short_description()
+{
+    sed -E '
+        1, /Table of Contents/ {
+            /^>.*DENTIST.*/ { N; d }
+        }
+    '
+}
+
+
+function remove_table_of_contents()
+{
+    sed -E '
+        /^(#\s*)?Table of Contents$/,/^(#\s*)?Install$/ {
+            /^(#\s*)?Install$/ ! d
+        }
+    '
+}
+
+
+function adjust_relative_paths()
+{
+    sed -E '
+        s,\./docs(/.+)\.md,%DOT%\1.html,g
+        s,\./LICENSE,%DOT%/license.html,g
+        s,(`[^`])*\.(/[^`]*`),\1%DOT%\2,g
+        s,https://a-ludi.github.io/dentist/,%DOT%/,g
+        s,%DOT%,.,g
+    '
+}
+
+
+function add_md_header()
+{
+    echo "$@"
+    echo '======='
+    echo
+    cat
+}
+
+
+function adjust_email_links()
+{
+    sed -E 's/<[^>]+>/\&lt;&\&gt;/'
+}
+
+
+function list_sub_pages()
+{
+    find "$WEBROOT" -maxdepth 1 -type f -name '*.md' -not -name 'index.md'
+}
+
+
+function add_back_link()
+{
+    sed -E '
+        /^={3,}/ {
+            n;
+            /Back to homepage/ ! {
+                i \
+[&larr; Back to homepage](/dentist)\
+
+                :print-rest
+                n
+                b print-rest
+            }
+        }
+    '
+}

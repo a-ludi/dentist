@@ -5,6 +5,7 @@ DENTIST
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
+[![DOI 10.1101/2021.02.26.432990](https://img.shields.io/badge/DOI-(pre--print)_10.1101%2F2021.02.26.432990-informational)](https://doi.org/10.1101/2021.02.26.432990)
 
 Long sequencing reads allow increasing contiguity and completeness of
 fragmented, short-read based genome assemblies by closing assembly gaps,
@@ -12,11 +13,34 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
+**API documentation:** ([current][api-current], [v2.0.0][api-v2.0.0])
+
 **First time here? Head over to [the example](#example) and make sure it works.**
+
+
+[api-current]: ./api/current
+[api-v2.0.0]: ./api/v2.0.0
 
 
 Install
 -------
+
+### Use Conda (recommended)
+
+Make sure [Conda][conda] is installed on your system. You can then use DENTIST like so:
+
+```sh
+# run the whole workflow on a cluster using Singularity
+snakemake --configfile=snakemake.yml --use-conda -jall
+snakemake --configfile=snakemake.yml --use-conda --profile=slurm
+```
+
+The last command is explained in more detail below in
+[the usage section](#usage).
+
+
+[conda]: https://docs.conda.io/projects/conda/
+
 
 ### Use a Singularity Container (recommended)
 
@@ -121,10 +145,11 @@ available packages on Bioconda are outdated and should not be used at the
 moment.
 
 Please use the following versions in your dependencies in case you experience
-troubles. These should be the same versions used in the [Dockerfile](https://github.com/a-ludi/dentist/blob/develop/Dockerfile):
+troubles. These should be the same versions used in the
+[Conda recipe](./conda/recipes/dentist-core/meta.yaml):
 
-- [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
 - [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
+- [DENTIST@2.0.0](https://github.com/a-ludi/dentist/tree/v2.0.0)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
 - [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
@@ -148,31 +173,36 @@ Before you start producing wonderful scientific results, you should skip over
 to the [example section](#example) and try to run the small example. This will
 make sure your setup is working as expected.
 
-### Quick execution with Snakemake (and Singularity)
+### Quick execution with Snakemake (and Singularity or Conda)
 
 > TL;DR
 >
->     # edit dentist.json and snakemake.yml
->     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+>     # edit dentist.yml and snakemake.yml
+>     snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 
 Install [Snakemake][snakemake] version >=5.32.1 and copy these files into your
 working directory:
 
-- `./snakemake/Snakefile`
-- `./snakemake/snakemake.yml`
-- `./snakemake/dentist.json`
+```sh
+cp -r -t .
+    ./snakemake/dentist.yml \
+    ./snakemake/Snakefile \
+    ./snakemake/snakemake.yml \
+    ./snakemake/envs \
+    ./snakemake/scripts
+```
 
-Next edit `snakemake.yml` and `dentist.json` to fit your needs and optionally
+Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
 test your configuration with
 
-    snakemake --configfile=snakemake.yml --use-singularity --cores=1 -f -- validate_dentist_config
+    snakemake --configfile=snakemake.yml --use-conda --cores=1 -f -- validate_dentist_config
 
 If no errors occurred the whole workflow can be executed using
 
-    snakemake --configfile=snakemake.yml --use-singularity --cores=all
+    snakemake --configfile=snakemake.yml --use-conda --cores=all
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
-One may use Snakemake's `--jobs` to run independent jobs in parallel. Larger
+One may use Snakemake's `--cores` to run independent jobs in parallel. Larger
 data sets may require a cluster in which case you can use Snakemake's
 [cloud][snakemake-cloud] or [cluster][snakemake-cluster] facilities.
 
@@ -190,11 +220,19 @@ Snakemake][snakemake-cluster] if this does not suit your needs. Another good
 starting point is [the Snakemake-Profiles project][smp-project].
 
 Start by copying these files to your working/home directory:
-    
-- `./snakemake/Snakefile`
-- `./snakemake/snakemake.yml`
-- `./snakemake/cluster.yml`
-- _One_ of `./snakemake/profile-slurm.*.yml` → `~/.config/snakemake/slurm/config.yaml`
+
+```sh
+cp -r -t .
+    ./snakemake/cluster.yml \
+    ./snakemake/dentist.yml \
+    ./snakemake/Snakefile \
+    ./snakemake/snakemake.yml \
+    ./snakemake/envs \
+    ./snakemake/scripts
+mkdir -p ~/.config/snakemake/slurm
+# choose appropriate file from `snakemake/profile-slurm.*.yml`
+cp ./snakemake/profile-slurm.submit-async.yml ~/.config/snakemake/slurm
+```
 
 Next [adjust the profile][snakemake-profiles] according to your cluster. This
 should enable Snakemake to submit and track jobs on your cluster. You may use
@@ -202,7 +240,7 @@ the configuration values specified in `cluster.yml` to configure job names and
 resource allocation for each step of the pipeline. Now, submit the workflow
 to your cluster by
 
-    snakemake --configfile=snakemake.yml --profile=slurm --use-singularity
+    snakemake --configfile=snakemake.yml --profile=slurm --use-conda
 
 Note, parameters specified in the profile provide default values and can be
 overridden by specifying different value on the CLI.
@@ -232,7 +270,7 @@ First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-3/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -252,6 +290,26 @@ md5sum -c checksum.md5
 
 Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
+
+
+### Execution with Conda
+
+Execute the workflow inside a convenient Singularity image by adding `--use-conda` to the call to Snakemake:
+
+```sh
+# run the workflow
+snakemake --configfile=snakemake.yml --use-conda --cores=all
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+In more recent versions of Snakemake, you may need to also pass
+`--conda-frontend=conda` unless you have [Mamba][mamba] installed. Mamba is a
+faster alternative to Conda.
+
+
+[mamba]: https://github.com/mamba-org/mamba
 
 
 ### Execution in Singularity Container
@@ -274,9 +332,9 @@ Execute the workflow on a *SLURM cluster*:
 ```sh
 mkdir -p "$HOME/.config/snakemake/slurm"
 # select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
-cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yaml"
+cp -v "profile-slurm.submit-async.yml" "$HOME/.config/snakemake/slurm/config.yaml"
 # execute using the cluster profile
-snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 
 # validate the files
 md5sum -c checksum.md5
@@ -297,7 +355,7 @@ The default parameters are rather **conservative**, i.e. they focus on
 correctness of the result while not sacrificing too much sensitivity.
 
 We also provide a **greedy** sample configuration
-([`snakemake/dentist.greedy.json`](https://github.com/a-ludi/dentist/blob/develop/snakemake/dentist.greedy.json)) which
+([`snakemake/dentist.greedy.yml`](./snakemake/dentist.greedy.yml)) which
 focuses on sensitivity but may introduce more errors. _**Warning:** Use with
 care! Always validate the closed gaps (e.g. manual inspection)._
 
@@ -315,6 +373,62 @@ Therefore, we provide this shorter list of important and influential
 parameters. Please also consider adjusting the performance parameter in the
 workflow configuration (`snakemake/snakemake.yml`).
 
+- `--read-coverage`: This is the preferred way of providing values to
+  `--max-coverage-reads`, `--max-improper-coverage-reads` and
+  `--min-coverage-reads`. See below how their values are derived from
+  `--read-coverage`.
+
+    Ideally, the user provides the haploid read coverage which, can be
+    inferred using a histogram of the alignment coverage across the assembly.
+    Alternatively, the average raw read coverage can be used which is the
+    number of base pairs in the reads divided by the number of base pairs
+    in the assembly.
+
+- `--ploidy`: Combined with `--read-coverage`, this parameters is the preferred
+    way of providing `--min-coverage-reads`.
+
+    We use the Wikipedia definition of ploidy, as "the number of complete sets of chromosomes in a cell" (https://en.wikipedia.org/wiki/Ploidy)
+
+- `--max-coverage-reads`, `--max-improper-coverage-reads`: 
+  These parameters are used to derive a repeat mask from the ref vs. reads
+  alignment. If the coverage of (improper) alignments is larger than the given
+  theshold it will be considered repetitive. If supplied, default values are derived from `--read-coverage` as follows:
+  
+    The maximum read coverage `C_max` is calculated from the global read
+    coverage `C` (provided via --read-coverage) such that the probability of
+    observing more than `C_max` alignments in a unique (non-repetitive) genomic
+    region is very small (see [pre-print][dentist-bioarxiv], Methods section
+    and Supplementary Table 2). In practice, this probability is approximated
+    via
+
+    ```
+    C_max = floor(C / log(log(log(b * C + c) / log(a))))
+    where
+        a = 1.65
+        b = 0.1650612
+        c = 5.9354533
+    ```
+
+    To further increase the sensitivity, DENTIST searches for smaller
+    repeat-induced local alignments. To this end, we define an alignment as
+    proper if there are at most 100 bp (adjustable via
+    --proper-alignment-allowance) of unaligned sequence on either end of the
+    read. All other alignments, where only a smaller substring of the read
+    aligns, are called improper. Improper alignments are often indicative of
+    repetitive regions. Therefore, DENTIST considers genomic regions, where the
+    number of improper read alignments is higher than a threshold to be
+    repetitive. By default, this threshold equals half the global read coverage C.
+    (see [pre-print][dentist-bioarxiv], Methods section). In practice, a smoothed
+    version of `max(4, x/2)` is used to provide better performance for very low
+    read coverage. The maximum improper read coverage `I_max` is computed as
+
+    ```
+    I_max = floor(a*x + exp(b*(c - x)))
+    where
+        a = 0.5
+        b = 0.1875
+        c = 8
+    ```
 
 - `--dust-{reads,ref}`, `--daligner-{consensus,reads-vs-reads,self}`,
   `--damapper-ref-vs-reads`, `--datander-ref`, `--daccord`:  
@@ -380,6 +494,17 @@ workflow configuration (`snakemake/snakemake.yml`).
   reads. Thus, increasing any of these numbers makes the *valid* gaps more
   robust but may reduce their number.
 
+    If `--min-coverage-reads` is not provided, it will be derived from
+    `--read-coverage` (see above) and `--ploidy`. Given (haploid) read coverage
+    `C` and ploidy `p`, the minimum read coverage `C_min` is calculated as
+
+    ```
+      C_min = C / (2 * p)
+    ```
+
+    This corresponds to 50% of the long read coverage expected to be sequenced
+    from a haploid locus (see [pre-print][dentist-bioarxiv], Methods section).
+
 
 [dentist-cli-summary]: ./list-of-commandline-options.html
 
@@ -407,10 +532,11 @@ be very diverse and manual adjustments may become necessary. Here is a small
 guide which config parameters influence the number of jobs and how much
 resources they consume.
 
-- `max_threads`: Sets the maximum number of threads/cores a single job may
-  use. A single-threaded job will always allocate a single core but
+- `threads_per_process`: Sets the maximum number of threads/cores a single job
+  may use. A single-threaded job will always allocate a single core but
   thread-parallel steps, e.g. the sequence alignments, will use up to
-  `max_threads` if snakemake has been provided enough cores via `--cores`.
+  `threads_per_process` if snakemake has been provided enough cores
+  via `--cores`.
 - `-s<block_size:uint>`: The assembly and reads FAST/A files are converted into
   Dazzler DBs. These DBs store the sequence in a 2-bit encoding and have
   additional features like tracks (similar to BED files). Also they are split
@@ -494,6 +620,21 @@ dentist_container: "/path/to/dir/dentist_stable.sif"
 ```
 
 Now, you are ready for execution.
+
+Note, if you want to use Conda without internet connection, you can just use the
+pre-compiled binaries instead because they are just what Conda will install.
+Be sure to adjust your `PATH` accordingly, e.g.:
+
+```sh
+PATH="$PWD/bin:$PATH" snakemake --configfile=snakemake.yml --profile=slurm
+```
+
+
+### Illegally formatted line from `DBshow -n`
+
+This error message may appear in DENTIST's log files. It is a known bug that
+will be fixed in a future release. In the meantime avoid FASTA headers that
+contain a literal `" :: "`.
 
 
 Citation

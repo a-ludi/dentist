@@ -1,6 +1,7 @@
 /.jekyll-cache
 /_site
 /.bundle
+/api
 /vendor
 *.png
 *.pdf
