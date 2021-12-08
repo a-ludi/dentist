@@ -17,7 +17,13 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
+**API documentation:** ([current][api-current], [v2.0.0][api-v2.0.0])
+
 **First time here? Head over to [the example](#example) and make sure it works.**
+
+
+[api-current]: https://a-ludi.github.io/dentist/api/current
+[api-v2.0.0]: https://a-ludi.github.io/dentist/api/v2.0.0
 
 
 Table of Contents
