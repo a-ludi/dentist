@@ -67,7 +67,6 @@ def prefetch_conda_env(env_file):
     from snakemake.deployment.conda import Env
     from snakemake.persistence import Persistence
 
-    print(dir(workflow))
     dag = type('FakeDAG', (object,), dict(
         workflow=type('FakeWorkflow', (object,), dict(
                 persistence=Persistence(conda_prefix=workflow.conda_prefix),
