@@ -157,10 +157,11 @@ available packages on Bioconda are outdated and should not be used at the
 moment.
 
 Please use the following versions in your dependencies in case you experience
-troubles. These should be the same versions used in the [Dockerfile](./Dockerfile):
+troubles. These should be the same versions used in the
+[Conda recipe](./conda/recipes/dentist-core/meta.yaml):
 
-- [DENTIST@1.0.0](https://github.com/a-ludi/dentist/tree/v1.0.0)
 - [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
+- [DENTIST@2.0.0](https://github.com/a-ludi/dentist/tree/v2.0.0)
 - [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
 - [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
 - [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
@@ -184,31 +185,36 @@ Before you start producing wonderful scientific results, you should skip over
 to the [example section](#example) and try to run the small example. This will
 make sure your setup is working as expected.
 
-### Quick execution with Snakemake (and Singularity)
+### Quick execution with Snakemake (and Singularity or Conda)
 
 > TL;DR
 >
 >     # edit dentist.yml and snakemake.yml
->     snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+>     snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 
 Install [Snakemake][snakemake] version >=5.32.1 and copy these files into your
 working directory:
 
-- `./snakemake/Snakefile`
-- `./snakemake/snakemake.yml`
-- `./snakemake/dentist.yml`
+```sh
+cp -r -t .
+    ./snakemake/dentist.yml \
+    ./snakemake/Snakefile \
+    ./snakemake/snakemake.yml \
+    ./snakemake/envs \
+    ./snakemake/scripts
+```
 
 Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
 test your configuration with
 
-    snakemake --configfile=snakemake.yml --use-singularity --cores=1 -f -- validate_dentist_config
+    snakemake --configfile=snakemake.yml --use-conda --cores=1 -f -- validate_dentist_config
 
 If no errors occurred the whole workflow can be executed using
 
-    snakemake --configfile=snakemake.yml --use-singularity --cores=all
+    snakemake --configfile=snakemake.yml --use-conda --cores=all
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
-One may use Snakemake's `--jobs` to run independent jobs in parallel. Larger
+One may use Snakemake's `--cores` to run independent jobs in parallel. Larger
 data sets may require a cluster in which case you can use Snakemake's
 [cloud][snakemake-cloud] or [cluster][snakemake-cluster] facilities.
 
@@ -226,11 +232,19 @@ Snakemake][snakemake-cluster] if this does not suit your needs. Another good
 starting point is [the Snakemake-Profiles project][smp-project].
 
 Start by copying these files to your working/home directory:
-    
-- `./snakemake/Snakefile`
-- `./snakemake/snakemake.yml`
-- `./snakemake/cluster.yml`
-- _One_ of `./snakemake/profile-slurm.*.yml` → `~/.config/snakemake/slurm/config.yaml`
+
+```sh
+cp -r -t .
+    ./snakemake/cluster.yml \
+    ./snakemake/dentist.yml \
+    ./snakemake/Snakefile \
+    ./snakemake/snakemake.yml \
+    ./snakemake/envs \
+    ./snakemake/scripts
+mkdir -p ~/.config/snakemake/slurm
+# choose appropriate file from `snakemake/profile-slurm.*.yml`
+cp ./snakemake/profile-slurm.submit-async.yml ~/.config/snakemake/slurm
+```
 
 Next [adjust the profile][snakemake-profiles] according to your cluster. This
 should enable Snakemake to submit and track jobs on your cluster. You may use
@@ -238,7 +252,7 @@ the configuration values specified in `cluster.yml` to configure job names and
 resource allocation for each step of the pipeline. Now, submit the workflow
 to your cluster by
 
-    snakemake --configfile=snakemake.yml --profile=slurm --use-singularity
+    snakemake --configfile=snakemake.yml --profile=slurm --use-conda
 
 Note, parameters specified in the profile provide default values and can be
 overridden by specifying different value on the CLI.
@@ -290,6 +304,26 @@ Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 
+### Execution with Conda
+
+Execute the workflow inside a convenient Singularity image by adding `--use-conda` to the call to Snakemake:
+
+```sh
+# run the workflow
+snakemake --configfile=snakemake.yml --use-conda --cores=all
+
+# validate the files
+md5sum -c checksum.md5
+```
+
+In more recent versions of Snakemake, you may need to also pass
+`--conda-frontend=conda` unless you have [Mamba][mamba] installed. Mamba is a
+faster alternative to Conda.
+
+
+[mamba]: https://github.com/mamba-org/mamba
+
+
 ### Execution in Singularity Container
 
 Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
@@ -310,9 +344,9 @@ Execute the workflow on a *SLURM cluster*:
 ```sh
 mkdir -p "$HOME/.config/snakemake/slurm"
 # select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
-cp -v "profile-slurm.sync.yml" "$HOME/.config/snakemake/slurm/config.yaml"
+cp -v "profile-slurm.submit-async.yml" "$HOME/.config/snakemake/slurm/config.yaml"
 # execute using the cluster profile
-snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 
 # validate the files
 md5sum -c checksum.md5
@@ -510,10 +544,11 @@ be very diverse and manual adjustments may become necessary. Here is a small
 guide which config parameters influence the number of jobs and how much
 resources they consume.
 
-- `max_threads`: Sets the maximum number of threads/cores a single job may
-  use. A single-threaded job will always allocate a single core but
+- `threads_per_process`: Sets the maximum number of threads/cores a single job
+  may use. A single-threaded job will always allocate a single core but
   thread-parallel steps, e.g. the sequence alignments, will use up to
-  `max_threads` if snakemake has been provided enough cores via `--cores`.
+  `threads_per_process` if snakemake has been provided enough cores
+  via `--cores`.
 - `-s<block_size:uint>`: The assembly and reads FAST/A files are converted into
   Dazzler DBs. These DBs store the sequence in a 2-bit encoding and have
   additional features like tracks (similar to BED files). Also they are split
@@ -598,16 +633,20 @@ dentist_container: "/path/to/dir/dentist_stable.sif"
 
 Now, you are ready for execution.
 
+Note, if you want to use Conda without internet connection, you can just use the
+pre-compiled binaries instead because they are just what Conda will install.
+Be sure to adjust your `PATH` accordingly, e.g.:
+
+```sh
+PATH="$PWD/bin:$PATH" snakemake --configfile=snakemake.yml --profile=slurm
+```
+
 
 ### Illegally formatted line from `DBshow -n`
 
 This error message may appear in DENTIST's log files. It is a known bug that
 will be fixed in a future release. In the meantime avoid FASTA headers that
-contain a string like this:
-
-```
- :: Contig 27[4174278,32079331]
-```
+contain a literal `" :: "`.
 
 
 Citation
