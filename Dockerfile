@@ -22,7 +22,7 @@ RUN bail_out() { echo "ERROR" "$@"; exit 1; } >&2; \
     && apt-get update && apt-get install -y git curl patch \
     && curl https://repo.anaconda.com/miniconda/Miniconda3-py39_4.9.2-Linux-x86_64.sh > install.sh \
     && chmod +x install.sh \
-    && printf "\nyes\n/opt/miniconda3\n\n" | ./install.sh \
+    && ./install.sh -b -p /opt/miniconda3 \
     && rm install.sh \
     && ( \
         export PATH="/opt/miniconda3/bin:$PATH" \
