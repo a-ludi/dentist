@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -356,7 +330,46 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">filter</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">take</span><span class="pun">, </span><span class="pln">takeExactly</span><span class="pun">;
+
+</span><span class="kwd">struct </span><span class="typ">PowersOfTwo</span><span class="pun">(</span><span class="typ">bool </span><span class="pln">shouldSave</span><span class="pun">)
+{
+    </span><span class="pln">size_t i </span><span class="pun">= </span><span class="lit">1</span><span class="pun">;
+
+    </span><span class="typ">void </span><span class="pln">popFront</span><span class="pun">() </span><span class="kwd">pure nothrow
+    </span><span class="pun">{
+        </span><span class="pln">i </span><span class="pun">*= </span><span class="lit">2</span><span class="pun">;
+    }
+
+    </span><span class="kwd">@property </span><span class="pln">size_t front</span><span class="pun">() </span><span class="kwd">const pure nothrow
+    </span><span class="pun">{
+        </span><span class="kwd">return </span><span class="pln">i </span><span class="pun">+ </span><span class="lit">0</span><span class="pun">;
+    }
+
+    </span><span class="kwd">@property </span><span class="typ">bool </span><span class="pln">empty</span><span class="pun">() </span><span class="kwd">const pure nothrow
+    </span><span class="pun">{
+        </span><span class="kwd">return false</span><span class="pun">;
+    }
+
+    </span><span class="kwd">static if </span><span class="pun">(</span><span class="pln">shouldSave</span><span class="pun">)
+    {
+        </span><span class="kwd">@property </span><span class="typ">PowersOfTwo </span><span class="pln">save</span><span class="pun">() </span><span class="kwd">const pure nothrow
+        </span><span class="pun">{
+            </span><span class="kwd">return cast</span><span class="pun">(</span><span class="kwd">typeof</span><span class="pun">(</span><span class="kwd">return</span><span class="pun">)) </span><span class="kwd">this</span><span class="pun">;
+        }
+    }
+}
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">last</span><span class="pun">([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">]) == </span><span class="lit">3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">last</span><span class="pun">(</span><span class="typ">PowersOfTwo</span><span class="pun">!</span><span class="kwd">true</span><span class="pun">(</span><span class="lit">1</span><span class="pun">)<wbr/>.</span><span class="pln">takeExactly</span><span class="pun">(</span><span class="lit">5</span><span class="pun">)) == </span><span class="lit">16</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">last</span><span class="pun">(</span><span class="typ">PowersOfTwo</span><span class="pun">!</span><span class="kwd">true</span><span class="pun">(</span><span class="lit">1</span><span class="pun">)<wbr/>.</span><span class="pln">take</span><span class="pun">(</span><span class="lit">5</span><span class="pun">)) == </span><span class="lit">16</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">last</span><span class="pun">(</span><span class="typ">PowersOfTwo</span><span class="pun">!</span><span class="kwd">false</span><span class="pun">(</span><span class="lit">1</span><span class="pun">)<wbr/>.</span><span class="pln">take</span><span class="pun">(</span><span class="lit">5</span><span class="pun">)) == </span><span class="lit">16</span><span class="pun">);
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -352,11 +326,6 @@ $('#symbolSearchPane').show();</script>
 							Function <code>Region.this</code>
 						</a>
 					</li>
-					<li>
-						<a href="#2">
-							Function <code>Region.this</code>
-						</a>
-					</li>
 				</ul>
 			</nav><h2 id="0">Function Region.this</h2><p>Construct a region from <code class="lang-d"><a href="../../../dentist/util/region/Region.this.html#intervals"><span class="pln">intervals</span></a></code>.
 </p>
@@ -377,7 +346,19 @@ Modifying them outside of the struct leads to undefined behavior.
 </p>
 </section>
 
-			<h2 id="1">Function Region.this</h2><p>Construct a region from a single <code class="lang-d"><a href="../../../dentist/util/region/Region.this.html#interval"><span class="pln">interval</span></a></code>.
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="pln">R </span><span class="pun">= <a href="../../../dentist/util/region/Region.html"></span><span class="typ">Region</span></a><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">TI </span><span class="pun">= </span><span class="pln">R<wbr/></span><span class="pun">.</span><span class="typ">TaggedInterval</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">region </span><span class="pun">= </span><span class="pln">R</span><span class="pun">([</span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">), </span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">10</span><span class="pun">), </span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">0</span><span class="pun">, </span><span class="lit">10</span><span class="pun">)]);
+
+</span><span class="com">// Intervals get implicitly normalized.
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">region<wbr/></span><span class="pun">.</span><span class="pln">intervals </span><span class="pun">== [</span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">0</span><span class="pun">, </span><span class="lit">10</span><span class="pun">), </span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">)]);
+
+</span></code></pre>
+</section>
+<h2 id="1">Function Region.this</h2><p>Construct a region from a single <code class="lang-d"><a href="../../../dentist/util/region/Region.this.html#interval"><span class="pln">interval</span></a></code>.
 </p>
 			<div class="prototype">
 				<code class="lang-d">
@@ -388,14 +369,8 @@ Modifying them outside of the struct leads to undefined behavior.
 			&nbsp;&nbsp;<a href="../../../dentist/util/region/Region.TaggedInterval.html"><span class="typ">Region<wbr/></span><span class="pun">.<wbr/></span><span class="typ">TaggedInterval</span></a> <span class="pln">interval</span>
 			<br/>
 			<span class="pun">)</span><span class="pun">;</span>
-					</div>
-				</code>
-			</div>
-			
-			<h2 id="2">Function Region.this</h2><p></p>
-			<div class="prototype">
-				<code class="lang-d">
-					<div class="single-prototype">
+			<br/>
+			<br/>
 			<span class="pln">this</span>
 			<span class="pun">(</span>
 			<br/>
@@ -410,7 +385,29 @@ Modifying them outside of the struct leads to undefined behavior.
 				</code>
 			</div>
 			
-			
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="pln">R </span><span class="pun">= <a href="../../../dentist/util/region/Region.html"></span><span class="typ">Region</span></a><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">TI </span><span class="pun">= </span><span class="pln">R<wbr/></span><span class="pun">.</span><span class="typ">TaggedInterval</span><span class="pun">;
+
+</span><span class="pln">R region </span><span class="pun">= </span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">region<wbr/></span><span class="pun">.</span><span class="pln">intervals </span><span class="pun">== [</span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">)]);
+
+</span></code></pre>
+</section>
+<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="pln">R </span><span class="pun">= <a href="../../../dentist/util/region/Region.html"></span><span class="typ">Region</span></a><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">TI </span><span class="pun">= </span><span class="pln">R<wbr/></span><span class="pun">.</span><span class="typ">TaggedInterval</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">region </span><span class="pun">= </span><span class="pln">R</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">region<wbr/></span><span class="pun">.</span><span class="pln">intervals </span><span class="pun">== [</span><span class="pln">TI</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">15</span><span class="pun">, </span><span class="lit">20</span><span class="pun">)]);
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

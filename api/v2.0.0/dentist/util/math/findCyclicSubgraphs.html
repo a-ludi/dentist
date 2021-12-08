@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -377,6 +351,39 @@ $('#symbolSearchPane').show();</script>
 			<section><h2>Returns</h2>
 <p>range of cycles in the graph represented as arrays of node indices
 </p>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="pln">G </span><span class="pun">= <a href="../../../dentist/util/math/Graph.html"></span><span class="typ">Graph</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+
+</span><span class="com">//   __
+//   \ \
+//    `-0 -- 1 -- 2 -- 3
+//      |       / |    |
+//      |      /  |    |
+//      4 -- 5 -- 6    7
+</span><span class="kwd">auto </span><span class="pln">g </span><span class="pun">= </span><span class="pln">G</span><span class="pun">([</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">7</span><span class="pun">], [
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">0</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">5</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">6</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">7</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">),
+    </span><span class="pln">G<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">),
+]);
+</span><span class="kwd">auto </span><span class="pln">cycles </span><span class="pun">= </span><span class="pln">g<wbr/></span><span class="pun">.</span><span class="pln">findCyclicSubgraphs</span><span class="pun">();
+
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">cycles<wbr/></span><span class="pun">.</span><span class="pln">equal</span><span class="pun">([
+    [</span><span class="lit">0</span><span class="pun">],
+    [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">5</span><span class="pun">],
+    [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">0</span><span class="pun">],
+]));
+</span></code></pre>
 </section>
 
 			<footer>

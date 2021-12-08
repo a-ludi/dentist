@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -393,6 +367,133 @@ $('#symbolSearchPane').show();</script>
 <section><h2>See also</h2>
 <p><a href="https://en.wikipedia.org/wiki/Floyd-Warshall_algorithm">https://en.wikipedia.org/wiki/Floyd-Warshall_algorithm</a>
 </p>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="com">//    _____________   _____________
+//   /             v /             v
+// (0) --&gt; (1) --&gt; (2)     (3) --&gt; (4)
+</span><span class="kwd">enum <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">5</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">hasEdge </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">1 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">!= </span><span class="lit">2</span><span class="pun">) ||
+                          (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">2 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">% </span><span class="lit">2 </span><span class="pun">== </span><span class="lit">0</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">weight </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; </span><span class="lit">1</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">shortestPaths </span><span class="pun">= </span><span class="pln">shortestPathsFloydWarshall</span><span class="pun">!(</span><span class="pln">hasEdge</span><span class="pun">, </span><span class="pln">weight</span><span class="pun">)(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pun">);
+
+</span><span class="kwd">debug </span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">printConnections</span><span class="pun">([[</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">], [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">], [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">], [</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]]);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == </span><span class="lit">2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == </span><span class="lit">2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">), </span><span class="pln">size_t</span><span class="pun">[]<wbr/>.</span><span class="pln">init</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">isConnected</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == </span><span class="lit">1</span><span class="pun">);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="com">//    _____-4______   _____-4______
+//   /             v /             v
+// (0) --&gt; (1) --&gt; (2)     (3) --&gt; (4)
+//     -1      -1              -1
+</span><span class="kwd">enum <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">5</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">hasEdge </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">1 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">!= </span><span class="lit">2</span><span class="pun">) ||
+                          (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">2 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">% </span><span class="lit">2 </span><span class="pun">== </span><span class="lit">0</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">weight </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; -(</span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">u </span><span class="pun">- </span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">v</span><span class="pun">)^^</span><span class="lit">2</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">shortestPaths </span><span class="pun">= </span><span class="pln">shortestPathsFloydWarshall</span><span class="pun">!(</span><span class="pln">hasEdge</span><span class="pun">, </span><span class="pln">weight</span><span class="pun">)(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pun">);
+
+</span><span class="kwd">debug </span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">printConnections</span><span class="pun">([[</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">], [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">], [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">], [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">], [</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]]);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == -</span><span class="lit">8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == -</span><span class="lit">5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">), </span><span class="pln">size_t</span><span class="pun">[]<wbr/>.</span><span class="pln">init</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">isConnected</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">3</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">shortestPath</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">), [</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">) == -</span><span class="lit">1</span><span class="pun">);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">, </span><span class="pln">map</span><span class="pun">;
+
+</span><span class="com">//    _____-4______   _____-4______
+//   /             v /             v
+// (0) --&gt; (1) --&gt; (2)     (3) --&gt; (4)
+//     -1      -1              -1
+</span><span class="kwd">enum <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">5</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">hasEdge </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">1 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">!= </span><span class="lit">2</span><span class="pun">) ||
+                          (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">2 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">% </span><span class="lit">2 </span><span class="pun">== </span><span class="lit">0</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">weight </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; -(</span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">u </span><span class="pun">- </span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">v</span><span class="pun">)^^</span><span class="lit">2</span><span class="pun">;
+
+</span><span class="kwd">enum </span><span class="pln">bestN </span><span class="pun">= </span><span class="lit">7</span><span class="pun">;
+</span><span class="kwd">auto <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#bestConnections"></span><span class="pln">bestConnections</span></a><span class="pln"> </span><span class="pun">= </span><span class="kwd">new </span><span class="pln">size_t</span><span class="pun">[</span><span class="lit">2</span><span class="pun">][</span><span class="pln">bestN</span><span class="pun">];
+</span><span class="kwd">auto </span><span class="pln">shortestPaths </span><span class="pun">= </span><span class="pln">shortestPathsFloydWarshall</span><span class="pun">!(</span><span class="pln">hasEdge</span><span class="pun">, </span><span class="pln">weight</span><span class="pun">)(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pun">, <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#bestConnections"></span><span class="pln">bestConnections</span></a><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#bestConnections"></span><span class="pln">bestConnections</span></a><span class="pun">, [
+    [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">4</span><span class="pun">],
+    [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">],
+    [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">2</span><span class="pun">],
+    [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">4</span><span class="pun">],
+    [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">],
+    [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">],
+    [</span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">],
+]));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">bestConnections<wbr/></span><span class="pun">.</span><span class="pln">map</span><span class="pun">!(</span><span class="pln">c </span><span class="pun">=&gt; </span><span class="pln">shortestPaths<wbr/></span><span class="pun">.</span><span class="pln">dist</span><span class="pun">(</span><span class="pln">c</span><span class="pun">[</span><span class="lit">0</span><span class="pun">], </span><span class="pln">c</span><span class="pun">[</span><span class="lit">1</span><span class="pun">])), [
+    -</span><span class="lit">8</span><span class="pun">,
+    -</span><span class="lit">5</span><span class="pun">,
+    -</span><span class="lit">4</span><span class="pun">,
+    -</span><span class="lit">4</span><span class="pun">,
+    -</span><span class="lit">1</span><span class="pun">,
+    -</span><span class="lit">1</span><span class="pun">,
+    -</span><span class="lit">1</span><span class="pun">,
+]));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p>Optimize performance by choosing appropriate <code class="lang-d"><span class="pln">graphType</span></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">datetime<wbr/></span><span class="pun">.</span><span class="pln">stopwatch</span><span class="pun">;
+
+</span><span class="kwd">enum <a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">5</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">hasEdge </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">1 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">!= </span><span class="lit">2</span><span class="pun">) ||
+                          (</span><span class="pln">u </span><span class="pun">+ </span><span class="lit">2 </span><span class="pun">== </span><span class="pln">v </span><span class="pun">&amp;&amp; </span><span class="pln">u </span><span class="pun">% </span><span class="lit">2 </span><span class="pun">== </span><span class="lit">0</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">weight </span><span class="pun">= (</span><span class="pln">u</span><span class="pun">, </span><span class="pln">v</span><span class="pun">) =&gt; -(</span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">u </span><span class="pun">- </span><span class="kwd">cast</span><span class="pun">(</span><span class="typ">long</span><span class="pun">) </span><span class="pln">v</span><span class="pun">)^^</span><span class="lit">2</span><span class="pun">;
+
+</span><span class="kwd">alias </span><span class="pln">shortestPathsGeneral </span><span class="pun">= () =&gt; </span><span class="pln">shortestPathsFloydWarshall</span><span class="pun">!(
+    </span><span class="pln">hasEdge</span><span class="pun">,
+    </span><span class="pln">weight</span><span class="pun">,
+    <a href="../../../dentist/util/graphalgo/GraphType.html#general"></span><span class="typ">GraphType<wbr/></span><span class="pun">.</span><span class="pln">general</span></a><span class="pun">,
+)(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">shortestPathsDAG </span><span class="pun">= () =&gt; </span><span class="pln">shortestPathsFloydWarshall</span><span class="pun">!(
+    </span><span class="pln">hasEdge</span><span class="pun">,
+    </span><span class="pln">weight</span><span class="pun">,
+    <a href="../../../dentist/util/graphalgo/GraphType.html#DAG"></span><span class="typ">GraphType<wbr/></span><span class="pun">.</span><span class="pln">DAG</span></a><span class="pun">,
+)(<a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html#n"></span><span class="pln">n</span></a><span class="pun">);
+
+</span><span class="kwd">enum </span><span class="pln">numRounds </span><span class="pun">= </span><span class="lit">10_000</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">result </span><span class="pun">= </span><span class="pln">benchmark</span><span class="pun">!(
+    </span><span class="pln">shortestPathsGeneral</span><span class="pun">,  </span><span class="com">// =&gt; 157.029400ms
+    </span><span class="pln">shortestPathsDAG</span><span class="pun">,      </span><span class="com">// =&gt;  35.348500ms
+</span><span class="pun">)(</span><span class="pln">numRounds</span><span class="pun">);
+
+</span><span class="kwd">debug </span><span class="pun">(</span><span class="lit">2</span><span class="pun">)
+{
+    </span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio </span><span class="pun">: </span><span class="pln">writefln</span><span class="pun">;
+
+    </span><span class="pln">writefln</span><span class="pun">!</span><span class="str">"Computed %d rounds:"</span><span class="pun">(</span><span class="pln">numRounds</span><span class="pun">);
+    </span><span class="pln">writefln</span><span class="pun">!</span><span class="str">"shortestPathsGeneral:  %fms"</span><span class="pun">(</span><span class="pln">result</span><span class="pun">[</span><span class="lit">0</span><span class="pun">]<wbr/>.</span><span class="pln">total</span><span class="pun">!</span><span class="str">"nsecs"</span><span class="pun">/</span><span class="lit">1e9</span><span class="pun">*</span><span class="lit">1e3</span><span class="pun">);
+    </span><span class="pln">writefln</span><span class="pun">!</span><span class="str">"shortestPathsDAG:      %fms"</span><span class="pun">(</span><span class="pln">result</span><span class="pun">[</span><span class="lit">1</span><span class="pun">]<wbr/>.</span><span class="pln">total</span><span class="pun">!</span><span class="str">"nsecs"</span><span class="pun">/</span><span class="lit">1e9</span><span class="pun">*</span><span class="lit">1e3</span><span class="pun">);
+}
+</span></code></pre>
 </section>
 
 			<footer>

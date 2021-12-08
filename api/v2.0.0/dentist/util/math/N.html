@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -358,7 +332,27 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="pun">{
+    </span><span class="kwd">auto <a href="../../../dentist/util/math/N.html#totalSize"></span><span class="pln">totalSize</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">54</span><span class="pun">;
+    </span><span class="kwd">auto <a href="../../../dentist/util/math/N.html#values"></span><span class="pln">values</span></a><span class="pln"> </span><span class="pun">= [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">10</span><span class="pun">];
+    </span><span class="kwd">enum </span><span class="pln">N50 </span><span class="pun">= </span><span class="lit">8</span><span class="pun">;
+    </span><span class="kwd">enum </span><span class="pln">N10 </span><span class="pun">= </span><span class="lit">10</span><span class="pun">;
+
+    </span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">N</span><span class="pun">!</span><span class="lit">50</span><span class="pun">(<a href="../../../dentist/util/math/N.html#values"></span><span class="pln">values</span></a><span class="pun">, <a href="../../../dentist/util/math/N.html#totalSize"></span><span class="pln">totalSize</span></a><span class="pun">) == </span><span class="pln">N50</span><span class="pun">);
+    </span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">N</span><span class="pun">!</span><span class="lit">10</span><span class="pun">(<a href="../../../dentist/util/math/N.html#values"></span><span class="pln">values</span></a><span class="pun">, <a href="../../../dentist/util/math/N.html#totalSize"></span><span class="pln">totalSize</span></a><span class="pun">) == </span><span class="pln">N10</span><span class="pun">);
+}
+{
+    </span><span class="kwd">auto <a href="../../../dentist/util/math/N.html#totalSize"></span><span class="pln">totalSize</span></a><span class="pln"> </span><span class="pun">= </span><span class="lit">32</span><span class="pun">;
+    </span><span class="kwd">auto <a href="../../../dentist/util/math/N.html#values"></span><span class="pln">values</span></a><span class="pln"> </span><span class="pun">= [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">8</span><span class="pun">];
+    </span><span class="kwd">enum </span><span class="pln">N50 </span><span class="pun">= </span><span class="lit">8</span><span class="pun">;
+
+    </span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">N</span><span class="pun">!</span><span class="lit">50</span><span class="pun">(<a href="../../../dentist/util/math/N.html#values"></span><span class="pln">values</span></a><span class="pun">, <a href="../../../dentist/util/math/N.html#totalSize"></span><span class="pln">totalSize</span></a><span class="pun">) == </span><span class="pln">N50</span><span class="pun">);
+}
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

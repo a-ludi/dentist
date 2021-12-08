@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -389,7 +363,38 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">seq </span><span class="pun">= </span><span class="str">"GGTTGTAAATTGACTGTTGTCTGCT\ngccaatctactggtgggggagagat"</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">revComp </span><span class="pun">= </span><span class="str">"atctctcccccaccagtagattggc\nAGCAGACAACAGTCAATTTACAACC"</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">seq<wbr/></span><span class="pun">.</span><span class="pln">reverseComplement </span><span class="pun">== </span><span class="pln">revComp</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">seq<wbr/></span><span class="pun">.</span><span class="pln">reverseComplementer<wbr/></span><span class="pun">.</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">revComp</span><span class="pun">));
+
+</span><span class="kwd">auto </span><span class="pln">fastaRecord1 </span><span class="pun">= </span><span class="str">q"EOF
+    &gt;sequence1
+    CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+    AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent<wbr/></span><span class="pun">.</span><span class="pln">parseFastaRecord</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">fastaRecord1RevComp </span><span class="pun">= </span><span class="pln">fastaRecord1<wbr/></span><span class="pun">.</span><span class="pln">reverseComplement</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1RevComp<wbr/></span><span class="pun">.</span><span class="pln">header </span><span class="pun">== </span><span class="str">"&gt;sequence1"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1RevComp</span><span class="pun">[]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"GGGTTAGGGTTAGGGTTGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAGGGTTAG"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1RevComp</span><span class="pun">[</span><span class="lit">0 </span><span class="pun">.. </span><span class="lit">5</span><span class="pun">]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"GGGTT"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1RevComp<wbr/></span><span class="pun">.</span><span class="pln">toFasta</span><span class="pun">(</span><span class="lit">13</span><span class="pun">)<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">q"EOF
+    &gt;sequence1
+    GGGTTAGGGTTAG
+    GGTTGTTAGGGTT
+    AGGGTTAGGGTTA
+    GGGTTAGGGTTAG
+    GGTTAGGGTTAGG
+    GTTAGGGTTAGGG
+    TTAGGGTTAGGGT
+    TAGGGTTAG
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">));
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

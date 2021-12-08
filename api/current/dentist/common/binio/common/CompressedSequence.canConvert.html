@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module selected">
 						<a href="../../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -357,7 +331,17 @@ ignoring casing.
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">enum </span><span class="pln">testSequence </span><span class="pun">= </span><span class="str">"atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT"</span><span class="pun">;
+</span><span class="kwd">enum </span><span class="pln">falseSequence </span><span class="pun">= </span><span class="str">"atgccaactactttgaNNNNNnnnnnAGGCACAGGTGCGCCT"</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">canConvert</span><span class="pun">(</span><span class="pln">testSequence</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">canConvert</span><span class="pun">(</span><span class="pln">falseSequence</span><span class="pun">));
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

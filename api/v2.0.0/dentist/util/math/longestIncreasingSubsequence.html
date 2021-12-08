@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -362,6 +336,29 @@ $('#symbolSearchPane').show();</script>
 			<section><h2>See Also</h2>
 <p><a href="https://en.wikipedia.org/wiki/Longest_increasing_subsequence">https://en.wikipedia.org/wiki/Longest_increasing_subsequence</a>
 </p>
+</section>
+<section><h2>Example</h2>
+<p>Example from Wikipedia
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">inputSequence </span><span class="pun">= [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">12</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">10</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">14</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">13</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">15</span><span class="pun">];
+</span><span class="kwd">auto </span><span class="pln">expectedOutput </span><span class="pun">= [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">15</span><span class="pun">];
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">inputSequence<wbr/></span><span class="pun">.</span><span class="pln">longestIncreasingSubsequence<wbr/></span><span class="pun">.</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">expectedOutput</span><span class="pun">));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p>Example using a different <code class="lang-d"><span class="pln">pred</span></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">retro</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">inputSequence </span><span class="pun">= [</span><span class="lit">0</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">12</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">10</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">14</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">13</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">15</span><span class="pun">];
+</span><span class="kwd">auto </span><span class="pln">expectedOutput </span><span class="pun">= [</span><span class="lit">12</span><span class="pun">, </span><span class="lit">10</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">3</span><span class="pun">];
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">inputSequence<wbr/></span><span class="pun">.</span><span class="pln">longestIncreasingSubsequence</span><span class="pun">!</span><span class="str">"a &gt; b"<wbr/></span><span class="pun">.</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">expectedOutput</span><span class="pun">));
+</span></code></pre>
 </section>
 
 			<footer>

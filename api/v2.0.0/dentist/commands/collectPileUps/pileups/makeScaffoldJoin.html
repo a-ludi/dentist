@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -368,7 +342,122 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			<h2 id="1">Function makeScaffoldJoin</h2><p>Generate join from <code class="lang-d"><a href="../../../../dentist/commands/collectPileUps/pileups/makeScaffoldJoin.html#inputGap"><span class="pln">inputGap</span></a></code>.
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="typ">LocalAlignment </span><span class="pun">= </span><span class="typ">AlignmentChain<wbr/></span><span class="pun">.</span><span class="typ">LocalAlignment</span><span class="pun">;
+</span><span class="kwd">enum </span><span class="pln">complement </span><span class="pun">= </span><span class="typ">AlignmentFlag<wbr/></span><span class="pun">.</span><span class="pln">complement</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">frontExtension </span><span class="pun">= </span><span class="typ">ReadAlignment</span><span class="pun">(
+    </span><span class="typ">SeededAlignment<wbr/></span><span class="pun">.</span><span class="pln">from</span><span class="pun">(</span><span class="typ">AlignmentChain</span><span class="pun">(
+        </span><span class="lit">3</span><span class="pun">,
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">100</span><span class="pun">),
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+        </span><span class="typ">AlignmentFlags</span><span class="pun">(),
+        [
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">9</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+        ],
+    ))<wbr/>.</span><span class="pln">front</span><span class="pun">,
+);
+</span><span class="kwd">auto </span><span class="pln">backExtension </span><span class="pun">= </span><span class="typ">ReadAlignment</span><span class="pun">(
+    </span><span class="typ">SeededAlignment<wbr/></span><span class="pun">.</span><span class="pln">from</span><span class="pun">(</span><span class="typ">AlignmentChain</span><span class="pun">(
+        </span><span class="lit">5</span><span class="pun">,
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">100</span><span class="pun">),
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+        </span><span class="typ">AlignmentFlags</span><span class="pun">(),
+        [
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">94</span><span class="pun">, </span><span class="lit">95</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">97</span><span class="pun">, </span><span class="lit">98</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+        ],
+    ))<wbr/>.</span><span class="pln">front</span><span class="pun">,
+);
+</span><span class="kwd">auto </span><span class="pln">gap </span><span class="pun">= </span><span class="typ">ReadAlignment</span><span class="pun">(
+    </span><span class="typ">SeededAlignment<wbr/></span><span class="pun">.</span><span class="pln">from</span><span class="pun">(</span><span class="typ">AlignmentChain</span><span class="pun">(
+        </span><span class="lit">11</span><span class="pun">,
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">100</span><span class="pun">),
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+        </span><span class="typ">AlignmentFlags</span><span class="pun">(</span><span class="pln">complement</span><span class="pun">),
+        [
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">94</span><span class="pun">, </span><span class="lit">95</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">97</span><span class="pun">, </span><span class="lit">98</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+        ],
+    ))<wbr/>.</span><span class="pln">front</span><span class="pun">,
+    </span><span class="typ">SeededAlignment<wbr/></span><span class="pun">.</span><span class="pln">from</span><span class="pun">(</span><span class="typ">AlignmentChain</span><span class="pun">(
+        </span><span class="lit">12</span><span class="pun">,
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">100</span><span class="pun">),
+        </span><span class="typ">Contig</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+        </span><span class="typ">AlignmentFlags</span><span class="pun">(),
+        [
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">94</span><span class="pun">, </span><span class="lit">95</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+            </span><span class="typ">LocalAlignment</span><span class="pun">(
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">97</span><span class="pun">, </span><span class="lit">98</span><span class="pun">),
+                </span><span class="typ">Locus</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">),
+                </span><span class="lit">0</span><span class="pun">,
+            ),
+        ],
+    ))<wbr/>.</span><span class="pln">front</span><span class="pun">,
+);
+</span><span class="kwd">auto </span><span class="pln">inputGap </span><span class="pun">= </span><span class="typ">GapSegment</span><span class="pun">(
+    </span><span class="lit">1</span><span class="pun">, </span><span class="com">// beginGlobalContigId
+    </span><span class="lit">2</span><span class="pun">, </span><span class="com">// endGlobalContigId
+    </span><span class="lit">0</span><span class="pun">,  </span><span class="com">// scaffoldId
+    </span><span class="lit">0</span><span class="pun">,  </span><span class="com">// beginContigId
+    </span><span class="lit">1</span><span class="pun">,  </span><span class="com">// endContigId
+    </span><span class="lit">15</span><span class="pun">, </span><span class="com">// begin
+    </span><span class="lit">25</span><span class="pun">, </span><span class="com">// end
+</span><span class="pun">);
+
+</span><span class="kwd">auto </span><span class="pln">join1 </span><span class="pun">= </span><span class="pln">makeScaffoldJoin</span><span class="pun">(</span><span class="pln">frontExtension</span><span class="pun">);
+</span><span class="kwd">auto </span><span class="pln">join2 </span><span class="pun">= </span><span class="pln">makeScaffoldJoin</span><span class="pun">(</span><span class="pln">backExtension</span><span class="pun">);
+</span><span class="kwd">auto </span><span class="pln">join3 </span><span class="pun">= </span><span class="pln">makeScaffoldJoin</span><span class="pun">(</span><span class="pln">gap</span><span class="pun">);
+</span><span class="kwd">auto </span><span class="pln">join4 </span><span class="pun">= </span><span class="pln">makeScaffoldJoin</span><span class="pun">(</span><span class="pln">inputGap</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join1<wbr/></span><span class="pun">.</span><span class="pln">start </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join1<wbr/></span><span class="pun">.</span><span class="pln">end </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join1<wbr/></span><span class="pun">.</span><span class="pln">payload </span><span class="pun">== <a href="../../../../dentist/commands/collectPileUps/pileups/ScaffoldPayload.pileUp.html"></span><span class="typ">ScaffoldPayload<wbr/></span><span class="pun">.</span><span class="pln">pileUp</span></a><span class="pun">([</span><span class="pln">frontExtension</span><span class="pun">]));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join2<wbr/></span><span class="pun">.</span><span class="pln">start </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join2<wbr/></span><span class="pun">.</span><span class="pln">end </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join2<wbr/></span><span class="pun">.</span><span class="pln">payload </span><span class="pun">== <a href="../../../../dentist/commands/collectPileUps/pileups/ScaffoldPayload.pileUp.html"></span><span class="typ">ScaffoldPayload<wbr/></span><span class="pun">.</span><span class="pln">pileUp</span></a><span class="pun">([</span><span class="pln">backExtension</span><span class="pun">]));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join3<wbr/></span><span class="pun">.</span><span class="pln">start </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join3<wbr/></span><span class="pun">.</span><span class="pln">end </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join3<wbr/></span><span class="pun">.</span><span class="pln">payload </span><span class="pun">== <a href="../../../../dentist/commands/collectPileUps/pileups/ScaffoldPayload.pileUp.html"></span><span class="typ">ScaffoldPayload<wbr/></span><span class="pun">.</span><span class="pln">pileUp</span></a><span class="pun">([</span><span class="pln">gap</span><span class="pun">]));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join4<wbr/></span><span class="pun">.</span><span class="pln">start </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join4<wbr/></span><span class="pun">.</span><span class="pln">end </span><span class="pun">== </span><span class="typ">ContigNode</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">join4<wbr/></span><span class="pun">.</span><span class="pln">payload </span><span class="pun">== <a href="../../../../dentist/commands/collectPileUps/pileups/ScaffoldPayload.inputGap.html"></span><span class="typ">ScaffoldPayload<wbr/></span><span class="pun">.</span><span class="pln">inputGap</span></a><span class="pun">());
+</span></code></pre>
+</section>
+<h2 id="1">Function makeScaffoldJoin</h2><p>Generate join from <code class="lang-d"><a href="../../../../dentist/commands/collectPileUps/pileups/makeScaffoldJoin.html#inputGap"><span class="pln">inputGap</span></a></code>.
 </p>
 			<div class="prototype">
 				<code class="lang-d">

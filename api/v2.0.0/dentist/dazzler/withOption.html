@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -376,7 +350,150 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+<p><code class="lang-d"><a href="../../dentist/dazzler/OptionModifier.html#replaceOrAdd"><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">replaceOrAdd</span></a></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">enum <a href="../../dentist/dazzler/withOption.html#dazzlerOptions"></span><span class="pln">dazzlerOptions</span></a><span class="pln"> </span><span class="pun">= [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+];
+
+</span><span class="kwd">auto </span><span class="pln">modifiedDazzlerOptions </span><span class="pun">= </span><span class="pln">dazzlerOptions
+    <wbr/></span><span class="pun">.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-T"</span><span class="pun">, </span><span class="str">"16"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#replaceOrAdd"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">replaceOrAdd</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-k"</span><span class="pun">, </span><span class="str">"20"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#replaceOrAdd"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">replaceOrAdd</span></a><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">modifiedDazzlerOptions</span><span class="pun">, [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T16"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+    </span><span class="str">"-k20"</span><span class="pun">,
+]));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p><code class="lang-d"><a href="../../dentist/dazzler/OptionModifier.html#ensurePresent"><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">ensurePresent</span></a></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">enum <a href="../../dentist/dazzler/withOption.html#dazzlerOptions"></span><span class="pln">dazzlerOptions</span></a><span class="pln"> </span><span class="pun">= [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+];
+
+</span><span class="kwd">auto </span><span class="pln">modifiedDazzlerOptions </span><span class="pun">= </span><span class="pln">dazzlerOptions
+    <wbr/></span><span class="pun">.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-C"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#ensurePresent"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">ensurePresent</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-e"</span><span class="pun">, </span><span class="str">"0.841500"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#ensurePresent"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">ensurePresent</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-m"</span><span class="pun">, </span><span class="str">"dust"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#ensurePresent"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">ensurePresent</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-m"</span><span class="pun">, </span><span class="str">"dentist-reads"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#ensurePresent"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">ensurePresent</span></a><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">modifiedDazzlerOptions</span><span class="pun">, [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+    </span><span class="str">"-mdentist-reads"</span><span class="pun">,
+]));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p><code class="lang-d"><a href="../../dentist/dazzler/OptionModifier.html#defaultValue"><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">defaultValue</span></a></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">enum <a href="../../dentist/dazzler/withOption.html#dazzlerOptions"></span><span class="pln">dazzlerOptions</span></a><span class="pln"> </span><span class="pun">= [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+];
+
+</span><span class="kwd">auto </span><span class="pln">modifiedDazzlerOptions </span><span class="pun">= </span><span class="pln">dazzlerOptions
+    <wbr/></span><span class="pun">.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-e"</span><span class="pun">, </span><span class="str">"0.7"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#defaultValue"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">defaultValue</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-s"</span><span class="pun">, </span><span class="str">"126"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#defaultValue"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">defaultValue</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-P"</span><span class="pun">, </span><span class="kwd">null</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#defaultValue"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">defaultValue</span></a><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">modifiedDazzlerOptions</span><span class="pun">, [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+    </span><span class="str">"-s126"</span><span class="pun">,
+]));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p><code class="lang-d"><a href="../../dentist/dazzler/OptionModifier.html#add"><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">add</span></a></code> and <code class="lang-d"><a href="../../dentist/dazzler/OptionModifier.html#remove"><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">remove</span></a></code>
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+
+</span><span class="kwd">enum <a href="../../dentist/dazzler/withOption.html#dazzlerOptions"></span><span class="pln">dazzlerOptions</span></a><span class="pln"> </span><span class="pun">= [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-T8"</span><span class="pun">,
+    </span><span class="str">"-P/tmp"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+];
+
+</span><span class="kwd">auto </span><span class="pln">modifiedDazzlerOptions </span><span class="pun">= </span><span class="pln">dazzlerOptions
+    <wbr/></span><span class="pun">.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-T"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#remove"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">remove</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-M"</span><span class="pun">, </span><span class="str">"128"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#remove"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">remove</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-P"</span><span class="pun">, </span><span class="str">"/tmp"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#remove"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">remove</span></a><span class="pun">)
+    <wbr/>.</span><span class="pln">withOption</span><span class="pun">(</span><span class="str">"-m"</span><span class="pun">, </span><span class="str">"dentist-reads"</span><span class="pun">, <a href="../../dentist/dazzler/OptionModifier.html#add"></span><span class="typ">OptionModifier<wbr/></span><span class="pun">.</span><span class="pln">add</span></a><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">modifiedDazzlerOptions</span><span class="pun">, [
+    </span><span class="str">"-C"</span><span class="pun">,
+    </span><span class="str">"-n.7"</span><span class="pun">,
+    </span><span class="str">"-e0.841500"</span><span class="pun">,
+    </span><span class="str">"-M25"</span><span class="pun">,
+    </span><span class="str">"-mdust"</span><span class="pun">,
+    </span><span class="str">"-mdentist-self"</span><span class="pun">,
+    </span><span class="str">"-mtan"</span><span class="pun">,
+    </span><span class="str">"-mdentist-reads"</span><span class="pun">,
+]));
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

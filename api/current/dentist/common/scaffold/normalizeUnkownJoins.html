@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -356,7 +330,176 @@ applicable. Afterwards the gap joins may not be canonical anymore, i.e.
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="pln">J </span><span class="pun">= <a href="../../../dentist/common/scaffold/Join.html"></span><span class="typ">Join</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">S </span><span class="pun">= <a href="../../../dentist/common/scaffold/Scaffold.html"></span><span class="typ">Scaffold</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">CN </span><span class="pun">= <a href="../../../dentist/common/scaffold/ContigNode.html"></span><span class="typ">ContigNode</span></a><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">CP </span><span class="pun">= <a href="../../../dentist/common/scaffold/ContigPart.html"></span><span class="typ">ContigPart</span></a><span class="pun">;
+
+</span><span class="com">//  Case 1:
+//
+//      o        oxxxxo        o   =&gt;   o        o    o        o
+//                                 =&gt;
+//        o -- o        o -- o     =&gt;     o -- oxxxxxxxxo -- o
+</span><span class="kwd">auto </span><span class="pln">scaffold1 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">2</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold1<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">3</span><span class="pun">);
+
+</span><span class="com">//  Case 2:
+//
+//      o        oxxxxo        o  =&gt;  o        o   xxxo        o
+//                     \          =&gt;              /    \
+//        o -- o        o -- o    =&gt;    o -- oxxxx      o -- o
+</span><span class="kwd">auto </span><span class="pln">scaffold2 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">2</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold2<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">4</span><span class="pun">);
+
+</span><span class="com">//  Case 3:
+//
+//      o        oxxxxo        o  =&gt;  o        o    o        o
+//                                =&gt;
+//        o -- o        o -- o    =&gt;    o -- o        o -- o
+//                      |         =&gt;                  |
+//                      o -- o    =&gt;                  o -- o
+//                                =&gt;
+//                    o        o  =&gt;                o        o
+</span><span class="kwd">auto </span><span class="pln">scaffold3 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">3</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">3</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold3<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">4</span><span class="pun">);
+
+</span><span class="com">//  Case 4:
+//
+//      o        oxxxxo        o  =&gt;  o        oxxx   o        o
+//              /                 =&gt;          /    \
+//        o -- o        o -- o    =&gt;    o -- o      xxxxo -- o
+</span><span class="kwd">auto </span><span class="pln">scaffold4 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">2</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold4<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">4</span><span class="pun">);
+
+</span><span class="com">//  Case 5:
+//
+//      o        oxxxxo        o
+//              /      \
+//        o -- o        o -- o
+</span><span class="kwd">auto </span><span class="pln">scaffold5 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">2</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold5<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">5</span><span class="pun">);
+
+</span><span class="com">//  Case 6:
+//
+//      o        oxxxxo        o  =&gt;  o        o    o        o
+//              /                 =&gt;          /
+//        o -- o        o -- o    =&gt;    o -- o        o -- o
+//                      |         =&gt;                  |
+//                      o -- o    =&gt;                  o -- o
+//                                =&gt;
+//                    o        o  =&gt;                o        o
+</span><span class="kwd">auto </span><span class="pln">scaffold6 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">3</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold6</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold6</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">3</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold6</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold6</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold6</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold6<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">5</span><span class="pun">);
+
+</span><span class="com">//  Case 7:
+//
+//      o        oxxxxo        o  =&gt;  o        o    o        o
+//                                =&gt;
+//        o -- o        o -- o    =&gt;    o -- o        o -- o
+//             |                  =&gt;         |
+//        o -- o                  =&gt;    o -- o
+//                                =&gt;
+//      o        o                =&gt;  o        o
+</span><span class="kwd">auto </span><span class="pln">scaffold7 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">3</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold7</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold7</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">3</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold7</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold7</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold7<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">4</span><span class="pun">);
+
+</span><span class="com">//  Case 8:
+//
+//      o        oxxxxo        o  =&gt;  o        o    o        o
+//                     \          =&gt;                 \
+//        o -- o        o -- o    =&gt;    o -- o        o -- o
+//             |                  =&gt;         |
+//        o -- o                  =&gt;    o -- o
+//                                =&gt;
+//      o        o                =&gt;  o        o
+</span><span class="kwd">auto </span><span class="pln">scaffold8 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">3</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">3</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold8</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold8<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">5</span><span class="pun">);
+
+</span><span class="com">//  Case 9:
+//
+//      o        oxxxxo        o  =&gt;  o        o    o        o
+//                                =&gt;
+//        o -- o        o -- o    =&gt;    o -- o        o -- o
+//             |        |         =&gt;         |        |
+//             o ------ o         =&gt;         o ------ o
+//                                =&gt;
+//           o            o       =&gt;       o            o
+</span><span class="kwd">auto </span><span class="pln">scaffold9 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)(</span><span class="lit">3</span><span class="pun">, [
+    <a href="../../../dentist/common/scaffold/getUnkownJoin.html"></span><span class="pln">getUnkownJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="lit">1</span><span class="pun">),
+])<wbr/>.</span><span class="pln">normalizeUnkownJoins</span><span class="pun">!</span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold9</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold9</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(<a href="../../../dentist/common/scaffold/getDefaultJoin.html"></span><span class="pln">getDefaultJoin</span></a><span class="pun">!</span><span class="typ">int</span><span class="pun">(</span><span class="lit">3</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">scaffold9</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold9</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">)) </span><span class="kwd">in </span><span class="pln">scaffold9</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">scaffold9<wbr/></span><span class="pun">.</span><span class="pln">edges<wbr/></span><span class="pun">.</span><span class="pln">walkLength </span><span class="pun">== </span><span class="lit">5</span><span class="pun">);
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

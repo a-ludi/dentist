@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -354,7 +328,36 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="typ">string </span><span class="pln">fastaData </span><span class="pun">= </span><span class="str">q"EOF
+    &gt;sequence1
+    CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+    AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+    &gt;sequence2
+    AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTG
+    TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">fasta </span><span class="pun">= </span><span class="pln">fastaData<wbr/></span><span class="pun">.</span><span class="pln">parseFasta</span><span class="pun">();
+</span><span class="kwd">auto </span><span class="pln">fastaRecords </span><span class="pun">= [
+    <a href="../../../dentist/util/fasta/FastaRecord.html"></span><span class="typ">FastaRecord</span></a><span class="pun">!</span><span class="typ">string</span><span class="pun">(</span><span class="str">q"EOF
+        &gt;sequence1
+        CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+        AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">),
+    <a href="../../../dentist/util/fasta/FastaRecord.html"></span><span class="typ">FastaRecord</span></a><span class="pun">!</span><span class="typ">string</span><span class="pun">(</span><span class="str">q"EOF
+        &gt;sequence2
+        AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTG
+        TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">),
+];
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fasta<wbr/></span><span class="pun">.</span><span class="pln">length </span><span class="pun">== </span><span class="lit">2</span><span class="pun">, </span><span class="pln">fasta<wbr/></span><span class="pun">.</span><span class="pln">length<wbr/></span><span class="pun">.</span><span class="pln">to</span><span class="pun">!</span><span class="typ">string</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fasta</span><span class="pun">[</span><span class="lit">0</span><span class="pun">] == </span><span class="pln">fastaRecords</span><span class="pun">[</span><span class="lit">0</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fasta</span><span class="pun">[</span><span class="lit">1</span><span class="pun">] == </span><span class="pln">fastaRecords</span><span class="pun">[</span><span class="lit">1</span><span class="pun">]);
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

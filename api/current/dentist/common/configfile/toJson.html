@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -356,7 +330,24 @@ can be converted.
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">enum </span><span class="pln">complexJson </span><span class="pun">= </span><span class="str">`{
+"int": 42,
+"float": 3.1415,
+"truth": true,
+"void": null,
+"answer": "The answer is 42.",
+"list": ["Apple", "Banana", "Coconut", {"weird": "thing"}],
+}`</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">expected </span><span class="pun">= ((</span><span class="pln">json</span><span class="pun">) =&gt; </span><span class="pln">parseJson</span><span class="pun">(</span><span class="pln">json</span><span class="pun">))(</span><span class="pln">complexJson</span><span class="pun">);
+</span><span class="kwd">auto </span><span class="pln">yamlConverted </span><span class="pun">= </span><span class="typ">YAMLLoader<wbr/></span><span class="pun">.</span><span class="pln">fromString</span><span class="pun">(</span><span class="pln">complexJson</span><span class="pun">)<wbr/>.</span><span class="pln">load</span><span class="pun">()<wbr/>.</span><span class="pln">toJson</span><span class="pun">();
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">expected </span><span class="pun">== </span><span class="pln">yamlConverted</span><span class="pun">);
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

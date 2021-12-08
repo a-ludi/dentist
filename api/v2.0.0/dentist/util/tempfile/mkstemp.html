@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="UTF-8"/>
-		<title>mkstemp - multiple declarations</title>
+		<title>Function mkstemp</title>
 		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
 		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
 		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -339,21 +313,7 @@ $('#symbolSearchPane').show();</script>
 			</ul>
 		</nav>
 		<div id="main-contents">
-			<h1>mkstemp - multiple declarations</h1>
-			<nav class="page-nav">
-				<ul>
-					<li>
-						<a href="#0">
-							Function <code>mkstemp</code>
-						</a>
-					</li>
-					<li>
-						<a href="#1">
-							Function <code>mkstemp</code>
-						</a>
-					</li>
-				</ul>
-			</nav><h2 id="0">Function mkstemp</h2><p>Generates a unique temporary filename from <code class="lang-d"><a href="../../../dentist/util/tempfile/mkstemp.html#templateString"><span class="pln">templateString</span></a></code>, creates
+			<h1>Function mkstemp</h1><p>Generates a unique temporary filename from <code class="lang-d"><a href="../../../dentist/util/tempfile/mkstemp.html#templateString"><span class="pln">templateString</span></a></code>, creates
         and opens the file, and returns the open file and generated name.
 </p>
 			<div class="prototype">
@@ -365,25 +325,8 @@ $('#symbolSearchPane').show();</script>
 			&nbsp;&nbsp;<span class="kwd">in </span><span class="kwd">const</span><span class="pun">(</span><span class="typ">string</span><span class="pun">)</span> <span class="pln">templateString</span>
 			<br/>
 			<span class="pun">)</span><span class="pln"> </span><span class="kwd">@trusted</span><span class="pun">;</span>
-					</div>
-				</code>
-			</div>
-			<section><p>The last six characters of template must be "XXXXXX" and these are
-        replaced with a string that makes the filename unique.
-</p>
-
-<p>        The optional <code class="lang-d"><span class="pln">templateSuffix</span></code> will be appended to the file name.
-</p>
-</section>
-
-			<section><h3>Returns</h3>
-<p>The open file and generated name.
-</p>
-</section>
-<h2 id="1">Function mkstemp</h2><p></p>
-			<div class="prototype">
-				<code class="lang-d">
-					<div class="single-prototype">
+			<br/>
+			<br/>
 			<span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Tuple</span>!(std.stdio.File,"file",string,"name") <span class="pln">mkstemp</span>
 			<span class="pun">(</span>
 			<br/>
@@ -395,8 +338,58 @@ $('#symbolSearchPane').show();</script>
 					</div>
 				</code>
 			</div>
-			
-			
+			<section><p>The last six characters of template must be "XXXXXX" and these are
+        replaced with a string that makes the filename unique.
+</p>
+
+<p>        The optional <code class="lang-d"><a href="../../../dentist/util/tempfile/mkstemp.html#templateSuffix"><span class="pln">templateSuffix</span></a></code> will be appended to the file name.
+</p>
+</section>
+
+			<section><h2>Returns</h2>
+<p>The open file and generated name.
+</p>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">startsWith</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">file </span><span class="pun">: </span><span class="pln">remove</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">tempFile </span><span class="pun">= </span><span class="pln">mkstemp</span><span class="pun">(</span><span class="str">".unittest-XXXXXX"</span><span class="pun">);
+</span><span class="kwd">scope </span><span class="pun">(</span><span class="pln">exit</span><span class="pun">)
+    </span><span class="pln">remove</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">name</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">name<wbr/></span><span class="pun">.</span><span class="pln">startsWith</span><span class="pun">(</span><span class="str">".unittest-"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">isOpen</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">error</span><span class="pun">);
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">writeln</span><span class="pun">(</span><span class="str">"foobar"</span><span class="pun">);
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">flush</span><span class="pun">();
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">rewind</span><span class="pun">();
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">readln</span><span class="pun">() == </span><span class="str">"foobar\n"</span><span class="pun">);
+
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">endsWith</span><span class="pun">, </span><span class="pln">startsWith</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">file </span><span class="pun">: </span><span class="pln">remove</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">tempFile </span><span class="pun">= </span><span class="pln">mkstemp</span><span class="pun">(</span><span class="str">".unittest-XXXXXX"</span><span class="pun">, </span><span class="str">".ext"</span><span class="pun">);
+</span><span class="kwd">scope </span><span class="pun">(</span><span class="pln">exit</span><span class="pun">)
+    </span><span class="pln">remove</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">name</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">name<wbr/></span><span class="pun">.</span><span class="pln">startsWith</span><span class="pun">(</span><span class="str">".unittest-"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">name<wbr/></span><span class="pun">.</span><span class="pln">endsWith</span><span class="pun">(</span><span class="str">".ext"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">isOpen</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">error</span><span class="pun">);
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">writeln</span><span class="pun">(</span><span class="str">"foobar"</span><span class="pun">);
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">flush</span><span class="pun">();
+</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">rewind</span><span class="pun">();
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">tempFile<wbr/></span><span class="pun">.</span><span class="pln">file<wbr/></span><span class="pun">.</span><span class="pln">readln</span><span class="pun">() == </span><span class="str">"foobar\n"</span><span class="pun">);
+}
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

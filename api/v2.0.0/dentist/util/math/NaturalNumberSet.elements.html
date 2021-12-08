@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -344,7 +318,7 @@ $('#symbolSearchPane').show();</script>
 			<div class="prototype">
 				<code class="lang-d">
 					<div class="single-prototype">
-			<a href="../../../dentist/util/math/NaturalNumberSet.ElementsRange.html"><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.<wbr/></span><span class="typ">ElementsRange</span></a>!(const(dentist.util.math.NaturalNumberSet)) <span class="pln">elements</span>
+			<span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">util<wbr/></span><span class="pun">.</span><span class="pln">math<wbr/></span><span class="pun">.</span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="typ">ElementsRange</span>!(const(dentist.util.math.NaturalNumberSet)) <span class="pln">elements</span>
 			<span class="pun">(</span>
 			<br/>
 			&nbsp;&nbsp;<span class="typ">ulong</span> <span class="pln">fromElement</span> <span class="pun">=</span> <span class="lit">0LU</span><span class="pun">,</span>
@@ -354,7 +328,7 @@ $('#symbolSearchPane').show();</script>
 			<span class="pun">)</span><span class="pln"> </span><span class="kwd">pure nothrow @property const</span><span class="pun">;</span>
 			<br/>
 			<br/>
-			<a href="../../../dentist/util/math/NaturalNumberSet.ElementsRange.html"><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.<wbr/></span><span class="typ">ElementsRange</span></a>!(dentist.util.math.NaturalNumberSet) <span class="pln">elements</span>
+			<span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">util<wbr/></span><span class="pun">.</span><span class="pln">math<wbr/></span><span class="pun">.</span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="typ">ElementsRange</span>!(dentist.util.math.NaturalNumberSet) <span class="pln">elements</span>
 			<span class="pun">(</span>
 			<br/>
 			&nbsp;&nbsp;<span class="typ">ulong</span> <span class="pln">fromElement</span> <span class="pun">=</span> <span class="lit">0LU</span><span class="pun">,</span>
@@ -370,7 +344,67 @@ fulfill <code class="lang-d"><a href="../../../dentist/util/math/NaturalNumberSe
 </p>
 </section>
 
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">iota</span><span class="pun">;
+
+<a href="../../../dentist/util/math/NaturalNumberSet.html"></span><span class="typ">NaturalNumberSet</span></a><span class="pln"> set</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">someNumbers </span><span class="pun">= </span><span class="pln">iota</span><span class="pun">(</span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">partSize</span><span class="pun">)<wbr/>.</span><span class="pln">filter</span><span class="pun">!</span><span class="str">"a % 3 == 0"</span><span class="pun">;
+
+</span><span class="kwd">foreach </span><span class="pun">(</span><span class="pln">i</span><span class="pun">; </span><span class="pln">someNumbers</span><span class="pun">)
+{
+    </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">i</span><span class="pun">);
+}
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">someNumbers</span><span class="pun">, </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">elements</span><span class="pun">));
+
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p>The set may be modified while iterating:
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">iota</span><span class="pun">;
+
+</span><span class="kwd">enum </span><span class="pln">numElements </span><span class="pun">= </span><span class="lit">64</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">set </span><span class="pun">= <a href="../../../dentist/util/math/NaturalNumberSet.html"></span><span class="typ">NaturalNumberSet</span></a><span class="pun">(</span><span class="pln">numElements</span><span class="pun">, </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">addAll</span><span class="pun">);
+
+</span><span class="kwd">foreach </span><span class="pun">(</span><span class="pln">i</span><span class="pun">; </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">elements</span><span class="pun">)
+{
+    </span><span class="kwd">if </span><span class="pun">(</span><span class="pln">i </span><span class="pun">% </span><span class="lit">10 </span><span class="pun">== </span><span class="lit">0</span><span class="pun">)
+        </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">remove</span><span class="pun">(</span><span class="pln">i </span><span class="pun">+ </span><span class="lit">1</span><span class="pun">);
+}
+
+</span><span class="kwd">auto </span><span class="pln">expectedNumbers </span><span class="pun">= </span><span class="pln">iota</span><span class="pun">(</span><span class="pln">numElements</span><span class="pun">)<wbr/>.</span><span class="pln">filter</span><span class="pun">!</span><span class="str">"a == 0 || !((a - 1) % 10 == 0)"</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">expectedNumbers</span><span class="pun">, </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">elements</span><span class="pun">));
+
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+<p>Limits <code class="lang-d"><a href="../../../dentist/util/math/NaturalNumberSet.elements.html#fromElement"><span class="pln">fromElement</span></a><span class="pln"> </span><span class="pun">.. <a href="../../../dentist/util/math/NaturalNumberSet.elements.html#toElement"></span><span class="pln">toElement</span></a></code> may be given
+</p>
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">iota</span><span class="pun">;
+
+<a href="../../../dentist/util/math/NaturalNumberSet.html"></span><span class="typ">NaturalNumberSet</span></a><span class="pln"> set</span><span class="pun">;
+</span><span class="kwd">auto </span><span class="pln">someNumbers </span><span class="pun">= </span><span class="pln">iota</span><span class="pun">(</span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">partSize</span><span class="pun">)<wbr/>.</span><span class="pln">filter</span><span class="pun">!</span><span class="str">"a % 3 == 0"</span><span class="pun">;
+
+</span><span class="kwd">foreach </span><span class="pun">(</span><span class="pln">i</span><span class="pun">; </span><span class="pln">someNumbers</span><span class="pun">)
+{
+    </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">i</span><span class="pun">);
+}
+
+</span><span class="kwd">enum </span><span class="pln">from </span><span class="pun">= </span><span class="lit">3</span><span class="pun">;
+</span><span class="kwd">enum </span><span class="pln">to </span><span class="pun">= </span><span class="lit">16</span><span class="pun">;
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(
+    </span><span class="pln">someNumbers<wbr/></span><span class="pun">.</span><span class="pln">filter</span><span class="pun">!(</span><span class="pln">n </span><span class="pun">=&gt; </span><span class="pln">from </span><span class="pun">&lt;= </span><span class="pln">n </span><span class="pun">&amp;&amp; </span><span class="pln">n </span><span class="pun">&lt; </span><span class="pln">to</span><span class="pun">),
+    </span><span class="pln">set<wbr/></span><span class="pun">.</span><span class="pln">elements</span><span class="pun">(</span><span class="pln">from</span><span class="pun">, </span><span class="pln">to</span><span class="pun">),
+));
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

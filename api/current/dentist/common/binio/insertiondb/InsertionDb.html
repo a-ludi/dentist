@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -350,32 +324,6 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			<section><h2>Fields</h2>
-				<table>
-					<col class="caption"/>
-					<tr>
-						<th>Name</th><th>Type</th><th>Description</th>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.file.html" class="private"><code>file</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio<wbr/></span><span class="pun">.</span><span class="typ">File</span></code></td><td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.index.html" class="private"><code>index</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/binio/insertiondb/InsertionDbIndex.html"><span class="typ">InsertionDbIndex</span></a></code></td><td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.slices.html" class="private"><code>slices</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Tuple</span>!(dentist.common.binio.common.ArrayStorage!(dentist.common.binio.insertiondb.InsertionStorage).ArrayStorage,"insertions",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.common.CompressedBaseQuad).ArrayStorage,"compressedBaseQuads",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.insertiondb.SeededAlignmentStorage).ArrayStorage,"overlaps",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.insertiondb.LocalAlignmentStorage).ArrayStorage,"localAlignments",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.insertiondb.TracePointStorage).ArrayStorage,"tracePoints",dentist.common.binio.common.ArrayStorage!(uint).ArrayStorage,"readIds")</code></td><td></td>
-					</tr>
-				</table>
-			</section>
 			<section><h2>Properties</h2>
 				<table>
 					<col class="caption"/>
@@ -516,87 +464,6 @@ if possible.
 if possible.
 </td>
 					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.ensureDbIndex.html" class="private">
-								<code>ensureDbIndex</code>
-							</a>
-							<span class="tableEntryAnnotation">()</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.getSlices.html" class="private">
-								<code>getSlices</code>
-							</a>
-							<span class="tableEntryAnnotation">(from, to)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(insertions, compressedBaseQuads, overlaps, readIds)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(compressedBaseQuads)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(readIds)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(overlaps, localAlignments)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(localAlignments, tracePoints)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(tracePoints)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.readSlice.html" class="private">
-								<code>readSlice</code>
-							</a>
-							<span class="tableEntryAnnotation">(from, to)</span>
-						</td>
-						<td></td>
-					</tr>
 				</table>
 			</section>
 			<section><h2>Aliases</h2>
@@ -607,52 +474,12 @@ if possible.
 					</tr>
 					<tr>
 						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.__xdtor.html" class="public">
-								<code>__xdtor</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.__xpostblit.html" class="public">
-								<code>__xpostblit</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
 							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.opDollar.html" class="public">
 								<code>opDollar</code>
 							</a>
 						</td>
 						<td>Return the number of insertions in this DB.
 </td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.DbSlices.html" class="private">
-								<code>DbSlices</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.LocalAlignment.html" class="private">
-								<code>LocalAlignment</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/insertiondb/InsertionDb.TracePoint.html" class="private">
-								<code>TracePoint</code>
-							</a>
-						</td>
-						<td></td>
 					</tr>
 				</table>
 			</section>

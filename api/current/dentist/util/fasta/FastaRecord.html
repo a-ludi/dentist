@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -317,16 +301,6 @@ $('#symbolSearchPane').show();</script>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/dazzler.html">dazzler</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
 					</div>
 				</li>
 			</ul>
@@ -488,7 +462,47 @@ $('#symbolSearchPane').show();</script>
 					</tr>
 				</table>
 			</section>
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">fastaRecord1 </span><span class="pun">= </span><span class="str">q"EOF
+    &gt;sequence1
+    CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCT
+    AACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent<wbr/></span><span class="pun">.</span><span class="pln">parseFastaRecord</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1<wbr/></span><span class="pun">.</span><span class="pln">header </span><span class="pun">== </span><span class="str">"&gt;sequence1"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1</span><span class="pun">[]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"CTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACCCTAACAACCCTAACCCTAACCC"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1</span><span class="pun">[</span><span class="lit">0 </span><span class="pun">.. </span><span class="lit">5</span><span class="pun">]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"CTAAC"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord1<wbr/></span><span class="pun">.</span><span class="pln">toFasta</span><span class="pun">(</span><span class="lit">13</span><span class="pun">)<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">q"EOF
+    &gt;sequence1
+    CTAACCCTAACCC
+    TAACCCTAACCCT
+    AACCCTAACCCTA
+    ACCCTAACCCTAA
+    CCCTAACCCTAAC
+    CCTAACCCTAACC
+    CTAACAACCCTAA
+    CCCTAACCC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">));
+
+</span><span class="kwd">auto </span><span class="pln">fastaRecord2 </span><span class="pun">= </span><span class="str">q"EOF
+    &gt;sequence2
+    AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTG
+    TAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent<wbr/></span><span class="pun">.</span><span class="pln">parseFastaRecord</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord2<wbr/></span><span class="pun">.</span><span class="pln">header </span><span class="pun">== </span><span class="str">"&gt;sequence2"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord2</span><span class="pun">[]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTGTATTGTAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAACAACCCTAACC"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord2</span><span class="pun">[</span><span class="lit">5 </span><span class="pun">.. </span><span class="lit">10</span><span class="pun">]<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">"GAGCA"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">fastaRecord2<wbr/></span><span class="pun">.</span><span class="pln">toFasta</span><span class="pun">(</span><span class="lit">45</span><span class="pun">)<wbr/>.</span><span class="pln">equal</span><span class="pun">(</span><span class="str">q"EOF
+    &gt;sequence2
+    AAGCTGAGCAGGGCTTTAAAGCTATCTTATTAATAATTATTTCTG
+    TATTGTAACCCTAACCCTAAACCTAACCCTAACCCTAACCCTAAC
+    AACCCTAACC
+EOF"<wbr/></span><span class="pun">.</span><span class="pln">outdent</span><span class="pun">));
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

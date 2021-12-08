@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -369,6 +343,63 @@ $('#symbolSearchPane').show();</script>
                         represented as indices, are connected</td></tr>
 <tr><td id="numNodes">numNodes</td><td>   total number of nodes in the graph</td></tr>
 </table>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">only</span><span class="pun">;
+
+</span><span class="kwd">alias </span><span class="pln">modEqv</span><span class="pun">(</span><span class="pln">size_t m</span><span class="pun">) = (</span><span class="pln">a</span><span class="pun">, </span><span class="pln">b</span><span class="pun">) =&gt; (</span><span class="pln">a </span><span class="pun">% </span><span class="pln">m</span><span class="pun">) == (</span><span class="pln">b </span><span class="pun">% </span><span class="pln">m</span><span class="pun">);
+</span><span class="kwd">alias </span><span class="pln">clusterByThreshold</span><span class="pun">(</span><span class="pln">size_t t</span><span class="pun">) = (</span><span class="pln">a</span><span class="pun">, </span><span class="pln">b</span><span class="pun">) =&gt; (</span><span class="pln">a </span><span class="pun">&lt; </span><span class="pln">t</span><span class="pun">) == (</span><span class="pln">b </span><span class="pun">&lt; </span><span class="pln">t</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(
+    </span><span class="pln">findMaximallyConnectedComponents</span><span class="pun">!(</span><span class="pln">modEqv</span><span class="pun">!</span><span class="lit">5</span><span class="pun">)(</span><span class="lit">15</span><span class="pun">),
+    </span><span class="pln">only</span><span class="pun">(
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">10</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">11</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">12</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">13</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">14</span><span class="pun">),
+    ),
+));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(
+    </span><span class="pln">findMaximallyConnectedComponents</span><span class="pun">!(</span><span class="pln">modEqv</span><span class="pun">!</span><span class="lit">3</span><span class="pun">)(</span><span class="lit">15</span><span class="pun">),
+    </span><span class="pln">only</span><span class="pun">(
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">9</span><span class="pun">, </span><span class="lit">12</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">10</span><span class="pun">, </span><span class="lit">13</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">14</span><span class="pun">),
+    ),
+));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(
+    </span><span class="pln">findMaximallyConnectedComponents</span><span class="pun">!(</span><span class="pln">clusterByThreshold</span><span class="pun">!</span><span class="lit">10</span><span class="pun">)(</span><span class="lit">15</span><span class="pun">),
+    </span><span class="pln">only</span><span class="pun">(
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">7</span><span class="pun">, </span><span class="lit">8</span><span class="pun">, </span><span class="lit">9</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">10</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">12</span><span class="pun">, </span><span class="lit">13</span><span class="pun">, </span><span class="lit">14</span><span class="pun">),
+    ),
+));
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">algorithm </span><span class="pun">: </span><span class="pln">equal</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">range </span><span class="pun">: </span><span class="pln">only</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">connectivity </span><span class="pun">= [
+    [</span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">true </span><span class="pun">],
+    [</span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">true </span><span class="pun">, </span><span class="kwd">false</span><span class="pun">],
+    [</span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">true </span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">],
+    [</span><span class="kwd">true </span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">, </span><span class="kwd">false</span><span class="pun">],
+];
+</span><span class="kwd">alias </span><span class="pln">isConnected </span><span class="pun">= (</span><span class="pln">i</span><span class="pun">, </span><span class="pln">j</span><span class="pun">) =&gt; </span><span class="pln">connectivity</span><span class="pun">[</span><span class="pln">i</span><span class="pun">][</span><span class="pln">j</span><span class="pun">];
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(
+    </span><span class="pln">findMaximallyConnectedComponents</span><span class="pun">!</span><span class="pln">isConnected</span><span class="pun">(</span><span class="lit">4</span><span class="pun">),
+    </span><span class="pln">only</span><span class="pun">(
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">0</span><span class="pun">, </span><span class="lit">3</span><span class="pun">),
+        <a href="../../../dentist/util/math/NaturalNumberSet.create.html"></span><span class="typ">NaturalNumberSet<wbr/></span><span class="pun">.</span><span class="pln">create</span></a><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">),
+    ),
+));
+</span></code></pre>
 </section>
 
 			<footer>

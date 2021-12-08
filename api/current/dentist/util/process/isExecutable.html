@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -364,6 +338,14 @@ $('#symbolSearchPane').show();</script>
 <tr><td id="name">name</td><td> Path to file or name of executable</td></tr>
 <tr><td id="searchPath">searchPath</td><td> Determines wether or not the path should be searched.</td></tr>
 </table>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">assert</span><span class="pun">(</span><span class="pln">isExecutable</span><span class="pun">(</span><span class="str">"/bin/sh"</span><span class="pun">, </span><span class="typ">No<wbr/></span><span class="pun">.</span><span class="pln">searchPath</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">isExecutable</span><span class="pun">(</span><span class="str">"/bin/sh"</span><span class="pun">, </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">searchPath</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">isExecutable</span><span class="pun">(</span><span class="str">"sh"</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(!</span><span class="pln">isExecutable</span><span class="pun">(</span><span class="str">"does-not-exist-anywhere"</span><span class="pun">));
+</span></code></pre>
 </section>
 
 			<footer>

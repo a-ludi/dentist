@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -356,7 +330,17 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">enum </span><span class="pln">numbers </span><span class="pun">= [</span><span class="lit">19</span><span class="pun">, </span><span class="lit">6</span><span class="pun">, </span><span class="lit">29</span><span class="pun">, </span><span class="lit">39</span><span class="pun">, </span><span class="lit">98</span><span class="pun">, </span><span class="lit">86</span><span class="pun">, </span><span class="lit">27</span><span class="pun">, </span><span class="lit">11</span><span class="pun">, </span><span class="lit">23</span><span class="pun">, </span><span class="lit">59</span><span class="pun">, </span><span class="lit">20</span><span class="pun">, </span><span class="lit">34</span><span class="pun">, </span><span class="lit">84</span><span class="pun">, </span><span class="lit">38</span><span class="pun">, </span><span class="lit">20</span><span class="pun">];
+
+</span><span class="kwd">auto </span><span class="pln">set </span><span class="pun">= </span><span class="pln">hashSet</span><span class="pun">(</span><span class="pln">numbers</span><span class="pun">);
+
+</span><span class="kwd">foreach </span><span class="pun">(</span><span class="pln">n</span><span class="pun">; </span><span class="pln">numbers</span><span class="pun">)
+    </span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">n </span><span class="kwd">in </span><span class="pln">set</span><span class="pun">);
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

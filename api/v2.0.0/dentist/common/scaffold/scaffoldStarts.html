@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -356,7 +330,61 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">alias </span><span class="typ">Payload </span><span class="pun">= </span><span class="typ">int</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">J </span><span class="pun">= <a href="../../../dentist/common/scaffold/Join.html"></span><span class="typ">Join</span></a><span class="pun">!</span><span class="typ">Payload</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">S </span><span class="pun">= <a href="../../../dentist/common/scaffold/Scaffold.html"></span><span class="typ">Scaffold</span></a><span class="pun">!</span><span class="typ">Payload</span><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">CN </span><span class="pun">= <a href="../../../dentist/common/scaffold/ContigNode.html"></span><span class="typ">ContigNode</span></a><span class="pun">;
+</span><span class="kwd">alias </span><span class="pln">CP </span><span class="pun">= <a href="../../../dentist/common/scaffold/ContigPart.html"></span><span class="typ">ContigPart</span></a><span class="pun">;
+</span><span class="com">//   contig 1      contig 2
+//
+//  o        o     o        o
+//                         / e4
+//    o -- o ------- o -- o
+//              e3
+//
+//    o -- o         o -- o         o -- o
+//                         \ e7 e8 /      \ e9
+//  o        o     o        o     o        o
+//
+//   contig 5       contig 4      contig 3
+//
+</span><span class="kwd">auto </span><span class="pln">scaffold1 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">Payload</span><span class="pun">, </span><span class="typ">Payload</span><span class="pun">)(</span><span class="lit">5</span><span class="pun">, [
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e3
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post </span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e4
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post </span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e7
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e8
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">post </span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e9
+</span><span class="pun">]);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">scaffoldStarts</span><span class="pun">!</span><span class="typ">Payload</span><span class="pun">(</span><span class="pln">scaffold1</span><span class="pun">), [
+    </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">),
+    </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">3</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">pre</span><span class="pun">),
+    </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">),
+    </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">5</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">),
+]));
+
+</span><span class="com">//   contig 1      contig 2
+//
+//  o        o     o        o
+//
+//              e1
+//    o -- o ------- o -- o
+//     \_________________/
+//              e2
+//
+</span><span class="kwd">auto </span><span class="pln">scaffold2 </span><span class="pun">= <a href="../../../dentist/common/scaffold/buildScaffold.html"></span><span class="pln">buildScaffold</span></a><span class="pun">!(<a href="../../../dentist/common/scaffold/sumPayloads.html"></span><span class="pln">sumPayloads</span></a><span class="pun">!</span><span class="typ">Payload</span><span class="pun">, </span><span class="typ">Payload</span><span class="pun">)(</span><span class="lit">2</span><span class="pun">, [
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e1
+    </span><span class="pln">J</span><span class="pun">(</span><span class="pln">CN</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">end</span><span class="pun">), </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin </span><span class="pun">), </span><span class="lit">1</span><span class="pun">), </span><span class="com">// e2
+</span><span class="pun">]);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">equal</span><span class="pun">(</span><span class="pln">scaffoldStarts</span><span class="pun">!</span><span class="typ">Payload</span><span class="pun">(</span><span class="pln">scaffold2</span><span class="pun">), [
+    </span><span class="pln">CN</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="pln">CP<wbr/></span><span class="pun">.</span><span class="pln">begin</span><span class="pun">),
+]));
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -350,32 +324,6 @@ $('#symbolSearchPane').show();</script>
 				</code>
 			</div>
 			
-			<section><h2>Fields</h2>
-				<table>
-					<col class="caption"/>
-					<tr>
-						<th>Name</th><th>Type</th><th>Description</th>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.dbIndex.html" class="private"><code>dbIndex</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/binio/pileupdb/PileUpDbIndex.html"><span class="typ">PileUpDbIndex</span></a></code></td><td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.dbSlices.html" class="private"><code>dbSlices</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Tuple</span>!(dentist.common.binio.common.ArrayStorage!(dentist.common.binio.common.ArrayStorage!(dentist.common.binio.common.ArrayStorage!(dentist.common.binio.pileupdb.SeededAlignmentStorage).ArrayStorage).ArrayStorage).ArrayStorage,"pileUps",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.common.ArrayStorage!(dentist.common.binio.pileupdb.SeededAlignmentStorage).ArrayStorage).ArrayStorage,"readAlignments",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.pileupdb.SeededAlignmentStorage).ArrayStorage,"seededAlignments",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.pileupdb.LocalAlignmentStorage).ArrayStorage,"localAlignments",dentist.common.binio.common.ArrayStorage!(dentist.common.binio.pileupdb.TracePointStorage).ArrayStorage,"tracePoints")</code></td><td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.pileUpDb.html" class="private"><code>pileUpDb</code></a>
-						</td>
-						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio<wbr/></span><span class="pun">.</span><span class="typ">File</span></code></td><td></td>
-					</tr>
-				</table>
-			</section>
 			<section><h2>Properties</h2>
 				<table>
 					<col class="caption"/>
@@ -497,78 +445,6 @@ if possible.
 						<td>Closes the underlying file.
 </td>
 					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.ensureDbIndex.html" class="private">
-								<code>ensureDbIndex</code>
-							</a>
-							<span class="tableEntryAnnotation">()</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.getDbSlices.html" class="private">
-								<code>getDbSlices</code>
-							</a>
-							<span class="tableEntryAnnotation">(from, to)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(pileUps, readAlignments)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(seededAlignments, localAlignments)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(readAlignments, seededAlignments)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(localAlignments, tracePoints)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.parse.html" class="private">
-								<code>parse</code>
-							</a>
-							<span class="tableEntryAnnotation">(tracePoints)</span>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.readSlice.html" class="private">
-								<code>readSlice</code>
-							</a>
-							<span class="tableEntryAnnotation">(from, to)</span>
-						</td>
-						<td></td>
-					</tr>
 				</table>
 			</section>
 			<section><h2>Aliases</h2>
@@ -579,52 +455,12 @@ if possible.
 					</tr>
 					<tr>
 						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.__xdtor.html" class="public">
-								<code>__xdtor</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.__xpostblit.html" class="public">
-								<code>__xpostblit</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
 							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.opDollar.html" class="public">
 								<code>opDollar</code>
 							</a>
 						</td>
 						<td>Return the number of pile ups in this DB.
 </td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.DbSlices.html" class="private">
-								<code>DbSlices</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.LocalAlignment.html" class="private">
-								<code>LocalAlignment</code>
-							</a>
-						</td>
-						<td></td>
-					</tr>
-					<tr>
-						<td>
-							<a href="../../../../dentist/common/binio/pileupdb/PileUpDb.TracePoint.html" class="private">
-								<code>TracePoint</code>
-							</a>
-						</td>
-						<td></td>
 					</tr>
 				</table>
 			</section>

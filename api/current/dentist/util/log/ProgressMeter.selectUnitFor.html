@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -355,7 +329,15 @@ is up to three.
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">assert</span><span class="pun">(</span><span class="pln">selectUnitFor</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) == <a href="../../../dentist/util/log/ProgressMeter.Unit.html#one"></span><span class="typ">Unit<wbr/></span><span class="pun">.</span><span class="pln">one</span></a><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">selectUnitFor</span><span class="pun">(</span><span class="lit">25 </span><span class="pun">* </span><span class="lit">1024</span><span class="pun">) == <a href="../../../dentist/util/log/ProgressMeter.Unit.html#kilo"></span><span class="typ">Unit<wbr/></span><span class="pun">.</span><span class="pln">kilo</span></a><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">selectUnitFor</span><span class="pun">(</span><span class="lit">13 </span><span class="pun">* </span><span class="lit">1024</span><span class="pun">*</span><span class="lit">1024</span><span class="pun">) == <a href="../../../dentist/util/log/ProgressMeter.Unit.html#mega"></span><span class="typ">Unit<wbr/></span><span class="pun">.</span><span class="pln">mega</span></a><span class="pun">);
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -372,7 +346,17 @@ nodes.
 </p>
 </section>
 
-			<h2 id="1">Function Graph.indexOf</h2><p>Returns the index of edge <code class="lang-d"><span class="pln">n</span></code> in the list of edges.
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">g1 </span><span class="pun">= <a href="../../../dentist/util/math/Graph.html"></span><span class="typ">Graph</span></a><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">indexOf</span><span class="pun">(</span><span class="lit">1</span><span class="pun">) == </span><span class="lit">0</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">indexOf</span><span class="pun">(</span><span class="lit">2</span><span class="pun">) == </span><span class="lit">1</span><span class="pun">);
+</span><span class="pln">assertThrown</span><span class="pun">!<a href="../../../dentist/util/math/MissingNodeException.html"></span><span class="typ">MissingNodeException</span></a><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">indexOf</span><span class="pun">(</span><span class="lit">3</span><span class="pun">));
+
+</span></code></pre>
+</section>
+<h2 id="1">Function Graph.indexOf</h2><p>Returns the index of edge <code class="lang-d"><span class="pln">n</span></code> in the list of edges.
 </p>
 			<div class="prototype">
 				<code class="lang-d">
@@ -391,7 +375,20 @@ nodes.
 </p>
 </section>
 
-			
+			<section><h3>Example</h3>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">g1 </span><span class="pun">= <a href="../../../dentist/util/math/Graph.html"></span><span class="typ">Graph</span></a><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="kwd">auto </span><span class="pln">e1 </span><span class="pun">= </span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">);
+
+</span><span class="pln">g1 </span><span class="pun">~= </span><span class="pln">e1</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">indexOf</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)) == </span><span class="lit">0</span><span class="pun">);
+</span><span class="pln">assertThrown</span><span class="pun">!<a href="../../../dentist/util/math/MissingEdgeException.html"></span><span class="typ">MissingEdgeException</span></a><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">indexOf</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">)));
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

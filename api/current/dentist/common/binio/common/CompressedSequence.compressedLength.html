@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset="UTF-8"/>
-		<title>CompressedSequence.compressedLength - multiple declarations</title>
+		<title>Function CompressedSequence.compressedLength</title>
 		<link rel="stylesheet" type="text/css" href="../../../../styles/ddox.css"/>
 		<link rel="stylesheet" href="../../../../prettify/prettify.css" type="text/css"/>
 		<script type="text/javascript" src="../../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../../scripts/ddox.js">/**/</script>
@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module selected">
 						<a href="../../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -339,35 +313,15 @@ $('#symbolSearchPane').show();</script>
 			</ul>
 		</nav>
 		<div id="main-contents">
-			<h1>CompressedSequence.compressedLength - multiple declarations</h1>
-			<nav class="page-nav">
-				<ul>
-					<li>
-						<a href="#0">
-							Function <code>CompressedSequence.compressedLength</code>
-						</a>
-					</li>
-					<li>
-						<a href="#1">
-							Function <code>CompressedSequence.compressedLength</code>
-						</a>
-					</li>
-				</ul>
-			</nav><h2 id="0">Function CompressedSequence.compressedLength</h2><p>Number of bytes required to store the sequence. This does not include
+			<h1>Function CompressedSequence.compressedLength</h1><p>Number of bytes required to store the sequence. This does not include
 meta data.
 </p>
 			<div class="prototype">
 				<code class="lang-d">
 					<div class="single-prototype">
 			<span class="typ">ulong</span> <span class="pln">compressedLength</span><span class="pun">(</span><span class="pun">)</span><span class="pln"> </span><span class="kwd">pure nothrow @property const</span><span class="pun">;</span>
-					</div>
-				</code>
-			</div>
-			
-			<h2 id="1">Function CompressedSequence.compressedLength</h2><p></p>
-			<div class="prototype">
-				<code class="lang-d">
-					<div class="single-prototype">
+			<br/>
+			<br/>
 			<span class="pln">size_t</span> <span class="pln">compressedLength</span>(S)
 			<span class="pun">(</span>
 			<br/>
@@ -380,7 +334,15 @@ meta data.
 				</code>
 			</div>
 			
-			
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">enum </span><span class="pln">testSequence </span><span class="pun">= </span><span class="str">"atgccaactactttgaacgcgCCGCAAGGCACAGGTGCGCCT"</span><span class="pun">;
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">compressedLength</span><span class="pun">(</span><span class="pln">testSequence</span><span class="pun">) == </span><span class="lit">11</span><span class="pun">);
+
+</span></code></pre>
+</section>
+
 			<footer>
 				<table class="license-info">
 					<tr>

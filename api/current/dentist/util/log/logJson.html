@@ -183,22 +183,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/common/binio.html">binio</a>
 					</div>
 			<ul class="tree-view">
-				<li class="tree-view collapsed">
-					<div class="package ">_testdata
-					</div>
-			<ul class="tree-view">
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
-					</div>
-				</li>
-			</ul>
-				</li>
 				<li>
 					<div class="module ">
 						<a href="../../../dentist/common/binio/common.html">common</a>
@@ -319,16 +303,6 @@ $('#symbolSearchPane').show();</script>
 						<a href="../../../dentist/dazzler.html">dazzler</a>
 					</div>
 				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/modules.html">modules</a>
-					</div>
-				</li>
-				<li>
-					<div class="module ">
-						<a href="../../../dentist/swinfo.html">swinfo</a>
-					</div>
-				</li>
 			</ul>
 				</li>
 				<li>
@@ -381,6 +355,33 @@ $('#symbolSearchPane').show();</script>
 <table><col class="caption"><tr><th>Name</th><th>Description</th></tr>
 <tr><td id="args">args</td><td> pairs of <code class="lang-d"><span class="pln">name</span></code> (<code class="lang-d"><span class="typ">string</span></code>) and <code class="lang-d"><span class="pln">value</span></code></td></tr>
 </table>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">import </span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio </span><span class="pun">: </span><span class="typ">File</span><span class="pun">, </span><span class="pln">stderr</span><span class="pun">;
+</span><span class="kwd">import </span><span class="pln">vibe<wbr/></span><span class="pun">.</span><span class="pln">data<wbr/></span><span class="pun">.</span><span class="pln">json </span><span class="pun">: </span><span class="typ">Json</span><span class="pun">, </span><span class="pln">parseJsonString</span><span class="pun">;
+
+</span><span class="kwd">auto </span><span class="pln">origStderr </span><span class="pun">= </span><span class="pln">stderr</span><span class="pun">;
+</span><span class="pln">stderr </span><span class="pun">= </span><span class="typ">File<wbr/></span><span class="pun">.</span><span class="pln">tmpfile</span><span class="pun">();
+</span><span class="kwd">scope </span><span class="pun">(</span><span class="pln">exit</span><span class="pun">)
+{
+    </span><span class="pln">stderr<wbr/></span><span class="pun">.</span><span class="pln">close</span><span class="pun">();
+    </span><span class="pln">stderr </span><span class="pun">= </span><span class="pln">origStderr</span><span class="pun">;
+}
+
+<a href="../../../dentist/util/log/logJsonError.html"></span><span class="pln">logJsonError</span></a><span class="pun">(
+    </span><span class="str">"error"</span><span class="pun">, </span><span class="str">"mysterious observation"</span><span class="pun">,
+    </span><span class="str">"secret"</span><span class="pun">, </span><span class="lit">42</span><span class="pun">,
+);
+
+</span><span class="pln">stderr<wbr/></span><span class="pun">.</span><span class="pln">rewind</span><span class="pun">();
+</span><span class="kwd">auto </span><span class="pln">observed </span><span class="pun">= </span><span class="pln">parseJsonString</span><span class="pun">(</span><span class="pln">stderr<wbr/></span><span class="pun">.</span><span class="pln">readln</span><span class="pun">);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">observed</span><span class="pun">[</span><span class="str">"thread"</span><span class="pun">]<wbr/>.</span><span class="pln">type </span><span class="pun">== </span><span class="typ">Json<wbr/></span><span class="pun">.</span><span class="typ">Type<wbr/></span><span class="pun">.</span><span class="pln">int_</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">observed</span><span class="pun">[</span><span class="str">"timestamp"</span><span class="pun">]<wbr/>.</span><span class="pln">type </span><span class="pun">== </span><span class="typ">Json<wbr/></span><span class="pun">.</span><span class="typ">Type<wbr/></span><span class="pun">.</span><span class="pln">int_</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">observed</span><span class="pun">[</span><span class="str">"error"</span><span class="pun">] == </span><span class="str">"mysterious observation"</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">observed</span><span class="pun">[</span><span class="str">"secret"</span><span class="pun">] == </span><span class="lit">42</span><span class="pun">);
+</span></code></pre>
 </section>
 
 			<footer>
