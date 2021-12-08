@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct ReadAlignment</title>
+		<link rel="stylesheet" type="text/css" href="../../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module selected">
+						<a href="../../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">_testdata
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/modules.html">modules</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/swinfo.html">swinfo</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct ReadAlignment</h1><p>Alignment of a read against the reference. This is either one or two
+    alignment chains which belong to the same read and one or two reference
+    contig(s).
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">ReadAlignment</span>
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section><p>It uses a static array of <code class="lang-d"><a href="../../../../dentist/common/alignments/base/SeededAlignment.html"><span class="typ">SeededAlignment</span></a></code>s to store the alignments, thus
+    avoiding memory allocation.
+</p>
+</section>
+
+			<section><h2>Constructors</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.this.html" class="public">
+								<code>this</code>
+							</a>
+							<span class="tableEntryAnnotation">(alignments)</span>
+						</td>
+						<td>Construct from one or two <code class="lang-d"><a href="../../../../dentist/common/alignments/base/SeededAlignment.html"><span class="typ">SeededAlignment</span></a></code>s. Returns an empty
+<code class="lang-d"><a href="../../../../dentist/common/alignments/base/ReadAlignment.html"><span class="typ">ReadAlignment</span></a></code> If <code class="lang-d"><a href="../../../../dentist/common/alignments/base/ReadAlignment.this.html#alignments"><span class="pln">alignments</span></a></code> has an invalid length and writes a
+<code class="lang-d"><span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">util<wbr/></span><span class="pun">.</span><span class="pln">log<wbr/></span><span class="pun">.</span><span class="typ">LogLevel<wbr/></span><span class="pun">.</span><span class="kwd">debug</span></code> message.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment._alignments.html" class="private"><code>_alignments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/SeededAlignment.html"><span class="typ">SeededAlignment</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment._length.html" class="private"><code>_length</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isAntiParallel.html" class="public property"><code>isAntiParallel</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment spans a gap and the flanking
+        contigs have in different orientation (according to this alignment).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isBackExtension.html" class="public property"><code>isBackExtension</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment is an back extension, ie. it is an
+        extension and reaches over the back of the reference contig.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isExtension.html" class="public property"><code>isExtension</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment is an extension, ie. it is a front or
+        back extension.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isFrontExtension.html" class="public property"><code>isFrontExtension</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment is an front extension, ie. it is an
+        extension and reaches over the front of the reference contig.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isGap.html" class="public property"><code>isGap</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment spans a gap, ie. two alignments of
+        the same read on different reference contigs are involved.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isInOrder.html" class="public property"><code>isInOrder</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>If readAlignment is a gap return true iff the first alignment's
+        <code class="lang-d"><span class="pln">contigA<wbr/></span><span class="pun">.</span><span class="pln">id</span></code> is lower than the second alignment's; otherwise returns
+        true.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isParallel.html" class="public property"><code>isParallel</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment spans a gap and the flanking
+        contigs have in the same orientation (according to this alignment).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.isValid.html" class="public property"><code>isValid</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff the read alignment is valid, ie. it is either an
+        extension or gap.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.length.html" class="public property"><code>length</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Returns the number of <code class="lang-d"><a href="../../../../dentist/common/alignments/base/SeededAlignment.html"><span class="typ">SeededAlignment</span></a></code>s.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.opDollar.html" class="public property"><code>opDollar</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Returns the number of <code class="lang-d"><a href="../../../../dentist/common/alignments/base/SeededAlignment.html"><span class="typ">SeededAlignment</span></a></code>s.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.type.html" class="public property"><code>type</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/ReadAlignmentType.html"><span class="typ">ReadAlignmentType</span></a></code></td><td>Get the type of the read alignment.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.__unittest_L2090_C5.html" class="public">
+								<code>__unittest_L2090_C5</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.__unittest_L2271_C5.html" class="public">
+								<code>__unittest_L2271_C5</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.getInOrder.html" class="public">
+								<code>getInOrder</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Swap contained alignments if they are not <code class="lang-d"><a href="../../../../dentist/common/alignments/base/ReadAlignment.isInOrder.html"><span class="pln">isInOrder</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.opIndex.html" class="public">
+								<code>opIndex</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Return a view of the contained alignments.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/ReadAlignment.opIndex.html" class="public">
+								<code>opIndex</code>
+							</a>
+							<span class="tableEntryAnnotation">(idx)</span>
+						</td>
+						<td>Return the alignment at <code class="lang-d"><a href="../../../../dentist/common/alignments/base/ReadAlignment.opIndex.html#idx"><span class="pln">idx</span></a></code> (zero-based).
+</td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

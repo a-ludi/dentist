@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.commandline</title>
+		<link rel="stylesheet" type="text/css" href="../styles/ddox.css"/>
+		<link rel="stylesheet" href="../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../scripts/jquery.js">/**/</script><script type="text/javascript" src="../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">_testdata
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/modules.html">modules</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/swinfo.html">swinfo</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.commandline</h1><p>Defines the behavior of the DENTIST command line client. The central
+    component of this file is <code class="lang-d"><a href="../dentist/commandline/OptionsFor.html"><span class="typ">OptionsFor</span></a></code> which encapsulates the complete
+    CLI interface.
+</p><section></section>
+
+			<section><section><h2>See also</h2>
+<p><code class="lang-d"><a href="../dentist/commands.html"><span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">commands</span></a></code>
+</p>
+</section>
+</section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L290_C1" class="public" href="../dentist/commandline/__unittest_L290_C1.html">__unittest_L290_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L3049_C1" class="public" href="../dentist/commandline/__unittest_L3049_C1.html">__unittest_L3049_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="assertExternalToolsAvailable" class="public" href="../dentist/commandline/assertExternalToolsAvailable.html">assertExternalToolsAvailable</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Assert availability of all external dependencies. This is called before
+any command is executed.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="printListOfAllOptions" class="public" href="../dentist/commandline/printListOfAllOptions.html">printListOfAllOptions</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Print a list of all CLI options formatted using Markdown (called by
+<code class="lang-d"><a href="../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">--</span><span class="pln">list</span><span class="pun">-</span><span class="pln">options</span></code>).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="run" class="public" href="../dentist/commandline/run.html">run</a><span class="tableEntryAnnotation">(args)</span>
+							</code>
+						</td>
+						<td>Start DENTIST with the given set of arguments.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L3284_C5" class="protected" href="../dentist/commandline/__unittest_L3284_C5.html">__unittest_L3284_C5</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L3392_C5" class="protected" href="../dentist/commandline/__unittest_L3392_C5.html">__unittest_L3392_C5</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L3458_C5" class="protected" href="../dentist/commandline/__unittest_L3458_C5.html">__unittest_L3458_C5</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L3732_C5" class="protected" href="../dentist/commandline/__unittest_L3732_C5.html">__unittest_L3732_C5</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="cleanUp" class="protected" href="../dentist/commandline/cleanUp.html">cleanUp</a><span class="tableEntryAnnotation">(options)</span>
+							</code>
+						</td>
+						<td>Run all <code class="lang-d"><a href="../dentist/commandline/CleanUp.html"><span class="typ">CleanUp</span></a></code> hooks of <code class="lang-d"><a href="../dentist/commandline/cleanUp.html#options"><span class="pln">options</span></a></code>. Use with <code class="lang-d"><span class="kwd">scope</span></code> statement:
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="parseCoordString" class="protected" href="../dentist/commandline/parseCoordString.html">parseCoordString</a><span class="tableEntryAnnotation">(coordString)</span>
+							</code>
+						</td>
+						<td>Parse a string of form <code class="lang-d"><span class="pun">[</span><span class="pln">scaffold</span><span class="pun">/&lt;</span><span class="pln">scaff</span><span class="pun">&gt;/][</span><span class="pln">contig</span><span class="pun">/&lt;</span><span class="pln">contig</span><span class="pun">&gt;/]&lt;</span><span class="pln">coord</span><span class="pun">&gt;</span></code>
+into an <code class="lang-d"><span class="typ">OutputCoordinate</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="parseRange" class="protected" href="../dentist/commandline/parseRange.html">parseRange</a><span class="tableEntryAnnotation">(rangeString)</span>
+							</code>
+						</td>
+						<td>Parse integer range of form <code class="lang-d"><span class="pln">from</span><span class="pun">..</span><span class="pln">to</span></code>. Result is written into <code class="lang-d"><span class="pln">dest</span></code>
+or returned.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="printExternalDependencies" class="protected" href="../dentist/commandline/printExternalDependencies.html">printExternalDependencies</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Print a list of all external dependencies and their availability to
+standard output (called by <code class="lang-d"><a href="../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">--</span><span class="pln">dependencies</span></code>).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="processOptions" class="protected" href="../dentist/commandline/processOptions.html">processOptions</a><span class="tableEntryAnnotation">(options)</span>
+							</code>
+						</td>
+						<td>Implementation of validations and hooks for options processing.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="runCommand" class="protected" href="../dentist/commandline/runCommand.html">runCommand</a><span class="tableEntryAnnotation">(args)</span>
+							</code>
+						</td>
+						<td>Parse args of <code class="lang-d"><span class="pln">command</span></code> and execute it.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateCoordStrings" class="protected" href="../dentist/commandline/validateCoordStrings.html">validateCoordStrings</a><span class="tableEntryAnnotation">(coordStrings)</span>
+							</code>
+						</td>
+						<td>Validate <code class="lang-d"><span class="pln">coordString</span></code> has the expected format.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateDB" class="protected" href="../dentist/commandline/validateDB.html">validateDB</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Validate <code class="lang-d"><a href="../dentist/commandline/validateDB.html#dbFile"><span class="pln">dbFile</span></a></code> is the stub of a Dazzler DB or DAM.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateFileExists" class="protected" href="../dentist/commandline/validateFileExists.html">validateFileExists</a><span class="tableEntryAnnotation">(file)</span>
+							</code>
+						</td>
+						<td>Validate that files exist.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateFileExtension" class="protected" href="../dentist/commandline/validateFileExtension.html">validateFileExtension</a><span class="tableEntryAnnotation">(file, msg)</span>
+							</code>
+						</td>
+						<td>Validate <code class="lang-d"><a href="../dentist/commandline/validateFileExtension.html#file"><span class="pln">file</span></a></code> ends with one of the given <code class="lang-d"><span class="pln">extensions</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateFilesExist" class="protected" href="../dentist/commandline/validateFilesExist.html">validateFilesExist</a><span class="tableEntryAnnotation">(files)</span>
+							</code>
+						</td>
+						<td>Validate that files exist.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateFileWritable" class="protected" href="../dentist/commandline/validateFileWritable.html">validateFileWritable</a><span class="tableEntryAnnotation">(fileName)</span>
+							</code>
+						</td>
+						<td>Validate file can be opened for writing.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateInputMask" class="protected" href="../dentist/commandline/validateInputMask.html">validateInputMask</a><span class="tableEntryAnnotation">(dbFile, mask, allowBlock)</span>
+							</code>
+						</td>
+						<td>Validate hidden mask files exist.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateInputMasks" class="protected" href="../dentist/commandline/validateInputMasks.html">validateInputMasks</a><span class="tableEntryAnnotation">(dbFile, masks, allowBlock)</span>
+							</code>
+						</td>
+						<td>Validate hidden mask files exist.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateLasFile" class="protected" href="../dentist/commandline/validateLasFile.html">validateLasFile</a><span class="tableEntryAnnotation">(lasFile, allowEmpty)</span>
+							</code>
+						</td>
+						<td>Validate <code class="lang-d"><a href="../dentist/commandline/validateLasFile.html#lasFile"><span class="pln">lasFile</span></a></code> looks like a valid LAS file and is not empty unless
+<code class="lang-d"><a href="../dentist/commandline/validateLasFile.html#allowEmpty"><span class="pln">allowEmpty</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validateOutputMask" class="protected" href="../dentist/commandline/validateOutputMask.html">validateOutputMask</a><span class="tableEntryAnnotation">(dbFile, maskDestination, allowBlock)</span>
+							</code>
+						</td>
+						<td>Validate hidden mask files can be opened for writing.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="validatePositive" class="protected" href="../dentist/commandline/validatePositive.html">validatePositive</a><span class="tableEntryAnnotation">(value)</span>
+							</code>
+						</td>
+						<td>Validate <code class="lang-d"><a href="../dentist/commandline/validatePositive.html#value"><span class="pln">value</span></a><span class="pln"> </span><span class="pun">&gt; </span><span class="lit">0</span></code> or
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="hasValidOptionNames" class="private" href="../dentist/commandline/hasValidOptionNames.html">hasValidOptionNames</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="htmlEscape" class="private" href="../dentist/commandline/htmlEscape.html">htmlEscape</a><span class="tableEntryAnnotation">(str)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="htmlUnescape" class="private" href="../dentist/commandline/htmlUnescape.html">htmlUnescape</a><span class="tableEntryAnnotation">(str)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="makeCommandsSummary" class="private" href="../dentist/commandline/makeCommandsSummary.html">makeCommandsSummary</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="makeCommandSummary" class="private" href="../dentist/commandline/makeCommandSummary.html">makeCommandSummary</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="markdownHtmlUnescape" class="private" href="../dentist/commandline/markdownHtmlUnescape.html">markdownHtmlUnescape</a><span class="tableEntryAnnotation">(str)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="parseCommandName" class="private" href="../dentist/commandline/parseCommandName.html">parseCommandName</a><span class="tableEntryAnnotation">(args)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="printBaseHelp" class="private" href="../dentist/commandline/printBaseHelp.html">printBaseHelp</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="printCommandsSummary" class="private" href="../dentist/commandline/printCommandsSummary.html">printCommandsSummary</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="printVersion" class="private" href="../dentist/commandline/printVersion.html">printVersion</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Classes</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="CLIException" class="protected" href="../dentist/commandline/CLIException.html">CLIException</a>
+							</code>
+						</td>
+						<td>Used to signal errors during the processing of CLI arguments.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="UsageRequested" class="private" href="../dentist/commandline/UsageRequested.html">UsageRequested</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="BaseOptions" class="public" href="../dentist/commandline/BaseOptions.html">BaseOptions</a>
+							</code>
+						</td>
+						<td>This describes the basic, ie. non-command-specific, options of DENTIST.
+See source code or run <code class="lang-d"><a href="../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">--<a href="../dentist/commandline/BaseOptions.help.html"></span><span class="pln">help</span></a></code> for a description of the fields.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="OptionsFor" class="public" href="../dentist/commandline/OptionsFor.html">OptionsFor</a>
+							</code>
+						</td>
+						<td>Options for the different commands. See the source code,
+<code class="lang-d"><a href="../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">&lt;<a href="../dentist/commandline/OptionsFor.command.html"></span><span class="pln">command</span></a><span class="pun">&gt; --<a href="../dentist/commandline/OptionsFor.help.html"></span><span class="pln">help</span></a></code> or <code class="lang-d"><a href="../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">--</span><span class="pln">list</span><span class="pun">-</span><span class="pln">options</span></code> for
+a description of the options.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="CleanUp" class="protected" href="../dentist/commandline/CleanUp.html">CleanUp</a>
+							</code>
+						</td>
+						<td>Mark method as hook that is executed before termination of the
+program.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="PostValidate" class="protected" href="../dentist/commandline/PostValidate.html">PostValidate</a>
+							</code>
+						</td>
+						<td>Mark method as hook that is executed after validations.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="PreValidate" class="protected" href="../dentist/commandline/PreValidate.html">PreValidate</a>
+							</code>
+						</td>
+						<td>Mark method as hook that is executed before validations.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Validate" class="protected" href="../dentist/commandline/Validate.html">Validate</a>
+							</code>
+						</td>
+						<td>Decorate options with validations. Validations shall throw an
+exception if the option value is considered invalid.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="RevertField" class="private" href="../dentist/commandline/RevertField.html">RevertField</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="RevertWith" class="private" href="../dentist/commandline/RevertWith.html">RevertWith</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ReturnCode" class="public" href="../dentist/commandline/ReturnCode.html">ReturnCode</a>
+							</code>
+						</td>
+						<td>Possible returns codes of the command line execution.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Priority" class="protected" href="../dentist/commandline/Priority.html">Priority</a>
+							</code>
+						</td>
+						<td>Used to determine execution order of <code class="lang-d"><a href="../dentist/commandline/PreValidate.html"><span class="typ">PreValidate</span></a></code>, <code class="lang-d"><a href="../dentist/commandline/PostValidate.html"><span class="typ">PostValidate</span></a></code> and
+<code class="lang-d"><a href="../dentist/commandline/CleanUp.html"><span class="typ">CleanUp</span></a></code> hooks.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Templates</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="cmpPriority" class="protected" href="../dentist/commandline/cmpPriority.html">cmpPriority</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Manifest constants</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="commandsSummary" class="public" href="../dentist/commandline/commandsSummary.html">
+								<code>commandsSummary</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>A summary of all commands with a short description.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="commandSummary" class="public" href="../dentist/commandline/commandSummary.html">
+								<code>commandSummary</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>A short summary for each command to be output underneath the usage.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="getUDA" class="protected" href="../dentist/commandline/getUDA.html">
+								<code>getUDA</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="validate" class="protected" href="../dentist/commandline/validate.html">
+								<code>validate</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="pln">enforce</span>!CLIException</code>
+						</td>
+						<td>Throw an exception unless the condition is met.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="typeOf" class="private" href="../dentist/commandline/typeOf.html">
+								<code>typeOf</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="kwd">typeof</span><span class="pun">(</span><span class="pln">T</span><span class="pun">)</span></code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

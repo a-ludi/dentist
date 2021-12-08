@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.util.math</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">_testdata
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/modules.html">modules</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/swinfo.html">swinfo</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.util.math</h1><p>Some additional mathematical functions.
+</p><section></section>
+
+			<section></section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L1339_C1" class="public" href="../../dentist/util/math/__unittest_L1339_C1.html">__unittest_L1339_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L133_C1" class="public" href="../../dentist/util/math/__unittest_L133_C1.html">__unittest_L133_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L1440_C1" class="public" href="../../dentist/util/math/__unittest_L1440_C1.html">__unittest_L1440_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L1486_C1" class="public" href="../../dentist/util/math/__unittest_L1486_C1.html">__unittest_L1486_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L1552_C1" class="public" href="../../dentist/util/math/__unittest_L1552_C1.html">__unittest_L1552_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L181_C1" class="public" href="../../dentist/util/math/__unittest_L181_C1.html">__unittest_L181_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2188_C1" class="public" href="../../dentist/util/math/__unittest_L2188_C1.html">__unittest_L2188_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2249_C1" class="public" href="../../dentist/util/math/__unittest_L2249_C1.html">__unittest_L2249_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2285_C1" class="public" href="../../dentist/util/math/__unittest_L2285_C1.html">__unittest_L2285_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L229_C1" class="public" href="../../dentist/util/math/__unittest_L229_C1.html">__unittest_L229_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2491_C1" class="public" href="../../dentist/util/math/__unittest_L2491_C1.html">__unittest_L2491_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L250_C1" class="public" href="../../dentist/util/math/__unittest_L250_C1.html">__unittest_L250_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2541_C1" class="public" href="../../dentist/util/math/__unittest_L2541_C1.html">__unittest_L2541_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L267_C1" class="public" href="../../dentist/util/math/__unittest_L267_C1.html">__unittest_L267_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2702_C1" class="public" href="../../dentist/util/math/__unittest_L2702_C1.html">__unittest_L2702_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Example from Wikipedia
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2713_C1" class="public" href="../../dentist/util/math/__unittest_L2713_C1.html">__unittest_L2713_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Example using a different <code class="lang-d"><span class="pln">pred</span></code>
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2724_C1" class="public" href="../../dentist/util/math/__unittest_L2724_C1.html">__unittest_L2724_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2734_C1" class="public" href="../../dentist/util/math/__unittest_L2734_C1.html">__unittest_L2734_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2744_C1" class="public" href="../../dentist/util/math/__unittest_L2744_C1.html">__unittest_L2744_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L2754_C1" class="public" href="../../dentist/util/math/__unittest_L2754_C1.html">__unittest_L2754_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L286_C1" class="public" href="../../dentist/util/math/__unittest_L286_C1.html">__unittest_L286_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L71_C1" class="public" href="../../dentist/util/math/__unittest_L71_C1.html">__unittest_L71_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="__unittest_L99_C1" class="public" href="../../dentist/util/math/__unittest_L99_C1.html">__unittest_L99_C1</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="absdiff" class="public" href="../../dentist/util/math/absdiff.html">absdiff</a><span class="tableEntryAnnotation">(a, b)</span>
+							</code>
+						</td>
+						<td>Returns the absolute difference between two numbers.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="add" class="public" href="../../dentist/util/math/add.html">add</a><span class="tableEntryAnnotation">(graph, edge)</span>
+							</code>
+						</td>
+						<td>Add <code class="lang-d"><a href="../../dentist/util/math/add.html#edge"><span class="pln">edge</span></a></code> to <code class="lang-d"><a href="../../dentist/util/math/add.html#graph"><span class="pln">graph</span></a></code> and handle existing edges with <code class="lang-d"><span class="pln">handleConflict</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="bulkAdd" class="public" href="../../dentist/util/math/bulkAdd.html">bulkAdd</a><span class="tableEntryAnnotation">(graph, edges)</span>
+							</code>
+						</td>
+						<td>Add a set of edges to this graph and merge mutli-edges using <code class="lang-d"><span class="pln">merge</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ceil" class="public" href="../../dentist/util/math/ceil.html">ceil</a><span class="tableEntryAnnotation">(x, base)</span>
+							</code>
+						</td>
+						<td>Round <code class="lang-d"><a href="../../dentist/util/math/ceil.html#x"><span class="pln">x</span></a></code> towards <code class="lang-d"><span class="pun">+</span><span class="pln">inf</span></code> according to <code class="lang-d"><a href="../../dentist/util/math/ceil.html#base"><span class="pln">base</span></a></code>, i.e. returns the next
+    integer larger or equal to <code class="lang-d"><a href="../../dentist/util/math/ceil.html#x"><span class="pln">x</span></a></code> which is divisible by <code class="lang-d"><a href="../../dentist/util/math/ceil.html#base"><span class="pln">base</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ceildiv" class="public" href="../../dentist/util/math/ceildiv.html">ceildiv</a><span class="tableEntryAnnotation">(a, b)</span>
+							</code>
+						</td>
+						<td>Returns the result of <code class="lang-d"><a href="../../dentist/util/math/ceil.html"><span class="pln">ceil</span></a><span class="pun">(<a href="../../dentist/util/math/ceildiv.html#a"></span><span class="pln">a</span></a><span class="pln"> </span><span class="pun">/ <a href="../../dentist/util/math/ceildiv.html#b"></span><span class="pln">b</span></a><span class="pun">)</span></code> but uses integer arithmetic only.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="filterEdges" class="public" href="../../dentist/util/math/filterEdges.html">filterEdges</a><span class="tableEntryAnnotation">(graph)</span>
+							</code>
+						</td>
+						<td>Filter edges of <code class="lang-d"><a href="../../dentist/util/math/filterEdges.html#graph"><span class="pln">graph</span></a></code> by <code class="lang-d"><span class="pln">pred</span></code> in-place.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="findAllCliques" class="public" href="../../dentist/util/math/findAllCliques.html">findAllCliques</a><span class="tableEntryAnnotation">(adjacencyList)</span>
+							</code>
+						</td>
+						<td>Find all maximal cliques in a graph represented by <code class="lang-d"><a href="../../dentist/util/math/findAllCliques.html#adjacencyList"><span class="pln">adjacencyList</span></a></code>.
+    The implementation is based on version 1 of the Bron-Kerbosch algorithm [1].
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="findCyclicSubgraphs" class="public" href="../../dentist/util/math/findCyclicSubgraphs.html">findCyclicSubgraphs</a><span class="tableEntryAnnotation">(graph, incidentEdgesCache)</span>
+							</code>
+						</td>
+						<td>Find a cycle base of an undirected graph using the Paton's
+    algorithm.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="findMaximallyConnectedComponents" class="public" href="../../dentist/util/math/findMaximallyConnectedComponents.html">findMaximallyConnectedComponents</a><span class="tableEntryAnnotation">(numNodes)</span>
+							</code>
+						</td>
+						<td>Find all maximally connected components of a graph. The predicate
+    <code class="lang-d"><span class="pln">isConnected</span></code> will be evaluated <code class="lang-d"><span class="pln">O</span><span class="pun">(</span><span class="pln">n</span><span class="pun">^^</span><span class="lit">2</span><span class="pun">)</span></code> times in the worst-case
+    and <code class="lang-d"><span class="pln">Ω</span><span class="pun">(</span><span class="pln">n</span><span class="pun">)</span></code> in the best case. In expectation it will be evaluated
+    <code class="lang-d"><span class="typ">θ</span><span class="pun">(</span><span class="pln">n</span><span class="pun">*</span><span class="pln">log</span><span class="pun">(</span><span class="pln">n</span><span class="pun">))</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="floor" class="public" href="../../dentist/util/math/floor.html">floor</a><span class="tableEntryAnnotation">(x, base)</span>
+							</code>
+						</td>
+						<td>Round <code class="lang-d"><a href="../../dentist/util/math/floor.html#x"><span class="pln">x</span></a></code> towards <code class="lang-d"><span class="pun">-</span><span class="pln">inf</span></code> according to <code class="lang-d"><a href="../../dentist/util/math/floor.html#base"><span class="pln">base</span></a></code>, i.e. returns the next
+    integer smaller or equal to <code class="lang-d"><a href="../../dentist/util/math/floor.html#x"><span class="pln">x</span></a></code> which is divisible by <code class="lang-d"><a href="../../dentist/util/math/floor.html#base"><span class="pln">base</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="longestIncreasingSubsequence" class="public" href="../../dentist/util/math/longestIncreasingSubsequence.html">longestIncreasingSubsequence</a><span class="tableEntryAnnotation">(sequence)</span>
+							</code>
+						</td>
+						<td>Calculate a longest increasing subsequence of <code class="lang-d"><a href="../../dentist/util/math/longestIncreasingSubsequence.html#sequence"><span class="pln">sequence</span></a></code>. This subsequence
+    is not necessarily contiguous, or unique. Given a <code class="lang-d"><a href="../../dentist/util/math/longestIncreasingSubsequence.html#sequence"><span class="pln">sequence</span></a></code> of <code class="lang-d"><span class="pln">n</span></code>
+    elements the algorithm uses <code class="lang-d"><span class="pln">O</span><span class="pun">(</span><span class="pln">n log n</span><span class="pun">)</span></code> evaluation of <code class="lang-d"><span class="pln">pred</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="mapEdges" class="public" href="../../dentist/util/math/mapEdges.html">mapEdges</a><span class="tableEntryAnnotation">(graph)</span>
+							</code>
+						</td>
+						<td>Modify edges of <code class="lang-d"><a href="../../dentist/util/math/mapEdges.html#graph"><span class="pln">graph</span></a></code> with <code class="lang-d"><span class="pln">fun</span></code> in-place.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="mean" class="public" href="../../dentist/util/math/mean.html">mean</a><span class="tableEntryAnnotation">(values)</span>
+							</code>
+						</td>
+						<td>Calculate the mean of <code class="lang-d"><a href="../../dentist/util/math/mean.html#values"><span class="pln">values</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="mean" class="public" href="../../dentist/util/math/mean.html">mean</a><span class="tableEntryAnnotation">(values, weights)</span>
+							</code>
+						</td>
+						<td>Calculate the weighted mean of <code class="lang-d"><a href="../../dentist/util/math/mean.html#values"><span class="pln">values</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="median" class="public" href="../../dentist/util/math/median.html">median</a><span class="tableEntryAnnotation">(values)</span>
+							</code>
+						</td>
+						<td>Calculate the median of <code class="lang-d"><a href="../../dentist/util/math/median.html#values"><span class="pln">values</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="N" class="public" href="../../dentist/util/math/N.html">N</a><span class="tableEntryAnnotation">(values, totalSize)</span>
+							</code>
+						</td>
+						<td>Calculate the N<code class="lang-d"><span class="pln">xx</span></code> (e.g. N50) of <code class="lang-d"><a href="../../dentist/util/math/N.html#values"><span class="pln">values</span></a></code>.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Classes</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="EdgeExistsException" class="public" href="../../dentist/util/math/EdgeExistsException.html">EdgeExistsException</a>
+							</code>
+						</td>
+						<td>Thrown if attempting to insert an edge into a <code class="lang-d"><a href="../../dentist/util/math/Graph.html"><span class="typ">Graph</span></a></code> that already exists.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="EmptySetException" class="public" href="../../dentist/util/math/EmptySetException.html">EmptySetException</a>
+							</code>
+						</td>
+						<td>Thrown if set operations the require elements are called.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="MissingEdgeException" class="public" href="../../dentist/util/math/MissingEdgeException.html">MissingEdgeException</a>
+							</code>
+						</td>
+						<td>Thrown if attempting to access an edge from a <code class="lang-d"><a href="../../dentist/util/math/Graph.html"><span class="typ">Graph</span></a></code> that does not exist.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="MissingNodeException" class="public" href="../../dentist/util/math/MissingNodeException.html">MissingNodeException</a>
+							</code>
+						</td>
+						<td>Thrown if attempting to access a node from a <code class="lang-d"><a href="../../dentist/util/math/Graph.html"><span class="typ">Graph</span></a></code> that does not exist.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Graph" class="public" href="../../dentist/util/math/Graph.html">Graph</a>
+							</code>
+						</td>
+						<td>This structure represents a graph with optional edge payloads. The graph
+is represented as a list of edges which is particularly suited for sparse
+graphs. While the set of nodes is fixed the set of edges is mutable.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="NaturalNumberSet" class="public" href="../../dentist/util/math/NaturalNumberSet.html">NaturalNumberSet</a>
+							</code>
+						</td>
+						<td>A set of natural numbers represented as a variable-length bit vector.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="BronKerboschVersion1" class="private" href="../../dentist/util/math/BronKerboschVersion1.html">BronKerboschVersion1</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="MaximalConnectedComponents" class="private" href="../../dentist/util/math/MaximalConnectedComponents.html">MaximalConnectedComponents</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="RoundingMode" class="public" href="../../dentist/util/math/RoundingMode.html">RoundingMode</a>
+							</code>
+						</td>
+						<td>Specify a rounding mode.
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

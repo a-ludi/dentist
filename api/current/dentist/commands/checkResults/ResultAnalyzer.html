@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct ResultAnalyzer</title>
+		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">_testdata
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/modules.html">modules</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/swinfo.html">swinfo</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct ResultAnalyzer</h1><p></p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">ResultAnalyzer</span>
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.options.html" class="public"><code>options</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><a href="../../../dentist/commandline/OptionsFor.html"><span class="typ">OptionsFor</span></a>!(19)<span class="pun">)</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.contigAlignments.html" class="protected"><code>contigAlignments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/commands/checkResults/ContigMapping.html"><span class="typ">ContigMapping</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.correctGapsPerIdentityLevel.html" class="protected"><code>correctGapsPerIdentityLevel</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span><span class="pun">[]</span><span class="pun">[</span><span class="lit">6</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.duplicateContigIds.html" class="protected"><code>duplicateContigIds</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/math/NaturalNumberSet.html"><span class="typ">NaturalNumberSet</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.dustMask.html" class="protected"><code>dustMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/region/Region.html"><span class="typ">Region</span></a>!(ulong,ulong,"contigId",0L)</code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.gapSummaries.html" class="protected"><code>gapSummaries</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/commands/checkResults/ResultAnalyzer.GapSummary.html"><span class="typ">ResultAnalyzer<wbr/></span><span class="pun">.<wbr/></span><span class="typ">GapSummary</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.mappedRegionsMask.html" class="protected"><code>mappedRegionsMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/region/Region.html"><span class="typ">Region</span></a>!(ulong,ulong,"contigId",0L)</code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.referenceGaps.html" class="protected"><code>referenceGaps</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/region/Region.html"><span class="typ">Region</span></a>!(ulong,ulong,"contigId",0L)</code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.referenceOffset.html" class="protected"><code>referenceOffset</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.resultContigLengths.html" class="protected"><code>resultContigLengths</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.resultScaffoldStructure.html" class="protected"><code>resultScaffoldStructure</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">variant<wbr/></span><span class="pun">.</span><span class="typ">VariantN</span>!(56L,dentist.dazzler.ContigSegment,dentist.dazzler.GapSegment)<span class="pun">)</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.trueAssemblyScaffoldStructure.html" class="protected"><code>trueAssemblyScaffoldStructure</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">variant<wbr/></span><span class="pun">.</span><span class="typ">VariantN</span>!(56L,dentist.dazzler.ContigSegment,dentist.dazzler.GapSegment)<span class="pun">)</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.addDustAnalysis.html" class="public">
+								<code>addDustAnalysis</code>
+							</a>
+							<span class="tableEntryAnnotation">(gapSummary)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.analyzeGaps.html" class="public">
+								<code>analyzeGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.collect.html" class="public">
+								<code>collect</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.computeInsertionAlignment.html" class="public">
+								<code>computeInsertionAlignment</code>
+							</a>
+							<span class="tableEntryAnnotation">(insertionMapping)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.findPerfectAlignments.html" class="public">
+								<code>findPerfectAlignments</code>
+							</a>
+							<span class="tableEntryAnnotation">(refDb, queryDb)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.findPerfectAlignmentsChunk.html" class="public">
+								<code>findPerfectAlignmentsChunk</code>
+							</a>
+							<span class="tableEntryAnnotation">(info)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.findReferenceContigs.html" class="public">
+								<code>findReferenceContigs</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getAverageInsertionError.html" class="public">
+								<code>getAverageInsertionError</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getClosedGapLengthHistogram.html" class="public">
+								<code>getClosedGapLengthHistogram</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getClosedGapMedian.html" class="public">
+								<code>getClosedGapMedian</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getCorrectGapLengthHistograms.html" class="public">
+								<code>getCorrectGapLengthHistograms</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getExtremumClosedGap.html" class="public">
+								<code>getExtremumClosedGap</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapId.html" class="public">
+								<code>getGapId</code>
+							</a>
+							<span class="tableEntryAnnotation">(insertionMapping)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapInfos.html" class="public">
+								<code>getGapInfos</code>
+							</a>
+							<span class="tableEntryAnnotation">(wantedState)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapInfos.html" class="public">
+								<code>getGapInfos</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapLengthHistogram.html" class="public">
+								<code>getGapLengthHistogram</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapMedian.html" class="public">
+								<code>getGapMedian</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getInputN50.html" class="public">
+								<code>getInputN50</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getInsertionMapping.html" class="public">
+								<code>getInsertionMapping</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getInsertionSequence.html" class="public">
+								<code>getInsertionSequence</code>
+							</a>
+							<span class="tableEntryAnnotation">(gapSummary)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getMaximumN50.html" class="public">
+								<code>getMaximumN50</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumBpsExpected.html" class="public">
+								<code>getNumBpsExpected</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumBpsInGaps.html" class="public">
+								<code>getNumBpsInGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumBpsKnown.html" class="public">
+								<code>getNumBpsKnown</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumBpsResult.html" class="public">
+								<code>getNumBpsResult</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumClosedGaps.html" class="public">
+								<code>getNumClosedGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumContigsExpected.html" class="public">
+								<code>getNumContigsExpected</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumCorrectGaps.html" class="public">
+								<code>getNumCorrectGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumMappedContigs.html" class="public">
+								<code>getNumMappedContigs</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumPartiallyClosedGaps.html" class="public">
+								<code>getNumPartiallyClosedGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getNumTranslocatedGaps.html" class="public">
+								<code>getNumTranslocatedGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getReferenceGaps.html" class="public">
+								<code>getReferenceGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getResultContigBegin.html" class="public">
+								<code>getResultContigBegin</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getResultN50.html" class="public">
+								<code>getResultN50</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getSequenceListFile.html" class="public">
+								<code>getSequenceListFile</code>
+							</a>
+							<span class="tableEntryAnnotation">(dbFile, workdir, crop)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.init.html" class="public">
+								<code>init</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.inputGapSize.html" class="public">
+								<code>inputGapSize</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isInnerGap.html" class="public">
+								<code>isInnerGap</code>
+							</a>
+							<span class="tableEntryAnnotation">(gap)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.makeCroppedSequenceList.html" class="public">
+								<code>makeCroppedSequenceList</code>
+							</a>
+							<span class="tableEntryAnnotation">(dbFile, crop)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.makeCroppedSubsetDb.html" class="public">
+								<code>makeCroppedSubsetDb</code>
+							</a>
+							<span class="tableEntryAnnotation">(inDbFile, crop, contigIds, workdir)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.makeIdentityLevelStats.html" class="public">
+								<code>makeIdentityLevelStats</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.makeIndexedSequenceList.html" class="public">
+								<code>makeIndexedSequenceList</code>
+							</a>
+							<span class="tableEntryAnnotation">(dbFile)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.mappedIntervalOf.html" class="public">
+								<code>mappedIntervalOf</code>
+							</a>
+							<span class="tableEntryAnnotation">(mapping)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.mappedIntervalOf.html" class="public">
+								<code>mappedIntervalOf</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.recoverSlightlyImperfectAlignments.html" class="public">
+								<code>recoverSlightlyImperfectAlignments</code>
+							</a>
+							<span class="tableEntryAnnotation">(unmappedContigIds)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.recoverSlightlyImperfectAlignments.html" class="public">
+								<code>recoverSlightlyImperfectAlignments</code>
+							</a>
+							<span class="tableEntryAnnotation">(info)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.resultGapSize.html" class="public">
+								<code>resultGapSize</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.resultSubseqFasta.html" class="public">
+								<code>resultSubseqFasta</code>
+							</a>
+							<span class="tableEntryAnnotation">(begin, end, gapId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.resultSubseqString.html" class="public">
+								<code>resultSubseqString</code>
+							</a>
+							<span class="tableEntryAnnotation">(begin, end, gapId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.testScaffolds.html" class="public">
+								<code>testScaffolds</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.trueAssemblySubseqFasta.html" class="public">
+								<code>trueAssemblySubseqFasta</code>
+							</a>
+							<span class="tableEntryAnnotation">(interval, gapId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.trueScaffoldLength.html" class="public">
+								<code>trueScaffoldLength</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.writeGapDetailsJson.html" class="public">
+								<code>writeGapDetailsJson</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.getGapState.html" class="private">
+								<code>getGapState</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isGap.html" class="private">
+								<code>isGap</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isGap.html" class="private">
+								<code>isGap</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhsContigId, rhsContigId)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isGapClosed.html" class="private">
+								<code>isGapClosed</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs, noSwap)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isGapPartiallyClosed.html" class="private">
+								<code>isGapPartiallyClosed</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs, noSwap)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.isGapUnclosed.html" class="private">
+								<code>isGapUnclosed</code>
+							</a>
+							<span class="tableEntryAnnotation">(lhs, rhs, noSwap)</span>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.GapSummary.html" class="public">
+								<code>GapSummary</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.InsertionMapping.html" class="public">
+								<code>InsertionMapping</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.GapState.html" class="public">
+								<code>GapState</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/commands/checkResults/ResultAnalyzer.__xpostblit.html" class="public">
+								<code>__xpostblit</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

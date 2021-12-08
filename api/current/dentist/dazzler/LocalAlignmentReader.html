@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Class LocalAlignmentReader</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">_testdata
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/_testdata/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/_testdata/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/modules.html">modules</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/swinfo.html">swinfo</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Class LocalAlignmentReader</h1><p>Read local alignments from a LAS file.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">class</span> <span class="typ">LocalAlignmentReader</span>
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section></section>
+
+			<section><h2>Constructors</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.this.html" class="protected">
+								<code>this</code>
+							</a>
+							<span class="tableEntryAnnotation">(lasFile, bufferMode, tracePointBuffer)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.this.html" class="protected">
+								<code>this</code>
+							</a>
+							<span class="tableEntryAnnotation">(lasFile, dbA, dbB, bufferMode, tracePointBuffer)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.this.html" class="private">
+								<code>this</code>
+							</a>
+							<span class="tableEntryAnnotation">(lasFile, aLengths, bLengths, bufferMode, tracePointBuffer)</span>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader._numLocalAlignments.html" class="private"><code>_numLocalAlignments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader._tracePointDistance.html" class="private"><code>_tracePointDistance</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.aLengths.html" class="private"><code>aLengths</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.bLengths.html" class="private"><code>bLengths</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.bufferMode.html" class="private"><code>bufferMode</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/dazzler/BufferMode.html"><span class="typ">BufferMode</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.currentLA.html" class="private"><code>currentLA</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/FlatLocalAlignment.html"><span class="typ">FlatLocalAlignment</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.fullTracePointBuffer.html" class="private"><code>fullTracePointBuffer</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/TracePoint.html"><span class="typ">TracePoint</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.isLargeTraceType.html" class="private"><code>isLargeTraceType</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.las.html" class="private"><code>las</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio<wbr/></span><span class="pun">.</span><span class="typ">File</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.numLocalAlignmentsLeft.html" class="private"><code>numLocalAlignmentsLeft</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.overlapHead.html" class="private"><code>overlapHead</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/dazzler/DazzlerOverlap.html"><span class="typ">DazzlerOverlap</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.tracePointBuffer.html" class="private"><code>tracePointBuffer</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/TracePoint.html"><span class="typ">TracePoint</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.currentNumTracePoints.html" class="public property"><code>currentNumTracePoints</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Returns the number of trace points in the current local alignment
+even if <code class="lang-d"><a href="../../dentist/dazzler/LocalAlignmentReader.skipTracePoints.html"><span class="pln">skipTracePoints</span></a></code> is true.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.empty.html" class="public property"><code>empty</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Range interface.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.front.html" class="public property"><code>front</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/FlatLocalAlignment.html"><span class="typ">FlatLocalAlignment</span></a></code></td><td>Range interface.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.length.html" class="public property"><code>length</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Range interface.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.numLocalAlignments.html" class="public property"><code>numLocalAlignments</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Total number of local alignments in the LAS file. This is not affected
+by range operation, e.g. <code class="lang-d"><a href="../../dentist/dazzler/LocalAlignmentReader.popFront.html"><span class="pln">popFront</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.skipTracePoints.html" class="public property"><code>skipTracePoints</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns whether reading or skipping trace points.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.tracePointDistance.html" class="public property"><code>tracePointDistance</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td>Trace point spacing of the LAS file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.getRawTracePointBuffer.html" class="protected property"><code>getRawTracePointBuffer</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ubyte</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.numLocalAlignments.html" class="private property"><code>numLocalAlignments</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.tracePointDistance.html" class="private property"><code>tracePointDistance</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.popFront.html" class="public">
+								<code>popFront</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Range interface.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.reset.html" class="public">
+								<code>reset</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Reset the range. This can be used to walk over a LAS file multiple
+times without reopening the <code class="lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">stdio<wbr/></span><span class="pun">.</span><span class="typ">File</span></code> or recreating the
+buffers.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.fillInContigLengths.html" class="protected">
+								<code>fillInContigLengths</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.fillInOverlapHead.html" class="protected">
+								<code>fillInOverlapHead</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.getTraceVectorLength.html" class="protected">
+								<code>getTraceVectorLength</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readHeader.html" class="protected">
+								<code>readHeader</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readLocalAlignment.html" class="protected">
+								<code>readLocalAlignment</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readNumLocalAlignments.html" class="protected">
+								<code>readNumLocalAlignments</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readOverlapHead.html" class="protected">
+								<code>readOverlapHead</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readTracePointDistance.html" class="protected">
+								<code>readTracePointDistance</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.readTraceVector.html" class="protected">
+								<code>readTraceVector</code>
+							</a>
+							<span class="tableEntryAnnotation">(traceLength)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.rewriteTracePointBufferToLargeTracePointType.html" class="protected">
+								<code>rewriteTracePointBufferToLargeTracePointType</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.skipTraceVector.html" class="protected">
+								<code>skipTraceVector</code>
+							</a>
+							<span class="tableEntryAnnotation">(traceLength)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.unexpectedEOF.html" class="protected">
+								<code>unexpectedEOF</code>
+							</a>
+							<span class="tableEntryAnnotation">(gotBuffer, expBuffer)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.contigLengths.html" class="private">
+								<code>contigLengths</code>
+							</a>
+							<span class="tableEntryAnnotation">(db)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.initialize.html" class="private">
+								<code>initialize</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/dazzler/LocalAlignmentReader.__xdtor.html" class="public">
+								<code>__xdtor</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>See also</h2>
+<p><code class="lang-d"><a href="../../dentist/dazzler/getFlatLocalAlignments.html"><span class="pln">getFlatLocalAlignments</span></a></code> for more details
+</p>
+</section>
+
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>
