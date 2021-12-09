@@ -6,7 +6,8 @@ DENTIST
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
-[![Docker Image Version (latest semver)](https://img.shields.io/docker/v/aludi/dentist?logo=docker&sort=semver)](https://hub.docker.com/repository/docker/aludi/dentist)
+[![Singularity Image Version](https://img.shields.io/badge/Singularity-v3.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
+[![Conda package Version](https://img.shields.io/conda/v/a_ludi/dentist?label=conda)](https://anaconda.org/a_ludi/dentist-core)
 [![DOI 10.1101/2021.02.26.432990](https://img.shields.io/badge/DOI-(pre--print)_10.1101%2F2021.02.26.432990-informational)](https://doi.org/10.1101/2021.02.26.432990)
 
 > DENTIST uses long reads to close assembly gaps at high accuracy.
