@@ -1,0 +1,50 @@
+Bootstrap: library
+From: ubuntu:16.04
+
+%labels
+    Author Arne Ludwig <ludwig@mpi-cbg.de>
+
+%setup
+    if ! [[ "$(uname)" == "Linux" || "$(uname)" == "Darwin" ]]
+    then
+        echo "error: only Linux or OSX platform supported" >&2
+        exit 1
+    fi
+
+    # Make sure dentist-core is up-to-date
+    #conda-build -c a_ludi -c bioconda \
+    #    --clobber=conda/recipes/dentist-core/local-build.yaml \
+    #    conda/recipes/dentist-core
+
+    # Create Conda env on host with binaries
+    mkdir -p build
+    conda create -p build/dentist-core -c local -c a_ludi -c bioconda \
+        dentist-core==local \
+        jq==1.6 \
+        'python>=3,<4'
+
+    # Copy binaries into the container
+    cp -r -t "$SINGULARITY_ROOTFS/usr/local" build/dentist-core/{bin,lib}
+
+%files
+    tests/test-commands.sh
+
+%post
+    # Determine timezone
+    TZ=Europe/London
+    ln -snf /usr/share/zoneinfo/"$TZ" /etc/localtime && echo "$TZ" > /etc/timezone
+    # Provide alternative location for bash
+    ln -s /bin/bash /usr/bin/bash
+
+%environment
+    # Determine timezone
+    export TZ=Europe/London
+
+    # Fix error message about locales (at least sometimes)
+    export LANGUAGE=C
+    export LANG=C
+    export LC_ALL=C
+
+%test
+    dentist -d
+    ./tests/test-commands.sh

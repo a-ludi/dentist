@@ -44,6 +44,11 @@
 # "docker://aludi/dentist:stable" and can be changed by the following line.
 #dentist_container: "docker://aludi/dentist:edge"
 
+# The workflow can be easily run inside using conda (--use-conda) to
+# reduce manual software installations. The default Conda environment
+# definition "envs/dentist_v2.yml" and can be changed by the following line.
+#dentist_env: "envs/dentist_local.yml"
+
 # Config file for dentist. Use this file to adjust parameters of DENTIST.
 # You must set at least either `ploidy` and `read-coverage` or
 # `max-coverage-reads` and `min-coverage-reads`.
