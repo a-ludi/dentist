@@ -83,7 +83,7 @@ $(inputs_valid_marker): $(checksum_inputs) $(generated_inputs)
 	md5sum -c $< && touch $@
 
 $(workflow_config): $(workflow_config_orig) $(mk_workflow_config_script) $(dentist_container)
-	awk -v 'dentist_container=$(notdir dentist_container)' \
+	awk -v 'dentist_container=$(notdir $(dentist_container))' \
 	    -v 'dentist_env=envs/$(dentist_env).yml' \
 	    -f $(mk_workflow_config_script) $< > $@
 
