@@ -1,0 +1,43 @@
+Bootstrap: library
+From: ubuntu:16.04
+
+%labels
+    Author Arne Ludwig <ludwig@mpi-cbg.de>
+
+%post
+    export DENTIST_VERSION=3.0.0
+
+%post
+    PREFIX=/usr/local
+
+    # Determine timezone
+    TZ=Europe/London
+    ln -snf /usr/share/zoneinfo/"$TZ" /etc/localtime && echo "$TZ" > /etc/timezone
+
+    # Provide alternative location for bash
+    ln -s /bin/bash /usr/bin/bash
+
+    apt-get update && apt-get install -y git curl patch
+    curl https://repo.anaconda.com/miniconda/Miniconda3-py39_4.9.2-Linux-x86_64.sh > install.sh
+    chmod +x install.sh
+    ./install.sh -b -p /opt/miniconda3
+    rm install.sh
+    (
+        export PATH="/opt/miniconda3/bin:$PATH"
+        eval "$(conda shell.bash hook)"
+        conda create -y -p "$PREFIX" -c a_ludi -c bioconda dentist-core=="$DENTIST_VERSION" jq==1.6
+    )
+    rm -rf /opt/miniconda3
+    apt-get remove -y curl && apt-get autoremove -y && apt-get clean
+
+%environment
+    # Determine timezone
+    export TZ=Europe/London
+
+    # Fix error message about locales (at least sometimes)
+    export LANGUAGE=C
+    export LANG=C
+    export LC_ALL=C
+
+%test
+    dentist -d
