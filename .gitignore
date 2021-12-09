@@ -2,12 +2,8 @@
 docs.json
 __dummy.html
 /dentist
-dentist.so
-dentist.dylib
-dentist.dll
-dentist.a
-dentist.lib
-dentist-test-*
+/dentist-test-*
+/dentist.*
 *.exe
 *.o
 *.obj
