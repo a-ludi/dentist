@@ -17,14 +17,17 @@ From: ubuntu:16.04
     #    conda/recipes/dentist-core
 
     # Create Conda env on host with binaries
-    mkdir -p build
-    conda create -p build/dentist-core -c local -c a_ludi -c bioconda \
+    ROOT="$(mktemp -d --tmpdir conda-dentist-core.XXXXXX)"
+    PREFIX="$ROOT/env"
+    trap 'rm -rf "$ROOT"' exit
+
+    conda create --copy -p "$PREFIX" -c local -c a_ludi -c bioconda \
         dentist-core==local \
         jq==1.6 \
         'python>=3,<4'
 
     # Copy binaries into the container
-    cp -r -t "$SINGULARITY_ROOTFS/usr/local" build/dentist-core/{bin,lib}
+    cp -r -t "$SINGULARITY_ROOTFS/usr/local" "$PREFIX"/{bin,lib}
 
 %files
     tests/test-commands.sh
