@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Function findAlignment</title>
+		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Function findAlignment</h1><p>Compute an alignment of <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#query"><span class="pln">query</span></a></code> against <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#reference"><span class="pln">reference</span></a></code> using the
+    Needleman-Wunsch algorithm with non-negative scores and constant
+    indel penalty. Optionally, the <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#freeShift"><span class="pln">freeShift</span></a></code> mode may be activated
+    as to allow large indels at the beginning and end of the alignment.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<a href="../../../dentist/util/string/SequenceAlignment.html"><span class="typ">SequenceAlignment</span></a>!(const(S),scoreFun) <span class="pln">findAlignment</span>(alias scoreFun, S)
+			<span class="pun">(</span>
+			<br/>
+			&nbsp;&nbsp;<span class="kwd">in </span><span class="pln">S</span> <span class="pln">reference</span><span class="pun">,</span>
+			<br/>
+			&nbsp;&nbsp;<span class="kwd">in </span><span class="pln">S</span> <span class="pln">query</span><span class="pun">,</span>
+			<br/>
+			&nbsp;&nbsp;<span class="kwd">in </span><a href="../../../dentist/util/string/score_t.html"><span class="pln">score_t</span></a> <span class="pln">indelPenalty</span><span class="pun">,</span>
+			<br/>
+			&nbsp;&nbsp;<a href="../../../dentist/common/alignments/base/Flag.html"><span class="typ">Flag</span></a>!"freeShift" <span class="pln">freeShift</span> <span class="pun">=</span> <span class="typ">No<wbr/></span><span class="pun">.</span><span class="pln">freeShift</span><span class="pun">,</span>
+			<br/>
+			&nbsp;&nbsp;<span class="pln">size_t</span> <span class="pln">memoryLimit</span> <span class="pun">=</span> <span class="lit">2 </span><span class="pun">^^ </span><span class="lit">20</span>
+			<br/>
+			<span class="pun">)</span><span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section><p>*Implementation Notes:** The current implementation needs
+    <code class="lang-d"><span class="pln">O</span><span class="pun">(</span><span class="pln">reference<wbr/></span><span class="pun">.</span><span class="pln">length </span><span class="pun">* </span><span class="pln">query<wbr/></span><span class="pun">.</span><span class="pln">length</span><span class="pun">)</span></code> in time and memory. As the
+    memory requirement easily exceeds available memory it can be
+    limited for now. This may change in future and an implementation
+    using <code class="lang-d"><span class="pln">O</span><span class="pun">(</span><span class="pln">max</span><span class="pun">(</span><span class="pln">reference<wbr/></span><span class="pun">.</span><span class="pln">length</span><span class="pun">, </span><span class="pln">query<wbr/></span><span class="pun">.</span><span class="pln">length</span><span class="pun">))</span></code> memory will be
+    silently selected for large inputs.
+</p>
+</section>
+
+			<section><h2>Parameters</h2>
+<table><col class="caption"><tr><th>Name</th><th>Description</th></tr>
+<tr><td id="scoreFun">scoreFun</td><td>     calculate score for a 'substitution' at <code class="lang-d"><span class="pln">i</span><span class="pun">, </span><span class="pln">j</span></code> using
+                       <code class="lang-d"><span class="pln">scoreFun</span><span class="pun">(<a href="../../../dentist/util/string/findAlignment.html#reference"></span><span class="pln">reference</span></a><span class="pun">[</span><span class="pln">i</span><span class="pun">], <a href="../../../dentist/util/string/findAlignment.html#reference"></span><span class="pln">reference</span></a><span class="pun">[</span><span class="pln">j</span><span class="pun">])</span></code></td></tr>
+<tr><td id="reference">reference</td><td>    Sequence to compare <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#query"><span class="pln">query</span></a></code> against</td></tr>
+<tr><td id="query">query</td><td>        Sequence to compare against <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#reference"><span class="pln">reference</span></a></code></td></tr>
+<tr><td id="indelPenalty">indelPenalty</td><td> Penalize each indel with this value</td></tr>
+<tr><td id="freeShift">freeShift</td><td>    Allow indels at the beginning and end of the alignment</td></tr>
+<tr><td id="memoryLimit">memoryLimit</td><td>  throw an error if the calculation would require more
+                       than <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#memoryLimit"><span class="pln">memoryLimit</span></a></code> bytes.</td></tr>
+</table>
+</section>
+<section><h2>Throws</h2>
+<p>AlignmentException if the calculation would require more than
+            <code class="lang-d"><a href="../../../dentist/util/string/findAlignment.html#memoryLimit"><span class="pln">memoryLimit</span></a></code> bytes.
+</p>
+</section>
+<section><h2>See Also</h2>
+<p><a href="http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm">http://en.wikipedia.org/wiki/Needleman-Wunsch_algorithm</a>
+</p>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">alignment </span><span class="pun">= </span><span class="pln">findAlignment</span><span class="pun">(</span><span class="str">"ACGTC"</span><span class="pun">, </span><span class="str">"AGTC"</span><span class="pun">, </span><span class="lit">1</span><span class="pun">);
+
+    </span><span class="com">//   - A G T C
+    // - 0 1 2 3 4
+    // A 1 0 1 2 3
+    // C 2 1 1 2 2
+    // G 3 2 1 2 3
+    // T 4 3 2 1 2
+    // C 5 4 3 2 1
+    //
+    // ACGTC
+    // | |||
+    // A-GTC
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">score </span><span class="pun">== </span><span class="lit">1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">editPath </span><span class="pun">== [
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#deletetion"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">deletetion</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+]);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">alignment </span><span class="pun">= </span><span class="pln">findAlignment</span><span class="pun">(</span><span class="str">"GCATGCT"</span><span class="pun">, </span><span class="str">"GATTACA"</span><span class="pun">, </span><span class="lit">1</span><span class="pun">);
+
+</span><span class="com">//   - G A T T A C A
+// - 0 1 2 3 4 5 6 7
+// G 1 0 1 2 3 4 5 6
+// C 2 1 2 3 4 5 4 5
+// A 3 2 1 2 3 4 5 4
+// T 4 3 2 1 2 3 6 5
+// G 5 4 3 2 3 4 5 6
+// C 6 5 4 3 4 5 4 5
+// T 7 6 5 4 3 6 5 6
+//
+// GCAT-GCT
+// | || *|*
+// G-ATTACA
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">score </span><span class="pun">== </span><span class="lit">4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">editPath </span><span class="pun">== [
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#deletetion"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">deletetion</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#insertion"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">insertion</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+    <a href="../../../dentist/util/string/EditOp.html#substitution"></span><span class="typ">EditOp<wbr/></span><span class="pun">.</span><span class="pln">substitution</span></a><span class="pun">,
+]);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">alignment </span><span class="pun">= </span><span class="pln">findAlignment</span><span class="pun">!</span><span class="str">"a == b ? 0 : 1"</span><span class="pun">(
+    </span><span class="str">"tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" </span><span class="pun">~
+    </span><span class="str">"gttgcaggtttgatctccacctggtcggggcacatgca"</span><span class="pun">,
+    </span><span class="str">"tgaggacagaagggtcatggtttaattctggtcacaggcacattcctggg" </span><span class="pun">~
+    </span><span class="str">"ttgtaggctcaattcccacccggtcggggccacatgca"</span><span class="pun">,
+    </span><span class="lit">1</span><span class="pun">,
+);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">toString</span><span class="pun">(</span><span class="lit">50</span><span class="pun">) ==
+    </span><span class="str">"tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg\n" </span><span class="pun">~
+    </span><span class="str">"|||||||||||||||||| |||||||||||||||||||||||||||||||\n" </span><span class="pun">~
+    </span><span class="str">"tgaggacagaagggtcat-ggtttaattctggtcacaggcacattcctgg\n" </span><span class="pun">~
+    </span><span class="str">"\n" </span><span class="pun">~
+    </span><span class="str">"gttgcaggtttgatctcc-acctggtcggggc-acatgca\n" </span><span class="pun">~
+    </span><span class="str">"||||*|||*|**|| ||| |||*||||||||| |||||||\n" </span><span class="pun">~
+    </span><span class="str">"gttgtaggctcaat-tcccacccggtcggggccacatgca"</span><span class="pun">);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">alignment </span><span class="pun">= </span><span class="pln">findAlignment</span><span class="pun">(
+    </span><span class="str">"tgaggacagaagggtcataggtttaattctggtcacaggcacattcctgg" </span><span class="pun">~
+    </span><span class="str">"gttgcaggtttgatctccacctggtcggggcacatgca"</span><span class="pun">,
+    </span><span class="str">"aatgaacagctgaggacagaagggtcatggtttaattctggtcacaggca" </span><span class="pun">~
+    </span><span class="str">"cattcctgggttgtaggctcaattcccacccggtcggggccacatgca"</span><span class="pun">,
+    </span><span class="lit">1</span><span class="pun">,
+    </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">freeShift</span><span class="pun">,
+);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">toString</span><span class="pun">(</span><span class="lit">50</span><span class="pun">) ==
+    </span><span class="str">"----------tgaggacagaagggtcataggtttaattctggtcacaggc\n" </span><span class="pun">~
+    </span><span class="str">"          |||||||||||||||||| |||||||||||||||||||||\n" </span><span class="pun">~
+    </span><span class="str">"aatgaacagctgaggacagaagggtcat-ggtttaattctggtcacaggc\n" </span><span class="pun">~
+    </span><span class="str">"\n" </span><span class="pun">~
+    </span><span class="str">"acattcctgggttgcaggtttgatctcc-acctggtcggggc-acatgca\n" </span><span class="pun">~
+    </span><span class="str">"||||||||||||||*|||*|**|| ||| |||*||||||||| |||||||\n" </span><span class="pun">~
+    </span><span class="str">"acattcctgggttgtaggctcaat-tcccacccggtcggggccacatgca"</span><span class="pun">);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="kwd">auto </span><span class="pln">alignment </span><span class="pun">= </span><span class="pln">findAlignment</span><span class="pun">(
+    </span><span class="str">"tatcctcaggtgaggactaacaacaaatatatatatatttatatctaaca" </span><span class="pun">~
+    </span><span class="str">"acatatgatttctaaaatttcaaaaatcttaaggctgaattaat"</span><span class="pun">,
+    </span><span class="str">"tatcctcaggtgaggcttaacaacaaatatatatatactgtaatatctaa" </span><span class="pun">~
+    </span><span class="str">"caacatatgattctaaaatttcaaaatgcttaaaggtctga"</span><span class="pun">,
+    </span><span class="lit">1</span><span class="pun">,
+    </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">freeShift</span><span class="pun">,
+);
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">alignment<wbr/></span><span class="pun">.</span><span class="pln">toString</span><span class="pun">(</span><span class="lit">50</span><span class="pun">) ==
+    </span><span class="str">"tatcctcaggtgaggact-aacaacaaatatatatata-ttta-tatcta\n" </span><span class="pun">~
+    </span><span class="str">"||||||||||||||| || ||||||||||||||||||| |*|| ||||||\n" </span><span class="pun">~
+    </span><span class="str">"tatcctcaggtgagg-cttaacaacaaatatatatatactgtaatatcta\n" </span><span class="pun">~
+    </span><span class="str">"\n" </span><span class="pun">~
+    </span><span class="str">"acaacatatgatttctaaaatttcaaaaatcttaa-gg-ctgaattaat\n" </span><span class="pun">~
+    </span><span class="str">"||||||||||||| ||||||||||||||**||||| || ||||      \n" </span><span class="pun">~
+    </span><span class="str">"acaacatatgatt-ctaaaatttcaaaatgcttaaaggtctga------"</span><span class="pun">);
+</span></code></pre>
+</section>
+
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

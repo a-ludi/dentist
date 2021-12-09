@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.util.graphalgo</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.util.graphalgo</h1><p>A selection of graph algorithms.
+</p><section></section>
+
+			<section></section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="connectedComponents" class="public" href="../../dentist/util/graphalgo/connectedComponents.html">connectedComponents</a><span class="tableEntryAnnotation">(n)</span>
+							</code>
+						</td>
+						<td>Calculate connected components of the graph defined by <code class="lang-d"><span class="pln">hasEdge</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="dagSingleSourceShortestPaths" class="public" href="../../dentist/util/graphalgo/dagSingleSourceShortestPaths.html">dagSingleSourceShortestPaths</a><span class="tableEntryAnnotation">(start, n)</span>
+							</code>
+						</td>
+						<td>Calculate all shortest paths in a DAG starting at <code class="lang-d"><a href="../../dentist/util/graphalgo/dagSingleSourceShortestPaths.html#start"><span class="pln">start</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="shortestPathsFloydWarshall" class="public" href="../../dentist/util/graphalgo/shortestPathsFloydWarshall.html">shortestPathsFloydWarshall</a><span class="tableEntryAnnotation">(n)</span>
+							</code>
+						</td>
+						<td>Calculate all shortest paths between all pairs of nodes. The functions
+    <code class="lang-d"><span class="pln">hasEdge</span></code> and <code class="lang-d"><span class="pln">weight</span></code> define the graphs structure and weights,
+    respectively. Nodes are represented as <code class="lang-d"><span class="pln">size_t</span></code> integers.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="topologicalSort" class="public" href="../../dentist/util/graphalgo/topologicalSort.html">topologicalSort</a><span class="tableEntryAnnotation">(n)</span>
+							</code>
+						</td>
+						<td>Topologically sort a DAG.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Classes</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="NoDAG" class="public" href="../../dentist/util/graphalgo/NoDAG.html">NoDAG</a>
+							</code>
+						</td>
+						<td>Thrown if a cycle was detected.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="FloydWarshallMatrix" class="public" href="../../dentist/util/graphalgo/FloydWarshallMatrix.html">FloydWarshallMatrix</a>
+							</code>
+						</td>
+						<td>Provides access to the all pairs shortest paths solution.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="SingleSourceShortestPathsSolution" class="public" href="../../dentist/util/graphalgo/SingleSourceShortestPathsSolution.html">SingleSourceShortestPathsSolution</a>
+							</code>
+						</td>
+						<td>Provides access to the single source shortest paths solution.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="GraphType" class="public" href="../../dentist/util/graphalgo/GraphType.html">GraphType</a>
+							</code>
+						</td>
+						<td>Specify the type of the graph for performance improvements.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="allPairsShortestPaths" class="public" href="../../dentist/util/graphalgo/allPairsShortestPaths.html">
+								<code>allPairsShortestPaths</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="pln">shortestPathsFloydWarshall</span></code>
+						</td>
+						<td>Calculate all shortest paths between all pairs of nodes. The functions
+    <code class="lang-d"><span class="pln">hasEdge</span></code> and <code class="lang-d"><span class="pln">weight</span></code> define the graphs structure and weights,
+    respectively. Nodes are represented as <code class="lang-d"><span class="pln">size_t</span></code> integers.
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

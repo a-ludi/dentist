@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.util.region</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.util.region</h1><p>Defines <code class="lang-d"><a href="../../dentist/util/region/Region.html"><span class="typ">Region</span></a></code> and common operation with these. A <code class="lang-d"><a href="../../dentist/util/region/Region.html"><span class="typ">Region</span></a></code> is a set of
+    tagged intervals where differently tagged intervals are distinct.
+</p><section></section>
+
+			<section></section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="convexHull" class="public" href="../../dentist/util/region/convexHull.html">convexHull</a><span class="tableEntryAnnotation">(region)</span>
+							</code>
+						</td>
+						<td>Returns convex hull of the region.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="empty" class="public" href="../../dentist/util/region/empty.html">empty</a><span class="tableEntryAnnotation">(thing)</span>
+							</code>
+						</td>
+						<td>Returns true iff <code class="lang-d"><a href="../../dentist/util/region/empty.html#thing"><span class="pln">thing</span></a></code> is empty.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="enforceMatchingTags" class="public" href="../../dentist/util/region/enforceMatchingTags.html">enforceMatchingTags</a><span class="tableEntryAnnotation">(taggableA, taggableB)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="enforceNonEmpty" class="public" href="../../dentist/util/region/enforceNonEmpty.html">enforceNonEmpty</a><span class="tableEntryAnnotation">(region)</span>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="findTilings" class="public" href="../../dentist/util/region/findTilings.html">findTilings</a><span class="tableEntryAnnotation">(elements, maxLocalOverlap, maxGlobalOverlap)</span>
+							</code>
+						</td>
+						<td>Find all valid tilings of elements.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="min" class="public" href="../../dentist/util/region/min.html">min</a><span class="tableEntryAnnotation">(region)</span>
+							</code>
+						</td>
+						<td>Returns the minimum/supremum point of the region. Both minimum and
+    supremum are undefined for empty regions.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="sup" class="public" href="../../dentist/util/region/sup.html">sup</a><span class="tableEntryAnnotation">(region)</span>
+							</code>
+						</td>
+						<td>Returns the minimum/supremum point of the region. Both minimum and
+    supremum are undefined for empty regions.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="union_" class="public" href="../../dentist/util/region/union_.html">union_</a><span class="tableEntryAnnotation">(regions)</span>
+							</code>
+						</td>
+						<td>Returns the union of all elements.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Classes</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="EmptyRegionException" class="public" href="../../dentist/util/region/EmptyRegionException.html">EmptyRegionException</a>
+							</code>
+						</td>
+						<td>Thrown if regions is unexpectedly empty.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="MismatchingTagsException" class="public" href="../../dentist/util/region/MismatchingTagsException.html">MismatchingTagsException</a>
+							</code>
+						</td>
+						<td>Thrown if two operands require the same tag but different were provided.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Region" class="public" href="../../dentist/util/region/Region.html">Region</a>
+							</code>
+						</td>
+						<td>A Region is a set of tagged intervals where differently tagged intervals are distinct.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Tiling" class="public" href="../../dentist/util/region/Tiling.html">Tiling</a>
+							</code>
+						</td>
+						<td>Tiling solution.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Manifest constants</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="isTaggable" class="public" href="../../dentist/util/region/isTaggable.html">
+								<code>isTaggable</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Checks if T has a property <code class="lang-d"><span class="pln">tag</span></code> implicitly convertible to <code class="lang-d"><span class="typ">Tag</span></code> – if given.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="TagType" class="public" href="../../dentist/util/region/TagType.html">
+								<code>TagType</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="kwd">typeof</span><span class="pun">(</span><span class="pln">instance<wbr/></span><span class="pun">.</span><span class="pln">tag</span><span class="pun">)</span></code>
+						</td>
+						<td>Returns the type of the property <code class="lang-d"><span class="pln">tag</span></code> of <code class="lang-d"><span class="pln">T</span></code>.
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

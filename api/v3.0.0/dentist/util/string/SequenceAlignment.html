@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct SequenceAlignment</title>
+		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct SequenceAlignment</h1><p>Represents an alignment of two sequences.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">SequenceAlignment</span>(S, alias scoreFun)
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.editPath.html" class="public"><code>editPath</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/string/EditOp.html"><span class="typ">EditOp</span></a><span class="pun">[]</span></code></td><td>Edit path.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.freeShift.html" class="public"><code>freeShift</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/common/alignments/base/Flag.html"><span class="typ">Flag</span></a>!"freeShift"</code></td><td>Whether this is a free shift alignment. Indels at the boundaries
+are scored neutrally if true.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.indelPenalty.html" class="public"><code>indelPenalty</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/string/score_t.html"><span class="pln">score_t</span></a></code></td><td>Penalty score for insertions and deletions.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.query.html" class="public"><code>query</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">S</span></code></td><td>Query sequence.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.reference.html" class="public"><code>reference</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">S</span></code></td><td>Reference sequence.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.score.html" class="public"><code>score</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../dentist/util/string/score_t.html"><span class="pln">score_t</span></a></code></td><td>Total score of this alignment.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.computeScore.html" class="public">
+								<code>computeScore</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Compute alignment score.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.isValid.html" class="public">
+								<code>isValid</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Check if the edit ops, score and sequences match with each other.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.isValid.html" class="public">
+								<code>isValid</code>
+							</a>
+							<span class="tableEntryAnnotation">(walkResult)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.opDollar.html" class="public">
+								<code>opDollar</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Returns <code class="lang-d"><span class="pln">reference<wbr/></span><span class="pun">.</span><span class="pln">length</span></code> for use with slicing operator.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.opIndex.html" class="public">
+								<code>opIndex</code>
+							</a>
+							<span class="tableEntryAnnotation">(slice)</span>
+						</td>
+						<td>Get a partial alignment with respect to <code class="lang-d"><a href="../../../dentist/util/string/SequenceAlignment.reference.html"><span class="pln">reference</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.opSlice.html" class="public">
+								<code>opSlice</code>
+							</a>
+							<span class="tableEntryAnnotation">(begin, end)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.partial.html" class="public">
+								<code>partial</code>
+							</a>
+							<span class="tableEntryAnnotation">(begin, end, stripInsertions)</span>
+						</td>
+						<td>Get a partial alignment with respect to <code class="lang-d"><a href="../../../dentist/util/string/SequenceAlignment.reference.html"><span class="pln">reference</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.stripInsertions.html" class="public">
+								<code>stripInsertions</code>
+							</a>
+							<span class="tableEntryAnnotation">(strip)</span>
+						</td>
+						<td>Strip leading/trailing insertions.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.toString.html" class="public">
+								<code>toString</code>
+							</a>
+							<span class="tableEntryAnnotation">(width)</span>
+						</td>
+						<td>Get a string representation of this alignment. Visual alignment breaks
+unless elements of the sequences convert to single chars via <code class="lang-d"><span class="pln">to</span><span class="pun">!</span><span class="typ">string</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.walkEditOps.html" class="public">
+								<code>walkEditOps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.WalkResult.html" class="public">
+								<code>WalkResult</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/string/SequenceAlignment.getScore.html" class="public">
+								<code>getScore</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

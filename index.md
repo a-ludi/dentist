@@ -13,13 +13,14 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
-**API documentation:** ([current][api-current], [v2.0.0][api-v2.0.0])
+**API documentation:** ([current][api-current], [v3.0.0][api-v3.0.0], [v2.0.0][api-v2.0.0])
 
 **First time here? Head over to [the example](#example) and make sure it works.**
 
 
 [api-current]: ./api/current
 [api-v2.0.0]: ./api/v2.0.0
+[api-v3.0.0]: ./api/v3.0.0
 
 
 Install
@@ -39,7 +40,7 @@ The last command is explained in more detail below in
 [the usage section](#usage).
 
 
-[conda]: https://docs.conda.io/projects/conda/
+[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
 
 
 ### Use a Singularity Container (recommended)
@@ -68,15 +69,15 @@ The last command is explained in more detail below in
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The pre-built binaries are stored in a subfolder
-called `bin`. Here are the instructions for `v2.0.0`:
+called `bin`. Here are the instructions for `v3.0.0`:
 
 ```sh
 # download & extract pre-built binaries
-wget https://github.com/a-ludi/dentist/releases/download/v2.0.0/dentist.v2.0.0.x86_64.tar.gz
-tar -xzf dentist.v2.0.0.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
+tar -xzf dentist.v3.0.0.x86_64.tar.gz
 
 # make binaries available to your shell
-cd dentist.v2.0.0.x86_64
+cd dentist.v3.0.0.x86_64
 PATH="$PWD/bin:$PATH"
 
 # check installation with
@@ -130,32 +131,22 @@ The following software packages are required to run `dentist`:
   > auxiliary information such as masks or QV tracks
 - [DALIGNER][daligner] (=2020-01-15)
   > Find significant local alignments.
-- [DAMAPPER][damapper] (>=2020-03-10)
+- [DAMAPPER][damapper] (>=2020-03-22)
   > Find alignment chains, i.e. sequences of significant local alignments
   > possibly with unaligned gaps.
 - [DAMASKER][damasker] (>=2020-01-15)
   > Discover tandem repeats.
 - [DASCRUBBER][dascrubber] (>=2020-07-26)
   > Estimate coverage and compute QVs.
-- [daccord][daccord] (>=v0.0.17)
+- [daccord][daccord] (>=v0.0.18)
   > Compute reference-based consensus sequence for gap filling.
 
 Please see their own documentation for installation instructions. Note, the
 available packages on Bioconda are outdated and should not be used at the
-moment.
+moment but they are available using `conda install -c a_ludi <dependency>`.
 
-Please use the following versions in your dependencies in case you experience
-troubles. These should be the same versions used in the
-[Conda recipe](./conda/recipes/dentist-core/meta.yaml):
-
-- [snakemake@5.32.1](https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html)
-- [DENTIST@2.0.0](https://github.com/a-ludi/dentist/tree/v2.0.0)
-- [DAZZ_DB@d22ae58](https://github.com/thegenemyers/DAZZ_DB/tree/d22ae58d32a663d09325699f17373ccf8c6f93a0)
-- [DALIGNER@c2b47da](https://github.com/thegenemyers/DALIGNER/tree/c2b47da6b3c94ed248a6be395c5b96a4e63b3f63)
-- [DAMAPPER@b2c9d7f](https://github.com/thegenemyers/DAMAPPER/tree/b2c9d7fd64bb4dd2dde7c69ff3cc8a04cbeeebbc)
-- [DAMASKER@22139ff](https://github.com/thegenemyers/DAMASKER/tree/22139ff1c2b2c0ff2589fbc9cc948370be799827)
-- [DASCRUBBER@a53dbe8](https://github.com/thegenemyers/DASCRUBBER/tree/a53dbe879a716e7b08338f397de5a0403637641e)
-- [daccord@0.0.17](https://gitlab.com/german.tischler/daccord/tree/d54b10bb863b14103cf8e03c07efe4f93c5772d8)
+Please use the exact versions specified in the
+[Conda recipe][dentist-core-recipe] in case you experience troubles.
 
 
 [DUB]: https://code.dlang.org/download "Download DUB"
@@ -165,6 +156,8 @@ troubles. These should be the same versions used in the
 [damasker]: https://github.com/thegenemyers/DAMASKER
 [dascrubber]: https://github.com/thegenemyers/DASCRUBBER
 [daccord]: https://gitlab.com/german.tischler/daccord
+[dentist-core-recipe]: ./conda/recipes/dentist-core/meta.yaml
+
 
 Usage
 -----
@@ -173,33 +166,54 @@ Before you start producing wonderful scientific results, you should skip over
 to the [example section](#example) and try to run the small example. This will
 make sure your setup is working as expected.
 
-### Quick execution with Snakemake (and Singularity or Conda)
+### Quick execution with Snakemake
 
 > TL;DR
 >
+>     wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
+>     tar -xzf dentist.v3.0.0.x86_64.tar.gz
+>     cd dentist.v3.0.0.x86_64
+>     
 >     # edit dentist.yml and snakemake.yml
->     snakemake --configfile=snakemake.yml --use-conda --profile=slurm
+>
+>     # execute with CONDA:
+>     snakemake --configfile=snakemake.yml --use-conda
+>
+>     # execute with SINGULARITY:
+>     snakemake --configfile=snakemake.yml --use-singularity
+>
+>     # execute with pre-built binaries:
+>     PATH="$PWD/bin:$PATH" snakemake --configfile=snakemake.yml
 
-Install [Snakemake][snakemake] version >=5.32.1 and copy these files into your
-working directory:
+Install [Snakemake][snakemake] version >=5.32.1 and prepare your working
+directory:
 
 ```sh
-cp -r -t .
-    ./snakemake/dentist.yml \
-    ./snakemake/Snakefile \
-    ./snakemake/snakemake.yml \
-    ./snakemake/envs \
-    ./snakemake/scripts
+wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
+tar -xzf dentist.v3.0.0.x86_64.tar.gz
+
+cp -r -t . \
+    dentist.v3.0.0.x86_64/snakemake/dentist.yml \
+    dentist.v3.0.0.x86_64/snakemake/Snakefile \
+    dentist.v3.0.0.x86_64/snakemake/snakemake.yml \
+    dentist.v3.0.0.x86_64/snakemake/envs \
+    dentist.v3.0.0.x86_64/snakemake/scripts
 ```
 
 Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
 test your configuration with
 
-    snakemake --configfile=snakemake.yml --use-conda --cores=1 -f -- validate_dentist_config
+```sh
+# see above for variants with pre-built binaries or Singularity
+snakemake --configfile=snakemake.yml --use-conda --cores=1 -f -- validate_dentist_config
+```
 
 If no errors occurred the whole workflow can be executed using
 
-    snakemake --configfile=snakemake.yml --use-conda --cores=all
+```sh
+# see above for variants with pre-built binaries or Singularity
+snakemake --configfile=snakemake.yml --use-conda --cores=all
+```
 
 For small genomes of a few 100 Mbp this should run on a regular workstation.
 One may use Snakemake's `--cores` to run independent jobs in parallel. Larger
@@ -214,36 +228,39 @@ data sets may require a cluster in which case you can use Snakemake's
 
 #### Executing on a Cluster
 
-To make execution on a cluster easy DENTIST comes with examples files to make
-Snakemake use SLURM via DRMAA. Please read the [documentation of
-Snakemake][snakemake-cluster] if this does not suit your needs. Another good
-starting point is [the Snakemake-Profiles project][smp-project].
+Please follow the [setup steps from above](#quick-execution-with-snakemake)
+except for the actual execution.
 
-Start by copying these files to your working/home directory:
+To make execution on a cluster easy DENTIST comes with examples files to make
+Snakemake use SLURM via DRMAA, `sbatch` or `srun` found under
+[`snakemake`](./snakemake). If your cluster does not use SLURM please modify
+the profiles to suit your needs or read the [documentation of
+Snakemake][snakemake-cluster]. Another good starting point is [the
+Snakemake-Profiles project][smp-project].
+
+After you have selected an appropriate cluster profile, make it available to
+Snakemake, e.g.:
 
 ```sh
-cp -r -t .
-    ./snakemake/cluster.yml \
-    ./snakemake/dentist.yml \
-    ./snakemake/Snakefile \
-    ./snakemake/snakemake.yml \
-    ./snakemake/envs \
-    ./snakemake/scripts
-mkdir -p ~/.config/snakemake/slurm
 # choose appropriate file from `snakemake/profile-slurm.*.yml`
+mkdir -p ~/.config/snakemake/slurm
 cp ./snakemake/profile-slurm.submit-async.yml ~/.config/snakemake/slurm
 ```
 
-Next [adjust the profile][snakemake-profiles] according to your cluster. This
-should enable Snakemake to submit and track jobs on your cluster. You may use
-the configuration values specified in `cluster.yml` to configure job names and
-resource allocation for each step of the pipeline. Now, submit the workflow
-to your cluster by
+Adjust the profile according to your cluster, e.g. you may need to specify
+accounting information. Values defined in `cluster.yml` can be used in the
+profile as demonstrated in the examples. This file is also the place to modify
+resource allocations and job names.
 
-    snakemake --configfile=snakemake.yml --profile=slurm --use-conda
+Now, you can execute the workflow like this:
 
-Note, parameters specified in the profile provide default values and can be
-overridden by specifying different value on the CLI.
+```sh
+snakemake --configfile=snakemake.yml --profile=slurm --use-conda
+```
+
+Snakemake will now start submitting jobs to your cluster until all the work is
+done. If something fails, you can execute the same command again to continue
+from the latest state of the workflow.
 
 
 [smp-project]: https://github.com/snakemake-profiles/doc
@@ -263,14 +280,15 @@ Example
 
 Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-You can also use the convenient Singularity container to execute the rules.
-Just make sure you have [Singularity][singularity] 3.5.x or later installed.
+You can also use the convenient Conda package or Singularity container to
+execute the rules. Just make sure you have [Conda][conda] or [Singularity][singularity] >=3.5.x installed, respectively.
+
 
 First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-3/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -327,21 +345,8 @@ md5sum -c checksum.md5
 
 ### Cluster Execution
 
-Execute the workflow on a *SLURM cluster*:
-
-```sh
-mkdir -p "$HOME/.config/snakemake/slurm"
-# select one of the profile-slurm.{drmaa,submit-async,submit-sync}.yml files
-cp -v "profile-slurm.submit-async.yml" "$HOME/.config/snakemake/slurm/config.yaml"
-# execute using the cluster profile
-snakemake --configfile=snakemake.yml --use-conda --profile=slurm
-
-# validate the files
-md5sum -c checksum.md5
-```
-
-If you want to run with a different cluster manager or in the cloud, please
-read the [advice below](#executing-on-a-cluster).
+Please follow the [instructions "Executing on a
+Cluster"](#executing-on-a-cluster) above.
 
 
 Configuration
