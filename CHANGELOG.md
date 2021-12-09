@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Docker container; now building directly Singularity image
 - outdated integration tests
 - deprecated and unused code
 - obsolete testing command `translocate-gaps`
