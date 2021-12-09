@@ -24,7 +24,7 @@ workflow_config = $(distdir)/snakemake.yml
 workflow_config_orig = ../snakemake/snakemake.yml
 mk_workflow_config_script = $(scriptdir)/mk-workflow-config.awk
 
-dentist_container=$(distdir)/dentist_$(dentist_version).sif
+dentist_container=$(distdir)/dentist_$(dentist_version:v%=%).sif
 binaries=$(addprefix $(bindir)/,Catrack computeintrinsicqv daccord daligner \
 	DAM2fasta damapper DAScover DASqv datander DB2fasta DBa2b DBb2a DBdump \
 	DBdust DBmv DBrm DBshow DBsplit DBstats DBtrim DBwipe dentist dumpLA \
@@ -35,7 +35,7 @@ runtime_environment = $(dentist_container) $(binaries)
 workflow_results = $(shell tr '\n' ' ' < result-files.lst)
 checksum_workflow = $(distdir)/checksum.md5
 
-additional_dist_files = $(addprefix $(distdir)/,dentist.yml envs README.md scripts Snakefile) \
+additional_dist_files = $(addprefix $(distdir)/,dentist.yml envs/$(dentist_env).yml README.md scripts Snakefile) \
 	$(wildcard $(distdir)/profile-slurm.*.yml)
 
 dist_tarball = dentist-example.tar.gz
@@ -65,6 +65,7 @@ input-data: $(generated_inputs) $(inputs_valid_marker)
 $(assembly_reference_dam): $(assembly_reference)
 	@echo "-- making DAM for reference assembly ..."
 	mkdir -p $(@D)
+	[[ ! -f $@ ]] || DBrm $@
 	zcat -f $< | fasta2DAM -i $@ && DBsplit -x0 -a $@
 
 $(simulated_reads): $(assembly_reference_dam)
@@ -93,6 +94,7 @@ $(checksum_workflow): $(workflow_results) $(generated_inputs)
 .PHONY: $(dentist_container)
 $(dentist_container):
 	$(MAKE) -C .. $(@F)
+	ln -srf ../$(@F) $@
 
 .PHONY: dist
 dist: $(dist_tarball)
@@ -192,7 +194,7 @@ binaries: $(binaries)
 
 
 $(binaries) &: $(conda_prefix) $(addprefix $(conda_prefix)/bin/,$(notdir $(binaries)))
-	install -D -t $(bindir) $^
+	install -D -t $(bindir) $(filter-out $(conda_prefix),$^)
 
 
 .passed-binaries-path-correct-check: export PATH := $(shell pwd)/$(bindir):$(PATH)

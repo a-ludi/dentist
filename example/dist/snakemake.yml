@@ -1,6 +1,6 @@
 full_validation: true
-dentist_container: dentist_local.sif
-dentist_env: envs/dentist_local.yml
+dentist_container: dentist_3.0.0.sif
+dentist_env: envs/dentist_v3.yml
 dentist_config:         dentist.yml
 inputs:
     reference:          reference.fasta
