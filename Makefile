@@ -4,6 +4,7 @@ dentist_list_of_commandline_options = $(DENTIST)/docs/list-of-commandline-option
 
 api_docs = $(wildcard docs.*.json)
 api_versions = $(patsubst docs.%.json,%,$(api_docs))
+api_htmls = $(addprefix api/,$(addsuffix /index.html,$(api_versions)))
 
 site_files = index.md license.md list-of-commandline-options.md
 
@@ -13,7 +14,7 @@ ddox = dub run -q ddox --
 ddox_root = $(shell dub describe ddox | jq -r '.packages[] | select(.name == "ddox") | .path')
 
 .PHONY: all
-all: $(site_files) $(addprefix api/,$(api_versions))
+all: $(site_files) $(api_htmls)
 
 
 index.md: $(dentist_readme)
@@ -25,9 +26,9 @@ list-of-commandline-options.md: $(dentist_list_of_commandline_options)
 
 
 .PHONY: api-docs
-api-docs: $(addprefix api/,$(api_versions))
+api-docs: $(api_htmls)
 
 
-api/%: docs.%.json
-	$(ddox) generate-html $(ddox_generate_flags) $< $@
-	cp -r -t $@ $(ddox_root)/public/*
+api/%/index.html: docs.%.json
+	$(ddox) generate-html $(ddox_generate_flags) $< $(@D)
+	cp -r -t $(@D) $(ddox_root)/public/*
