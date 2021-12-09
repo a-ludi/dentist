@@ -44,6 +44,8 @@ requirements:
     - dazz_db==1.0.20200727+commit.d22ae58
 
 test:
+  requires:
+    - jq==1.6
   source_files:
     - tests/test-commands.sh
   commands:
