@@ -60,8 +60,8 @@ conda-dentist:
 	    conda/recipes/dentist
 
 
-docs/list-of-commandline-options.md: $(container)
-	singularity exec $< dentist --list-options > $@
+docs/list-of-commandline-options.md: $(binaries)
+	$(dist_dir)/bin/dentist --list-options > $@
 
 
 .PHONY: api-docs
