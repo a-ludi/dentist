@@ -10,6 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
+## [3.0.0] - 2021-12-09
+### Added
+
+- Conda packages `dentist` and `dentist-core`
+- DENTIST's configuration may be in YAML format
+- print summary of all commands with `dentist --commands`
+- user may select the maximum alignment error rate
+- note on a known bug that prohibits using ` :: ` in FASTA headers
+- online API documentation
+- included the demo example into the main repo
+- included JQ in the container for easy inspections
+- minimal integration tests that cover the whole pipeline
+
+### Changed
+
+- substantially extended code documentation
+- improved documentation of `read-coverage` and friends
+- improved error message if no pile ups have been found
+- using a fixed version for Containers to avoid caching issues
+- renamed workflow parameter `max_threads` → `threads_per_process`
+- keep assertions in production code
+- allow empty LAS files for masking
+- improved pre-push hook to reduce accidental errors
+
+### Removed
+
+- outdated integration tests
+- deprecated and unused code
+- obsolete testing command `translocate-gaps`
+
+### Fixed
+
+- improved compatibility of pre-compiled binaries by using Conda package 
+- make alignments with more than 2^^32 local alignments work
+- minor compatibility fixes in the container
+- broken links in README
+- replaced defintion list by simple list in README
+
+
 ## [2.0.0] - 2021-06-21
 ### Added
 - list of all commandline options
