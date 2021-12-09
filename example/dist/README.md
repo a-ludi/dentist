@@ -9,7 +9,8 @@ DENTIST\: Mini Example
 
 Quickly test [DENTIST][dentist] with this example workflow. It uses part of the
 _D. melanogaster_ reference assembly (dm6) and simulated reads to demonstrate
-the workflow. The full source code of DENTIST is available at <https://github.com/a-ludi/dentist>.
+the workflow. The full source code of DENTIST is available at
+<https://github.com/a-ludi/dentist>.
 
 If you experience issues, please search the issues at [DENTIST's
 repository](https://github.com/a-ludi/dentist/issues) or create a new one if
@@ -33,13 +34,13 @@ Install
 
 Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-You can also use the convenient Singularity container to execute the rules.
-Just make sure you have [Singularity][singularity] 3.5.x or later installed.
+You can also use the convenient Conda package or Singularity container to
+execute the rules. Just make sure you have [Conda][conda] or [Singularity][singularity] >=3.5.x installed, respectively.
 
 
 [snakemake]: https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html
 [singularity]: https://sylabs.io/guides/3.5/user-guide/quick_start.html
-[dentist-install]: https://github.com/a-ludi/dentist#install
+[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
 
 
 Usage
@@ -49,7 +50,7 @@ First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist-example/releases/download/v2.0.0-1/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -73,7 +74,8 @@ laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 ### Execution using Conda
 
-Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
+Execute the workflow using a convenient Conda environment by adding
+`--use-conda` to the call to Snakemake:
 
 ```sh
 # run the workflow
@@ -86,7 +88,8 @@ md5sum -c checksum.md5
 
 ### Execution in Singularity Container
 
-Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
+Execute the workflow inside a convenient Singularity image by adding
+`--use-singularity` to the call to Snakemake:
 
 ```sh
 # run the workflow
@@ -112,14 +115,11 @@ snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
 md5sum -c checksum.md5
 ```
 
-If you want to run with a different cluster manager or in the cloud, please
-read the advice in [DENTIST's README][dentist-cluster]. The easiest option is
-to adjust the `srun` command in `profile-slurm.sync.yml` to your cluster, e.g.
-`qsub -sync yes`. The command must submit a job to the cluster and *wait* for
-it to finish.
+Find more advice on execution using a cluster in the
+[online documentation][dentist-cluster].
 
 
-[dentist-install]: https://github.com/a-ludi/dentist#executing-on-a-cluster
+[dentist-cluster]: https://a-ludi.github.io/dentist/#cluster-execution
 
 
 Citation
