@@ -30,11 +30,14 @@ export git_root
 git_root="$PWD"
 IGNORE_LINKS=""
 IGNORE_PATHS='
-    ./workdir
-    ./dentist-example
+    ./conda-build.sh
+    ./dentist-gh-pages
+    ./dentist/docs.json
     ./../../dentist
+    ./dentist-example
     ./prepare-site.sh
     ./snakemake/profile-slurm.*.yml
+    ./workdir
 '
 
 
