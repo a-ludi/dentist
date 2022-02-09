@@ -18,3 +18,7 @@ max_line_length = 100
 # Makefile - important to use tabs
 [Makefile]
 indent_style = tab
+
+# Makefile - important to use tabs
+[*.tsv]
+indent_style = tab
