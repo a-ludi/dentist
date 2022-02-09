@@ -66,6 +66,7 @@ def prefetch_conda_env(env_file):
 
     from snakemake.deployment.conda import Env
     from snakemake.persistence import Persistence
+    from inspect import signature
 
     dag = type('FakeDAG', (object,), dict(
         workflow=type('FakeWorkflow', (object,), dict(
@@ -75,12 +76,17 @@ def prefetch_conda_env(env_file):
                 sourcecache=workflow.sourcecache
             ))))
 
-    conda_env = Env(
-        env_file,
-        dag.workflow,
-        container_img=singularity_image,
-        cleanup=workflow.conda_cleanup_pkgs,
-    )
+    wf_arg = "workflow"
+    if "dag" in signature(Env).parameters:
+        wf_arg = "dag"
+
+    env_args = {
+        "env_file": env_file,
+        wf_arg: dag.workflow,
+        "container_img": singularity_image,
+        "cleanup": workflow.conda_cleanup_pkgs,
+    }
+    conda_env = Env(**env_args)
     conda_env.create()
 
 
@@ -95,7 +101,11 @@ def shellcmd(cmd):
         from snakemake.deployment.conda import Conda
 
         conda = Conda(singularity_image, prefix_path=workflow.conda_base_path)
-        conda_cmd = conda.shellcmd(conda_env.path, cmd)
+        if hasattr(conda_env, "path"):
+            conda_env_path = conda_env.path
+        else:
+            conda_env_path = conda_env.address
+        conda_cmd = conda.shellcmd(conda_env_path, cmd)
 
         return conda_cmd
     else:
