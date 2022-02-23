@@ -263,7 +263,7 @@ Snakemake, e.g.:
 ```sh
 # choose appropriate file from `snakemake/profile-slurm.*.yml`
 mkdir -p ~/.config/snakemake/slurm
-cp ./snakemake/profile-slurm.submit-async.yml ~/.config/snakemake/slurm
+cp ./snakemake/profile-slurm.submit-async.yml ~/.config/snakemake/slurm/config.yaml
 ```
 
 Adjust the profile according to your cluster, e.g. you may need to specify
