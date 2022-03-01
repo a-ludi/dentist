@@ -6,7 +6,7 @@ DENTIST
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
 [![Singularity Image Version](https://img.shields.io/badge/Singularity-v3.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
 [![Conda package Version](https://img.shields.io/conda/v/a_ludi/dentist?label=conda)](https://anaconda.org/a_ludi/dentist-core)
-[![DOI 10.1101/2021.02.26.432990](https://img.shields.io/badge/DOI-(pre--print)_10.1101%2F2021.02.26.432990-informational)](https://doi.org/10.1101/2021.02.26.432990)
+[![DOI:10.1093/gigascience/giab100](https://img.shields.io/badge/DOI_10.1093%2Fgigascience%2Fgiab100-informational)][dentist-gigascience]
 
 Long sequencing reads allow increasing contiguity and completeness of
 fragmented, short-read based genome assemblies by closing assembly gaps,
@@ -403,7 +403,7 @@ workflow configuration (`snakemake/snakemake.yml`).
     The maximum read coverage `C_max` is calculated from the global read
     coverage `C` (provided via --read-coverage) such that the probability of
     observing more than `C_max` alignments in a unique (non-repetitive) genomic
-    region is very small (see [pre-print][dentist-bioarxiv], Methods section
+    region is very small (see [paper][dentist-gigascience], Methods section
     and Supplementary Table 2). In practice, this probability is approximated
     via
 
@@ -424,7 +424,7 @@ workflow configuration (`snakemake/snakemake.yml`).
     repetitive regions. Therefore, DENTIST considers genomic regions, where the
     number of improper read alignments is higher than a threshold to be
     repetitive. By default, this threshold equals half the global read coverage C.
-    (see [pre-print][dentist-bioarxiv], Methods section). In practice, a smoothed
+    (see [paper][dentist-gigascience], Methods section). In practice, a smoothed
     version of `max(4, x/2)` is used to provide better performance for very low
     read coverage. The maximum improper read coverage `I_max` is computed as
 
@@ -509,7 +509,7 @@ workflow configuration (`snakemake/snakemake.yml`).
     ```
 
     This corresponds to 50% of the long read coverage expected to be sequenced
-    from a haploid locus (see [pre-print][dentist-bioarxiv], Methods section).
+    from a haploid locus (see [paper][dentist-gigascience], Methods section).
 
 
 [dentist-cli-summary]: ./list-of-commandline-options.html
@@ -646,11 +646,12 @@ contain a literal `" :: "`.
 Citation
 --------
 
-> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – using long
-> reads to close assembly gaps at high accuracy. __Submitted for peer review__.
-> Pre-print at [https://doi.org/10.1101/2021.02.26.432990][dentist-bioarxiv]
+> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST — using long
+> reads for closing assembly gaps at high accuracy. _GigaScience_, Volume 11,
+> 2022, giab100.
+> [https://doi.org/10.1093/gigascience/giab100][dentist-gigascience]
 
-[dentist-bioarxiv]: https://doi.org/10.1101/2021.02.26.432990 "Pre-print manuscript at bioRxiv"
+[dentist-gigascience]: https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giab100/6514926 "Paper published at GigaScience"
 
 
 Maintainer
