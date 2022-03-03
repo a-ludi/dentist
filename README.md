@@ -127,19 +127,21 @@ and this README. In short, everything you to run DENTIST.
 
 ### Build from Source
 
-Be sure to install the D package manager [DUB][DUB]. Install using either
+1. Install the D package manager [DUB][DUB]. 
+2. Install [JQ 1.6][jq].
+3. Build DENTIST using either
+    ```sh
+    dub install dentist
+    ```
+    or
+    ```sh
+    git clone --recurse-submodules https://github.com/a-ludi/dentist.git
+    cd dentist
+    dub build
+    ```
 
-```sh
-dub install dentist
-```
+[jq]: https://stedolan.github.io/jq/download/
 
-or
-
-```sh
-git clone https://github.com/a-ludi/dentist.git
-cd dentist
-dub build
-```
 
 ### Runtime Dependencies
 
