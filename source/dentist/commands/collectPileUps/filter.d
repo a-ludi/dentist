@@ -55,7 +55,7 @@ import std.algorithm :
 import std.array :
     appender,
     array;
-import std.parallelism : taskPool;
+import std.parallelism : parallel, taskPool;
 import std.range :
     InputRange,
     inputRangeObject,
@@ -130,7 +130,7 @@ class LQAlignmentChainsFilter : AlignmentChainFilter
 
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
-        foreach (ref alignmentChain; alignmentChains)
+        foreach (ref alignmentChain; parallel(alignmentChains))
             alignmentChain.disableIf(alignmentChain.averageErrorRate > maxAlignmentError);
 
         return alignmentChains;
@@ -150,7 +150,7 @@ class ImproperAlignmentChainsFilter : AlignmentChainFilter
 
     override AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
-        foreach (ref alignmentChain; alignmentChains)
+        foreach (ref alignmentChain; parallel(alignmentChains))
         {
             alignmentChain.disableIf(!alignmentChain.isProper(properAlignmentAllowance));
         }
@@ -187,7 +187,7 @@ class ContainedAlignmentChainsFilter : AlignmentChainFilter
         alignmentChains.sort!("a < b", SwapStrategy.stable);
         alias intervalOf(string contig) = toInterval!(ReferenceInterval, contig);
 
-        foreach (i, ac1; alignmentChains)
+        foreach (i, ac1; parallel(alignmentChains))
         {
             if (ac1.flags.disabled)
                 continue;
@@ -336,7 +336,7 @@ class WeaklyAnchoredAlignmentChainsFilter : AlignmentChainFilter
 
     AlignmentChain[] opCall(AlignmentChain[] alignmentChains)
     {
-        foreach (ref alignmentChain; alignmentChains)
+        foreach (ref alignmentChain; parallel(alignmentChains))
         {
             alignmentChain.disableIf(isWeaklyAnchored(alignmentChain));
         }
