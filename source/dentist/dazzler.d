@@ -457,6 +457,9 @@ AlignmentChain[] getAlignments(
             ? uninitializedArray!(TracePoint[])(alignmentHeader.numTracePoints)
             : [],
     );
+    scope (exit)
+        localAlignmentReader.close();
+
     auto packer = localAlignmentReader.alignmentChainPacker(
         BufferMode.preallocated,
         uninitializedArray!(AlignmentChain.LocalAlignment[])(alignmentHeader.numLocalAlignments),
@@ -1251,6 +1254,8 @@ struct AlignmentHeader
         AlignmentHeader headerData;
 
         auto lasScanner = new LocalAlignmentReader(lasFile, BufferMode.skip);
+        scope (exit)
+            lasScanner.close();
 
         size_t currentChainLength;
         id_t lastContig;
@@ -1581,6 +1586,26 @@ class LocalAlignmentReader
         las.rewind();
         tracePointBuffer = fullTracePointBuffer;
         initialize();
+    }
+
+
+    /// Finish reading this range and free resources. This closes the
+    /// underyling file, drops all references to heap allocated memory, and
+    /// empties this range.
+    ///
+    /// Even though the range is empty afterwards, the object can still be
+    /// used to access properties `numLocalAlignments`, `tracePointDistance`,
+    /// and `skipTracePoints`.
+    void close()
+    {
+        las.close();
+        aLengths = [];
+        bLengths = [];
+        numLocalAlignmentsLeft = 0;
+        currentLA = FlatLocalAlignment.init;
+        overlapHead = DazzlerOverlap.init;
+        tracePointBuffer = [];
+        fullTracePointBuffer = [];
     }
 
 
@@ -3865,6 +3890,8 @@ string filterLocalAlignments(alias pred)(in string dbFile, in string lasFile)
         lasFile,
         BufferMode.overwrite,
     );
+    scope (exit)
+        flatLocalAlignments.close();
 
     filteredLasFile.writeAlignments(flatLocalAlignments.filter!pred);
 
@@ -3977,6 +4004,8 @@ string chainLocalAlignments(
         lasFile,
         BufferMode.preallocated,
     );
+    scope (exit)
+        flatLocalAlignments.close();
 
     auto chainedAlignments = chainLocalAlignmentsAlgo(
         flatLocalAlignments,
@@ -4018,8 +4047,9 @@ string filterPileUpAlignments(
     Flag!"forceFlat" forceFlat = No.forceFlat,
 )
 {
-    auto alignments = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated)
-        .array;
+    auto reader = getFlatLocalAlignments(dbFile, lasFile, BufferMode.preallocated);
+    auto alignments = reader.array;
+    reader.close();
 
     filterPileUpAlignments(alignments, properAlignmentAllowance, forceFlat);
 
