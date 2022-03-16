@@ -939,7 +939,7 @@ checkpoint reference2dam:
     container: dentist_container
     conda: dentist_env
     shell:
-        "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+        "fold -w9998 {input} | fasta2DAM -i{input} {output[0]} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
 # _fast2dam_checkpoint[reference] = "reference2dam"
@@ -950,7 +950,7 @@ checkpoint reference2dam:
 #         container: dentist_container
 #         conda: dentist_env
 #         shell:
-#             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+#             "fold -w9998 {input} | fasta2DAM -i{input} {output[0]} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 # else:
 #     checkpoint reference2dam:
 #         input: reference_fasta
@@ -958,7 +958,7 @@ checkpoint reference2dam:
 #         container: dentist_container
 #         conda: dentist_env
 #         shell:
-#             "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+#             "fold -w9998 {input} | fasta2DAM -i{input} {output[0]} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
 rule mark_assembly_reference:
@@ -973,7 +973,7 @@ checkpoint preliminary_gap_closed2dam:
     container: dentist_container
     conda: dentist_env
     shell:
-        "fasta2DAM {output[0]} {input} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
+        "fold -w9998 {input} | fasta2DAM -i{input} {output[0]} && DBsplit {additional_reference_dbsplit_options} {output[0]}"
 
 
 rule mark_assembly_preliminary_gap_closed:
@@ -1132,7 +1132,7 @@ checkpoint reads2db:
     container: dentist_container
     conda: dentist_env
     shell:
-        "{params.fasta2dazz} {output[0]} {input} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
+        "fold -w9998 {input} | {params.fasta2dazz} -i{input} {output[0]} && DBsplit {additional_reads_dbsplit_options} {output[0]}"
 
 
 rule mark_reads:
