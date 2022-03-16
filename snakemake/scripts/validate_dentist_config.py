@@ -1,12 +1,12 @@
-import json
 import subprocess
+import yaml
 
 
 def full_validate_dentist_config(config_file):
     errors = list()
     config = None
     with open(config_file, "r") as cf:
-        config = json.load(cf)
+        config = yaml.safe_load(cf)
 
     def prohibit_revert_in_default():
         if "__default__" in config:
