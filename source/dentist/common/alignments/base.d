@@ -118,7 +118,7 @@ struct Locus
 
 
 /// Alignment flag.
-enum Flag : ubyte
+enum Flag : byte
 {
     /// Alignment is relative the the reverse-complement of contig B.
     complement = 1 << 0,
