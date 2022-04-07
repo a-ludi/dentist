@@ -17,7 +17,7 @@ From: ubuntu:16.04
     # Provide alternative location for bash
     ln -s /bin/bash /usr/bin/bash
 
-    apt-get update && apt-get install -y git curl patch
+    apt-get update && apt-get install -y git curl patch python3
     curl https://repo.anaconda.com/miniconda/Miniconda3-py39_4.9.2-Linux-x86_64.sh > install.sh
     chmod +x install.sh
     ./install.sh -b -p /opt/miniconda3
