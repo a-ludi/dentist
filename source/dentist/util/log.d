@@ -260,6 +260,35 @@ enum LogLevel
 }
 
 
+/// Get a stack trace for the calling frame as JSON object.
+///
+/// Generating a stack trace takes quite some CPU cycles so this function will
+/// do that if `shouldLog(level)`; otherwise an empty array is returned.
+///
+/// Params:
+///     level = The log level for the stack trace
+///
+/// Returns: stack trace for the calling frame.
+auto getStackTrace(LogLevel level=LogLevel.max)
+{
+    import std.conv : to;
+    import core.runtime : defaultTraceHandler;
+    import vibe.data.json : Json, toJson = serializeToJson;
+
+    if (!shouldLog(level))
+        return Json.emptyArray;
+
+    string[] trace;
+    foreach (line; defaultTraceHandler())
+        trace ~= line.to!string;
+
+    // discard irrelevant frames
+    trace = trace[3 .. $];
+
+    return trace.toJson;
+}
+
+
 /// Do not use directly. Use `mixin(traceExecution)` instead.
 struct ExecutionTracer(LogLevel logLevel = LogLevel.diagnostic)
 {

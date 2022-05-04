@@ -93,7 +93,7 @@ import std.path :
     stripExtension,
     withExtension;
 import std.process : Config, escapeShellCommand, kill, pipeProcess,
-    ProcessPipes, Redirect, wait;
+    Redirect, wait;
 import std.range :
     chain,
     chunks,
@@ -6205,6 +6205,12 @@ private
             );
         }
 
+        debug (Issue31_TooManyOpenFiles)
+            logJsonError(
+                "function", "fasta2dam()",
+                "command", command.toJson,
+                "stackTrace", getStackTrace(),
+            );
         auto process = pipeProcess(
             ["fasta2DAM", Fasta2DazzlerOptions.fromStdin, outFile],
             Redirect.stdin,
@@ -6269,6 +6275,12 @@ private
             );
         }
 
+        debug (Issue31_TooManyOpenFiles)
+            logJsonError(
+                "function", "fasta2db()",
+                "command", command.toJson,
+                "stackTrace", getStackTrace(),
+            );
         auto process = pipeProcess(
             ["fasta2DB", Fasta2DazzlerOptions.fromStdin, outFile],
             Redirect.stdin,
@@ -6469,6 +6481,13 @@ private
             "command", sanitizedCommand.map!Json.array,
             "state", "pre",
         );
+        debug (Issue31_TooManyOpenFiles)
+            logJsonError(
+                "function", "executeWrapper()",
+                "type", type,
+                "command", sanitizedCommand.toJson,
+                "stackTrace", getStackTrace(),
+            );
         auto result = execCall(sanitizedCommand);
         logJsonDiagnostic(
             "action", "execute",

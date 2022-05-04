@@ -106,6 +106,12 @@ final class LinesPipe(CommandInfo, Flag!"isBuffered" isBuffered)
     private this(CommandInfo processInfo)
     {
         this.processInfo = processInfo;
+        debug (Issue31_TooManyOpenFiles)
+            logJsonError(
+                "function", "LinesPipe()",
+                "command", processInfo.command.toJson,
+                "stackTrace", getStackTrace(),
+            );
     }
 
     ~this()
