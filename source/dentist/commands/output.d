@@ -450,6 +450,102 @@ class AssemblyWriter
         agpFile.writefln!"# object\tobject_beg\tobject_end\tpart_number\tcomponent_type\tcomponent_id/gap_length\tcomponent_beg/gap_type\tcomponent_end/linkage\torientation\tlinkage_evidence"();
     }
 
+    void writeAGPContig(
+        id_t contigId,
+        size_t contigBegin,
+        size_t contigEnd,
+        bool complement,
+        AGPLinkageEvidence linkageEvidence = AGPLinkageEvidence.na,
+    )
+    in (agpFile.isOpen)
+    {
+        writeAGPComponent(
+            AGPComponentType.wgsContig,
+            contigId.to!string,
+            contig.begin + contigBegin,
+            contig.begin + contigEnd,
+            complement,
+            linkageEvidence,
+        );
+    }
+
+    void writeAGPInsertion(
+        const id_t[] readIds,
+        size_t insertionBegin,
+        size_t insertionEnd,
+        bool complement,
+        AGPLinkageEvidence linkageEvidence = AGPLinkageEvidence.cloneContig,
+    )
+    in (agpFile.isOpen)
+    {
+        writeAGPComponent(
+            AGPComponentType.otherSequence,
+            format!"reads-%(%d-%)"(readIds[]),
+            insertionBegin,
+            insertionEnd,
+            complement,
+            linkageEvidence,
+        );
+    }
+
+    void writeAGPComponent(
+        AGPComponentType componentType,
+        string componentId,
+        size_t componentBeg,
+        size_t componentEnd,
+        bool complement,
+        AGPLinkageEvidence linkageEvidence,
+    )
+    in (agpFile.isOpen)
+    {
+        writeAGPObject();
+        // component_type
+        agpFile.writef!"%s\t"(cast(string) componentType);
+        // component_id/gap_length
+        agpFile.writef!"%s\t"(componentId);
+        // component_beg/gap_type
+        agpFile.writef!"%d\t"(componentBeg);
+        // component_end/linkage
+        agpFile.writef!"%d\t"(componentEnd);
+        // orientation
+        agpFile.writef!"%s\t"(complement ? "+" : "-");
+        // linkage_evidence
+        agpFile.writef!"%s\n"(cast(string) linkageEvidence);
+    }
+
+    void writeAGPGap(
+        size_t gapLength,
+        string gapType = "scaffold",
+        AGPLinkageEvidence linkageEvidence = AGPLinkageEvidence.unspecified,
+    )
+    in (agpFile.isOpen)
+    {
+        writeAGPObject();
+        // component_type
+        agpFile.writef!"%s\t"(cast(string) AGPComponentType.gapWithSpecifiedSize);
+        // component_id/gap_length
+        agpFile.writef!"%d\t"(gapLength);
+        // component_beg/gap_type
+        agpFile.writef!"%s\t"(gapType);
+        // component_end/linkage
+        agpFile.writef!"%s\t"("yes");
+        // orientation
+        agpFile.writef!"%s\t"("na");
+        // linkage_evidence
+        agpFile.writef!"%s\n"(cast(string) linkageEvidence);
+    }
+
+    void writeAGPObject()
+    in (agpFile.isOpen)
+    {
+        string object = currentScaffold.split("\t")[0];
+        coord_t objectBeg = currentScaffoldCoord;
+        coord_t objectEnd = nextScaffoldCoord - 1;
+        id_t partNumber = currentScaffoldPartId;
+
+        agpFile.writef!"%s\t%d\t%d\t%d\t"(object, objectBeg, objectEnd, partNumber);
+    }
+
     void logSparseInsertionWalks()
     {
         auto oldLogLevel = getLogLevel();
@@ -661,18 +757,12 @@ class AssemblyWriter
         nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
-            agpFile.writeln(only(
-                currentScaffold.split("\t")[0],
-                to!string(currentScaffoldCoord),
-                to!string(nextScaffoldCoord - 1),
-                to!string(currentScaffoldPartId),
-                cast(string) AGPComponentType.wgsContig,
-                to!string(insertionInfo.contigId),
-                to!string(insertionInfo.cropping.begin),
-                to!string(insertionInfo.cropping.end),
-                insertionInfo.complement ? "+" : "-",
-                cast(string) AGPLinkageEvidence.na,
-            ).joiner("\t"));
+            writeAGPContig(
+                insertionInfo.contigId,
+                insertionInfo.cropping.begin,
+                insertionInfo.cropping.end,
+                insertionInfo.complement,
+            );
 
         static if (isTesting)
             contigAlignments ~= ContigMapping(
@@ -713,18 +803,7 @@ class AssemblyWriter
         nextContigCoord = currentContigCoord + cast(coord_t) insertionInfo.length;
 
         if (agpFile.isOpen)
-            agpFile.writeln(only(
-                currentScaffold.split("\t")[0],
-                to!string(currentScaffoldCoord),
-                to!string(nextScaffoldCoord - 1),
-                to!string(currentScaffoldPartId),
-                cast(string) AGPComponentType.gapWithSpecifiedSize,
-                to!string(insertion.payload.contigLength),
-                to!string("scaffold"),
-                to!string("yes"),
-                to!string("na"),
-                cast(string) AGPLinkageEvidence.unspecified,
-            ).joiner("\t"));
+            writeAGPGap(insertion.payload.contigLength);
 
         logJsonDebug(
             "info", "writing gap",
@@ -755,18 +834,12 @@ class AssemblyWriter
         auto rightContigId = insertion.target(begin).contigId;
 
         if (agpFile.isOpen)
-            agpFile.writeln(only(
-                currentScaffold.split("\t")[0],
-                to!string(currentScaffoldCoord),
-                to!string(nextScaffoldCoord - 1),
-                to!string(currentScaffoldPartId),
-                cast(string) AGPComponentType.otherSequence,
-                format!"reads-%(%d-%)"(insertion.payload.readIds),
-                to!string(insertionInfo.cropping.begin),
-                to!string(insertionInfo.cropping.end),
-                to!string(insertionInfo.complement ? '+' : '-'),
-                cast(string) AGPLinkageEvidence.cloneContig,
-            ).joiner("\t"));
+            writeAGPInsertion(
+                insertion.payload.readIds,
+                insertionInfo.cropping.begin,
+                insertionInfo.cropping.end,
+                insertionInfo.complement,
+            );
 
         if (closedGapsBedFile.isOpen)
             closedGapsBedFile.writeln(only(
