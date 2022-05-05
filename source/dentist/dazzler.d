@@ -118,7 +118,7 @@ import std.range.primitives :
     save,
     walkLength;
 import std.stdio : File;
-import std.string : lineSplitter, outdent;
+import std.string : lineSplitter, outdent, splitLines;
 import std.traits : isArray, isIntegral, isSomeString, ReturnType, Unqual;
 import std.typecons : Flag, No, tuple, Tuple, Yes;
 import std.uni : toUpper;
@@ -4516,6 +4516,88 @@ id_t getNumContigs(in string dbFile, Flag!"untrimmedDb" untrimmedDb = No.untrimm
     }
 
     return numContigs;
+}
+
+
+/// Returns an array of read/contig headers of the give `.db` or `.dam`.
+///
+/// Returns: array of read/contig headers.
+string[] getDbHeaders(in string dbFile)
+{
+    enum string[] dbshowOptions = [DBshowOptions.noSequence];
+
+    auto rawHeaders = dbshow(dbFile, dbshowOptions);
+    auto headers = parseHeadersFromDbshow(rawHeaders, dbFile.endsWith(damFileExtension));
+
+    return headers;
+}
+
+
+private string[] parseHeadersFromDbshow(in string rawHeaders, bool isDam)
+{
+    auto headers = splitLines(rawHeaders);
+
+    if (isDam)
+        foreach (ref header; headers)
+            header = header.sliceUntil(" :: ");
+
+    return headers;
+}
+
+unittest
+{
+    auto exampleDump = q"EOS
+>translocated_gaps_48 with extra stuff :: Contig 0[0,1841737]
+>translocated_gaps_48 with extra stuff :: Contig 1[1841765,2336850]
+>translocated_gaps_48 with extra stuff :: Contig 2[2336926,2543450]
+>translocated_gaps_48 with extra stuff :: Contig 3[2543547,3036363]
+>translocated_gaps_49 with extra stuff :: Contig 0[0,1841737]
+>translocated_gaps_49 with extra stuff :: Contig 1[1841765,2336850]
+>translocated_gaps_49 with extra stuff :: Contig 2[2336926,2543450]
+EOS";
+
+    auto headers = parseHeadersFromDbshow(exampleDump, true).array;
+
+    assert(headers == [
+        ">translocated_gaps_48 with extra stuff",
+        ">translocated_gaps_48 with extra stuff",
+        ">translocated_gaps_48 with extra stuff",
+        ">translocated_gaps_48 with extra stuff",
+        ">translocated_gaps_49 with extra stuff",
+        ">translocated_gaps_49 with extra stuff",
+        ">translocated_gaps_49 with extra stuff",
+    ]);
+}
+
+unittest
+{
+    auto exampleDump = q"EOS
+>Sim/1/0_37105 RQ=0.870
+>Sim/2/0_21902 RQ=0.870
+>Sim/3/0_41326 RQ=0.870
+>Sim/4/0_21429 RQ=0.870
+>Sim/5/0_43291 RQ=0.870
+>Sim/6/0_24692 RQ=0.870
+>Sim/7/0_26844 RQ=0.870
+>Sim/8/0_41144 RQ=0.870
+>Sim/9/0_16887 RQ=0.870
+>Sim/10/0_19330 RQ=0.870
+EOS";
+
+    auto headers = parseHeadersFromDbshow(exampleDump, false).array;
+
+    assert(headers == [
+        ">Sim/1/0_37105 RQ=0.870",
+        ">Sim/2/0_21902 RQ=0.870",
+        ">Sim/3/0_41326 RQ=0.870",
+        ">Sim/4/0_21429 RQ=0.870",
+        ">Sim/5/0_43291 RQ=0.870",
+        ">Sim/6/0_24692 RQ=0.870",
+        ">Sim/7/0_26844 RQ=0.870",
+        ">Sim/8/0_41144 RQ=0.870",
+        ">Sim/9/0_16887 RQ=0.870",
+        ">Sim/10/0_19330 RQ=0.870",
+    ]);
 }
 
 
