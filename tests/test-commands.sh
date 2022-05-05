@@ -51,18 +51,18 @@ AJaCOBZtYujdAG0tnLxwDKCgH73Xb+idRXGl0koeSYELaRSG9gCZesoUDM1ZFDxFZnrt/L4RKpge
 WbBwMqHlOvJt/ra07NOMuLu8vrq51Q+b+0eYFMRR6qJF6oovswOmxvjIZH9Ykzqeo23HyTuB9gma
 j7MVPNdN/zTeY95ZlwuzKgU+DkupCC5etks8UdYpR0NczlorKDrhgEK6QzFbze6zPGR9ruC3v1gp
 OH6j7nw0uzk/fQFgPnmIgwEAAA=="
-# generate with: md5sum data/* data/.??* dentist.json snakemake.json checksums.output.md5 | bzip2 | base64
+# generate with: md5sum data/* data/.??* dentist.json snakemake.json | gzip | base64
 INPUT_CHECKSUMS_DATA="\
-H4sIAAAAAAAAA33QSW4cMQwF0H2doi6QtiQOko7DSfCQahutaiC5fQSks4rtBXd8/CQl4dDiBX2I
-ayvai7AUso4lmsm+u5zyJHPGoT9//7jFiFtcLS4ux1adcyqFEkHJAFCrU4R2VLMw6l/rIfOUrWpS
-tOFQHWtHtuoe2aKPFV71v/Qz5vmg1sBWEHviMaBrFxWDhNYUcuJ/0bcQnw8CSFK0UgBJ62QmLusC
-IVDOCuNBLp+sqx9zS3XUlIs1HLxWBo51c+0GhEIh/Rv+7LctJWZnR7HFlKi55zSwRZGkVfM3/MV/
-bVkUA3qEjNpE1H1UTky9ryFJdPG4ni/rP6/z/bpRzplqDKRuIblU9WHOKsNG9MT7Pq/yFseqv6Bx
-QfBEq4URA8EYO9VEVhwSwL7bc9jbvB/z8n4/P+7n5XDa/gBNiB0wQAIAAA=="
+H4sIAAAAAAAAA33QOVIDQQwF0HxOMRfA9KZW6zhaCwMeKM8EcHu6ChMBDhQ+/S9xaiHFSrNgk1GE
+CncuoNSKD+V1NT74kffdL/L6+XD18Ktv6ifjy4LWcyoFEtSSa62IBu5CTVRdgf7XwfvBC0qSpmEV
+rSG1rmjmWZ1ihqP8Sj98P25UR9UZ1C31iEpCLKw1NR1Sc+o/0Vdn22+kNuAiCF6BB4EqG88LGKr0
+LDVu5PRHXXnfl4SBKRcdLfqsXLvPm5G0QmNwpjv8ya5LSr1bt8Y6mQAMs5yiDS+cBCXf4Wf7WDJL
+80ruHDiYxSywpw5Ec0limdy34zz/87y/bQvknAE9GpA654JiodaFQ8Mp9XXdN37xy5xv8AWelVCk
+CQIAAA=="
 # generate with: md5sum gap-closed.closed-gaps.bed gap-closed.fasta | gzip | base64
 OUTPUT_CHECKSUMS_DATA="\
-H4sIAAAAAAAAA1XLQQqEMAxA0b2n8AKKSZOmOU7SpG4GZqBzfxRcufrw4EMlcG+QiJ0NNVQCOBWR
-/DCWdT3tt/XPd2bsT7Zb5u4ZC9M4koQlvCWQDuiqRai2klCLvuZh82/LBUObCp1wAAAA"
+H4sIAAAAAAAAA1XLSwrDMAxF0XlWkQ0kyJblyMt51ieTQgvu/mmho44uHLiSOppIFiPtIJ9zFmlj
+hJVrBPO+33gd9niu8POX4yvrnOGbsXJ3IwKnRIkKaFYoVUfzfv3NifXG9gHK8nuEcAAAAA=="
 
 
 function _decompress()
@@ -209,7 +209,7 @@ function run_workflow()
     dentist collect --config=dentist.json  --threads=1 --auxiliary-threads=1 --mask=dentist-self-H,tan-H,dentist-reads-H workdir/assembly-test.dam workdir/reads.db workdir/assembly-test.reads.las workdir/pile-ups.db
     dentist process --config=dentist.json  --threads=1 --auxiliary-threads=1 --mask=dentist-self-H,tan-H,dentist-reads-H --batch=0..2 workdir/assembly-test.dam workdir/reads.db workdir/pile-ups.db workdir/insertions/batch.0.db
     dentist merge-insertions workdir/insertions.db workdir/insertions/batch.0.db
-    dentist output --config=dentist.json  --agp=workdir/gap-closed-preliminary.closed-gaps.agp --closed-gaps-bed=workdir/gap-closed-preliminary.closed-gaps.bed --revert=scaffolding,skip-gaps,skip-gaps-file workdir/assembly-test.dam workdir/insertions.db workdir/gap-closed-preliminary.fasta
+    dentist output --config=dentist.json  --agp=workdir/gap-closed-preliminary.closed-gaps.agp --closed-gaps-bed=workdir/gap-closed-preliminary.closed-gaps.bed --revert=scaffolding,skip-gaps,skip-gaps-file,agp-dazzler --agp-dazzler workdir/assembly-test.dam workdir/reads.db workdir/insertions.db workdir/gap-closed-preliminary.fasta
     fasta2DAM workdir/gap-closed-preliminary.dam workdir/gap-closed-preliminary.fasta && DBsplit -x20 workdir/gap-closed-preliminary.dam
     dentist bed2mask --config=dentist.json  --data-comments --bed=workdir/gap-closed-preliminary.closed-gaps.bed workdir/gap-closed-preliminary.dam closed-gaps
     ( cd workdir && datander '-T1' -s126 -l500 -e0.7 gap-closed-preliminary.1 )
@@ -226,7 +226,7 @@ function run_workflow()
     dentist merge-masks --config=dentist.json  workdir/gap-closed-preliminary.dam dentist-weak-coverage 1.dentist-weak-coverage
     cat workdir/validation-report.1.json > workdir/validation-report.json
     jq -r 'select(.isValid // false | not) | .contigIds | map(tostring) | join("-")' workdir/validation-report.json > workdir/skip-gaps.txt
-    dentist output --config=dentist.json  --agp=gap-closed.agp --closed-gaps-bed=gap-closed.closed-gaps.bed --skip-gaps-file=workdir/skip-gaps.txt workdir/assembly-test.dam workdir/insertions.db gap-closed.fasta
+    dentist output --config=dentist.json  --agp=gap-closed.agp --closed-gaps-bed=gap-closed.closed-gaps.bed --skip-gaps-file=workdir/skip-gaps.txt workdir/assembly-test.dam workdir/reads.db workdir/insertions.db gap-closed.fasta
 )
 
 
