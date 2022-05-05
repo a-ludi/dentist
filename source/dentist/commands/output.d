@@ -72,11 +72,12 @@ import dentist.common.scaffold :
 import dentist.dazzler :
     ContigSegment,
     GapSegment,
+    getDbHeaders,
     getNumContigs,
     getFastaSequence,
     getScaffoldStructure,
     ScaffoldSegment;
-import dentist.util.algorithm : replaceInPlace;
+import dentist.util.algorithm : replaceInPlace, sliceUntil;
 import dentist.util.fasta : complement, reverseComplementer;
 import dentist.util.log;
 import dentist.util.math :
@@ -108,7 +109,7 @@ import std.algorithm :
     sort,
     swap,
     swapAt;
-import std.array : array, split;
+import std.array : array, join, split;
 import std.ascii : toUpper;
 import std.conv : to;
 import std.format : format;
@@ -122,6 +123,7 @@ import std.range :
 import std.range.primitives : empty, front, popFront, save;
 import std.stdio : File, stderr, stdout;
 import std.typecons : Flag, No, tuple, Tuple, Yes;
+import std.ascii : isWhite;
 import vibe.data.json : Json, toJson = serializeToJson;
 
 
@@ -198,6 +200,7 @@ class AssemblyWriter
     protected const(ScaffoldSegment)[] scaffoldStructure;
     size_t numReferenceContigs;
     const(ContigSegment)[] contigs;
+    string[] readFastaIds;
     bool[size_t[2]] skipGaps;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
@@ -277,6 +280,14 @@ class AssemblyWriter
             .filter!(part => part.peek!ContigSegment !is null)
             .map!(contigPart => contigPart.get!ContigSegment)
             .array;
+        readFastaIds = !agpFile.isOpen || options.agpDazzler || options.agpSkipReadIds
+            ? []
+            : getDbHeaders(options.readsDb);
+
+        // remove leading `>` and take only the prefix up to a whitespace
+        foreach (ref header; readFastaIds)
+            header = header[1 .. $].sliceUntil!isWhite;
+
         foreach (skipGap; options.skipGaps)
         {
 
@@ -459,9 +470,16 @@ class AssemblyWriter
     )
     in (agpFile.isOpen)
     {
+        const contig = options.agpDazzler
+            ? ContigSegment(contigId)
+            : contigs[contigId - 1];
+        assert(contig.globalContigId == contigId);
+
         writeAGPComponent(
             AGPComponentType.wgsContig,
-            contigId.to!string,
+            options.agpDazzler
+                ? contigId.to!string
+                : contig.header[1 .. $].split("\t")[0],
             contig.begin + contigBegin,
             contig.begin + contigEnd,
             complement,
@@ -480,7 +498,14 @@ class AssemblyWriter
     {
         writeAGPComponent(
             AGPComponentType.otherSequence,
-            format!"reads-%(%d-%)"(readIds[]),
+            options.agpSkipReadIds
+                ? format!"%d reads"(readIds.length)
+                : (options.agpDazzler
+                    ? format!"reads-%(%d-%)"(readIds[])
+                    : readIds[]
+                        .map!(readId => readFastaIds[readId - 1])
+                        .join(" ")
+                ),
             insertionBegin,
             insertionEnd,
             complement,

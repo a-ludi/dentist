@@ -673,6 +673,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.collectPileUps,
         DentistCommand.processPileUps,
         DentistCommand.validateRegions,
+        DentistCommand.output,
     ))
     {
         static if (command.among(
@@ -1001,6 +1002,27 @@ struct OptionsFor(DentistCommand _command)
         @Option("agp")
         @Help(format!"write AGP v%s file that describes the output assembly"(agpVersion))
         string agpFile;
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("agp-dazzler")
+        @Help("use Dazzler DB contig IDs to identify AGP components")
+        OptionFlag agpDazzler;
+    }
+
+    static if (command.among(
+        DentistCommand.output,
+    ))
+    {
+        @Option("agp-skip-read-ids")
+        @Help("
+            do not enumerate all reads used for gap closing in AGP file to
+            reduce the resulting file size
+        ")
+        OptionFlag agpSkipReadIds;
     }
 
     static if (command.among(

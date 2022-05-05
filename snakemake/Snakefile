@@ -830,7 +830,7 @@ insertions = join(workdir_, workflow_.get("insertions", "insertions.db"))
 # command-specific
 from os import environ
 dentist_flags = environ.get("DENTIST_FLAGS", "")
-preliminary_output_revert_options = ["scaffolding", "skip-gaps", "skip-gaps-file"]
+preliminary_output_revert_options = ["scaffolding", "skip-gaps", "skip-gaps-file", "agp-dazzler"]
 
 if is_dentist_testing():
     preliminary_output_revert_options.append("cache-contig-alignments")
@@ -1362,6 +1362,7 @@ rule preliminary_output:
     input:
         config = dentist_config_file,
         refdb = await_db_files(reference),
+        readsdb = await_db_files(reads),
         insertions = insertions
     output:
         fasta = preliminary_gap_closed_fasta,
@@ -1373,7 +1374,7 @@ rule preliminary_output:
     container: dentist_container
     conda: dentist_env
     shell:
-        "dentist output --config={input.config} {dentist_flags} --agp={output[agp]} --closed-gaps-bed={output[bed]} {params.revert_options} {input.refdb[0]} {input.insertions} {output[fasta]} 2> {log}"
+        "dentist output --config={input.config} {dentist_flags} --agp-dazzler --agp={output[agp]} --closed-gaps-bed={output[bed]} {params.revert_options} {input.refdb[0]} {input.readsdb[0]} {input.insertions} {output[fasta]} 2> {log}"
 
 
 rule preliminary_gap_closed_vs_reads_alignment_block:
@@ -1501,6 +1502,7 @@ if workflow_flags["no_purge_output"]:
         input:
             config = dentist_config_file,
             refdb = await_db_files(reference),
+            readsdb = await_db_files(reads),
             insertions = insertions
         output:
             fasta = gap_closed_fasta,
@@ -1510,12 +1512,13 @@ if workflow_flags["no_purge_output"]:
         container: dentist_container
         conda: dentist_env
         shell:
-            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
+            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} {input.refdb[0]} {input.readsdb[0]} {input.insertions} {output.fasta} 2> {log}"
 else:
     rule purged_output:
         input:
             config = dentist_config_file,
             refdb = await_db_files(reference),
+            readsdb = await_db_files(reads),
             insertions = insertions,
             skip_gaps = skip_gaps
         output:
@@ -1526,7 +1529,7 @@ else:
         container: dentist_container
         conda: dentist_env
         shell:
-            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} --skip-gaps-file={input.skip_gaps} {input.refdb[0]} {input.insertions} {output.fasta} 2> {log}"
+            "dentist output --config={input.config} {dentist_flags} --agp={output.agp} --closed-gaps-bed={output.bed} --skip-gaps-file={input.skip_gaps} {input.refdb[0]} {input.readsdb[0]} {input.insertions} {output.fasta} 2> {log}"
 
 
 #-----------------------------------------------------------------------------
