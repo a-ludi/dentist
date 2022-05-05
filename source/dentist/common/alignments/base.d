@@ -2109,6 +2109,18 @@ struct ReadAlignment
     }
 
 
+    /// Returns true if both read alignments are equal.
+    bool opEquals(const ReadAlignment other) const pure nothrow
+    {
+        return this == other;
+    }
+
+    bool opEquals(const ref ReadAlignment other) const pure nothrow
+    {
+        return this[] == other[];
+    }
+
+
     /**
         If readAlignment is a gap return true iff the first alignment's
         `contigA.id` is lower than the second alignment's; otherwise returns
