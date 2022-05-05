@@ -108,7 +108,7 @@ import std.algorithm :
     sort,
     swap,
     swapAt;
-import std.array : array;
+import std.array : array, split;
 import std.ascii : toUpper;
 import std.conv : to;
 import std.format : format;
@@ -197,7 +197,7 @@ class AssemblyWriter
     protected const Options options;
     protected const(ScaffoldSegment)[] scaffoldStructure;
     size_t numReferenceContigs;
-    size_t[] contigLengths;
+    const(ContigSegment)[] contigs;
     bool[size_t[2]] skipGaps;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
@@ -273,10 +273,9 @@ class AssemblyWriter
 
         numReferenceContigs = getNumContigs(options.refDb);
         scaffoldStructure = getScaffoldStructure(options.refDb).array;
-        contigLengths = scaffoldStructure
+        contigs = scaffoldStructure
             .filter!(part => part.peek!ContigSegment !is null)
             .map!(contigPart => contigPart.get!ContigSegment)
-            .map!(contigPart => contigPart.end - contigPart.begin + 0)
             .array;
         foreach (skipGap; options.skipGaps)
         {
@@ -308,7 +307,7 @@ class AssemblyWriter
             .map!"a.value";
 
         assemblyGraph = initScaffold!(
-            contigId => InsertionInfo(CompressedSequence(), contigLengths[contigId - 1], []),
+            contigId => InsertionInfo(CompressedSequence(), contigs[contigId - 1].length, []),
             InsertionInfo,
         )(numReferenceContigs);
         assemblyGraph.bulkAdd!(joins => mergeInsertions(joins))(insertions);
@@ -621,10 +620,11 @@ class AssemblyWriter
 
     protected string scaffoldHeader(in ContigNode begin, in Flag!"isCyclic" isCyclic)
     {
-        if (isCyclic)
-            return format!"circular-scaffold-%d"(begin.contigId);
-        else
-            return format!"scaffold-%d"(begin.contigId);
+        // get orig scaffold header and drop the leading `>`
+        auto origScaffoldHeader = contigs[begin.contigId - 1].header[1 .. $];
+        auto circularSuffix = isCyclic ? "\tisCyclic" : "";
+
+        return format!"%s\tscaffold-%d%s"(origScaffoldHeader, begin.contigId, circularSuffix);
     }
 
     protected void writeHeader()
@@ -662,7 +662,7 @@ class AssemblyWriter
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
-                currentScaffold,
+                currentScaffold.split("\t")[0],
                 to!string(currentScaffoldCoord),
                 to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
@@ -714,7 +714,7 @@ class AssemblyWriter
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
-                currentScaffold,
+                currentScaffold.split("\t")[0],
                 to!string(currentScaffoldCoord),
                 to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
@@ -756,7 +756,7 @@ class AssemblyWriter
 
         if (agpFile.isOpen)
             agpFile.writeln(only(
-                currentScaffold,
+                currentScaffold.split("\t")[0],
                 to!string(currentScaffoldCoord),
                 to!string(nextScaffoldCoord - 1),
                 to!string(currentScaffoldPartId),
@@ -770,7 +770,7 @@ class AssemblyWriter
 
         if (closedGapsBedFile.isOpen)
             closedGapsBedFile.writeln(only(
-                currentScaffold,
+                currentScaffold.split("\t")[0],
                 to!string(currentScaffoldCoord - 1),
                 to!string(nextScaffoldCoord),
                 format!("%s-%d-%d|%s-%(%d-%)")(

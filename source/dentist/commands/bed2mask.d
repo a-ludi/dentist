@@ -99,7 +99,7 @@ ContigSegment[][string] getContigsByScaffold(string refDb)
             .chunkBy!"a.scaffoldId == b.scaffoldId";
 
     foreach (contigChunk; contigChunks)
-        contigsByScaffold[contigChunk.front.header[1 .. $]] = contigChunk.array;
+        contigsByScaffold[contigChunk.front.header.split("\t")[0][1 .. $]] = contigChunk.array;
 
     return contigsByScaffold;
 }
