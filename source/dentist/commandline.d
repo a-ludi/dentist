@@ -2654,6 +2654,9 @@ struct OptionsFor(DentistCommand _command)
         /// This is a temporary directory to store all working data.
         @Option("tmpdir", "P")
         @Help("use <string> as a working directory")
+        @Validate!(validateNonConfundingPath!("Pass a temporary directory " ~
+            "without such a pattern via environment variable TMPDIR or CLI " ~
+            "option --tmpdir, -P or config option `__default__.tmpdir`."))
         string tmpdir;
 
         @PostValidate(Priority.high)
@@ -3700,6 +3703,29 @@ protected
                 );
             }
         }
+    }
+
+
+    /// Validate `file` does not contain any `.[digits]` pattern which may
+    /// confund `daccord` and friends into thinking it is a DB block number.
+    ///
+    /// Params:
+    ///     file =       file path to be validated
+    ///     fix_guide =  short guide on how to best fix the issue
+    ///     msg =        error message on validation failure. The first
+    ///                  placeholder is for `file` and the second for
+    ///                  `fix_guide`
+    /// See_also: $(LINK https://github.com/a-ludi/dentist/issues/32)
+    void validateNonConfundingPath(
+        string fix_guide,
+        string msg = "path contains a `.[digits]` pattern which may confund " ~
+        "`daccord` and friends (https://github.com/a-ludi/dentist/issues/32): " ~
+        "%s\n\n%s",
+    )(in string file)
+    {
+        enum dotDigitsRegex = ctRegex!`\.[0-9]+([./]|$)`;
+
+        validate(!file.matchFirst(dotDigitsRegex), format(msg, file, fix_guide));
     }
 
 
