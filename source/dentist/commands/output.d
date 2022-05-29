@@ -202,6 +202,7 @@ class AssemblyWriter
     const(ContigSegment)[] contigs;
     string[] readFastaIds;
     bool[size_t[2]] skipGaps;
+    StringUniqifier!size_t getUniqScaffold;
     OutputScaffold assemblyGraph;
     OutputScaffold.IncidentEdgesCache incidentEdgesCache;
     ContigNode[] scaffoldStartNodes;
@@ -741,11 +742,20 @@ class AssemblyWriter
 
     protected string scaffoldHeader(in ContigNode begin, in Flag!"isCyclic" isCyclic)
     {
-        // get orig scaffold header and drop the leading `>`
-        auto origScaffoldHeader = contigs[begin.contigId - 1].header[1 .. $];
-        auto circularSuffix = isCyclic ? "\tisCyclic" : "";
+        const contigId = begin.contigId;
+        // get original scaffold ID and make sure there is no tab contained
+        const origScaffId = contigs[contigId - 1].header[1 .. $].sliceUntil('\t');
+        // get a uniquified version of `origScaffId`
+        const uniqScaffId = getUniqScaffold(contigId, origScaffId);
+        // append additional information
+        const circularSuffix = isCyclic ? "\tisCyclic" : "";
+        const header = format!"%s\tscaffold-%d%s"(
+            uniqScaffId,
+            contigId,
+            circularSuffix,
+        );
 
-        return format!"%s\tscaffold-%d%s"(origScaffoldHeader, begin.contigId, circularSuffix);
+        return header;
     }
 
     protected void writeHeader()
@@ -1019,4 +1029,47 @@ private ReadAlignmentType getType(in Insertion insertion)
         return ReadAlignmentType.back;
     else
         assert(0, "illegal insertion type");
+}
+
+
+struct StringUniqifier(K, string fmt = "%s-%d")
+{
+    protected size_t[string] dupCounts;
+    protected string[K] cache;
+
+    string opCall(K key, string label)
+    {
+        // check cache first
+        auto cacheHit = key in cache;
+        if (cacheHit)
+            // found ulabel in cache
+            return *cacheHit;
+
+        // get the number of duplciates of `label`
+        const dupCount = dupCounts.get(label, 0);
+        const ulabel = dupCount == 0
+            // use plain `label` if there are no duplicates
+            ? label
+            // create a unique label from `fmt`
+            : format!fmt(label, dupCount);
+
+        // add `ulabel` to cache
+        cache[key] = ulabel;
+        // update dupcliate counts
+        dupCounts[label] = dupCount + 1;
+
+        return ulabel;
+    }
+}
+
+unittest
+{
+    StringUniqifier!int uniq;
+
+    assert(uniq(1, "A") == "A");
+    assert(uniq(1, "A") == "A");
+    assert(uniq(2, "A") == "A-1");
+    assert(uniq(2, "A") == "A-1");
+    assert(uniq(3, "A") == "A-2");
+    assert(uniq(4, "B") == "B");
 }
