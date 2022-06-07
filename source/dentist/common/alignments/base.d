@@ -2075,14 +2075,14 @@ struct ReadAlignment
 
 
     /// Return a view of the contained alignments.
-    inout(SeededAlignment[]) opIndex() inout pure nothrow
+    inout(SeededAlignment[]) opIndex() inout pure nothrow return
     {
         return _alignments[0 .. _length];
     }
 
 
     /// Return the alignment at `idx` (zero-based).
-    inout(SeededAlignment) opIndex(T)(T idx) inout pure nothrow
+    inout(SeededAlignment) opIndex(T)(T idx) inout pure nothrow return
     {
         return this[][idx];
     }
