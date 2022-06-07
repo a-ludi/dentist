@@ -859,7 +859,7 @@ struct OptionsFor(DentistCommand _command)
         DentistCommand.translateCoords,
     ))
     {
-        @Argument("<coord-string>", Multiplicity.oneOrMore)
+        @Argument("<in:coord-string>", Multiplicity.oneOrMore)
         @Help(q"{
             translate coordinate(s) given by <coord-string> of the result into
             coordinates on the reference. Coordinates are always 1-based.
