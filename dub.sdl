@@ -16,6 +16,7 @@ stringImportPaths "scripts"
 buildRequirements "allowWarnings"
 
 preBuildCommands  "./update-swinfo.sh" "./update-modules.sh"
+postBuildCommands  "./update-config-schema.sh"
 
 x:ddoxFilterArgs  "--min-protection=Protected" \
     "--ex" "dentist.swinfo" "--ex" "dentist.modules" \
