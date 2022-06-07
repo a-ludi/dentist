@@ -10,6 +10,7 @@ module dentist.common.configfile;
 
 import darg :
     Argument,
+    Help,
     isArgumentHandler,
     isOptionHandler,
     Option,
@@ -18,6 +19,9 @@ import dentist.commandline : OptionsFor;
 import dentist.common.commands :
     DentistCommand,
     dentistCommands;
+import dentist.util.jsonschema :
+    jsonSchema,
+    schemaRef;
 import dyaml :
     YAMLLoader = Loader,
     YAML = Node,
@@ -39,9 +43,10 @@ import std.range :
     ElementType,
     only;
 import std.range.primitives;
-import std.stdio : File;
+import std.stdio : File, stderr;
 import std.string :
-    split;
+    split,
+    wrap;
 import std.traits :
     arity,
     EnumMembers,
@@ -82,6 +87,13 @@ class ConfigFileException : Exception
 {
     ///
     mixin basicExceptionCtors;
+}
+
+
+/// Decorator
+struct ConfigType(alias T)
+{
+    alias Type = T;
 }
 
 
@@ -375,6 +387,203 @@ void validateConfigCommand(Options)(Json commandConfig)
             ),
         );
     }
+}
+
+
+/// Generate a JSON schema for DENTIST's config.
+///
+/// See_also: $(LINK https://json-schema.org/)
+Json getJsonSchema()
+{
+    auto schema = Json([
+        "$schema": Json("https://json-schema.org/draft/2020-12/schema"),
+        "$id": Json("uri://a-ludi/dentist/v3/config.schema.json"),
+        "title": Json("DENTIST config"),
+        "description": Json("Configuration file content for DENTIST."),
+        "$defs": Json([
+            "option-list": Json([
+                "anyOf": Json([
+                    Json(["type": Json("string")]),
+                    Json(["type": Json([Json("string")])]),
+                ]),
+            ]),
+        ]),
+        "type": Json("object"),
+    ]);
+
+    auto properties = Json.emptyObject();
+    properties[configDefaultKey] = generateJsonSchemaDefault();
+
+    static foreach (command; EnumMembers!DentistCommand)
+        properties[OptionsFor!command.commandName] = generateJsonSchemaFor!command();
+
+    schema["properties"] = properties;
+
+    return schema;
+}
+
+unittest
+{
+    auto schema = getJsonSchema();
+
+    assert(schema["properties"]["__default__"]["properties"]["reference"]["type"] == "string");
+    assert(schema["properties"]["__default__"]["properties"]["quiet"]["type"] == "boolean");
+    assert(schema["properties"]["output"]["properties"]["skip-gaps"]["type"] == schemaRef!"option-list");
+}
+
+protected Json generateJsonSchemaDefault()
+{
+    auto properties = Json.emptyObject();
+    bool[string] conflicts;
+
+    static foreach (command; EnumMembers!DentistCommand)
+    {{
+        alias Options = OptionsFor!command;
+
+        foreach (member; __traits(allMembers, Options))
+        {
+            alias symbol = Alias!(__traits(getMember, Options, member));
+            alias ConfigTypes = getUDAs!(symbol, ConfigType);
+
+            enum propSchemata = propertySchema!(symbol, ConfigTypes);
+
+            foreach (key, propSchema; propSchemata.byKeyValue())
+            {
+                if (key in properties && properties[key] != propSchema)
+                {
+                    conflicts[key] = true;
+                    if (properties[key].type == Json.Type.array)
+                        properties[key] ~= propSchema;
+                    else
+                        properties[key] = Json([properties[key], propSchema]);
+                }
+                else
+                {
+                    properties[key] = propSchema;
+                }
+            }
+        }
+    }}
+
+    foreach (key; conflicts.keys)
+    {
+        auto schemata = properties[key];
+        properties.remove(key);
+        version (unittest)
+            stderr.writefln!"removing multiple conflicting schemata for `%s`:\n%-(%s\n%)"(
+                key,
+                schemata,
+            );
+    }
+
+    return Json([
+        "type": Json("object"),
+        "properties": properties,
+    ]);
+}
+
+
+protected Json generateJsonSchemaFor(DentistCommand command, bool reportConflicts = true)()
+{
+    auto properties = Json.emptyObject();
+    bool[string] conflicts;
+
+    alias Options = OptionsFor!command;
+
+    foreach (member; __traits(allMembers, Options))
+    {
+        alias symbol = Alias!(__traits(getMember, Options, member));
+        alias ConfigTypes = getUDAs!(symbol, ConfigType);
+
+        enum propSchemata = propertySchema!(symbol, ConfigTypes);
+
+        foreach (key, propSchema; propSchemata.byKeyValue())
+        {
+            if (key in properties && properties[key] != propSchema)
+            {
+                conflicts[key] = true;
+                if (properties[key].type == Json.Type.array)
+                    properties[key] ~= propSchema;
+                else
+                    properties[key] = Json([properties[key], propSchema]);
+            }
+            else
+            {
+                properties[key] = propSchema;
+            }
+        }
+    }
+
+    foreach (key; conflicts.keys)
+    {
+        auto schemata = properties[key];
+        properties.remove(key);
+        if (reportConflicts)
+            stderr.writefln!"removing multiple conflicting schemata for `%s`:\n%-(%s\n%)"(
+                key,
+                schemata,
+            );
+    }
+
+    return Json([
+        "type": Json("object"),
+        "properties": properties,
+    ]);
+}
+
+
+protected template propertySchema(alias symbol, CT = void)
+{
+    static if (is(typeof(symbol)) || !is(CT == void))
+    {
+        static if (is(CT == void))
+            alias T = typeof(symbol);
+        else
+            alias T = CT.Type;
+        enum names = configNamesOf!symbol;
+
+        static if (names.length == 0 || is(CT == ConfigType!void))
+        {
+            enum propertySchema = Json.emptyObject;
+        }
+        else static if (isOptionHandler!T)
+        {
+            pragma(msg, "option " ~ names[0] ~ " has an OptionHandler");
+            enum propertySchema = Json.emptyObject;
+        }
+        else
+        {
+            //enum arguments = getUDAs!(symbol, Argument);
+            //enum options = getUDAs!(symbol, Option);
+            enum helps = getUDAs!(symbol, Help);
+
+            static if (isArgumentHandler!T)
+                enum propSchema = Json(["type": schemaRef!"option-list"]);
+            else
+                enum propSchema = jsonSchema!T;
+
+            static if (helps.length > 0)
+                enum propertySchema = makeFullPropSchema(propSchema, names, helps[0].help);
+            else
+                enum propertySchema = makeFullPropSchema(propSchema, names);
+        }
+    }
+    else
+    {
+        enum propertySchema = Json.emptyObject;
+    }
+}
+
+private Json makeFullPropSchema(Json propSchema, string[] names, string help = null)
+{
+    if (help !is null)
+        propSchema["description"] = help.wrap(size_t.max)[0 .. $ - 1];
+
+    auto schema = Json.emptyObject;
+    foreach (name; names)
+        schema[name] = propSchema;
+
+    return schema;
 }
 
 

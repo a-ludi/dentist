@@ -40,8 +40,10 @@ import dentist.common.commands :
     dentistCommands,
     TestingCommand;
 import dentist.common.configfile :
-    retroInitFromConfig,
+    ConfigType,
     fromBytes,
+    getJsonSchema,
+    retroInitFromConfig,
     SizeUnit,
     toBytes;
 import dentist.common.binio : PileUpDb;
@@ -144,7 +146,8 @@ import std.regex :
 import std.stdio :
     File,
     stderr,
-    stdin;
+    stdin,
+    stdout;
 import std.string :
     join,
     lineSplitter,
@@ -180,6 +183,7 @@ import std.typecons :
 import transforms : camelCase;
 import vibe.data.json :
     serializeToJsonString,
+    serializeToPrettyJson,
     toJson = serializeToJson;
 
 
@@ -231,6 +235,10 @@ ReturnCode run(in string[] args)
         {
             return ReturnCode.runtimeError;
         }
+
+        return ReturnCode.ok;
+    case "--config-schema":
+        printConfigSchema();
 
         return ReturnCode.ok;
     case "-l":
@@ -519,6 +527,14 @@ private void printBaseHelp()
 private void printCommandsSummary()
 {
     stderr.writeln(commandsSummary);
+}
+
+
+private void printConfigSchema()
+{
+    auto writer = stdout.lockingTextWriter;
+    writer.serializeToPrettyJson(getJsonSchema());
+    writer.put('\n');
 }
 
 
@@ -1095,6 +1111,7 @@ struct OptionsFor(DentistCommand _command)
             reference.
         }")
         @(RevertField!"referenceContigBatch")
+        @ConfigType!string
         void parseReferenceContigBatch(string batchString) pure
         {
             try
@@ -1394,6 +1411,7 @@ struct OptionsFor(DentistCommand _command)
         @Help(configHelpString)
         @(Validate!(value => value is null || validateFileExists(value)))
         @(Validate!(value => value is null || value.validateFileExtension!(".json", ".yaml", ".yml")))
+        @ConfigType!void
         string configFile;
 
         @PreValidate(Priority.high)
@@ -1701,6 +1719,7 @@ struct OptionsFor(DentistCommand _command)
 
     @Option("help", "h")
     @Help("Prints this help.")
+    @ConfigType!void
     OptionFlag help;
 
     static if (command.among(
@@ -2722,6 +2741,7 @@ struct OptionsFor(DentistCommand _command)
 
     @Option("usage")
     @Help("Print a short command summary.")
+    @ConfigType!void
     void requestUsage() pure
     {
         enforce!UsageRequested(false, "usage requested");
@@ -2733,6 +2753,7 @@ struct OptionsFor(DentistCommand _command)
         Warning: performance may be drastically reduced if using three times.
     ")
     @(RevertField!"verbosity")
+    @ConfigType!size_t
     void increaseVerbosity() pure
     {
         ++verbosity;
@@ -3155,6 +3176,12 @@ struct BaseOptions
     @Option("help", "h")
     @Help("Prints this help.")
     OptionFlag help;
+
+    @Option("config-schema")
+    @Help("
+        Print JSON schema (https://json-schema.org/) for DENTIST's config file.
+    ")
+    OptionFlag configSchema;
 
     @Option("list-options", "l")
     @Help("Print a list of all options across all commands.")
