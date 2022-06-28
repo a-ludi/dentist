@@ -10,7 +10,6 @@ __dummy.html
 *.lst
 *.log
 *.fasta
-*.py
 *~
 *.tar
 *.tar.gz
