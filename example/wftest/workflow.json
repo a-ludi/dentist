@@ -1,0 +1,33 @@
+{
+    "dentist": {
+        "__default__": {
+            "read-coverage": 20.0,
+            "ploidy": 2,
+            "verbose": 2
+        }
+    },
+    "inputs": {
+        "reference": "reference.fasta",
+        "reads": "reads.fasta",
+        "reads_type": "PACBIO_SMRT"
+    },
+    "outputs": {
+        "output_assembly": "gap-closed.fasta"
+    },
+    "reference_dbsplit": [
+        "-x1000",
+        "-a",
+        "-s50"
+    ],
+    "reads_dbsplit": [
+        "-x1000",
+        "-a",
+        "-s50"
+    ],
+    "workdir": "workdir",
+    "logdir": "logs",
+    "threads_per_process": 8,
+    "propagate_batch_size": 14,
+    "batch_size": 50,
+    "validation_blocks": 2
+}

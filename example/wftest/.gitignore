@@ -1,0 +1,8 @@
+*.agp
+*.bed
+*.fasta
+*.log
+.snakemake
+bin
+logs
+workdir
