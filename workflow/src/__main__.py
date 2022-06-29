@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import shlex
 from itertools import chain
 from os import environ
 from pathlib import Path
@@ -50,6 +51,8 @@ class DentistGapClosing(Workflow):
                 "-n": self.tandem_mask,
             },
         )
+        self.self_mask = self.config.get("self_mask", "dentist-self")
+        self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -63,9 +66,15 @@ class DentistGapClosing(Workflow):
         dentist.validate_config(self.dentist_config)
 
         self.mask_dust(self.reference)
+        self.execute_jobs()
         self.tandem_alignment(self.reference)
+        self.execute_jobs()
         self.mask_tandem(self.reference)
+        self.execute_jobs()
         self.self_alignment(self.reference)
+        self.execute_jobs()
+        self.mask_self(self.reference)
+        self.execute_jobs()
 
     def create_dentist_config(self):
         @self.collect_job(
@@ -234,6 +243,29 @@ class DentistGapClosing(Workflow):
             action=lambda inputs: ShellScript(
                 ("cd", self.workdir),
                 (*aligncmd, f"{db.stem}.{block_a}", f"{db.stem}.{block_b}"),
+            ),
+        )
+
+    def mask_self(self, db):
+        self.collect_job(
+            name=f"mask_self_{db.stem}",
+            inputs=[
+                self.workdir / alignment_file(db),
+                *db_files(db),
+                self.dentist_config,
+            ],
+            outputs=mask_files(db, self.self_mask),
+            log=self.log_file(f"mask-self.{db.stem}"),
+            action=lambda inputs: ShellScript(
+                (
+                    "dentist",
+                    "mask",
+                    f"--config={self.dentist_config}",
+                    *self.dentist_flags,
+                    inputs[1],
+                    inputs[0],
+                    self.self_mask,
+                )
             ),
         )
 
