@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from itertools import chain
 from os import environ
 from pathlib import Path
 
@@ -41,6 +42,14 @@ class DentistGapClosing(Workflow):
         self.lamerge_opts = ["-v"]
         if "TMPDIR" in environ:
             self.lamerge_opts.append(f"-P{environ['TMPDIR']}")
+        self.tanmask_opts = self.config.get("tanmask", [])
+        self.tanmask_opts = ensure_flags(
+            self.tanmask_opts,
+            {
+                "-v": True,
+                "-n": self.tandem_mask,
+            },
+        )
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -55,6 +64,8 @@ class DentistGapClosing(Workflow):
 
         self.mask_dust(self.reference)
         self.tandem_alignment(self.reference)
+        self.mask_tandem(self.reference)
+        self.self_alignment(self.reference)
 
     def create_dentist_config(self):
         @self.collect_job(
@@ -131,8 +142,8 @@ class DentistGapClosing(Workflow):
             self.lamerge(
                 self.workdir / alignment_file("TAN", db),
                 [
-                    self.workdir / a
-                    for a in block_alignments("TAN", db, block_a=FULL_DB)
+                    self.workdir / las
+                    for las in block_alignments("TAN", db, block_a=FULL_DB)
                 ],
                 job=f"tandem_alignment_{db.stem}",
                 log=self.log_file(f"tandem-alignment.{db.stem}"),
@@ -148,7 +159,7 @@ class DentistGapClosing(Workflow):
                 *db_files(db),
                 self.dentist_config,
             ],
-            outputs=[self.workdir / alignment_file("TAN", db.stem, block_b=block)],
+            outputs=[self.workdir / alignment_file("TAN", db, block_b=block)],
             action=lambda inputs: ShellScript(
                 (safe("{")),
                 ("cd", self.workdir),
@@ -161,13 +172,64 @@ class DentistGapClosing(Workflow):
             ),
         )
 
-    def self_alignment_block(self, db, block_a, block_b):
-        aligncmd = dentist.generate_options_for(
-            "self", self.dentist_config, ensure_masks([], dust_mask, tandem_mask)
+    def mask_tandem(self, db):
+        with self.grouped_jobs(f"{__name__}.{db.stem}"):
+            for i in range(get_num_blocks(db)):
+                self.mask_tandem_block(db, block=i + 1)
+            self.execute_jobs()
+            self.catrack(
+                db,
+                self.tandem_mask,
+                job=f"mask_tandem_{db.stem}",
+                log=self.log_file(f"mask-tandem.{db.stem}"),
+            )
+
+    def mask_tandem_block(self, db, block):
+        return self.collect_job(
+            name=f"mask_tandem_block_{db.stem}_{block}",
+            inputs=[
+                self.workdir / alignment_file("TAN", db, block_b=block),
+                *db_files(db),
+                self.dentist_config,
+            ],
+            outputs=mask_files(db, block_mask(self.tandem_mask, block)),
+            action=lambda inputs: ShellScript(
+                (
+                    "TANmask",
+                    *self.tanmask_opts,
+                    inputs[1],
+                    inputs[0],
+                    safe("&>"),
+                    self.log_file(f"mask-tandem.{db.stem}.{block}"),
+                ),
+            ),
         )
 
+    def self_alignment(self, db):
+        with self.grouped_jobs(f"{__name__}.{db.stem}"):
+            num_blocks = get_num_blocks(db)
+            for i in range(num_blocks):
+                for j in range(i, num_blocks):
+                    self.self_alignment_block(db, block_a=i + 1, block_b=j + 1)
+            self.execute_jobs()
+            self.lamerge(
+                self.workdir / alignment_file(db),
+                [self.workdir / las for las in block_alignments(db)],
+                job=f"self_alignment_{db.stem}",
+                log=self.log_file(f"self-alignment.{db.stem}"),
+            )
+
+    def self_alignment_block(self, db, block_a, block_b):
+        aligncmd = dentist.generate_options_for(
+            "self",
+            self.dentist_config,
+            ensure_masks([], self.dust_mask, self.tandem_mask),
+        )
+        aligncmd = ensure_threads_flag(aligncmd, threads=1)
+        aligncmd = deduplicate_flags(aligncmd)
+
         return self.collect_job(
-            name=f"self_alignment_block_{db.stem}_{block}",
+            name=f"self_alignment_block_{db.stem}_{block_a}_{block_b}",
             inputs=[
                 *db_files(db),
                 self.dentist_config,
@@ -175,8 +237,10 @@ class DentistGapClosing(Workflow):
                 *mask_files(db, self.tandem_mask),
             ],
             outputs=[
-                alignment_file(db.stem, block_a=block_a, block_b=block_b),
-                alignment_file(db.stem, block_b=block_a, block_a=block_b),
+                self.workdir
+                / alignment_file(db.stem, block_a=block_a, block_b=block_b),
+                self.workdir
+                / alignment_file(db.stem, block_b=block_b, block_a=block_a),
             ],
             action=lambda inputs: ShellScript(
                 (safe("{")),
@@ -198,6 +262,19 @@ class DentistGapClosing(Workflow):
             action=lambda inputs: ShellScript(
                 ("LAmerge", *self.lamerge_opts, merged, *parts, safe("&>"), log)
             ),
+        )
+
+    def catrack(self, db, mask, job, log):
+        self.collect_job(
+            name=job,
+            inputs=[
+                *db_files(db),
+                *chain.from_iterable(
+                    mask_files(db, bm) for bm in block_masks(mask, db)
+                ),
+            ],
+            outputs=mask_files(db, mask),
+            action=ShellScript(("Catrack", "-v", db, mask, safe("&>"), log)),
         )
 
     def log_file(self, id):

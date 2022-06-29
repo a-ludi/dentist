@@ -97,10 +97,11 @@ def generate_options_for(alignment_name, config_file, additional_flags=None):
             # clean up the command
             command = re.sub(r"<[^>]+>", "", command)
             command = command.rstrip()
+            command = shlex.split(command)
             if not additional_flags is None:
                 # add flags
-                command += " " + additional_flags
-            return shlex.split(command)
+                command.extend(additional_flags)
+            return command
 
     raise Exception(
         "failed to get alignment command: unknown alignment_name `{alignment_name}`"
