@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
+
 import argparse
 import json
+import os
 import re
 import sys
 from contextlib import contextmanager
 from pathlib import Path
+from textwrap import fill
 
 OnlyFlag = ("spanning", "extending", "both")
 JoinPolicy = ("scaffoldGaps", "scaffolds", "contigs")
@@ -60,19 +64,54 @@ class namespace(dict):
 
 
 class Reporter:
-    def __init__(self, log_dir, *, verbose):
+    def __init__(self, log_dir, *, verbose, width=100):
         self.log_dir = Path(log_dir)
         self.verbose = verbose
+        self.width = width
         self._indent = 0
 
     def __call__(self, file=sys.stdout):
+        self._report_file = file
         self.collect_opts_events()
         self.events_by_reason = group_by(self.events, lambda e: e.reason)
 
+        self.par(
+            f"In this run of DENTIST {len(self.events)} potentially closable "
+            f"gaps were not closed. More details:",
+        )
+        self.par(
+            "_Hint: use `DBshow -n workdir/[REFERENCE].dam | cat -n` "
+            "to translate contig numbers to FASTA coordinates._",
+        )
         self.report_collect_phase()
         self.report_process_phase()
         self.report_output_phase()
         self.report_unhandled_events()
+
+    def par(self, text):
+        indent = self._indent * "    "
+        print(
+            fill(
+                str(text),
+                self.width,
+                initial_indent=f"{indent}",
+                subsequent_indent=f"{indent}",
+            ),
+            end="\n\n",
+            file=self._report_file,
+        )
+
+    def li(self, item):
+        indent = self._indent * "    "
+        print(
+            fill(
+                str(item),
+                self.width,
+                initial_indent=f"{indent}- ",
+                subsequent_indent=f"{indent}  ",
+            ),
+            file=self._report_file,
+        )
 
     @contextmanager
     def open_logs(self):
@@ -123,10 +162,6 @@ class Reporter:
         if "length" in thing:
             _gap += f" ({thing.length} reads)"
         return _gap
-
-    def li(self, item):
-        indent = self._indent * "    "
-        print(f"{indent}- {item}")
 
     @contextmanager
     def indent(self):
@@ -288,18 +323,25 @@ def parse_args():
         action="store_true",
         help="increase level of detail in the report",
     )
+    parser.add_argument(
+        "--line-width",
+        "-w",
+        type=int,
+        default=100,
+        help="width of output in characters (default: 100)",
+    )
 
     return parser.parse_args()
 
 
-def generate_report(log_dir, *, verbose=False, file=sys.stdout):
-    report = Reporter(log_dir, verbose=verbose)
+def generate_report(log_dir, *, verbose=False, width=100, file=sys.stdout):
+    report = Reporter(log_dir, width=width, verbose=verbose)
     report(file)
 
 
 def main():
     args = parse_args()
-    generate_report(args.log_dir, verbose=args.verbose)
+    generate_report(args.log_dir, verbose=args.verbose, width=args.line_width)
 
 
 if __name__ == "__main__":
