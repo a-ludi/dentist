@@ -585,6 +585,9 @@ struct OptionsFor(DentistCommand _command)
     @Option()
     string executableVersion = version_;
 
+    @Option()
+    string gitCommit = .gitCommit;
+
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
         DentistCommand.propagateMask,
