@@ -300,7 +300,10 @@ class DentistGapClosing(Workflow):
             ),
             outputs=mask_files(db, mask),
             log=log,
-            action=lambda inputs: ShellScript(("Catrack", "-v", inputs.db[0], mask)),
+            action=lambda inputs, outputs: ShellScript(
+                ("rm", "-f", *outputs),
+                ("Catrack", "-v", inputs.db[0], mask),
+            ),
         )
 
     def log_file(self, id):
