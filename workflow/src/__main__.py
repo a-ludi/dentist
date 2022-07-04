@@ -82,6 +82,8 @@ class DentistGapClosing(Workflow):
         self.execute_jobs()
         self.mask_self(self.reference)
         self.execute_jobs()
+        self.ref_vs_reads_alignment(self.reference, self.reads)
+        self.execute_jobs()
 
     def create_dentist_config(self):
         @self.collect_job(
@@ -275,6 +277,60 @@ class DentistGapClosing(Workflow):
                     inputs.las,
                     self.self_mask,
                 )
+            ),
+        )
+
+    def ref_vs_reads_alignment(self, refdb, readsdb):
+        with self.grouped_jobs(f"{__name__}.{refdb.stem}.{readsdb.stem}"):
+            reads_blocks = get_num_blocks(readsdb)
+            for j in range(reads_blocks):
+                self.ref_vs_reads_alignment_block(refdb, readsdb, j + 1)
+            self.execute_jobs()
+            self.lamerge(
+                self.workdir / alignment_file(refdb, readsdb),
+                [
+                    self.workdir / las
+                    for las in block_alignments(refdb, readsdb, block_a=FULL_DB)
+                ],
+                job=f"ref_vs_reads_alignment_{refdb.stem}_{readsdb.stem}",
+                log=self.log_file(
+                    f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}"
+                ),
+            )
+
+    def ref_vs_reads_alignment_block(self, refdb, readsdb, block_reads):
+        aligncmd = dentist.generate_options_for(
+            "reads",
+            self.dentist_config,
+            ensure_masks([], self.dust_mask, self.tandem_mask, self.self_mask),
+        )
+        aligncmd = ensure_threads_flag(aligncmd, threads=1)
+        aligncmd = deduplicate_flags(aligncmd)
+
+        self.collect_job(
+            name=f"ref_vs_reads_alignment_block_{refdb.stem}_{readsdb.stem}_{block_reads}",
+            inputs=FileList(
+                refdb=db_files(refdb),
+                readsdb=db_files(readsdb),
+                dust_mask=mask_files(refdb, self.dust_mask),
+                tandem_mask=mask_files(refdb, self.tandem_mask),
+                self_mask=mask_files(refdb, self.self_mask),
+                config=self.dentist_config,
+            ),
+            outputs=[
+                self.workdir / alignment_file(refdb, readsdb, block_b=block_reads),
+                self.workdir / alignment_file(readsdb, refdb, block_a=block_reads),
+            ],
+            log=self.log_file(
+                f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}.{block_reads}"
+            ),
+            action=lambda inputs: ShellScript(
+                ("cd", self.workdir),
+                (
+                    *aligncmd,
+                    inputs.refdb[0].stem,
+                    f"{inputs.readsdb[0].stem}.{block_reads}",
+                ),
             ),
         )
 
