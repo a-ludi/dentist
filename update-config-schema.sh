@@ -10,7 +10,13 @@ function main()
 {
     echo -n 'Updating `'"$SCHEMA_FILE"'` ... ' >&2
 
-    ./dentist --config-schema > "$SCHEMA_FILE~"
+    if [[ "$DUB_BUILD_TYPE" == unittest || "$DUB_BUILD_TYPE" == docs-json ]]
+    then
+        echo 'skipped' >&2
+        return
+    fi
+
+    "$DUB_BUILD_PATH/dentist" --config-schema > "$SCHEMA_FILE~"
 
     if ! cmp -s "$SCHEMA_FILE" "$SCHEMA_FILE~";
     then
