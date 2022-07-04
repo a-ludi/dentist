@@ -59,6 +59,7 @@ class DentistGapClosing(Workflow):
             },
         )
         self.self_mask = self.config.get("self_mask", "dentist-self")
+        self.reads_mask = self.config.get("reads_mask", "dentist-reads")
         self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
 
     def run(self):
@@ -83,6 +84,8 @@ class DentistGapClosing(Workflow):
         self.mask_self(self.reference)
         self.execute_jobs()
         self.ref_vs_reads_alignment(self.reference, self.reads)
+        self.execute_jobs()
+        self.mask_reads()
         self.execute_jobs()
 
     def create_dentist_config(self):
@@ -331,6 +334,31 @@ class DentistGapClosing(Workflow):
                     inputs.refdb[0].stem,
                     f"{inputs.readsdb[0].stem}.{block_reads}",
                 ),
+            ),
+        )
+
+    def mask_reads(self):
+        self.collect_job(
+            name=f"mask_reads",
+            inputs=FileList(
+                refdb=db_files(self.reference),
+                readsdb=db_files(self.reads),
+                las=self.workdir / alignment_file(self.reference, self.reads),
+                config=self.dentist_config,
+            ),
+            outputs=mask_files(self.reference, self.reads_mask),
+            log=self.log_file("mask-reads"),
+            action=lambda inputs: ShellScript(
+                (
+                    "dentist",
+                    "mask",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    inputs.refdb[0],
+                    inputs.readsdb[0],
+                    inputs.las,
+                    self.reads_mask,
+                )
             ),
         )
 
