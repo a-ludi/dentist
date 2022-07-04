@@ -241,10 +241,8 @@ class DentistGapClosing(Workflow):
                 config=self.dentist_config,
             ),
             outputs=[
-                self.workdir
-                / alignment_file(db.stem, block_a=block_a, block_b=block_b),
-                self.workdir
-                / alignment_file(db.stem, block_b=block_b, block_a=block_a),
+                self.workdir / alignment_file(db, block_a=block_a, block_b=block_b),
+                self.workdir / alignment_file(db, block_a=block_b, block_b=block_a),
             ],
             log=self.log_file(f"self-alignment.{db.stem}.{block_a}.{block_b}"),
             action=lambda inputs: ShellScript(
