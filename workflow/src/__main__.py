@@ -7,7 +7,14 @@ from os import environ
 from pathlib import Path
 
 import util.dentist as dentist
-from dentist.workflow.engine import ShellScript, Workflow, cli_parser, python_code, safe
+from dentist.workflow.engine import (
+    FileList,
+    ShellScript,
+    Workflow,
+    cli_parser,
+    python_code,
+    safe,
+)
 from util.dazzler import *
 
 log = logging.getLogger(__name__)
@@ -164,14 +171,14 @@ class DentistGapClosing(Workflow):
 
         return self.collect_job(
             name=f"tandem_alignment_block_{db.stem}_{block}",
-            inputs=[
-                *db_files(db),
-                self.dentist_config,
-            ],
+            inputs=FileList(
+                db=db_files(db),
+                config=self.dentist_config,
+            ),
             outputs=[self.workdir / alignment_file("TAN", db, block_b=block)],
             log=self.log_file(f"tandem-alignment.{db.stem}.{block}"),
             action=lambda inputs: ShellScript(
-                ("cd", self.workdir), (*aligncmd, f"{db.stem}.{block}")
+                ("cd", self.workdir), (*aligncmd, f"{inputs.db[0].stem}.{block}")
             ),
         )
 
@@ -190,15 +197,15 @@ class DentistGapClosing(Workflow):
     def mask_tandem_block(self, db, block):
         return self.collect_job(
             name=f"mask_tandem_block_{db.stem}_{block}",
-            inputs=[
-                self.workdir / alignment_file("TAN", db, block_b=block),
-                *db_files(db),
-                self.dentist_config,
-            ],
+            inputs=FileList(
+                db=db_files(db),
+                las=self.workdir / alignment_file("TAN", db, block_b=block),
+                config=self.dentist_config,
+            ),
             outputs=mask_files(db, block_mask(self.tandem_mask, block)),
             log=self.log_file(f"mask-tandem.{db.stem}.{block}"),
             action=lambda inputs: ShellScript(
-                ("TANmask", *self.tanmask_opts, inputs[1], inputs[0]),
+                ("TANmask", *self.tanmask_opts, inputs.db[0], inputs.las),
             ),
         )
 
@@ -227,12 +234,12 @@ class DentistGapClosing(Workflow):
 
         return self.collect_job(
             name=f"self_alignment_block_{db.stem}_{block_a}_{block_b}",
-            inputs=[
-                *db_files(db),
-                self.dentist_config,
-                *mask_files(db, self.dust_mask),
-                *mask_files(db, self.tandem_mask),
-            ],
+            inputs=FileList(
+                db=db_files(db),
+                dust_mask=mask_files(db, self.dust_mask),
+                tandem_mask=mask_files(db, self.tandem_mask),
+                config=self.dentist_config,
+            ),
             outputs=[
                 self.workdir
                 / alignment_file(db.stem, block_a=block_a, block_b=block_b),
@@ -242,18 +249,22 @@ class DentistGapClosing(Workflow):
             log=self.log_file(f"self-alignment.{db.stem}.{block_a}.{block_b}"),
             action=lambda inputs: ShellScript(
                 ("cd", self.workdir),
-                (*aligncmd, f"{db.stem}.{block_a}", f"{db.stem}.{block_b}"),
+                (
+                    *aligncmd,
+                    f"{inputs.db[0].stem}.{block_a}",
+                    f"{inputs.db[0].stem}.{block_b}",
+                ),
             ),
         )
 
     def mask_self(self, db):
         self.collect_job(
             name=f"mask_self_{db.stem}",
-            inputs=[
-                self.workdir / alignment_file(db),
-                *db_files(db),
-                self.dentist_config,
-            ],
+            inputs=FileList(
+                db=db_files(db),
+                las=self.workdir / alignment_file(db),
+                config=self.dentist_config,
+            ),
             outputs=mask_files(db, self.self_mask),
             log=self.log_file(f"mask-self.{db.stem}"),
             action=lambda inputs: ShellScript(
@@ -262,8 +273,8 @@ class DentistGapClosing(Workflow):
                     "mask",
                     f"--config={self.dentist_config}",
                     *self.dentist_flags,
-                    inputs[1],
-                    inputs[0],
+                    inputs.db[0],
+                    inputs.las,
                     self.self_mask,
                 )
             ),
@@ -275,23 +286,23 @@ class DentistGapClosing(Workflow):
             inputs=parts,
             outputs=[merged],
             log=log,
-            action=lambda inputs: ShellScript(
-                ("LAmerge", *self.lamerge_opts, merged, *parts)
+            action=lambda inputs, outputs: ShellScript(
+                ("LAmerge", *self.lamerge_opts, outputs[0], *inputs)
             ),
         )
 
     def catrack(self, db, mask, job, log):
         self.collect_job(
             name=job,
-            inputs=[
-                *db_files(db),
-                *chain.from_iterable(
+            inputs=FileList(
+                db=db_files(db),
+                mask_files=chain.from_iterable(
                     mask_files(db, bm) for bm in block_masks(mask, db)
                 ),
-            ],
+            ),
             outputs=mask_files(db, mask),
             log=log,
-            action=ShellScript(("Catrack", "-v", db, mask)),
+            action=lambda inputs: ShellScript(("Catrack", "-v", inputs.db[0], mask)),
         )
 
     def log_file(self, id):
