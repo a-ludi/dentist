@@ -398,8 +398,7 @@ def main():
     import logging
     import sys
 
-    logging.basicConfig(level=logging.DEBUG)
-    parser = cli_parser()
+    parser = cli_parser(log_level=True)
     parser.add_argument(
         "workflow_config",
         metavar="<config:json>",
@@ -408,6 +407,7 @@ def main():
         default="workflow.json",
     )
     params = vars(parser.parse_args())
+    logging.basicConfig(level=params.pop("log_level"))
 
     DentistGapClosing(**params)()
 
