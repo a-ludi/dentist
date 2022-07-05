@@ -5,15 +5,6 @@ def db_name(db_file):
     return Path(db_file).stem
 
 
-def fasta_to_workdb(fasta_file, ext, workdir):
-    if ext not in {".db", ".dam"}:
-        raise ValueError("`ext` must be '.db' or '.dam'")
-    fasta_name = str(Path(fasta_file).stem).replace(".", "_")
-    workdir = Path(workdir)
-
-    return workdir / f"{fasta_name}{ext}"
-
-
 def db_files(db):
     db = Path(db)
     assert db.suffix in {".db", ".dam"}

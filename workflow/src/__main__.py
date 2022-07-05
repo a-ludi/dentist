@@ -124,11 +124,12 @@ class DentistGapClosing(Workflow):
         else:
             db_ext = ".dam"
             fasta2dazz = "fasta2DAM"
-        workdb = fasta_to_workdb(fasta, db_ext, self.workdir)
+        workdb = self.workdir / f"{role}{db_ext}"
         self.collect_job(
             name=f"{role}2dazzler",
             inputs=[fasta],
             outputs=db_files(workdb),
+            exec_local=True,
             action=lambda inputs, outputs: ShellScript(
                 # make sure no DB is present because sequences would be
                 # appended instead of creating a fresh one
