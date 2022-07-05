@@ -1,0 +1,79 @@
+__default__:
+    partition:  batch
+    # default number of threads for multi-threaded jobs
+    threads:    8
+
+mask_dust:
+    threads:    1
+    mem_mb:     4096
+    time:       "00:30"
+
+tandem_alignment_block:
+    mem_mb:     32768
+    time:       "00:30"
+
+tandem_alignment:
+    threads:    1
+    mem_mb:     1024
+    time:       "00:30"
+
+mask_tandem_block:
+    threads:    1
+    mem_mb:     32768
+    time:       "00:30"
+
+self_alignment_block:
+    mem_mb:     32768
+    time:       "01:00"
+
+self_alignment:
+    threads:    1
+    mem_mb:     1024
+    time:       "00:30"
+
+mask_self:
+    threads:    1
+    mem_mb:     8192
+    time:       "00:30"
+
+ref_vs_reads_alignment_block:
+    mem_mb:     32768
+    time:       "02:00"
+
+ref_vs_reads_alignment:
+    threads:    1
+    mem_mb:     1024
+    time:       "01:00"
+
+reads_vs_ref_alignment:
+    threads:    1
+    mem_mb:     1024
+    time:       "01:00"
+
+mask_reads:
+    threads:    1
+    mem_mb:     1024
+    time:       "00:15"
+
+propagate_mask:
+    threads:    1
+    mem_mb:     8192
+    time:       "02:00"
+    nCPUs:      8
+
+collect:
+    mem_mb:     32768
+    time:       "24:00"
+
+process:
+    mem_mb:     16384
+    time:       "24:00"
+
+output:
+    threads:    1
+    mem_mb:     16384
+    time:       "01:00"
+
+validate_regions_block:
+    mem_mb:     32768
+    time:       "00:30"

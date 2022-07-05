@@ -151,6 +151,7 @@ class DentistGapClosing(Workflow):
             name=f"mask_dust_{db.stem}",
             inputs=db_files(db),
             outputs=mask_files(db, self.dust_mask),
+            resources="mask_dust",
             action=lambda inputs: ShellScript(
                 (*dustcmd, inputs[0].with_suffix("")),
             ),
@@ -168,12 +169,12 @@ class DentistGapClosing(Workflow):
                     for las in block_alignments("TAN", db, block_a=FULL_DB)
                 ],
                 job=f"tandem_alignment_{db.stem}",
+                resources="tandem_alignment",
                 log=self.log_file(f"tandem-alignment.{db.stem}"),
             )
 
     def tandem_alignment_block(self, db, block):
         aligncmd = dentist.generate_options_for("tandem", self.dentist_config)
-        aligncmd = ensure_threads_flag(aligncmd, threads=1)
 
         return self.collect_job(
             name=f"tandem_alignment_block_{db.stem}_{block}",
@@ -183,8 +184,13 @@ class DentistGapClosing(Workflow):
             ),
             outputs=[self.workdir / alignment_file("TAN", db, block_b=block)],
             log=self.log_file(f"tandem-alignment.{db.stem}.{block}"),
-            action=lambda inputs: ShellScript(
-                ("cd", self.workdir), (*aligncmd, f"{inputs.db[0].stem}.{block}")
+            resources="tandem_alignment_block",
+            action=lambda inputs, resources: ShellScript(
+                ("cd", self.workdir),
+                (
+                    *ensure_threads_flag(aligncmd, resources["threads"]),
+                    f"{inputs.db[0].stem}.{block}",
+                ),
             ),
         )
 
@@ -210,6 +216,7 @@ class DentistGapClosing(Workflow):
             ),
             outputs=mask_files(db, block_mask(self.tandem_mask, block)),
             log=self.log_file(f"mask-tandem.{db.stem}.{block}"),
+            resources="mask_tandem_block",
             action=lambda inputs: ShellScript(
                 ("TANmask", *self.tanmask_opts, inputs.db[0], inputs.las),
             ),
@@ -226,6 +233,7 @@ class DentistGapClosing(Workflow):
                 self.workdir / alignment_file(db),
                 [self.workdir / las for las in block_alignments(db)],
                 job=f"self_alignment_{db.stem}",
+                resources="self_alignment",
                 log=self.log_file(f"self-alignment.{db.stem}"),
             )
 
@@ -235,7 +243,6 @@ class DentistGapClosing(Workflow):
             self.dentist_config,
             ensure_masks([], self.dust_mask, self.tandem_mask),
         )
-        aligncmd = ensure_threads_flag(aligncmd, threads=1)
         aligncmd = deduplicate_flags(aligncmd)
 
         return self.collect_job(
@@ -251,10 +258,11 @@ class DentistGapClosing(Workflow):
                 self.workdir / alignment_file(db, block_a=block_b, block_b=block_a),
             ],
             log=self.log_file(f"self-alignment.{db.stem}.{block_a}.{block_b}"),
-            action=lambda inputs: ShellScript(
+            resources="self_alignment_block",
+            action=lambda inputs, resources: ShellScript(
                 ("cd", self.workdir),
                 (
-                    *aligncmd,
+                    *ensure_threads_flag(aligncmd, resources["threads"]),
                     f"{inputs.db[0].stem}.{block_a}",
                     f"{inputs.db[0].stem}.{block_b}",
                 ),
@@ -271,6 +279,7 @@ class DentistGapClosing(Workflow):
             ),
             outputs=mask_files(db, self.self_mask),
             log=self.log_file(f"mask-self.{db.stem}"),
+            resources="mask_self",
             action=lambda inputs: ShellScript(
                 (
                     "dentist",
@@ -297,6 +306,7 @@ class DentistGapClosing(Workflow):
                     for las in block_alignments(refdb, readsdb, block_a=FULL_DB)
                 ],
                 job=f"ref_vs_reads_alignment_{refdb.stem}_{readsdb.stem}",
+                resources="ref_vs_reads_alignment",
                 log=self.log_file(
                     f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}"
                 ),
@@ -308,7 +318,6 @@ class DentistGapClosing(Workflow):
             self.dentist_config,
             ensure_masks([], self.dust_mask, self.tandem_mask, self.self_mask),
         )
-        aligncmd = ensure_threads_flag(aligncmd, threads=1)
         aligncmd = deduplicate_flags(aligncmd)
 
         self.collect_job(
@@ -328,10 +337,11 @@ class DentistGapClosing(Workflow):
             log=self.log_file(
                 f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}.{block_reads}"
             ),
-            action=lambda inputs: ShellScript(
+            resources="ref_vs_reads_alignment_block",
+            action=lambda inputs, resources: ShellScript(
                 ("cd", self.workdir),
                 (
-                    *aligncmd,
+                    *ensure_threads_flag(aligncmd, resources["threads"]),
                     inputs.refdb[0].stem,
                     f"{inputs.readsdb[0].stem}.{block_reads}",
                 ),
@@ -363,12 +373,13 @@ class DentistGapClosing(Workflow):
             ),
         )
 
-    def lamerge(self, merged, parts, job, log):
+    def lamerge(self, merged, parts, job, log, resources=None):
         self.collect_job(
             name=job,
             inputs=parts,
             outputs=[merged],
             log=log,
+            resources=resources,
             action=lambda inputs, outputs: ShellScript(
                 ("LAmerge", *self.lamerge_opts, outputs[0], *inputs)
             ),
@@ -385,6 +396,7 @@ class DentistGapClosing(Workflow):
             ),
             outputs=mask_files(db, mask),
             log=log,
+            exec_local=True,
             action=lambda inputs, outputs: ShellScript(
                 ("rm", "-f", *outputs),
                 ("Catrack", "-v", inputs.db[0], mask),
@@ -399,16 +411,32 @@ def main():
     import logging
     import sys
 
-    parser = cli_parser(log_level=True)
+    config_exts = ("json", "yaml", "yml")
+    override_defaults = dict(
+        workflow_root="directory of <config:json>",
+        resources=f"resources.({'|'.join(config_exts)}) in --workflow-root",
+    )
+    parser = cli_parser(log_level=True, **override_defaults)
     parser.add_argument(
         "workflow_config",
         metavar="<config:json>",
         type=Path,
-        help="workflow configuraiton file in JSON format",
+        help="workflow configuration file in JSON format",
         default="workflow.json",
     )
     params = vars(parser.parse_args())
     logging.basicConfig(level=params.pop("log_level"))
+
+    if str(params["workflow_root"]) == override_defaults["workflow_root"]:
+        params["workflow_root"] = params["workflow_config"].parent
+
+    if str(params["resources"]) == override_defaults["resources"]:
+        params["resources"] = None
+        for ext in config_exts:
+            p = params["workflow_root"] / f"resources.{ext}"
+            if p.exists():
+                params["resources"] = p.name
+                break
 
     DentistGapClosing(**params)()
 
