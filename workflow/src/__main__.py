@@ -158,7 +158,7 @@ class DentistGapClosing(Workflow):
         )
 
     def tandem_alignment(self, db):
-        with self.grouped_jobs(f"{__name__}.{db.stem}"):
+        with self.grouped_jobs(f"tandem_alignment_{db.stem}"):
             for i in range(get_num_blocks(db)):
                 self.tandem_alignment_block(db, block=i + 1)
             self.execute_jobs()
@@ -195,7 +195,7 @@ class DentistGapClosing(Workflow):
         )
 
     def mask_tandem(self, db):
-        with self.grouped_jobs(f"{__name__}.{db.stem}"):
+        with self.grouped_jobs(f"mask_tandem_{db.stem}"):
             for i in range(get_num_blocks(db)):
                 self.mask_tandem_block(db, block=i + 1)
             self.execute_jobs()
@@ -223,7 +223,7 @@ class DentistGapClosing(Workflow):
         )
 
     def self_alignment(self, db):
-        with self.grouped_jobs(f"{__name__}.{db.stem}"):
+        with self.grouped_jobs(f"self_alignment_{db.stem}"):
             num_blocks = get_num_blocks(db)
             for i in range(num_blocks):
                 for j in range(i, num_blocks):
@@ -294,7 +294,7 @@ class DentistGapClosing(Workflow):
         )
 
     def ref_vs_reads_alignment(self, refdb, readsdb):
-        with self.grouped_jobs(f"{__name__}.{refdb.stem}.{readsdb.stem}"):
+        with self.grouped_jobs(f"ref_vs_reads_alignment_{refdb.stem}_{readsdb.stem}"):
             reads_blocks = get_num_blocks(readsdb)
             for j in range(reads_blocks):
                 self.ref_vs_reads_alignment_block(refdb, readsdb, j + 1)
