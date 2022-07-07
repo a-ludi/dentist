@@ -83,6 +83,17 @@ def get_num_blocks(db):
         return 1
 
 
+def get_blocks(db_or_num_blocks, batch_size=1, *, first=1):
+    if isinstance(db_or_num_blocks, int):
+        N = db_or_num_blocks
+    else:
+        N = get_num_blocks(db_or_num_blocks)
+
+    return list(
+        range(i, min(i + batch_size, N + 1)) for i in range(first, N + 1, batch_size)
+    )
+
+
 FULL_DB = object()
 
 

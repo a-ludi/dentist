@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shlex
+from argparse import Namespace
 from itertools import chain
 from os import environ
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import util.dentist as dentist
 from dentist.workflow.engine import (
     FileList,
+    MultiIndex,
     ShellScript,
     Workflow,
     cli_parser,
@@ -23,6 +25,13 @@ log = logging.getLogger(__name__)
 class DentistGapClosing(Workflow):
     dust_mask = "dust"
     tandem_mask = "tan"
+    batched_jobs = (
+        "tandem_alignment",
+        "mask_tandem",
+        "self_alignment",
+        "ref_vs_reads_alignment",
+        "homogenize_mask",
+    )
 
     def __init__(
         self,
@@ -60,6 +69,9 @@ class DentistGapClosing(Workflow):
         )
         self.self_mask = self.config.get("self_mask", "dentist-self")
         self.reads_mask = self.config.get("reads_mask", "dentist-reads")
+        batch_size = dict((job, 1) for job in self.batched_jobs)
+        batch_size |= self.config.get("batch_size", dict())
+        self.batch_size = Namespace(**batch_size)
         self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
 
     def run(self):
@@ -162,8 +174,8 @@ class DentistGapClosing(Workflow):
 
     def tandem_alignment(self, db):
         with self.grouped_jobs(f"tandem_alignment_{db.stem}"):
-            for i in range(get_num_blocks(db)):
-                self.tandem_alignment_block(db, block=i + 1)
+            for blocks in get_blocks(db, self.batch_size.tandem_alignment):
+                self.tandem_alignment_block(db, blocks=blocks)
             self.execute_jobs()
             self.lamerge(
                 self.workdir / alignment_file("TAN", db),
@@ -176,32 +188,36 @@ class DentistGapClosing(Workflow):
                 log=self.log_file(f"tandem-alignment.{db.stem}"),
             )
 
-    def tandem_alignment_block(self, db, block):
+    def tandem_alignment_block(self, db, blocks):
         aligncmd = dentist.generate_options_for("tandem", self.dentist_config)
+        index = MultiIndex((blocks[0], blocks[-1]))
 
         return self.collect_job(
             name=f"tandem_alignment_block_{db.stem}",
-            index=block,
+            index=index,
             inputs=FileList(
                 db=db_files(db),
                 config=self.dentist_config,
             ),
-            outputs=[self.workdir / alignment_file("TAN", db, block_b=block)],
-            log=self.log_file(f"tandem-alignment.{db.stem}.{block}"),
+            outputs=[
+                self.workdir / alignment_file("TAN", db, block_b=block)
+                for block in index.values()
+            ],
+            log=self.log_file(f"tandem-alignment.{db.stem}.{index}"),
             resources="tandem_alignment_block",
             action=lambda inputs, index, resources: ShellScript(
                 ("cd", self.workdir),
                 (
                     *ensure_threads_flag(aligncmd, resources["threads"]),
-                    f"{inputs.db[0].stem}.{index}",
+                    *(f"{inputs.db[0].stem}.{block}" for block in index.values()),
                 ),
             ),
         )
 
     def mask_tandem(self, db):
         with self.grouped_jobs(f"mask_tandem_{db.stem}"):
-            for i in range(get_num_blocks(db)):
-                self.mask_tandem_block(db, block=i + 1)
+            for blocks in get_blocks(db, self.batch_size.mask_tandem):
+                self.mask_tandem_block(db, blocks=blocks)
             self.execute_jobs()
             self.catrack(
                 db,
@@ -210,29 +226,38 @@ class DentistGapClosing(Workflow):
                 log=self.log_file(f"mask-tandem.{db.stem}"),
             )
 
-    def mask_tandem_block(self, db, block):
+    def mask_tandem_block(self, db, blocks):
+        index = MultiIndex((blocks[0], blocks[-1]))
+
         return self.collect_job(
             name=f"mask_tandem_block_{db.stem}",
-            index=block,
+            index=index,
             inputs=FileList(
                 db=db_files(db),
-                las=self.workdir / alignment_file("TAN", db, block_b=block),
+                las=[
+                    self.workdir / alignment_file("TAN", db, block_b=block)
+                    for block in index.values()
+                ],
                 config=self.dentist_config,
             ),
-            outputs=mask_files(db, block_mask(self.tandem_mask, block)),
-            log=self.log_file(f"mask-tandem.{db.stem}.{block}"),
+            outputs=[
+                mask_files(db, block_mask(self.tandem_mask, block)) for block in blocks
+            ],
+            log=self.log_file(f"mask-tandem.{db.stem}.{index}"),
             resources="mask_tandem_block",
-            action=lambda inputs: ShellScript(
-                ("TANmask", *self.tanmask_opts, inputs.db[0], inputs.las),
+            action=lambda inputs, index: ShellScript(
+                ("TANmask", *self.tanmask_opts, inputs.db[0], *inputs.las),
             ),
         )
 
     def self_alignment(self, db):
         with self.grouped_jobs(f"self_alignment_{db.stem}"):
             num_blocks = get_num_blocks(db)
-            for i in range(num_blocks):
-                for j in range(i, num_blocks):
-                    self.self_alignment_block(db, block_a=i + 1, block_b=j + 1)
+            for i in range(1, num_blocks + 1):
+                for blocks in get_blocks(
+                    num_blocks, first=i, batch_size=self.batch_size.self_alignment
+                ):
+                    self.self_alignment_block(db, block_a=i, blocks_b=blocks)
             self.execute_jobs()
             self.lamerge(
                 self.workdir / alignment_file(db),
@@ -242,17 +267,18 @@ class DentistGapClosing(Workflow):
                 log=self.log_file(f"self-alignment.{db.stem}"),
             )
 
-    def self_alignment_block(self, db, block_a, block_b):
+    def self_alignment_block(self, db, block_a, blocks_b):
         aligncmd = dentist.generate_options_for(
             "self",
             self.dentist_config,
             ensure_masks([], self.dust_mask, self.tandem_mask),
         )
         aligncmd = deduplicate_flags(aligncmd)
+        index = MultiIndex(block_a, (blocks_b[0], blocks_b[-1]))
 
         return self.collect_job(
             name=f"self_alignment_block_{db.stem}",
-            index=(block_a, block_b),
+            index=index,
             inputs=FileList(
                 db=db_files(db),
                 dust_mask=mask_files(db, self.dust_mask),
@@ -260,17 +286,23 @@ class DentistGapClosing(Workflow):
                 config=self.dentist_config,
             ),
             outputs=[
-                self.workdir / alignment_file(db, block_a=block_a, block_b=block_b),
-                self.workdir / alignment_file(db, block_a=block_b, block_b=block_a),
+                (
+                    self.workdir / alignment_file(db, block_a=block_a, block_b=block_b),
+                    self.workdir / alignment_file(db, block_a=block_b, block_b=block_a),
+                )
+                for block_a, block_b in index.values()
             ],
-            log=self.log_file(f"self-alignment.{db.stem}.{block_a}.{block_b}"),
+            log=self.log_file(f"self-alignment.{db.stem}.{index}"),
             resources="self_alignment_block",
             action=lambda inputs, index, resources: ShellScript(
                 ("cd", self.workdir),
                 (
                     *ensure_threads_flag(aligncmd, resources["threads"]),
                     f"{inputs.db[0].stem}.{index[0]}",
-                    f"{inputs.db[0].stem}.{index[1]}",
+                    *(
+                        f"{inputs.db[0].stem}.{block_b}"
+                        for block_a, block_b in index.values()
+                    ),
                 ),
             ),
         )
@@ -301,9 +333,8 @@ class DentistGapClosing(Workflow):
 
     def ref_vs_reads_alignment(self, refdb, readsdb):
         with self.grouped_jobs(f"ref_vs_reads_alignment_{refdb.stem}_{readsdb.stem}"):
-            reads_blocks = get_num_blocks(readsdb)
-            for j in range(reads_blocks):
-                self.ref_vs_reads_alignment_block(refdb, readsdb, j + 1)
+            for blocks in get_blocks(readsdb, self.batch_size.ref_vs_reads_alignment):
+                self.ref_vs_reads_alignment_block(refdb, readsdb, blocks)
             self.execute_jobs()
             self.lamerge(
                 self.workdir / alignment_file(refdb, readsdb),
@@ -318,17 +349,18 @@ class DentistGapClosing(Workflow):
                 ),
             )
 
-    def ref_vs_reads_alignment_block(self, refdb, readsdb, block_reads):
+    def ref_vs_reads_alignment_block(self, refdb, readsdb, blocks_reads):
         aligncmd = dentist.generate_options_for(
             "reads",
             self.dentist_config,
             ensure_masks([], self.dust_mask, self.tandem_mask, self.self_mask),
         )
         aligncmd = deduplicate_flags(aligncmd)
+        index = MultiIndex((blocks_reads[0], blocks_reads[-1]))
 
         self.collect_job(
             name=f"ref_vs_reads_alignment_block_{refdb.stem}_{readsdb.stem}",
-            index=block_reads,
+            index=index,
             inputs=FileList(
                 refdb=db_files(refdb),
                 readsdb=db_files(readsdb),
@@ -338,11 +370,14 @@ class DentistGapClosing(Workflow):
                 config=self.dentist_config,
             ),
             outputs=[
-                self.workdir / alignment_file(refdb, readsdb, block_b=block_reads),
-                self.workdir / alignment_file(readsdb, refdb, block_a=block_reads),
+                (
+                    self.workdir / alignment_file(refdb, readsdb, block_b=block_reads),
+                    self.workdir / alignment_file(readsdb, refdb, block_a=block_reads),
+                )
+                for block_reads in index.values()
             ],
             log=self.log_file(
-                f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}.{block_reads}"
+                f"ref-vs-reads-alignment.{refdb.stem}.{readsdb.stem}.{index}"
             ),
             resources="ref_vs_reads_alignment_block",
             action=lambda inputs, index, resources: ShellScript(
@@ -350,7 +385,10 @@ class DentistGapClosing(Workflow):
                 (
                     *ensure_threads_flag(aligncmd, resources["threads"]),
                     inputs.refdb[0].stem,
-                    f"{inputs.readsdb[0].stem}.{index}",
+                    *(
+                        f"{inputs.readsdb[0].stem}.{block_reads}"
+                        for block_reads in index.values()
+                    ),
                 ),
             ),
         )
@@ -382,40 +420,48 @@ class DentistGapClosing(Workflow):
 
     def homogenize_mask(self, refdb, readsdb, mask):
         with self.grouped_jobs(f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}"):
-            for j in range(get_num_blocks(readsdb)):
-                self.homogenize_mask_block(refdb, readsdb, mask, j + 1)
+            for blocks in get_blocks(readsdb, self.batch_size.homogenize_mask):
+                self.homogenize_mask_block(refdb, readsdb, mask, blocks)
             self.execute_jobs()
             self.merge_masks(
                 refdb,
                 homogenized_mask(mask),
                 [
-                    pseudo_block_mask(homogenized_mask(mask), j + 1)
-                    for j in range(get_num_blocks(readsdb))
+                    pseudo_block_mask(
+                        homogenized_mask(mask), MultiIndex((blocks[0], blocks[-1]))
+                    )
+                    for blocks in get_blocks(readsdb, self.batch_size.homogenize_mask)
                 ],
                 job=f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}",
                 log=self.log_file(f"homogenize-mask.{refdb.stem}.{readsdb.stem}"),
             )
 
-    def homogenize_mask_block(self, refdb, readsdb, mask, block_reads):
+    def homogenize_mask_block(self, refdb, readsdb, mask, blocks_reads):
+        index = MultiIndex((blocks_reads[0], blocks_reads[-1]))
+
         self.collect_job(
             name=f"homogenize_mask_block_{refdb.stem}_{readsdb.stem}_{mask}",
-            index=block_reads,
+            index=index,
             inputs=FileList(
                 refdb=db_files(refdb),
                 readsdb=db_files(readsdb),
                 mask=mask_files(refdb, mask),
                 las=FileList(
-                    ref2reads=self.workdir
-                    / alignment_file(refdb, readsdb, block_b=block_reads),
-                    reads2ref=self.workdir
-                    / alignment_file(readsdb, refdb, block_a=block_reads),
+                    ref2reads=(
+                        self.workdir
+                        / alignment_file(refdb, readsdb, block_b=block_reads)
+                        for block_reads in index.values()
+                    ),
+                    reads2ref=(
+                        self.workdir
+                        / alignment_file(readsdb, refdb, block_a=block_reads)
+                        for block_reads in index.values()
+                    ),
                 ),
                 config=self.dentist_config,
             ),
-            outputs=mask_files(refdb, homogenized_mask(mask), pseudo_block=block_reads),
-            log=self.log_file(
-                f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{block_reads}"
-            ),
+            outputs=[mask_files(refdb, homogenized_mask(mask), pseudo_block=index)],
+            log=self.log_file(f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{index}"),
             resources="homogenize_mask_block",
             action=lambda inputs, index, resources: ShellScript(
                 (
@@ -426,7 +472,7 @@ class DentistGapClosing(Workflow):
                     f"--mask={mask}",
                     inputs.refdb[0],
                     inputs.readsdb[0],
-                    inputs.las.ref2reads,
+                    *inputs.las.ref2reads,
                     pseudo_block_mask(mask, index),
                 ),
                 (
@@ -437,7 +483,7 @@ class DentistGapClosing(Workflow):
                     f"--mask={pseudo_block_mask(mask, index)}",
                     inputs.readsdb[0],
                     inputs.refdb[0],
-                    inputs.las.reads2ref,
+                    *inputs.las.reads2ref,
                     pseudo_block_mask(homogenized_mask(mask), index),
                 ),
             ),

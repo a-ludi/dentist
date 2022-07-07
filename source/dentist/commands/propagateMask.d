@@ -21,7 +21,7 @@
 module dentist.commands.propagateMask;
 
 package(dentist) enum summary = "
-    Propagate masked regions through the provided alignment. That means the
+    Propagate masked regions through the provided alignment(s). That means the
     mask is first transferred to the B-contigs/reads according to the given
     alignments.
 
@@ -59,7 +59,7 @@ import std.algorithm :
     min,
     sort,
     swap;
-import std.array : array, appender;
+import std.array : array, appender, join;
 import std.format : format;
 import std.range :
     assumeSorted,
@@ -144,14 +144,17 @@ class MaskPropagator
 
     auto getLocalAlignmentsByContig()
     {
-        auto localAlignments = getFlatLocalAlignments(
-            options.refDb,
-            options.readsDb,
-            options.dbAlignmentFile,
-            BufferMode.preallocated,
-        ).array;
-
-        return localAlignments.sliceBy!((a, b) => a.contigA.id == b.contigA.id);
+        return options.dbAlignmentFiles
+            .map!(las => getFlatLocalAlignments(
+                options.refDb,
+                options.readsDb,
+                las,
+                BufferMode.preallocated,
+            ))
+            .join
+            .sort
+            .release
+            .sliceBy!((a, b) => a.contigA.id == b.contigA.id);
     }
 
 

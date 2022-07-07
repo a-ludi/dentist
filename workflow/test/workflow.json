@@ -28,6 +28,9 @@
     "logdir": "logs",
     "threads_per_process": 8,
     "propagate_batch_size": 14,
-    "batch_size": 50,
+    "batch_size": {
+        "ref_vs_reads_alignment": 2,
+        "homogenize_mask": 8
+    },
     "validation_blocks": 2
 }

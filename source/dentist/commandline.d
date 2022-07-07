@@ -600,18 +600,30 @@ struct OptionsFor(DentistCommand _command)
             enforce!ArgParseError(leftOver.length >= numArguments.lowerBound, referenceUDA.multiplicityError(0));
             enforce!ArgParseError(leftOver.length <= numArguments.upperBound, "Missing positional arguments.");
 
-            auto hasReadsDb = (leftOver.length == numArguments.upperBound);
             handleArg!"refDb"(this, leftOver[0]);
             leftOver = leftOver[1 .. $];
 
-            if (hasReadsDb)
+            if (leftOver[0].endsWith(".db", ".dam"))
             {
                 handleArg!"readsDb"(this, leftOver[0]);
                 leftOver = leftOver[1 .. $];
             }
 
-            handleArg!"dbAlignmentFile"(this, leftOver[0]);
-            leftOver = leftOver[1 .. $];
+            static if (__traits(hasMember, this, "dbAlignmentFile"))
+            {
+                handleArg!"dbAlignmentFile"(this, leftOver[0]);
+                leftOver = leftOver[1 .. $];
+            }
+            else static if (__traits(hasMember, this, "dbAlignmentFiles"))
+            {
+                while (leftOver[0].endsWith(".las"))
+                {
+                    handleArg!"dbAlignmentFiles"(this, leftOver[0]);
+                    leftOver = leftOver[1 .. $];
+                }
+            }
+            else
+                static assert(0, "unknown alignment argument");
 
             foreach (member; __traits(allMembers, typeof(this)))
             {
@@ -620,7 +632,7 @@ struct OptionsFor(DentistCommand _command)
 
                 static if (
                     argUDAs.length > 0 &&
-                    !member.among("refDb", "readsDb", "dbAlignmentFile")
+                    !member.among("refDb", "readsDb", "dbAlignmentFile", "dbAlignmentFiles")
                 )
                 {
                     handleArg!member(this, leftOver[0]);
@@ -731,7 +743,6 @@ struct OptionsFor(DentistCommand _command)
 
     static if (command.among(
         DentistCommand.maskRepetitiveRegions,
-        DentistCommand.propagateMask,
         DentistCommand.chainLocalAlignments,
     ))
     {
@@ -739,6 +750,16 @@ struct OptionsFor(DentistCommand _command)
         @Help("self-alignment of the reference assembly or reads vs. reference alignment")
         @(Validate!(value => validateLasFile(value, Yes.allowEmpty)))
         string dbAlignmentFile;
+    }
+
+    static if (command.among(
+        DentistCommand.propagateMask,
+    ))
+    {
+        @Argument("<in:alignment>", Multiplicity.oneOrMore)
+        @Help("self-alignment of the reference assembly or reads vs. reference alignment")
+        @(Validate!(values => validateLasFiles(values, Yes.allowEmpty)))
+        string[] dbAlignmentFiles;
     }
 
     static if (command.among(
@@ -3050,7 +3071,10 @@ struct OptionsFor(DentistCommand _command)
             static if (argUDAs.length > 0)
             {
                 lowerBound += argUDAs[0].lowerBound;
-                upperBound += argUDAs[0].upperBound;
+                if (upperBound == size_t.max || argUDAs[0].upperBound == size_t.max)
+                    upperBound = size_t.max;
+                else
+                    upperBound += argUDAs[0].upperBound;
             }
         }
 
@@ -3652,8 +3676,6 @@ protected
     /// `allowEmpty`.
     void validateLasFile(in string lasFile, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
     {
-        auto cwd = getcwd.absolutePath;
-
         validate(
             lasFile.endsWith(".las"),
             format!"expected .las file, got `%s`"(lasFile),
@@ -3663,6 +3685,14 @@ protected
             allowEmpty || !lasEmpty(lasFile),
             format!"empty alignment file `%s`"(lasFile),
         );
+    }
+
+
+    /// ditto
+    void validateLasFiles(in string[] lasFiles, in Flag!"allowEmpty" allowEmpty = No.allowEmpty)
+    {
+        foreach (lasFile; lasFiles)
+            validateLasFile(lasFile, allowEmpty);
     }
 
 
