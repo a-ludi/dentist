@@ -87,6 +87,9 @@ class DentistGapClosing(Workflow):
         self.execute_jobs()
         self.mask_reads()
         self.execute_jobs()
+        for mask in (self.self_mask, self.tandem_mask, self.reads_mask):
+            self.homogenize_mask(self.reference, self.reads, mask)
+        self.execute_jobs()
 
     def create_dentist_config(self):
         @self.collect_job(
@@ -373,6 +376,68 @@ class DentistGapClosing(Workflow):
             ),
         )
 
+    def homogenize_mask(self, refdb, readsdb, mask):
+        with self.grouped_jobs(f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}"):
+            for j in range(get_num_blocks(readsdb)):
+                self.homogenize_mask_block(refdb, readsdb, mask, j + 1)
+            self.execute_jobs()
+            self.merge_masks(
+                refdb,
+                homogenized_mask(mask),
+                [
+                    pseudo_block_mask(homogenized_mask(mask), j + 1)
+                    for j in range(get_num_blocks(readsdb))
+                ],
+                job=f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}",
+                log=self.log_file(f"homogenize-mask.{refdb.stem}.{readsdb.stem}"),
+            )
+
+    def homogenize_mask_block(self, refdb, readsdb, mask, block_reads):
+        self.collect_job(
+            name=f"homogenize_mask_block_{refdb.stem}_{readsdb.stem}_{block_reads}_{mask}",
+            inputs=FileList(
+                refdb=db_files(refdb),
+                readsdb=db_files(readsdb),
+                mask=mask_files(refdb, mask),
+                las=FileList(
+                    ref2reads=self.workdir
+                    / alignment_file(refdb, readsdb, block_b=block_reads),
+                    reads2ref=self.workdir
+                    / alignment_file(readsdb, refdb, block_a=block_reads),
+                ),
+                config=self.dentist_config,
+            ),
+            outputs=mask_files(refdb, homogenized_mask(mask), pseudo_block=block_reads),
+            log=self.log_file(
+                f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{block_reads}"
+            ),
+            resources="homogenize_mask_block",
+            action=lambda inputs, resources: ShellScript(
+                (
+                    "dentist",
+                    "propagate-mask",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    f"--mask={mask}",
+                    inputs.refdb[0],
+                    inputs.readsdb[0],
+                    inputs.las.ref2reads,
+                    pseudo_block_mask(mask, block_reads),
+                ),
+                (
+                    "dentist",
+                    "propagate-mask",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    f"--mask={pseudo_block_mask(mask, block_reads)}",
+                    inputs.readsdb[0],
+                    inputs.refdb[0],
+                    inputs.las.reads2ref,
+                    pseudo_block_mask(homogenized_mask(mask), block_reads),
+                ),
+            ),
+        )
+
     def lamerge(self, merged, parts, job, log, resources=None):
         self.collect_job(
             name=job,
@@ -400,6 +465,30 @@ class DentistGapClosing(Workflow):
             action=lambda inputs, outputs: ShellScript(
                 ("rm", "-f", *outputs),
                 ("Catrack", "-v", inputs.db[0], mask),
+            ),
+        )
+
+    def merge_masks(self, db, merged_mask, masks, job, log):
+        self.collect_job(
+            name=job,
+            inputs=FileList(
+                db=db_files(db),
+                masks=FileList.from_any(mask_files(db, mask) for mask in masks),
+                config=self.dentist_config,
+            ),
+            outputs=mask_files(db, merged_mask),
+            log=log,
+            exec_local=True,
+            action=lambda inputs, outputs: ShellScript(
+                (
+                    "dentist",
+                    "merge-masks",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    inputs.db[0],
+                    merged_mask,
+                    *masks,
+                )
             ),
         )
 

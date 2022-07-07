@@ -41,12 +41,12 @@ def pseudo_block_masks(mask, db, block=None):
     return [pseudo_block_mask(mask, b) for b in blocks]
 
 
-def mask_files(db, mask, *, block=None, pseudo_block=False):
+def mask_files(db, mask, *, block=None, pseudo_block=None):
     suffixes = ["anno", "data"]
     root = db.parent
 
-    if isinstance(pseudo_block, str):
-        block = pseudo_block
+    if pseudo_block is not None and block is None:
+        block = str(pseudo_block)
         pseudo_block = True
 
     if not block is None:
