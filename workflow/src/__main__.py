@@ -390,7 +390,7 @@ class DentistGapClosing(Workflow):
             name=job,
             inputs=FileList(
                 db=db_files(db),
-                mask_files=chain.from_iterable(
+                mask_files=FileList.from_any(
                     mask_files(db, bm) for bm in block_masks(mask, db)
                 ),
             ),
