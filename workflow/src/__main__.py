@@ -504,11 +504,9 @@ class DentistGapClosing(Workflow):
                 refdb=db_files(self.reference),
                 readsdb=db_files(self.reads),
                 las=self.workdir / alignment_file(self.reference, self.reads),
-                masks=FileList.from_any(
-                    dict(
-                        (mask, mask_files(self.reference, homogenized_mask(mask)))
-                        for mask in self.masks
-                    )
+                masks=dict(
+                    (mask, mask_files(self.reference, homogenized_mask(mask)))
+                    for mask in self.masks
                 ),
                 config=self.dentist_config,
             ),
@@ -522,7 +520,7 @@ class DentistGapClosing(Workflow):
                     *self.dentist_flags,
                     f"--threads={dentist.main_threads(resources['threads'])}",
                     f"--auxiliary-threads={dentist.auxiliary_threads(resources['threads'])}",
-                    f"--mask={','.join(self.masks)}",
+                    f"--mask={','.join(inputs.masks.keys())}",
                     inputs.refdb[0],
                     inputs.readsdb[0],
                     inputs.las,
@@ -548,16 +546,14 @@ class DentistGapClosing(Workflow):
             name=job,
             inputs=FileList(
                 db=db_files(db),
-                mask_files=FileList.from_any(
-                    mask_files(db, bm) for bm in block_masks(mask, db)
-                ),
+                mask=[mask_files(db, bm) for bm in block_masks(mask, db)],
             ),
-            outputs=mask_files(db, mask),
+            outputs={mask: mask_files(db, mask)},
             log=log,
             exec_local=True,
             action=lambda inputs, outputs: ShellScript(
                 ("rm", "-f", *outputs),
-                ("Catrack", "-v", inputs.db[0], mask),
+                ("Catrack", "-v", inputs.db[0], *outputs.keys()),
             ),
         )
 
@@ -566,10 +562,10 @@ class DentistGapClosing(Workflow):
             name=job,
             inputs=FileList(
                 db=db_files(db),
-                masks=FileList.from_any(mask_files(db, mask) for mask in masks),
+                masks=dict((mask, mask_files(db, mask)) for mask in masks),
                 config=self.dentist_config,
             ),
-            outputs=mask_files(db, merged_mask),
+            outputs={merged_mask: mask_files(db, merged_mask)},
             log=log,
             exec_local=True,
             action=lambda inputs, outputs: ShellScript(
@@ -579,8 +575,8 @@ class DentistGapClosing(Workflow):
                     f"--config={inputs.config}",
                     *self.dentist_flags,
                     inputs.db[0],
-                    merged_mask,
-                    *masks,
+                    *outputs.keys(),
+                    *inputs.masks.keys(),
                 )
             ),
         )
