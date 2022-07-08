@@ -69,10 +69,16 @@ class DentistGapClosing(Workflow):
         )
         self.self_mask = self.config.get("self_mask", "dentist-self")
         self.reads_mask = self.config.get("reads_mask", "dentist-reads")
+        self.masks = (
+            self.self_mask,
+            self.tandem_mask,
+            self.reads_mask,
+        )
         batch_size = dict((job, 1) for job in self.batched_jobs)
         batch_size |= self.config.get("batch_size", dict())
         self.batch_size = Namespace(**batch_size)
         self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
+        self.pile_ups = self.workdir / "pile-ups.db"
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -99,8 +105,10 @@ class DentistGapClosing(Workflow):
         self.execute_jobs()
         self.mask_reads()
         self.execute_jobs()
-        for mask in (self.self_mask, self.tandem_mask, self.reads_mask):
+        for mask in self.masks:
             self.homogenize_mask(self.reference, self.reads, mask)
+        self.execute_jobs()
+        self.collect()
         self.execute_jobs()
 
     def create_dentist_config(self):
@@ -486,6 +494,40 @@ class DentistGapClosing(Workflow):
                     *inputs.las.reads2ref,
                     pseudo_block_mask(homogenized_mask(mask), index),
                 ),
+            ),
+        )
+
+    def collect(self):
+        self.collect_job(
+            name="collect",
+            inputs=FileList(
+                refdb=db_files(self.reference),
+                readsdb=db_files(self.reads),
+                las=self.workdir / alignment_file(self.reference, self.reads),
+                masks=FileList.from_any(
+                    dict(
+                        (mask, mask_files(self.reference, homogenized_mask(mask)))
+                        for mask in self.masks
+                    )
+                ),
+                config=self.dentist_config,
+            ),
+            outputs=[self.pile_ups],
+            log=self.log_file("collect"),
+            action=lambda inputs, outputs, resources: ShellScript(
+                (
+                    "dentist",
+                    "collect",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    f"--threads={dentist.main_threads(resources['threads'])}",
+                    f"--auxiliary-threads={dentist.auxiliary_threads(resources['threads'])}",
+                    f"--mask={','.join(self.masks)}",
+                    inputs.refdb[0],
+                    inputs.readsdb[0],
+                    inputs.las,
+                    *outputs,
+                )
             ),
         )
 

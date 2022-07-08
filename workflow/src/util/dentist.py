@@ -106,3 +106,11 @@ def generate_options_for(alignment_name, config_file, additional_flags=None):
     raise Exception(
         "failed to get alignment command: unknown alignment_name `{alignment_name}`"
     )
+
+
+def auxiliary_threads(threads):
+    return max(1, threads // 4)
+
+
+def main_threads(threads):
+    return threads // auxiliary_threads(threads)
