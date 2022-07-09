@@ -30,7 +30,8 @@
     "propagate_batch_size": 14,
     "batch_size": {
         "ref_vs_reads_alignment": 2,
-        "homogenize_mask": 8
+        "homogenize_mask": 8,
+        "process_pile_ups": 50
     },
     "validation_blocks": 2
 }

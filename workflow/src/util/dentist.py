@@ -1,3 +1,4 @@
+import json
 import re
 import shlex
 import subprocess
@@ -114,3 +115,37 @@ def auxiliary_threads(threads):
 
 def main_threads(threads):
     return threads // auxiliary_threads(threads)
+
+
+def ceildiv(n, d):
+    return (n + d - 1) // d
+
+
+def get_num_pile_ups(pile_ups):
+    # emit at least one pile up in order to prevent the DAG from falling apart
+    num_pile_ups = 1
+
+    if pile_ups.exists():
+        try:
+            info_cmd = ("dentist", "show-pile-ups", "-j", pile_ups)
+            pile_ups_info_json = subprocess.check_output(
+                info_cmd, text=True, stderr=subprocess.DEVNULL
+            )
+            pile_ups_info = json.loads(pile_ups_info_json)
+            num_pile_ups = pile_ups_info["numPileUps"]
+        except subprocess.CalledProcessError as e:
+            raise e
+
+        if num_pile_ups == 0:
+            raise Exception(
+                "no candidates for gap closing found; stopping the pipeline immediately"
+            )
+
+    return num_pile_ups
+
+
+def batch_ranges(num_elements, batch_size):
+    from_index = 0
+    for batch_id in range(ceildiv(num_elements, batch_size)):
+        yield range(from_index, min(from_index + batch_size, num_elements))
+        from_index += batch_size

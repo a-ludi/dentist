@@ -31,6 +31,7 @@ class DentistGapClosing(Workflow):
         "self_alignment",
         "ref_vs_reads_alignment",
         "homogenize_mask",
+        "process_pile_ups",
     )
 
     def __init__(
@@ -79,6 +80,8 @@ class DentistGapClosing(Workflow):
         self.batch_size = Namespace(**batch_size)
         self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
         self.pile_ups = self.workdir / "pile-ups.db"
+        self.insertion_batches_dir = self.workdir / "insertions"
+        self.insertions = self.workdir / "insertions.db"
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -108,7 +111,9 @@ class DentistGapClosing(Workflow):
         for mask in self.masks:
             self.homogenize_mask(self.reference, self.reads, mask)
         self.execute_jobs()
-        self.collect()
+        self.collect_pile_ups()
+        self.execute_jobs()
+        self.process_pile_ups()
         self.execute_jobs()
 
     def create_dentist_config(self):
@@ -497,9 +502,9 @@ class DentistGapClosing(Workflow):
             ),
         )
 
-    def collect(self):
+    def collect_pile_ups(self):
         self.collect_job(
-            name="collect",
+            name="collect_pile_ups",
             inputs=FileList(
                 refdb=db_files(self.reference),
                 readsdb=db_files(self.reads),
@@ -511,11 +516,11 @@ class DentistGapClosing(Workflow):
                 config=self.dentist_config,
             ),
             outputs=[self.pile_ups],
-            log=self.log_file("collect"),
+            log=self.log_file("collect_pile_ups"),
             action=lambda inputs, outputs, resources: ShellScript(
                 (
                     "dentist",
-                    "collect",
+                    "collect-pile-ups",
                     f"--config={inputs.config}",
                     *self.dentist_flags,
                     f"--threads={dentist.main_threads(resources['threads'])}",
@@ -525,6 +530,107 @@ class DentistGapClosing(Workflow):
                     inputs.readsdb[0],
                     inputs.las,
                     *outputs,
+                )
+            ),
+        )
+
+    def process_pile_ups(self):
+        self.create_dirs("create_insertion_batches_dir", self.insertion_batches_dir)
+        self.execute_jobs()
+
+        with self.grouped_jobs("process_pile_ups"):
+            num_pile_ups = dentist.get_num_pile_ups(self.pile_ups)
+            for batch in dentist.batch_ranges(
+                num_pile_ups, self.batch_size.process_pile_ups
+            ):
+                self.process_pile_ups_batch(batch)
+            self.execute_jobs()
+            self.merge_insertions()
+
+    def process_pile_ups_batch(self, batch):
+        index = MultiIndex((batch[0], batch[-1]))
+        self.collect_job(
+            name="process_pile_ups",
+            index=index,
+            inputs=FileList(
+                refdb=db_files(self.reference),
+                readsdb=db_files(self.reads),
+                pile_ups=self.pile_ups,
+                masks=dict(
+                    (mask, mask_files(self.reference, homogenized_mask(mask)))
+                    for mask in self.masks
+                ),
+                config=self.dentist_config,
+            ),
+            outputs=[self.insertion_batches_dir / f"batch.{index}.db"],
+            log=self.log_file(f"process_pile_ups.{index}"),
+            action=lambda inputs, outputs, index, resources: ShellScript(
+                (
+                    "dentist",
+                    "process-pile-ups",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    f"--threads={dentist.main_threads(resources['threads'])}",
+                    f"--auxiliary-threads={dentist.auxiliary_threads(resources['threads'])}",
+                    f"--mask={','.join(inputs.masks.keys())}",
+                    f"--batch={index.to_str(range_sep='..')}",
+                    inputs.refdb[0],
+                    inputs.readsdb[0],
+                    inputs.pile_ups,
+                    *outputs,
+                )
+            ),
+        )
+
+    def merge_insertions(self):
+        merge_config = self.workdir / "dentist.merge.json"
+        insertion_batches = list(
+            chain.from_iterable(
+                job.outputs for job in self.jobs["process_pile_ups"].values()
+            )
+        )
+
+        @self.collect_job(
+            inputs=insertion_batches,
+            outputs=[merge_config],
+            log=self.log_file("merge-insertions"),
+            exec_local=True,
+        )
+        @python_code
+        def make_merge_config(inputs, outputs):
+            dentist_config = self.config.get("dentist", {})
+            merge_config = {
+                "__default__": dentist_config.get("__default__", {}),
+                "merge-insertions": dentist_config.get("merge-insertions", {}),
+            }
+            for cmd in ("__default__", "merge-insertions"):
+                for arg in ("insertions", "partitioned-insertions"):
+                    if arg in merge_config[cmd]:
+                        del merge_config[cmd][arg]
+            merge_config["merge-insertions"]["partitioned-insertions"] = list(
+                str(path) for path in inputs
+            )
+
+            with outputs[0].open("w") as merge_config_file:
+                json.dump(merge_config, merge_config_file)
+
+        self.execute_jobs()
+        self.collect_job(
+            name="merge_insertions",
+            inputs=FileList(
+                config=merge_config,
+                insertion_batches=insertion_batches,
+            ),
+            outputs=[self.insertions],
+            log=self.log_file("merge-insertions"),
+            action=lambda inputs, outputs: ShellScript(
+                (
+                    "dentist",
+                    "merge-insertions",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    *outputs,
+                    "-",
                 )
             ),
         )
