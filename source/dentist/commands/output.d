@@ -1046,12 +1046,15 @@ struct StringUniqifier(K, string fmt = "%s-%d")
             return *cacheHit;
 
         // get the number of duplciates of `label`
-        const dupCount = dupCounts.get(label, 0);
-        const ulabel = dupCount == 0
+        auto dupCount = dupCounts.get(label, 0);
+        auto ulabel = dupCount == 0
             // use plain `label` if there are no duplicates
             ? label
             // create a unique label from `fmt`
             : format!fmt(label, dupCount);
+
+        while (ulabel in dupCounts)
+            ulabel = format!fmt(label, ++dupCount);
 
         // add `ulabel` to cache
         cache[key] = ulabel;
