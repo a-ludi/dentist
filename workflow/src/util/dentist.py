@@ -6,6 +6,17 @@ import subprocess
 import yaml
 
 
+def is_testing():
+    version_info = subprocess.run(
+        ["dentist", "--version"],
+        text=True,
+        check=True,
+        capture_output=True,
+    ).stdout
+
+    return "+testing" in version_info
+
+
 def validate_config(config_file):
     errors = list()
     config = None

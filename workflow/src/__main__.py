@@ -33,6 +33,13 @@ class DentistGapClosing(Workflow):
         "homogenize_mask",
         "process_pile_ups",
     )
+    preliminary_output_revert_options = [
+        "scaffolding",
+        "skip-gaps",
+        "skip-gaps-file",
+        "agp-dazzler",
+    ] + (["cache-contig-alignments"] if dentist.is_testing() else [])
+    closed_gaps_mask = "closed-gaps"
 
     def __init__(
         self,
@@ -82,6 +89,7 @@ class DentistGapClosing(Workflow):
         self.pile_ups = self.workdir / "pile-ups.db"
         self.insertion_batches_dir = self.workdir / "insertions"
         self.insertions = self.workdir / "insertions.db"
+        self.gap_closed_fasta = Path(self.config["outputs"]["output_assembly"])
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -114,6 +122,8 @@ class DentistGapClosing(Workflow):
         self.collect_pile_ups()
         self.execute_jobs()
         self.process_pile_ups()
+        self.execute_jobs()
+        self.assembly_output(self.reference, self.reads, preliminary=True)
         self.execute_jobs()
 
     def create_dentist_config(self):
@@ -683,6 +693,51 @@ class DentistGapClosing(Workflow):
                     inputs.db[0],
                     *outputs.keys(),
                     *inputs.masks.keys(),
+                )
+            ),
+        )
+
+    def assembly_output(self, refdb, readsdb, skip_gaps=None, preliminary=False):
+        if preliminary:
+            job_name = "preliminary_output"
+            options = (
+                f"--revert={','.join(self.preliminary_output_revert_options)}",
+                "--agp-dazzler",
+            )
+            gap_closed_fasta = self.workdir / "gap-closed-preliminary.fasta"
+        else:
+            job_name = "unpurged_output" if skip_gaps is None else "purged_output"
+            options = tuple()
+            gap_closed_fasta = self.gap_closed_fasta
+
+        self.collect_job(
+            name=job_name,
+            inputs=FileList(
+                refdb=db_files(refdb),
+                readsdb=db_files(readsdb),
+                insertions=self.insertions,
+                config=self.dentist_config,
+                skip_gaps=[] if skip_gaps is None else skip_gaps,
+            ),
+            outputs=FileList(
+                fasta=gap_closed_fasta,
+                bed=gap_closed_fasta.with_suffix(f".{self.closed_gaps_mask}.bed"),
+                agp=gap_closed_fasta.with_suffix(f".agp"),
+            ),
+            log=self.log_file(job_name.replace("_", "-")),
+            action=lambda inputs, outputs: ShellScript(
+                (
+                    "dentist",
+                    "output",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    *options,
+                    f"--closed-gaps-bed={outputs.bed}",
+                    f"--agp={outputs.agp}",
+                    inputs.refdb[0],
+                    inputs.readsdb[0],
+                    inputs.insertions,
+                    outputs.fasta,
                 )
             ),
         )
