@@ -8,11 +8,11 @@ SCHEMA_FILE=config-schema.json
 
 function main()
 {
-    echo -n 'Updating `'"$SCHEMA_FILE"'` ... ' >&2
+    echo -n 'Updating `'"$SCHEMA_FILE"'` ... '
 
     if [[ "$DUB_BUILD_TYPE" == unittest || "$DUB_BUILD_TYPE" == docs-json ]]
     then
-        echo 'skipped' >&2
+        echo 'skipped'
         return
     fi
 
@@ -22,9 +22,9 @@ function main()
     then
         mv "$SCHEMA_FILE~" "$SCHEMA_FILE"
 
-        echo 'done' >&2
+        echo 'done'
     else
-        echo 'skipped' >&2
+        echo 'skipped'
     fi
 }
 
@@ -35,7 +35,7 @@ function clean_up()
 
 function on_error()
 {
-    echo failed >&2
+    echo failed
 }
 
 trap clean_up EXIT

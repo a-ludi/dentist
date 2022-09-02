@@ -8,7 +8,7 @@ EXTERNALDEPS_FILE=source/dentist/modules.d
 
 function main()
 {
-    echo -n 'Updating `dentist.modules` ... ' >&2
+    echo -n 'Updating `dentist.modules` ... '
 
     get_updated_modules "$EXTERNALDEPS_FILE" > "$EXTERNALDEPS_FILE~"
 
@@ -16,9 +16,9 @@ function main()
     then
         mv "$EXTERNALDEPS_FILE~" "$EXTERNALDEPS_FILE"
 
-        echo 'done' >&2
+        echo 'done'
     else
-        echo 'skipped' >&2
+        echo 'skipped'
     fi
 }
 
@@ -75,7 +75,7 @@ function clean_up()
 
 function on_error()
 {
-    echo failed >&2
+    echo failed
 }
 
 trap clean_up EXIT
