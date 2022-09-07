@@ -6,6 +6,12 @@ SCHEMA_FILE=config-schema.json
 #!/bin/bash
 
 
+function dentist()
+{
+    "${DUB_BUILD_PATH:-$PWD}/dentist" "$@"
+}
+
+
 function main()
 {
     echo -n 'Updating `'"$SCHEMA_FILE"'` ... '
@@ -16,7 +22,7 @@ function main()
         return
     fi
 
-    "$DUB_BUILD_PATH/dentist" --config-schema > "$SCHEMA_FILE~"
+    dentist --config-schema > "$SCHEMA_FILE~"
 
     if ! cmp -s "$SCHEMA_FILE" "$SCHEMA_FILE~";
     then
