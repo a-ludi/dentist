@@ -164,11 +164,11 @@ declare -A CHECKSUMS
 CHECKSUMS=(
     ['workdir/reference.reference.las']=bc7252a18a8d502ec35b368112994f06
     ['workdir/reference.reads.las']=ec8576ba93122feb6213e27bc4be12e7
-    ['workdir/pile-ups.db']=b377a10ed82c4c50e33a72eec88f1ef8
-    ['workdir/insertions.db']=4e43d8b3c8fae9a3c5eb5d5bf539ec9e
+    ['workdir/pile-ups.db']=fc74db0db88fe3acab5fa2fd31164300
+    ['workdir/insertions.db']=90ca129de08c0e5c69d0f8fd41831adc
     ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=243f97348b2843b0c20d1da84461bd03
     ['workdir/gap-closed-preliminary.reads.las']=1d39fdb6f5714cf0e316ce150e3619e0
-    ['gap-closed.agp']=df99c1f2d380e6de12251ff234805f07
+    ['gap-closed.agp']=b168b1f66338081b4cefbc0e9907ab2c
 )
 
 
