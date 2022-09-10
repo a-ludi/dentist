@@ -50,7 +50,7 @@ First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
