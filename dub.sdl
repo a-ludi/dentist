@@ -35,7 +35,7 @@ configuration "read-las-test" {
 }
 
 buildType "release" {
-    buildOptions "optimize" "inline"
+    buildOptions /*"optimize" "inline" */
 }
 
 buildType "docs-json" {

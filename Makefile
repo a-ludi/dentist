@@ -95,7 +95,7 @@ $(binaries) &:
 	BINARIES=( $(addprefix "$$PREFIX/bin/",$(notdir $(binaries))) ); \
 	trap 'rm -rf "$$ROOT"' exit; \
 	conda create -y --copy -p "$$PREFIX" -c local -c a_ludi -c bioconda \
-	    dentist-core==local \
+	    dentist-core==$(dentist_version:v%=%) \
 	    jq==1.6 \
 	    'python>=3,<4'; \
 	echo 'Installing binaries into $(dist_dir)'; \
