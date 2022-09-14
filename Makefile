@@ -1,7 +1,7 @@
 dentist_version = $(shell git describe)
 arch = $(shell uname -m)
-container = dentist_$(dentist_version).sif
-container_def = singularity/dentist_$(dentist_version).def
+container = dentist_$(dentist_version:v%=%).sif
+container_def = singularity/dentist_$(dentist_version:v%=%).def
 dentist_env=dentist_$(firstword $(subst ., ,$(dentist_version)))
 
 local_only = $(if $(findstring local,$(dentist_version)),$(1))
