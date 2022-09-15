@@ -70,6 +70,7 @@ api-docs: docs.json
 docs.json:
 	dub build --build=docs-json --config=testing
 	$(ddox) filter $(ddox_filter) $@
+	jq -f scripts/fix-empty-objects-in-docs.jq < $@ > $@~ && mv $@~ $@
 
 
 .PHONY: dist
