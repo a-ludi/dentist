@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct AlignmentChain</title>
+		<link rel="stylesheet" type="text/css" href="../../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module selected">
+						<a href="../../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct AlignmentChain</h1><p>Holds a chain of local alignments that form a compound alignment. An AlignmentChain should
+    contain at least one element.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">AlignmentChain</span>
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.contigA.html" class="public"><code>contigA</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/Contig.html"><span class="typ">Contig</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.contigB.html" class="public"><code>contigB</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/Contig.html"><span class="typ">Contig</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.flags.html" class="public"><code>flags</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">BitFlags</span>!(dentist.common.alignments.base.Flag,0)</code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.id.html" class="public"><code>id</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.localAlignments.html" class="public"><code>localAlignments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.LocalAlignment.html"><span class="typ">AlignmentChain<wbr/></span><span class="pun">.<wbr/></span><span class="typ">LocalAlignment</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.tracePointDistance.html" class="public"><code>tracePointDistance</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ushort</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.averageErrorRate.html" class="public property"><code>averageErrorRate</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td>Average diffs per base pair over all local alignments.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.beginsWith.html" class="public property"><code>beginsWith</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>This alignment begins within <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.beginsWith.html#allowance"><span class="pln">allowance</span></a></code> of the begin of <code class="lang-d"><span class="pln">contig</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.completelyCovers.html" class="public property"><code>completelyCovers</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns true iff this alignment covers <code class="lang-d"><span class="pln">contig</span></code> completely within
+<code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.completelyCovers.html#allowance"><span class="pln">allowance</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.coveredBases.html" class="public property"><code>coveredBases</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td>Sum of bases covered by each local alignment on contig A. Some bases
+may be counted multiple times.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.disabledInstance.html" class="public property"><code>disabledInstance</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.html"><span class="typ">AlignmentChain</span></a></code></td><td>Return a minimal <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.html"><span class="typ">AlignmentChain</span></a></code> with the disabled flag set.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.endsWith.html" class="public property"><code>endsWith</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>This alignment ends within <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.endsWith.html#allowance"><span class="pln">allowance</span></a></code> of the end of <code class="lang-d"><span class="pln">contig</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.first.html" class="public property"><code>first</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><a href="../../../../dentist/common/alignments/base/AlignmentChain.LocalAlignment.html"><span class="typ">AlignmentChain<wbr/></span><span class="pun">.<wbr/></span><span class="typ">LocalAlignment</span></a><span class="pun">)</span></code></td><td>Return first local alignment.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.isProper.html" class="public property"><code>isProper</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>This alignment is called proper iff it starts and ends at a contig
+boundary within <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.isProper.html#allowance"><span class="pln">allowance</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.last.html" class="public property"><code>last</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><a href="../../../../dentist/common/alignments/base/AlignmentChain.LocalAlignment.html"><span class="typ">AlignmentChain<wbr/></span><span class="pun">.<wbr/></span><span class="typ">LocalAlignment</span></a><span class="pun">)</span></code></td><td>Return last local alignment.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.totalDiffs.html" class="public property"><code>totalDiffs</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ulong</span></code></td><td>Sum of differences in each local alignment.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.cartoon.html" class="public">
+								<code>cartoon</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Generate a cartoon of this alignment relative to <code class="lang-d"><span class="pln">contig</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.compareIds.html" class="public">
+								<code>compareIds</code>
+							</a>
+							<span class="tableEntryAnnotation">(other)</span>
+						</td>
+						<td>Compare this alignment chain to other only by contig IDs.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.cropToTracePoint.html" class="public">
+								<code>cropToTracePoint</code>
+							</a>
+							<span class="tableEntryAnnotation">(startingSeed, contigPos, roundingMode)</span>
+						</td>
+						<td>Crops this local alignment from <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.cropToTracePoint.html#startingSeed"><span class="pln">startingSeed</span></a></code> (begin or end of
+alignment chain) to <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.cropToTracePoint.html#contigPos"><span class="pln">contigPos</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.disableIf.html" class="public">
+								<code>disableIf</code>
+							</a>
+							<span class="tableEntryAnnotation">(disable)</span>
+						</td>
+						<td>Set the disable flag if <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.disableIf.html#disable"><span class="pln">disable</span></a><span class="pln"> </span><span class="pun">== </span><span class="kwd">true</span></code> unless it is already set.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.fromJson.html" class="public">
+								<code>fromJson</code>
+							</a>
+							<span class="tableEntryAnnotation">(json)</span>
+						</td>
+						<td>Convert to/from <code class="lang-d"><span class="pln">vibed<wbr/></span><span class="pun">.</span><span class="pln">data<wbr/></span><span class="pun">.</span><span class="pln">json<wbr/></span><span class="pun">.</span><span class="typ">Json</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.isFullyContained.html" class="public">
+								<code>isFullyContained</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Returns true if the aligned read <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.contigB.html"><span class="pln">contigB</span></a></code> (with extensions on either
+        end) is fully contained in the reference <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.contigA.html"><span class="pln">contigA</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.opCmp.html" class="public">
+								<code>opCmp</code>
+							</a>
+							<span class="tableEntryAnnotation">(other)</span>
+						</td>
+						<td>Compare this alignment chain to <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.opCmp.html#other"><span class="pln">other</span></a></code>. Sort order is determined
+by these criteria:
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.toFlatLocalAlignments.html" class="public">
+								<code>toFlatLocalAlignments</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Split this alignment chain into a range of <code class="lang-d"><a href="../../../../dentist/common/alignments/base/FlatLocalAlignment.html"><span class="typ">FlatLocalAlignment</span></a></code>s. The
+resulting alignment are flagged appropriately to make reconstruction
+of the chain possible.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.toJson.html" class="public">
+								<code>toJson</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>Convert to/from <code class="lang-d"><span class="pln">vibed<wbr/></span><span class="pun">.</span><span class="pln">data<wbr/></span><span class="pun">.</span><span class="pln">json<wbr/></span><span class="pun">.</span><span class="typ">Json</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.translateTracePoint.html" class="public">
+								<code>translateTracePoint</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigPos, roundingMode)</span>
+						</td>
+						<td>Translate <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.translateTracePoint.html#contigPos"><span class="pln">contigPos</span></a></code> on <code class="lang-d"><span class="pln">contig</span></code> to a position on the other contig
+without exact alignment reconstruction. The first local alignment
+that covers <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.translateTracePoint.html#contigPos"><span class="pln">contigPos</span></a></code> is selected for translation.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.coveringLocalAlignmentIndex.html" class="protected">
+								<code>coveringLocalAlignmentIndex</code>
+							</a>
+							<span class="tableEntryAnnotation">(contigPos, roundingMode)</span>
+						</td>
+						<td>Return the index of the first local alignment that covers <code class="lang-d"><a href="../../../../dentist/common/alignments/base/AlignmentChain.coveringLocalAlignmentIndex.html#contigPos"><span class="pln">contigPos</span></a></code>.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../../dentist/common/alignments/base/AlignmentChain.LocalAlignment.html" class="public">
+								<code>LocalAlignment</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

@@ -4,7 +4,7 @@ DENTIST
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
-[![Singularity Image Version](https://img.shields.io/badge/Singularity-v3.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
+[![Singularity Image Version](https://img.shields.io/badge/Singularity-v4.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
 [![Conda package Version](https://img.shields.io/conda/v/a_ludi/dentist?label=conda)](https://anaconda.org/a_ludi/dentist-core)
 [![DOI:10.1093/gigascience/giab100](https://img.shields.io/badge/DOI_10.1093%2Fgigascience%2Fgiab100-informational)][dentist-gigascience]
 
@@ -14,7 +14,11 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
-**API documentation:** ([current][api-current], [v3.0.0][api-v3.0.0], [v2.0.0][api-v2.0.0])
+**API documentation:**
+[current][api-current],
+[v4.0.0][api-v4.0.0],
+[v3.0.0][api-v3.0.0],
+[v2.0.0][api-v2.0.0]
 
 **First time here? Head over to [the example](#example) and make sure it works.**
 
@@ -22,6 +26,7 @@ reads.
 [api-current]: ./api/current
 [api-v2.0.0]: ./api/v2.0.0
 [api-v3.0.0]: ./api/v3.0.0
+[api-v4.0.0]: ./api/v4.0.0
 
 
 Install
@@ -70,15 +75,15 @@ The last command is explained in more detail below in
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The pre-built binaries are stored in a subfolder
-called `bin`. Here are the instructions for `v3.0.0`:
+called `bin`. Here are the instructions for `v4.0.0`:
 
 ```sh
 # download & extract pre-built binaries
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
-tar -xzf dentist.v3.0.0.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+tar -xzf dentist.v4.0.0.x86_64.tar.gz
 
 # make binaries available to your shell
-cd dentist.v3.0.0.x86_64
+cd dentist.v4.0.0.x86_64
 PATH="$PWD/bin:$PATH"
 
 # check installation with
@@ -109,19 +114,21 @@ and this README. In short, everything you to run DENTIST.
 
 ### Build from Source
 
-Be sure to install the D package manager [DUB][DUB]. Install using either
+1. Install the D package manager [DUB][DUB]. 
+2. Install [JQ 1.6][jq].
+3. Build DENTIST using either
+    ```sh
+    dub install dentist
+    ```
+    or
+    ```sh
+    git clone --recurse-submodules https://github.com/a-ludi/dentist.git
+    cd dentist
+    dub build
+    ```
 
-```sh
-dub install dentist
-```
+[jq]: https://stedolan.github.io/jq/download/
 
-or
-
-```sh
-git clone https://github.com/a-ludi/dentist.git
-cd dentist
-dub build
-```
 
 ### Runtime Dependencies
 
@@ -171,9 +178,9 @@ make sure your setup is working as expected.
 
 > TL;DR
 >
->     wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
->     tar -xzf dentist.v3.0.0.x86_64.tar.gz
->     cd dentist.v3.0.0.x86_64
+>     wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+>     tar -xzf dentist.v4.0.0.x86_64.tar.gz
+>     cd dentist.v4.0.0.x86_64
 >     
 >     # edit dentist.yml and snakemake.yml
 >
@@ -190,15 +197,15 @@ Install [Snakemake][snakemake] version >=5.32.1 and prepare your working
 directory:
 
 ```sh
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
-tar -xzf dentist.v3.0.0.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+tar -xzf dentist.v4.0.0.x86_64.tar.gz
 
 cp -r -t . \
-    dentist.v3.0.0.x86_64/snakemake/dentist.yml \
-    dentist.v3.0.0.x86_64/snakemake/Snakefile \
-    dentist.v3.0.0.x86_64/snakemake/snakemake.yml \
-    dentist.v3.0.0.x86_64/snakemake/envs \
-    dentist.v3.0.0.x86_64/snakemake/scripts
+    dentist.v4.0.0.x86_64/snakemake/dentist.yml \
+    dentist.v4.0.0.x86_64/snakemake/Snakefile \
+    dentist.v4.0.0.x86_64/snakemake/snakemake.yml \
+    dentist.v4.0.0.x86_64/snakemake/envs \
+    dentist.v4.0.0.x86_64/snakemake/scripts
 ```
 
 Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
@@ -289,7 +296,7 @@ First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```

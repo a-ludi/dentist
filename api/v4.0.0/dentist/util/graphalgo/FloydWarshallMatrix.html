@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct FloydWarshallMatrix</title>
+		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct FloydWarshallMatrix</h1><p>Provides access to the all pairs shortest paths solution.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">FloydWarshallMatrix</span>(weight_t)
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section><p>This is the result of the Floyd-Warshall algorithm generated by
+<code class="lang-d"><a href="../../../dentist/util/graphalgo/shortestPathsFloydWarshall.html"><span class="pln">shortestPathsFloydWarshall</span></a></code>.
+</p>
+</section>
+
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix._dist.html" class="public"><code>_dist</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">weight_t</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix._next.html" class="public"><code>_next</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix._numNodes.html" class="public"><code>_numNodes</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.dist.html" class="public property"><code>dist</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">weight_t</span></code></td><td>Get the distance from <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.dist.html#u"><span class="pln">u</span></a></code> to <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.dist.html#v"><span class="pln">v</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.hasNext.html" class="public property"><code>hasNext</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Returns whether there is a next node after <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.hasNext.html#u"><span class="pln">u</span></a></code> on a shortest path
+from <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.hasNext.html#u"><span class="pln">u</span></a></code> to <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.hasNext.html#v"><span class="pln">v</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.isConnected.html" class="public property"><code>isConnected</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td>Return true if there is a path from <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.isConnected.html#u"><span class="pln">u</span></a></code> to <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.isConnected.html#v"><span class="pln">v</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.next.html" class="public property"><code>next</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td>Return the next node after <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.next.html#u"><span class="pln">u</span></a></code> on a shortest path from <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.next.html#u"><span class="pln">u</span></a></code> to <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.next.html#v"><span class="pln">v</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.numNodes.html" class="public property"><code>numNodes</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td>Number of nodes in the graph. This is the limit (exclusive) for
+node indices.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.hasNegativeCycles.html" class="public">
+								<code>hasNegativeCycles</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td>True if a negative cycle was detected.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.idx.html" class="public">
+								<code>idx</code>
+							</a>
+							<span class="tableEntryAnnotation">(u, v)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.shortestPath.html" class="public">
+								<code>shortestPath</code>
+							</a>
+							<span class="tableEntryAnnotation">(from, to)</span>
+						</td>
+						<td>Returns a lazy range of nodes that form a shortest path between <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.shortestPath.html#from"><span class="pln">from</span></a></code>
+and <code class="lang-d"><a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.shortestPath.html#to"><span class="pln">to</span></a></code>.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/graphalgo/FloydWarshallMatrix.ShortestPath.html" class="public">
+								<code>ShortestPath</code>
+							</a>
+						</td>
+						<td>Range of nodes that form a shortest path between two nodes.
+</td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

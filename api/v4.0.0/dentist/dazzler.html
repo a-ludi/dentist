@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.dazzler</title>
+		<link rel="stylesheet" type="text/css" href="../styles/ddox.css"/>
+		<link rel="stylesheet" href="../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../scripts/jquery.js">/**/</script><script type="text/javascript" src="../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.dazzler</h1><p>Defines bindings to and utilities for the Dazzler tool suite.
+</p><section></section>
+
+			<section></section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="alignmentChainPacker" class="public" href="../dentist/dazzler/alignmentChainPacker.html">alignmentChainPacker</a><span class="tableEntryAnnotation">(localAlignments, bufferMode, localAlignmentBuffer)</span>
+							</code>
+						</td>
+						<td>Transforms a range <code class="lang-d"><span class="pln">R</span></code> of <code class="lang-d"><span class="typ">FlatLocalAlignment</span></code>s into a range of
+<code class="lang-d"><span class="typ">AlignmentChain</span></code>s.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="buildDamFile" class="public" href="../dentist/dazzler/buildDamFile.html">buildDamFile</a><span class="tableEntryAnnotation">(fastaRecords, tmpdir, dbsplitOptions, append)</span>
+							</code>
+						</td>
+						<td>Build <code class="lang-d"><a href="../dentist/dazzler/buildDamFile.html#outputDb"><span class="pln">outputDb</span></a></code> with the given set of FASTA records. If no <code class="lang-d"><a href="../dentist/dazzler/buildDamFile.html#outputDb"><span class="pln">outputDb</span></a></code>
+    is given a temporary <code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">dam</span></code> file in <code class="lang-d"><a href="../dentist/dazzler/buildDamFile.html#tmpdir"><span class="pln">tmpdir</span></a></code> will be created.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="buildDbFile" class="public" href="../dentist/dazzler/buildDbFile.html">buildDbFile</a><span class="tableEntryAnnotation">(fastaRecords, tmpdir, dbsplitOptions, append)</span>
+							</code>
+						</td>
+						<td>Build <code class="lang-d"><a href="../dentist/dazzler/buildDbFile.html#outputDb"><span class="pln">outputDb</span></a></code> with the given set of FASTA records. If no <code class="lang-d"><a href="../dentist/dazzler/buildDbFile.html#outputDb"><span class="pln">outputDb</span></a></code>
+    is given a temporary <code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">db</span></code> file in <code class="lang-d"><a href="../dentist/dazzler/buildDbFile.html#tmpdir"><span class="pln">tmpdir</span></a></code> will be created.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="chainLocalAlignments" class="public" href="../dentist/dazzler/chainLocalAlignments.html">chainLocalAlignments</a><span class="tableEntryAnnotation">(dbFile, lasFile, options)</span>
+							</code>
+						</td>
+						<td>Chain local alignments in <code class="lang-d"><a href="../dentist/dazzler/chainLocalAlignments.html#lasFile"><span class="pln">lasFile</span></a></code> and write back to a LAS file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="computeQVs" class="public" href="../dentist/dazzler/computeQVs.html">computeQVs</a><span class="tableEntryAnnotation">(dbFile, lasFile, coverage)</span>
+							</code>
+						</td>
+						<td>Compute intrinsic quality values (QVs) from the alignments in <code class="lang-d"><a href="../dentist/dazzler/computeQVs.html#lasFile"><span class="pln">lasFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="dazzExtra" class="public" href="../dentist/dazzler/dazzExtra.html">dazzExtra</a><span class="tableEntryAnnotation">(name, data, accumMode)</span>
+							</code>
+						</td>
+						<td>Represents a track extra, i.e. additional data stored alongside a DB track.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="dbdust" class="public" href="../dentist/dazzler/dbdust.html">dbdust</a><span class="tableEntryAnnotation">(dbFile, dbdustOptions)</span>
+							</code>
+						</td>
+						<td>Run <code class="lang-d"><span class="typ">DBdust</span></code> on <code class="lang-d"><a href="../dentist/dazzler/dbdust.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="dbEmpty" class="public" href="../dentist/dazzler/dbEmpty.html">dbEmpty</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Returns true iff <code class="lang-d"><a href="../dentist/dazzler/dbEmpty.html#dbFile"><span class="pln">dbFile</span></a></code> is empty.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="dbSubset" class="public" href="../dentist/dazzler/dbSubset.html">dbSubset</a><span class="tableEntryAnnotation">(inDbFile, readIds, options, append)</span>
+							</code>
+						</td>
+						<td>Build DB file by using the given subset of reads in <code class="lang-d"><a href="../dentist/dazzler/dbSubset.html#inDbFile"><span class="pln">inDbFile</span></a></code>.
+Writes to <code class="lang-d"><span class="pln">outputDB</span></code> if given; otherwise a name with the same extenion as
+<code class="lang-d"><a href="../dentist/dazzler/dbSubset.html#inDbFile"><span class="pln">inDbFile</span></a></code> under <code class="lang-d"><span class="pln">options<wbr/></span><span class="pun">.</span><span class="pln">tmpdir</span></code> is safely generated. The resulting DB
+is implictly split using <code class="lang-d"><span class="pln">options<wbr/></span><span class="pun">.</span><span class="pln">dbsplitOptions</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="filterLocalAlignments" class="public" href="../dentist/dazzler/filterLocalAlignments.html">filterLocalAlignments</a><span class="tableEntryAnnotation">(lasFile)</span>
+							</code>
+						</td>
+						<td>Filter local alignments in <code class="lang-d"><a href="../dentist/dazzler/filterLocalAlignments.html#lasFile"><span class="pln">lasFile</span></a></code> producing a new LAS file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="filterPileUpAlignments" class="public" href="../dentist/dazzler/filterPileUpAlignments.html">filterPileUpAlignments</a><span class="tableEntryAnnotation">(dbFile, lasFile, properAlignmentAllowance, forceFlat)</span>
+							</code>
+						</td>
+						<td>Disables alignments that should not appear in a pile up.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getAlignments" class="public" href="../dentist/dazzler/getAlignments.html">getAlignments</a><span class="tableEntryAnnotation">(dbA, lasFile, includeTracePoints)</span>
+							</code>
+						</td>
+						<td>Read all alignment chains from <code class="lang-d"><a href="../dentist/dazzler/getAlignments.html#lasFile"><span class="pln">lasFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getBlockSize" class="public" href="../dentist/dazzler/getBlockSize.html">getBlockSize</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Return the of block size of <code class="lang-d"><a href="../dentist/dazzler/getBlockSize.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getConsensus" class="public" href="../dentist/dazzler/getConsensus.html">getConsensus</a><span class="tableEntryAnnotation">(dbFile, readId, options)</span>
+							</code>
+						</td>
+						<td>Build consensus using <code class="lang-d"><span class="pln">daccord</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getContigCutoff" class="public" href="../dentist/dazzler/getContigCutoff.html">getContigCutoff</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Return the contig/read length cutoff of <code class="lang-d"><a href="../dentist/dazzler/getContigCutoff.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getDalignment" class="public" href="../dentist/dazzler/getDalignment.html">getDalignment</a><span class="tableEntryAnnotation">(dbFile, dalignerOptions, outdir)</span>
+							</code>
+						</td>
+						<td>Align DB(s) to each other using <code class="lang-d"><span class="pln">daligner</span></code> executed in <code class="lang-d"><a href="../dentist/dazzler/getDalignment.html#outdir"><span class="pln">outdir</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getDamapping" class="public" href="../dentist/dazzler/getDamapping.html">getDamapping</a><span class="tableEntryAnnotation">(refDb, queryDb, damapperOptions, outdir)</span>
+							</code>
+						</td>
+						<td>Align <code class="lang-d"><a href="../dentist/dazzler/getDamapping.html#queryDb"><span class="pln">queryDb</span></a></code> against <code class="lang-d"><a href="../dentist/dazzler/getDamapping.html#refDb"><span class="pln">refDb</span></a></code> using <code class="lang-d"><span class="pln">damapper</span></code> executed in <code class="lang-d"><a href="../dentist/dazzler/getDamapping.html#outdir"><span class="pln">outdir</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getDbHeaders" class="public" href="../dentist/dazzler/getDbHeaders.html">getDbHeaders</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Returns an array of read/contig headers of the give <code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">db</span></code> or <code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">dam</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getDbRecords" class="public" href="../dentist/dazzler/getDbRecords.html">getDbRecords</a><span class="tableEntryAnnotation">(dbFile, dbdumpOptions)</span>
+							</code>
+						</td>
+						<td>Get the designated records of <code class="lang-d"><a href="../dentist/dazzler/getDbRecords.html#dbFile"><span class="pln">dbFile</span></a></code>. Returns all records unless
+    <code class="lang-d"><a href="../dentist/dazzler/getDbRecords.html#recordNumbers"><span class="pln">recordNumbers</span></a></code> is given.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getExactAlignment" class="public" href="../dentist/dazzler/getExactAlignment.html">getExactAlignment</a><span class="tableEntryAnnotation">(dbA, dbB, ac, memoryLimit)</span>
+							</code>
+						</td>
+						<td><font color=red>[Experimental]</font> Reconstruct the alignment matrix for <code class="lang-d"><a href="../dentist/dazzler/getExactAlignment.html#ac"><span class="pln">ac</span></a></code>
+force-filling gaps in the chain. Restrict reconstruction to
+<code class="lang-d"><span class="pun">[<a href="../dentist/dazzler/getExactAlignment.html#beginA"></span><span class="pln">beginA</span></a><span class="pun">, <a href="../dentist/dazzler/getExactAlignment.html#endA"></span><span class="pln">endA</span></a><span class="pun">)</span></code> on contig A if given.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getFastaEntries" class="public" href="../dentist/dazzler/getFastaEntries.html">getFastaEntries</a><span class="tableEntryAnnotation">(dbFile, recordNumbers, fastaLineWidth)</span>
+							</code>
+						</td>
+						<td>Get the designated set of records in FASTA format. If <code class="lang-d"><a href="../dentist/dazzler/getFastaEntries.html#recordNumbers"><span class="pln">recordNumbers</span></a></code> is
+    empty the whole DB will be converted.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getFastaSequence" class="public" href="../dentist/dazzler/getFastaSequence.html">getFastaSequence</a><span class="tableEntryAnnotation">(dbFile, recordNumber, cacheSize)</span>
+							</code>
+						</td>
+						<td>Get the base pair sequence of the designated record.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getFastaSequences" class="public" href="../dentist/dazzler/getFastaSequences.html">getFastaSequences</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Get the base pair sequences of the designated records. This does NOT
+    include the header.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getFlatLocalAlignments" class="public" href="../dentist/dazzler/getFlatLocalAlignments.html">getFlatLocalAlignments</a><span class="tableEntryAnnotation">(lasFile, bufferMode, tracePointBuffer)</span>
+							</code>
+						</td>
+						<td>Lazily read individual local alignments from <code class="lang-d"><a href="../dentist/dazzler/getFlatLocalAlignments.html#lasFile"><span class="pln">lasFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getHiddenDbFiles" class="public" href="../dentist/dazzler/getHiddenDbFiles.html">getHiddenDbFiles</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Return a list of hidden files associated to every <code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">dam</span></code>/<code class="lang-d"><wbr/><span class="pun">.</span><span class="pln">db</span></code> file. These
+    files contain the actual data used in all the computation. Thus, we
+    carefully check for their existence.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getLasFile" class="public" href="../dentist/dazzler/getLasFile.html">getLasFile</a><span class="tableEntryAnnotation">(dbA, baseDirectory)</span>
+							</code>
+						</td>
+						<td>Generate the LAS file name as <code class="lang-d"><span class="pln">daligner</span></code>/<code class="lang-d"><span class="pln">damapper</span></code> run in <code class="lang-d"><a href="../dentist/dazzler/getLasFile.html#baseDirectory"><span class="pln">baseDirectory</span></a></code>
+does.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getLocalAlignments" class="public" href="../dentist/dazzler/getLocalAlignments.html">getLocalAlignments</a><span class="tableEntryAnnotation">(dbA, options)</span>
+							</code>
+						</td>
+						<td>Compute local alignments of given DBs using <code class="lang-d"><span class="pln">daligner</span></code>. Uses <code class="lang-d"><a href="../dentist/dazzler/getLocalAlignments.html#dbB"><span class="pln">dbB</span></a><span class="pln"> </span><span class="pun">= <a href="../dentist/dazzler/getLocalAlignments.html#dbA"></span><span class="pln">dbA</span></a></code>
+if <code class="lang-d"><a href="../dentist/dazzler/getLocalAlignments.html#dbB"><span class="pln">dbB</span></a></code> is omitted.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getMappings" class="public" href="../dentist/dazzler/getMappings.html">getMappings</a><span class="tableEntryAnnotation">(dbA, dbB, options)</span>
+							</code>
+						</td>
+						<td>Compute local alignments of given DBs using <code class="lang-d"><span class="pln">damapper</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getMaskFiles" class="public" href="../dentist/dazzler/getMaskFiles.html">getMaskFiles</a><span class="tableEntryAnnotation">(dbFile, maskName, allowBlock)</span>
+							</code>
+						</td>
+						<td>Get the hidden files comprising the designated mask.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getNumBlocks" class="public" href="../dentist/dazzler/getNumBlocks.html">getNumBlocks</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Return the number of blocks in <code class="lang-d"><a href="../dentist/dazzler/getNumBlocks.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getNumContigs" class="public" href="../dentist/dazzler/getNumContigs.html">getNumContigs</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Get the number of reads/contig in <code class="lang-d"><a href="../dentist/dazzler/getNumContigs.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getScaffoldStructure" class="public" href="../dentist/dazzler/getScaffoldStructure.html">getScaffoldStructure</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Returns a lazy range of <code class="lang-d"><a href="../dentist/dazzler/ScaffoldSegment.html"><span class="typ">ScaffoldSegment</span></a></code>s describing the scaffold
+structure.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getTracePointDistance" class="public" href="../dentist/dazzler/getTracePointDistance.html">getTracePointDistance</a><span class="tableEntryAnnotation">(lasFile)</span>
+							</code>
+						</td>
+						<td>Returns the trace point distance in <code class="lang-d"><a href="../dentist/dazzler/getTracePointDistance.html#lasFile"><span class="pln">lasFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isValidPileUpAlignment" class="public" href="../dentist/dazzler/isValidPileUpAlignment.html">isValidPileUpAlignment</a><span class="tableEntryAnnotation">(alignment, allowance)</span>
+							</code>
+						</td>
+						<td>An alignment in a pile up is valid iff it is proper and the begin/end
+of both reads match.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="LAmerge" class="public" href="../dentist/dazzler/LAmerge.html">LAmerge</a><span class="tableEntryAnnotation">(mergedLas, lasFiles)</span>
+							</code>
+						</td>
+						<td>Merge given las files.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="lasEmpty" class="public" href="../dentist/dazzler/lasEmpty.html">lasEmpty</a><span class="tableEntryAnnotation">(lasFile)</span>
+							</code>
+						</td>
+						<td>Returns true iff lasFile contains zero parts.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="lasFileGenerated" class="public" href="../dentist/dazzler/lasFileGenerated.html">lasFileGenerated</a><span class="tableEntryAnnotation">(dbA, baseDirectory)</span>
+							</code>
+						</td>
+						<td>Check if a LAS file was generated by <code class="lang-d"><span class="pln">daligner</span></code>/<code class="lang-d"><span class="pln">damapper</span></code> run in
+<code class="lang-d"><a href="../dentist/dazzler/lasFileGenerated.html#baseDirectory"><span class="pln">baseDirectory</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="numDbRecords" class="public" href="../dentist/dazzler/numDbRecords.html">numDbRecords</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Returns the (trimmed) number of records in <code class="lang-d"><a href="../dentist/dazzler/numDbRecords.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="readDazzExtra" class="public" href="../dentist/dazzler/readDazzExtra.html">readDazzExtra</a><span class="tableEntryAnnotation">(dbFile, maskName, extraName)</span>
+							</code>
+						</td>
+						<td>Read extra <code class="lang-d"><a href="../dentist/dazzler/readDazzExtra.html#extraName"><span class="pln">extraName</span></a></code> of track <code class="lang-d"><a href="../dentist/dazzler/readDazzExtra.html#maskName"><span class="pln">maskName</span></a></code> with elements of type <code class="lang-d"><span class="pln">T</span></code> from
+    <code class="lang-d"><a href="../dentist/dazzler/readDazzExtra.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="readMask" class="public" href="../dentist/dazzler/readMask.html">readMask</a><span class="tableEntryAnnotation">(dbFile, maskName)</span>
+							</code>
+						</td>
+						<td>Read the <code class="lang-d"><span class="typ">Interval</span></code>s of a Dazzler mask for <code class="lang-d"><a href="../dentist/dazzler/readMask.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="removeDB" class="public" href="../dentist/dazzler/removeDB.html">removeDB</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Remove database and hidden files.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="stripDbExtension" class="public" href="../dentist/dazzler/stripDbExtension.html">stripDbExtension</a><span class="tableEntryAnnotation">(dbFile)</span>
+							</code>
+						</td>
+						<td>Strip extension of <code class="lang-d"><a href="../dentist/dazzler/stripDbExtension.html#dbFile"><span class="pln">dbFile</span></a></code> if its is <code class="lang-d"><a href="../dentist/dazzler/dbFileExtension.html"><span class="pln">dbFileExtension</span></a></code>
+or <code class="lang-d"><a href="../dentist/dazzler/damFileExtension.html"><span class="pln">damFileExtension</span></a></code>. Otherwise return <code class="lang-d"><a href="../dentist/dazzler/stripDbExtension.html#dbFile"><span class="pln">dbFile</span></a></code> untouched.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="withOption" class="public" href="../dentist/dazzler/withOption.html">withOption</a><span class="tableEntryAnnotation">(dazzlerOptions, optionName, mod)</span>
+							</code>
+						</td>
+						<td>Lazily modifies <code class="lang-d"><a href="../dentist/dazzler/withOption.html#dazzlerOptions"><span class="pln">dazzlerOptions</span></a></code> as specified.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="writeAlignments" class="public" href="../dentist/dazzler/writeAlignments.html">writeAlignments</a><span class="tableEntryAnnotation">(lasFile, flatLocalAlignments)</span>
+							</code>
+						</td>
+						<td>Write alignments to <code class="lang-d"><a href="../dentist/dazzler/writeAlignments.html#lasFile"><span class="pln">lasFile</span></a></code>. This method takes care of the differences
+between alignment flags in DENTIST and Dazzler code.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="writeDazzExtra" class="public" href="../dentist/dazzler/writeDazzExtra.html">writeDazzExtra</a><span class="tableEntryAnnotation">(dbFile, maskName, extra)</span>
+							</code>
+						</td>
+						<td>Write extra <code class="lang-d"><span class="pln">extraName</span></code> of track <code class="lang-d"><a href="../dentist/dazzler/writeDazzExtra.html#maskName"><span class="pln">maskName</span></a></code> with elements of type <code class="lang-d"><span class="pln">T</span></code> from
+    <code class="lang-d"><a href="../dentist/dazzler/writeDazzExtra.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="writeMask" class="public" href="../dentist/dazzler/writeMask.html">writeMask</a><span class="tableEntryAnnotation">(dbFile, maskName, intervals)</span>
+							</code>
+						</td>
+						<td>Write the list of intervals to a Dazzler mask for <code class="lang-d"><a href="../dentist/dazzler/writeMask.html#dbFile"><span class="pln">dbFile</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="fingerprint" class="protected" href="../dentist/dazzler/fingerprint.html">fingerprint</a><span class="tableEntryAnnotation">(alignmentChain)</span>
+							</code>
+						</td>
+						<td>Returns a tuple of contig IDs and first and last begin/end coords.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Classes</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DazzExtraNotFound" class="public" href="../dentist/dazzler/DazzExtraNotFound.html">DazzExtraNotFound</a>
+							</code>
+						</td>
+						<td>Thrown on failure while reading a Dazzler mask.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DazzlerCommandException" class="public" href="../dentist/dazzler/DazzlerCommandException.html">DazzlerCommandException</a>
+							</code>
+						</td>
+						<td>Signal error from the Dazzler bindings.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="LocalAlignmentReader" class="public" href="../dentist/dazzler/LocalAlignmentReader.html">LocalAlignmentReader</a>
+							</code>
+						</td>
+						<td>Read local alignments from a LAS file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="MaskReaderException" class="public" href="../dentist/dazzler/MaskReaderException.html">MaskReaderException</a>
+							</code>
+						</td>
+						<td>Thrown on failure while reading a Dazzler mask.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="AlignmentChainPacker" class="public" href="../dentist/dazzler/AlignmentChainPacker.html">AlignmentChainPacker</a>
+							</code>
+						</td>
+						<td>Transforms a range <code class="lang-d"><span class="pln">R</span></code> of <code class="lang-d"><span class="typ">FlatLocalAlignment</span></code>s into a range of
+<code class="lang-d"><span class="typ">AlignmentChain</span></code>s.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="AlignmentHeader" class="public" href="../dentist/dazzler/AlignmentHeader.html">AlignmentHeader</a>
+							</code>
+						</td>
+						<td>Meta information about a set of alignments, e.g. a LAS file.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ContigSegment" class="public" href="../dentist/dazzler/ContigSegment.html">ContigSegment</a>
+							</code>
+						</td>
+						<td>Describes the location of a contig inside its scaffold.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DazzExtra" class="public" href="../dentist/dazzler/DazzExtra.html">DazzExtra</a>
+							</code>
+						</td>
+						<td>Represents a track extra, i.e. additional data stored alongside a DB track.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DbRecord" class="public" href="../dentist/dazzler/DbRecord.html">DbRecord</a>
+							</code>
+						</td>
+						<td>Captures information about a single entry in a Dazzler DB.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="GapSegment" class="public" href="../dentist/dazzler/GapSegment.html">GapSegment</a>
+							</code>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="AccumMode" class="public" href="../dentist/dazzler/AccumMode.html">AccumMode</a>
+							</code>
+						</td>
+						<td>Accumulation mode for merging extras of block tracks.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="AlignmentReaderFlag" class="public" href="../dentist/dazzler/AlignmentReaderFlag.html">AlignmentReaderFlag</a>
+							</code>
+						</td>
+						<td>Control operation of <code class="lang-d"><a href="../dentist/dazzler/LocalAlignmentReader.html"><span class="typ">LocalAlignmentReader</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="BufferMode" class="public" href="../dentist/dazzler/BufferMode.html">BufferMode</a>
+							</code>
+						</td>
+						<td>Controls how to manage the buffer when reading data into memory.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ComputeIntrinsicQVOptions" class="public" href="../dentist/dazzler/ComputeIntrinsicQVOptions.html">ComputeIntrinsicQVOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">computeintrinsicqv</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DaccordOptions" class="public" href="../dentist/dazzler/DaccordOptions.html">DaccordOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">daccord</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DalignerOptions" class="public" href="../dentist/dazzler/DalignerOptions.html">DalignerOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">daligner</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DamapperOptions" class="public" href="../dentist/dazzler/DamapperOptions.html">DamapperOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">damapper</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DatanderOptions" class="public" href="../dentist/dazzler/DatanderOptions.html">DatanderOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">datander</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DBdumpOptions" class="public" href="../dentist/dazzler/DBdumpOptions.html">DBdumpOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="typ">DBdump</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DBdustOptions" class="public" href="../dentist/dazzler/DBdustOptions.html">DBdustOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="typ">DBdump</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DBshowOptions" class="public" href="../dentist/dazzler/DBshowOptions.html">DBshowOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="typ">DBshow</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="DbSplitOptions" class="public" href="../dentist/dazzler/DbSplitOptions.html">DbSplitOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="typ">DBsplit</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="Fasta2DazzlerOptions" class="public" href="../dentist/dazzler/Fasta2DazzlerOptions.html">Fasta2DazzlerOptions</a>
+							</code>
+						</td>
+						<td>Options for <code class="lang-d"><span class="pln">fasta2DAM</span></code> and <code class="lang-d"><span class="pln">fasta2DB</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="OptionModifier" class="public" href="../dentist/dazzler/OptionModifier.html">OptionModifier</a>
+							</code>
+						</td>
+						<td>Specifies the type of action <code class="lang-d"><a href="../dentist/dazzler/withOption.html"><span class="pln">withOption</span></a></code> should take.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Manifest constants</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="damFileExtension" class="public" href="../dentist/dazzler/damFileExtension.html">
+								<code>damFileExtension</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Constant holding the .dam file extension.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="dbdustMaskName" class="public" href="../dentist/dazzler/dbdustMaskName.html">
+								<code>dbdustMaskName</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td><code class="lang-d"><span class="typ">DBdust</span></code> always produces a mask with this name.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="dbFileExtension" class="public" href="../dentist/dazzler/dbFileExtension.html">
+								<code>dbFileExtension</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Constant holding the .db file extension.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="forceLargeTracePointType" class="public" href="../dentist/dazzler/forceLargeTracePointType.html">
+								<code>forceLargeTracePointType</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>This trace point spacing enforces the use
+of <code class="lang-d"><span class="typ">ushort</span></code> for trace point encoding.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="isOptionsList" class="public" href="../dentist/dazzler/isOptionsList.html">
+								<code>isOptionsList</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>True if <code class="lang-d"><span class="pln">T</span></code> is some array of strings.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="minAverageCorrelationRate" class="public" href="../dentist/dazzler/minAverageCorrelationRate.html">
+								<code>minAverageCorrelationRate</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Minimum allowed value for <code class="lang-d"><span class="pun">-</span><span class="pln">e</span></code> option of <code class="lang-d"><span class="pln">daligner</span></code>/<code class="lang-d"><span class="pln">damapper</span></code>
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="minBestMatches" class="public" href="../dentist/dazzler/minBestMatches.html">
+								<code>minBestMatches</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Minimum allowed value for <code class="lang-d"><span class="pun">-</span><span class="pln">n</span></code> option of <code class="lang-d"><span class="pln">damapper</span></code>
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="minQVCoverage" class="public" href="../dentist/dazzler/minQVCoverage.html">
+								<code>minQVCoverage</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>Minimum alignment coverage required to compute intrinsic quality values
+(QVs).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="minSequenceLength" class="public" href="../dentist/dazzler/minSequenceLength.html">
+								<code>minSequenceLength</code>
+							</a>
+						</td>
+						<td>
+						</td>
+						<td>The Dazzler tools require sequence of
+at least <code class="lang-d"><span class="pln">minSequenceLength</span></code> base pairs.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Global variables</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="handleExistingDb" class="public" href="../dentist/dazzler/handleExistingDb.html">
+								<code>handleExistingDb</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="typ">void</span> <span class="kwd">delegate</span><span class="pun">(</span><span class="typ">string</span><span class="pun">)</span></code>
+						</td>
+						<td>This funcion is called if writing to an existing DB is attempted without
+passing <code class="lang-d"><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">append</span></code> or similar to the called function.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="Append" class="public" href="../dentist/dazzler/Append.html">
+								<code>Append</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Flag</span>!("append")</code>
+						</td>
+						<td>Flag used to signal if DB write operations should append to an existing
+DB or call <code class="lang-d"><a href="../dentist/dazzler/handleExistingDb.html"><span class="pln">handleExistingDb</span></a></code> instead (default).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="ScaffoldSegment" class="public" href="../dentist/dazzler/ScaffoldSegment.html">
+								<code>ScaffoldSegment</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">variant<wbr/></span><span class="pun">.</span><span class="typ">VariantN</span>!(56L,dentist.dazzler.ContigSegment,dentist.dazzler.GapSegment)</code>
+						</td>
+						<td>Either <code class="lang-d"><a href="../dentist/dazzler/ContigSegment.html"><span class="typ">ContigSegment</span></a></code> or <code class="lang-d"><a href="../dentist/dazzler/GapSegment.html"><span class="typ">GapSegment</span></a></code>. Used to create a mixed range of
+the two base types.
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

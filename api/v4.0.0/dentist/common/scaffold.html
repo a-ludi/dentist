@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Module dentist.common.scaffold</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Module dentist.common.scaffold</h1><p>Work with scaffold graphs. A scaffold graph is an undirected graph with
+    optional edge payloads.
+</p><section><p>For each contig of the input assembly there exist four nodes in the graph:
+    <code class="lang-d"><a href="../../dentist/common/scaffold/ContigPart.html#pre"><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">pre</span></a></code>, <code class="lang-d"><a href="../../dentist/common/scaffold/ContigPart.html#begin"><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">begin</span></a></code>, <code class="lang-d"><a href="../../dentist/common/scaffold/ContigPart.html#end"><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">end</span></a></code> and
+    <code class="lang-d"><a href="../../dentist/common/scaffold/ContigPart.html#post"><span class="typ">ContigPart<wbr/></span><span class="pun">.</span><span class="pln">post</span></a></code>. These represent four locations relative to the contig.
+</p>
+
+<p>    Canonical edges are categorized by <code class="lang-d"><a href="../../dentist/common/scaffold/isDefault.html"><span class="pln">isDefault</span></a></code> (the contig itself),
+    <code class="lang-d"><a href="../../dentist/common/scaffold/isUnkown.html"><span class="pln">isUnkown</span></a></code> (a gap marked by <code class="lang-d"><span class="pln">n</span></code>s), <code class="lang-d"><a href="../../dentist/common/scaffold/isGap.html"><span class="pln">isGap</span></a></code> (pile up or insertion that
+    connects two contigs), <code class="lang-d"><a href="../../dentist/common/scaffold/isFrontExtension.html"><span class="pln">isFrontExtension</span></a></code> or <code class="lang-d"><span class="pln"> <a href="../../dentist/common/scaffold/isBackExtension.html"></span><span class="pln">isBackExtension</span></a></code> (pile up
+    or insertion that extends beyond the begin/end of a contig).
+</p>
+
+<p>    Gap edges are further categorized as <code class="lang-d"><a href="../../dentist/common/scaffold/isParallel.html"><span class="pln">isParallel</span></a></code> or <code class="lang-d"><a href="../../dentist/common/scaffold/isAntiParallel.html"><span class="pln">isAntiParallel</span></a></code>
+    depending on weather the involved contigs are connected in the same
+    (parallel) or opposite (anti-parallel) orientation.
+</p>
+
+<p>    The scaffold graph is used to collect pile ups of read alignments and
+    represent the final assembly.
+</p>
+</section>
+
+			<section><section><h2>See also</h2>
+<p><code class="lang-d"><a href="../../dentist/commands/collectPileUps.html"><span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">commands<wbr/></span><span class="pun">.</span><span class="pln">collectPileUps</span></a></code>,
+        <code class="lang-d"><a href="../../dentist/commands/output.html"><span class="pln">dentist<wbr/></span><span class="pun">.</span><span class="pln">commands<wbr/></span><span class="pun">.</span><span class="pln">output</span></a></code>
+</p>
+</section>
+</section>
+			<section>
+				<h2>Functions</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="buildScaffold" class="public" href="../../dentist/common/scaffold/buildScaffold.html">buildScaffold</a><span class="tableEntryAnnotation">(numReferenceContigs, rawJoins)</span>
+							</code>
+						</td>
+						<td>Build a scaffold graph using <code class="lang-d"><a href="../../dentist/common/scaffold/buildScaffold.html#rawJoins"><span class="pln">rawJoins</span></a></code>. This creates default edges for
+contigs <code class="lang-d"><span class="lit">1 </span><span class="pun">.. <a href="../../dentist/common/scaffold/buildScaffold.html#numReferenceContigs"></span><span class="pln">numReferenceContigs</span></a><span class="pln"> </span><span class="pun">+ </span><span class="lit">1</span></code> and inserts the <code class="lang-d"><a href="../../dentist/common/scaffold/buildScaffold.html#rawJoins"><span class="pln">rawJoins</span></a></code>.
+Multi-edges are merged using <code class="lang-d"><span class="pln">mergeMultiEdges</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="buildScaffold" class="public" href="../../dentist/common/scaffold/buildScaffold.html">buildScaffold</a><span class="tableEntryAnnotation">(rawJoins)</span>
+							</code>
+						</td>
+						<td>Build a scaffold graph using <code class="lang-d"><a href="../../dentist/common/scaffold/buildScaffold.html#rawJoins"><span class="pln">rawJoins</span></a></code>. The nodes are deduced from
+<code class="lang-d"><a href="../../dentist/common/scaffold/buildScaffold.html#rawJoins"><span class="pln">rawJoins</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="concatenatePayloads" class="public" href="../../dentist/common/scaffold/concatenatePayloads.html">concatenatePayloads</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Combine joins by concatenating their payloads.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="enforceJoinPolicy" class="public" href="../../dentist/common/scaffold/enforceJoinPolicy.html">enforceJoinPolicy</a><span class="tableEntryAnnotation">(scaffold, joinPolicy)</span>
+							</code>
+						</td>
+						<td>Enforce <code class="lang-d"><a href="../../dentist/common/scaffold/enforceJoinPolicy.html#joinPolicy"><span class="pln">joinPolicy</span></a></code> in <code class="lang-d"><a href="../../dentist/common/scaffold/enforceJoinPolicy.html#scaffold"><span class="pln">scaffold</span></a></code>. Write discarded joins to
+<code class="lang-d"><a href="../../dentist/common/scaffold/enforceJoinPolicy.html#forbiddenJoins"><span class="pln">forbiddenJoins</span></a></code> if given.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getDefaultJoin" class="public" href="../../dentist/common/scaffold/getDefaultJoin.html">getDefaultJoin</a><span class="tableEntryAnnotation">(contigId)</span>
+							</code>
+						</td>
+						<td>Construct the default join for <code class="lang-d"><a href="../../dentist/common/scaffold/getDefaultJoin.html#contigId"><span class="pln">contigId</span></a></code>. Initialize <code class="lang-d"><span class="pln">payload</span></code> with
+<code class="lang-d"><span class="pln">getPayload</span><span class="pun">(<a href="../../dentist/common/scaffold/getDefaultJoin.html#contigId"></span><span class="pln">contigId</span></a><span class="pun">)</span></code> if given.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="getUnkownJoin" class="public" href="../../dentist/common/scaffold/getUnkownJoin.html">getUnkownJoin</a><span class="tableEntryAnnotation">(preContigId, postContigId, payload)</span>
+							</code>
+						</td>
+						<td>Get join for a stretch of unknown sequence (<code class="lang-d"><span class="pln">n</span></code>s).
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="initScaffold" class="public" href="../../dentist/common/scaffold/initScaffold.html">initScaffold</a><span class="tableEntryAnnotation">(numReferenceContigs)</span>
+							</code>
+						</td>
+						<td>Creates a scaffold the default edges for contigs
+<code class="lang-d"><span class="lit">1 </span><span class="pun">.. <a href="../../dentist/common/scaffold/initScaffold.html#numReferenceContigs"></span><span class="pln">numReferenceContigs</span></a><span class="pln"> </span><span class="pun">+ </span><span class="lit">1</span></code>. Optionally specify
+a function that produces the payloads.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isAntiParallel" class="public" href="../../dentist/common/scaffold/isAntiParallel.html">isAntiParallel</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a gap edge and anti-parallel.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isBackExtension" class="public" href="../../dentist/common/scaffold/isBackExtension.html">isBackExtension</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a back extension edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isCyclic" class="public" href="../../dentist/common/scaffold/isCyclic.html">isCyclic</a><span class="tableEntryAnnotation">(scaffold, startNode, incidentEdgesCache)</span>
+							</code>
+						</td>
+						<td>Use <code class="lang-d"><a href="../../dentist/common/scaffold/linearWalk.html"><span class="pln">linearWalk</span></a></code> to determine if <code class="lang-d"><a href="../../dentist/common/scaffold/isCyclic.html#startNode"><span class="pln">startNode</span></a></code> is part of a cycle.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isDefault" class="public" href="../../dentist/common/scaffold/isDefault.html">isDefault</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a default/contig edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isExtension" class="public" href="../../dentist/common/scaffold/isExtension.html">isExtension</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is an extension edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isFrontExtension" class="public" href="../../dentist/common/scaffold/isFrontExtension.html">isFrontExtension</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a front extension edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isGap" class="public" href="../../dentist/common/scaffold/isGap.html">isGap</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a gap edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isParallel" class="public" href="../../dentist/common/scaffold/isParallel.html">isParallel</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a gap edge and parallel.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isReal" class="public" href="../../dentist/common/scaffold/isReal.html">isReal</a><span class="tableEntryAnnotation">(contigPart)</span>
+							</code>
+						</td>
+						<td>True for the two real locations <code class="lang-d"><span class="pln">begin</span></code> and <code class="lang-d"><span class="pln">end</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isTranscendent" class="public" href="../../dentist/common/scaffold/isTranscendent.html">isTranscendent</a><span class="tableEntryAnnotation">(contigPart)</span>
+							</code>
+						</td>
+						<td>True for the two symbolic locations <code class="lang-d"><span class="pln">pre</span></code> and <code class="lang-d"><span class="pln">post</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isUnkown" class="public" href="../../dentist/common/scaffold/isUnkown.html">isUnkown</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a unknown edge, ie. an edge for unknown sequence
+(<code class="lang-d"><span class="pln">n</span></code>s) of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="isValid" class="public" href="../../dentist/common/scaffold/isValid.html">isValid</a><span class="tableEntryAnnotation">(join)</span>
+							</code>
+						</td>
+						<td>Returns true iff join is a valid canonical edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="linearWalk" class="public" href="../../dentist/common/scaffold/linearWalk.html">linearWalk</a><span class="tableEntryAnnotation">(scaffold, startNode, incidentEdgesCache)</span>
+							</code>
+						</td>
+						<td>Performs a linear walk through a scaffold graph starting in <code class="lang-d"><a href="../../dentist/common/scaffold/linearWalk.html#startNode"><span class="pln">startNode</span></a></code>.
+    A linear walk is a sequence of adjacent joins where no node is visited
+    twice unless the graph is cyclic in which case the first node will appear
+    twice. The implementation requires the graph to have linear components,
+    i.e. for every node the degree must be at most two. If the component of
+    <code class="lang-d"><a href="../../dentist/common/scaffold/linearWalk.html#startNode"><span class="pln">startNode</span></a></code> is cyclic then the walk will end in <code class="lang-d"><a href="../../dentist/common/scaffold/linearWalk.html#startNode"><span class="pln">startNode</span></a></code> and the
+    <code class="lang-d"><a href="../../dentist/common/scaffold/isCyclic.html"><span class="pln">isCyclic</span></a></code> flag will be set.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="mergeExtensionsWithGaps" class="public" href="../../dentist/common/scaffold/mergeExtensionsWithGaps.html">mergeExtensionsWithGaps</a><span class="tableEntryAnnotation">(scaffold)</span>
+							</code>
+						</td>
+						<td>Remove extension edges were they coincide with a gap edge combining their
+payloads. This is intended to build pile ups with all reads that contribute
+to each gap.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="normalizeUnkownJoins" class="public" href="../../dentist/common/scaffold/normalizeUnkownJoins.html">normalizeUnkownJoins</a><span class="tableEntryAnnotation">(scaffold)</span>
+							</code>
+						</td>
+						<td>Normalizes unknown joins such that they join contigs or are removed as
+applicable. Afterwards the gap joins may not be canonical anymore, i.e.
+<code class="lang-d"><a href="../../dentist/common/scaffold/isUnkown.html"><span class="pln">isUnkown</span></a></code> may be false.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="removeBlacklisted" class="public" href="../../dentist/common/scaffold/removeBlacklisted.html">removeBlacklisted</a><span class="tableEntryAnnotation">(scaffold, blacklist)</span>
+							</code>
+						</td>
+						<td>Remove blacklisted gap joins. Write discarded joins to
+<code class="lang-d"><a href="../../dentist/common/scaffold/removeBlacklisted.html#forbiddenJoins"><span class="pln">forbiddenJoins</span></a></code> if given.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="removeNoneJoins" class="public" href="../../dentist/common/scaffold/removeNoneJoins.html">removeNoneJoins</a><span class="tableEntryAnnotation">(scaffold)</span>
+							</code>
+						</td>
+						<td>Remove marked edges from the graph. This always keeps the default edges.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="scaffoldStarts" class="public" href="../../dentist/common/scaffold/scaffoldStarts.html">scaffoldStarts</a><span class="tableEntryAnnotation">(scaffold, incidentEdgesCache)</span>
+							</code>
+						</td>
+						<td>Returns a range of <code class="lang-d"><a href="../../dentist/common/scaffold/ContigNode.html"><span class="typ">ContigNode</span></a></code>s where full contig walks should start.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="sumPayloads" class="public" href="../../dentist/common/scaffold/sumPayloads.html">sumPayloads</a><span class="tableEntryAnnotation">()</span>
+							</code>
+						</td>
+						<td>Combine joins by summing their payloads.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="LinearWalk" class="public" href="../../dentist/common/scaffold/LinearWalk.html">LinearWalk</a>
+							</code>
+						</td>
+						<td>Range that walks linearly through its scaffold graph.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="ContigPart" class="public" href="../../dentist/common/scaffold/ContigPart.html">ContigPart</a>
+							</code>
+						</td>
+						<td>Each contig has four designated parts where joins can start or end.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<code>
+								<a id="JoinPolicy" class="public" href="../../dentist/common/scaffold/JoinPolicy.html">JoinPolicy</a>
+							</code>
+						</td>
+						<td>Determine which kinds of joins are allowed.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section>
+				<h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a id="ContigNode" class="public" href="../../dentist/common/scaffold/ContigNode.html">
+								<code>ContigNode</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Tuple</span>!(ulong,"contigId",dentist.common.scaffold.ContigPart,"contigPart")</code>
+						</td>
+						<td>A contig is represented by four <code class="lang-d"><span class="typ">ContigNodes</span></code> in the scaffold graph: one
+for each <code class="lang-d"><a href="../../dentist/common/scaffold/ContigPart.html"><span class="typ">ContigPart</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="IncidentEdgesCache" class="public" href="../../dentist/common/scaffold/IncidentEdgesCache.html">
+								<code>IncidentEdgesCache</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><a href="../../dentist/common/scaffold/Scaffold.html"><span class="typ">Scaffold</span></a>!T</code>
+						</td>
+						<td><code class="lang-d"><span class="typ">IncidentEdgesCache</span></code> for <code class="lang-d"><a href="../../dentist/common/scaffold/Scaffold.html"><span class="typ">Scaffold</span></a><span class="pun">!</span><span class="pln">T</span></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="Join" class="public" href="../../dentist/common/scaffold/Join.html">
+								<code>Join</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><a href="../../dentist/common/scaffold/Scaffold.html"><span class="typ">Scaffold</span></a>!T</code>
+						</td>
+						<td>An edge of the scaffold graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a id="Scaffold" class="public" href="../../dentist/common/scaffold/Scaffold.html">
+								<code>Scaffold</code>
+							</a>
+						</td>
+						<td>
+							<code class="prettyprint lang-d"><a href="../../dentist/util/math/Graph.html"><span class="typ">Graph</span></a>!(ContigNode,void,No.isDirected,T)</code>
+						</td>
+						<td>Data structure for the scaffold graph described in the module
+documentation.
+</td>
+					</tr>
+				</table>
+			</section>
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

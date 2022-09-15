@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct Graph</title>
+		<link rel="stylesheet" type="text/css" href="../../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view ">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct Graph</h1><p>This structure represents a graph with optional edge payloads. The graph
+is represented as a list of edges which is particularly suited for sparse
+graphs. While the set of nodes is fixed the set of edges is mutable.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">Graph</span>(Node, Weight, <span class="pln">std<wbr/></span><span class="pun">.</span><span class="pln">typecons<wbr/></span><span class="pun">.</span><span class="typ">Flag</span>!("isDirected") isDirected<span class="pln"> </span><span class="pun">= </span><span class="typ">No<wbr/></span><span class="pun">.</span><span class="pln">isDirected</span>, EdgePayload)
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section><p>A graph may have directed or undirected edges. The edges may have weight
+and/or payloads associated with them. This difference between the two is
+that weights are considered in comparisons whereas payloads are not.
+</p>
+</section>
+
+			<section><h2>Constructors</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.this.html" class="public">
+								<code>this</code>
+							</a>
+							<span class="tableEntryAnnotation">(nodes)</span>
+						</td>
+						<td>Construct a graph from a set of nodes (and edges). Makes a copy
+        <code class="lang-d"><a href="../../../dentist/util/math/Graph.this.html#nodes"><span class="pln">nodes</span></a></code> and removes duplicates.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph._edges.html" class="public"><code>_edges</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">Appender</span>!(Edge[])</code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph._nodes.html" class="public"><code>_nodes</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">Node</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.edges.html" class="public property"><code>edges</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">auto</span></code></td><td>Get the set (ordered list) of edges in this graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.nodes.html" class="public property"><code>nodes</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">const</span><span class="pun">(</span><span class="typ">Node</span><span class="pun">[]</span><span class="pun">)</span></code></td><td>The set (ordered list) of nodes.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.nodes.html" class="public property"><code>nodes</code></a><span class="tableEntryAnnotation">[set]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">Node</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.bulkAddForce.html" class="public">
+								<code>bulkAddForce</code>
+							</a>
+							<span class="tableEntryAnnotation">(edges)</span>
+						</td>
+						<td>Add a set of edges to this graph without any checks.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.edge.html" class="public">
+								<code>edge</code>
+							</a>
+							<span class="tableEntryAnnotation">(args)</span>
+						</td>
+						<td>Construct an edge for this graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.forceAdd.html" class="public">
+								<code>forceAdd</code>
+							</a>
+							<span class="tableEntryAnnotation">(edge)</span>
+						</td>
+						<td>Forcibly add <code class="lang-d"><a href="../../../dentist/util/math/Graph.forceAdd.html#edge"><span class="pln">edge</span></a></code> to this graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.get.html" class="public">
+								<code>get</code>
+							</a>
+							<span class="tableEntryAnnotation">(edge)</span>
+						</td>
+						<td>Get the designated <code class="lang-d"><a href="../../../dentist/util/math/Graph.get.html#edge"><span class="pln">edge</span></a></code> from this graph. Only the <code class="lang-d"><span class="pln">start</span></code> and <code class="lang-d"><span class="pln">end</span></code>
+node will be compared.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.groupByNodes.html" class="public">
+								<code>groupByNodes</code>
+							</a>
+							<span class="tableEntryAnnotation">(a, b)</span>
+						</td>
+						<td>Same as <code class="lang-d"><a href="../../../dentist/util/math/Graph.groupByNodes.html#a"><span class="pln">a</span></a><span class="pln"> </span><span class="pun">== <a href="../../../dentist/util/math/Graph.groupByNodes.html#b"></span><span class="pln">b</span></a></code> but disregards the weight in weighted graphs.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.has.html" class="public">
+								<code>has</code>
+							</a>
+							<span class="tableEntryAnnotation">(node)</span>
+						</td>
+						<td>Check if edge/node exists in this graph. Ignores the edge weight
+if weighted.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.inDegree.html" class="public">
+								<code>inDegree</code>
+							</a>
+							<span class="tableEntryAnnotation">(n)</span>
+						</td>
+						<td>Get the in/out degree of node <code class="lang-d"><a href="../../../dentist/util/math/Graph.inDegree.html#n"><span class="pln">n</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.indexOf.html" class="public">
+								<code>indexOf</code>
+							</a>
+							<span class="tableEntryAnnotation">(n)</span>
+						</td>
+						<td>Returns the index of node <code class="lang-d"><a href="../../../dentist/util/math/Graph.indexOf.html#n"><span class="pln">n</span></a></code> in the list of nodes.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.indexOf.html" class="public">
+								<code>indexOf</code>
+							</a>
+							<span class="tableEntryAnnotation">(edge)</span>
+						</td>
+						<td>Returns the index of edge <code class="lang-d"><span class="pln">n</span></code> in the list of edges.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.inEdges.html" class="public">
+								<code>inEdges</code>
+							</a>
+							<span class="tableEntryAnnotation">(n)</span>
+						</td>
+						<td>Returns a range of in/outgoing edges of node <code class="lang-d"><a href="../../../dentist/util/math/Graph.inEdges.html#n"><span class="pln">n</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.opBinaryRight.html" class="public">
+								<code>opBinaryRight</code>
+							</a>
+							<span class="tableEntryAnnotation">(node)</span>
+						</td>
+						<td>Check if edge/node exists in this graph. Ignores the edge weight
+if weighted.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.opOpAssign.html" class="public">
+								<code>opOpAssign</code>
+							</a>
+							<span class="tableEntryAnnotation">(edge)</span>
+						</td>
+						<td>Add an <code class="lang-d"><a href="../../../dentist/util/math/Graph.opOpAssign.html#edge"><span class="pln">edge</span></a></code> to this graph.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.orderByNodes.html" class="public">
+								<code>orderByNodes</code>
+							</a>
+							<span class="tableEntryAnnotation">(a, b)</span>
+						</td>
+						<td>Same as <code class="lang-d"><a href="../../../dentist/util/math/Graph.orderByNodes.html#a"><span class="pln">a</span></a><span class="pln"> </span><span class="pun">&lt; <a href="../../../dentist/util/math/Graph.orderByNodes.html#b"></span><span class="pln">b</span></a></code> but disregards the weight in weighted graphs.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.outDegree.html" class="public">
+								<code>outDegree</code>
+							</a>
+							<span class="tableEntryAnnotation">(n)</span>
+						</td>
+						<td>Get the in/out degree of node <code class="lang-d"><a href="../../../dentist/util/math/Graph.outDegree.html#n"><span class="pln">n</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.outEdges.html" class="public">
+								<code>outEdges</code>
+							</a>
+							<span class="tableEntryAnnotation">(n)</span>
+						</td>
+						<td>Returns a range of in/outgoing edges of node <code class="lang-d"><a href="../../../dentist/util/math/Graph.outEdges.html#n"><span class="pln">n</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.replaceEdge.html" class="public">
+								<code>replaceEdge</code>
+							</a>
+							<span class="tableEntryAnnotation">(edgeIdx, newEdge)</span>
+						</td>
+						<td>Replace an edge in this graph.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.ConflictStrategy.html" class="public">
+								<code>ConflictStrategy</code>
+							</a>
+						</td>
+						<td>Some pre-defined conflict handlers for <code class="lang-d"><a href="../../../dentist/util/math/add.html"><span class="pln">add</span></a></code>.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../../dentist/util/math/Graph.Edge.html" class="public">
+								<code>Edge</code>
+							</a>
+						</td>
+						<td>An edge in the graph.
+</td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="com">//   +-+  +-+
+//   \ /  \ /
+//   (1)--(2)
+</span><span class="kwd">auto </span><span class="pln">g1 </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!</span><span class="typ">int</span><span class="pun">([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="pln">g1 </span><span class="pun">~= </span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">);
+</span><span class="pln">g1 </span><span class="pun">~= </span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">);
+</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g1</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">has</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">allDegrees</span><span class="pun">()<wbr/>.</span><span class="pln">degrees </span><span class="pun">== [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">allIncidentEdges</span><span class="pun">()<wbr/>.</span><span class="pln">incidentEdges </span><span class="pun">== [
+    [</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">), </span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)],
+    [</span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">), </span><span class="pln">g1<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)],
+]);
+
+</span><span class="com">//   0.5     0.5
+//   +-+     +-+
+//   \ /     \ /
+//   (1)-----(2)
+//       1.0
+</span><span class="kwd">auto </span><span class="pln">g2 </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">double</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="pln">g2 </span><span class="pun">~= </span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">);
+</span><span class="pln">g2 </span><span class="pun">~= </span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1.0</span><span class="pun">);
+</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g2</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">has</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">allDegrees</span><span class="pun">()<wbr/>.</span><span class="pln">degrees </span><span class="pun">== [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">allIncidentEdges</span><span class="pun">()<wbr/>.</span><span class="pln">incidentEdges </span><span class="pun">== [
+    [</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">), </span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1.0</span><span class="pun">)],
+    [</span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1.0</span><span class="pun">), </span><span class="pln">g2<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">)],
+]);
+
+</span><span class="com">//   0.5     0.5
+//   +-+     +-+
+//   \ v     v /
+//   (1)----&gt;(2)
+//       1.0
+</span><span class="kwd">auto </span><span class="pln">g3 </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">double</span><span class="pun">, </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">isDirected</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="pln">g3 </span><span class="pun">~= </span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">);
+</span><span class="pln">g3 </span><span class="pun">~= </span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1.0</span><span class="pun">);
+</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">0.5</span><span class="pun">));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g3</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(!(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g3</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">has</span><span class="pun">(</span><span class="pln">g3<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)));
+
+</span><span class="com">//   +-+   +-+
+//   \ v   v /
+//   (1)--&gt;(2)
+</span><span class="kwd">auto </span><span class="pln">g4 </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">void</span><span class="pun">, </span><span class="typ">Yes<wbr/></span><span class="pun">.</span><span class="pln">isDirected</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="pln">g4 </span><span class="pun">~= </span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">);
+</span><span class="pln">g4 </span><span class="pun">~= </span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">);
+</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g4</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(!(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g4</span><span class="pun">));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">has</span><span class="pun">(</span><span class="pln">g4<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)));
+
+</span><span class="com">//   +-+  +-+
+//   \ /  \ /
+//   (1)--(2)
+//
+// payload(1, 1) = [1];
+// payload(1, 2) = [2];
+// payload(2, 2) = [3];
+</span><span class="kwd">auto </span><span class="pln">g5 </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!(</span><span class="typ">int</span><span class="pun">, </span><span class="typ">void</span><span class="pun">, </span><span class="typ">No<wbr/></span><span class="pun">.</span><span class="pln">isDirected</span><span class="pun">, </span><span class="typ">int</span><span class="pun">[])([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+
+</span><span class="pln">g5 </span><span class="pun">~= </span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, [</span><span class="lit">1</span><span class="pun">]);
+</span><span class="pln">g5 </span><span class="pun">~= </span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, [</span><span class="lit">2</span><span class="pun">]);
+</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, [</span><span class="lit">3</span><span class="pun">]));
+
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">get</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">))<wbr/>.</span><span class="pln">payload </span><span class="pun">== [</span><span class="lit">1</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">get</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">))<wbr/>.</span><span class="pln">payload </span><span class="pun">== [</span><span class="lit">2</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">) </span><span class="kwd">in </span><span class="pln">g5</span><span class="pun">);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">get</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">))<wbr/>.</span><span class="pln">payload </span><span class="pun">== [</span><span class="lit">2</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">has</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)));
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">get</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">))<wbr/>.</span><span class="pln">payload </span><span class="pun">== [</span><span class="lit">3</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">allDegrees</span><span class="pun">()<wbr/>.</span><span class="pln">degrees </span><span class="pun">== [</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">allIncidentEdges</span><span class="pun">()<wbr/>.</span><span class="pln">incidentEdges </span><span class="pun">== [
+    [</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">), </span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)],
+    [</span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">), </span><span class="pln">g5<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">2</span><span class="pun">)],
+]);
+</span></code></pre>
+</section>
+<section><h2>Example</h2>
+
+<pre class="code"><code class="lang-d"><span class="com">//     -1     1         1
+// (1)----(2)---(3) (4)---(5) (6)
+</span><span class="typ">uint</span><span class="pun">[] </span><span class="pln">contigs </span><span class="pun">= [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">];
+</span><span class="kwd">auto </span><span class="pln">contigGraph </span><span class="pun">= </span><span class="typ">Graph</span><span class="pun">!(</span><span class="typ">uint</span><span class="pun">, </span><span class="typ">int</span><span class="pun">)([</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">6</span><span class="pun">]);
+
+</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, -</span><span class="lit">1</span><span class="pun">));
+</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">1</span><span class="pun">));
+</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">add</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">1</span><span class="pun">));
+
+</span><span class="kwd">foreach </span><span class="pun">(</span><span class="pln">contig</span><span class="pun">; </span><span class="pln">contigs</span><span class="pun">)
+{
+    </span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">degree</span><span class="pun">(</span><span class="pln">contig</span><span class="pun">) &lt;= </span><span class="lit">2</span><span class="pun">);
+}
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">allDegrees</span><span class="pun">()<wbr/>.</span><span class="pln">degrees </span><span class="pun">== [</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">1</span><span class="pun">, </span><span class="lit">0</span><span class="pun">]);
+</span><span class="kwd">assert</span><span class="pun">(</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">allIncidentEdges</span><span class="pun">()<wbr/>.</span><span class="pln">incidentEdges </span><span class="pun">== [
+    [</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, -</span><span class="lit">1</span><span class="pun">)],
+    [</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">1</span><span class="pun">, </span><span class="lit">2</span><span class="pun">, -</span><span class="lit">1</span><span class="pun">), </span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">1</span><span class="pun">)],
+    [</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">2</span><span class="pun">, </span><span class="lit">3</span><span class="pun">, </span><span class="lit">1</span><span class="pun">)],
+    [</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">1</span><span class="pun">)],
+    [</span><span class="pln">contigGraph<wbr/></span><span class="pun">.</span><span class="pln">edge</span><span class="pun">(</span><span class="lit">4</span><span class="pun">, </span><span class="lit">5</span><span class="pun">, </span><span class="lit">1</span><span class="pun">)],
+    [],
+]);
+</span></code></pre>
+</section>
+
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>

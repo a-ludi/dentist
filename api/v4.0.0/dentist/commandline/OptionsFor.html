@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8"/>
+		<title>Struct OptionsFor</title>
+		<link rel="stylesheet" type="text/css" href="../../styles/ddox.css"/>
+		<link rel="stylesheet" href="../../prettify/prettify.css" type="text/css"/>
+		<script type="text/javascript" src="../../scripts/jquery.js">/**/</script><script type="text/javascript" src="../../scripts/ddox.js">/**/</script>
+	</head>
+	<body onload="setupDdox();">
+		<nav id="main-nav">
+			<noscript>
+				<p style="color: red">The search functionality needs JavaScript enabled</p>
+			</noscript>
+			<div id="symbolSearchPane" style="display: none">
+				<form action="#" method="GET">
+					<input id="symbolSearch" type="text" name="q" placeholder="Search for symbols" autocomplete="off" onchange="performSymbolSearch(40);" onkeypress="this.onchange();" onpaste="this.onchange();" oninput="this.onchange();"/>
+				</form>
+				<ul id="symbolSearchResults" class="symbolList" style="display: none"></ul><script type="application/javascript" src="../../symbols.js"></script><script type="application/javascript">var symbolSearchRootDir = "../../";
+$('#symbolSearchPane').show();</script>
+			</div>
+			<ul class="tree-view">
+				<li class="tree-view ">
+					<div class="package ">
+						<a href="../../dentist.html">dentist</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands.html">commands</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/collectPileUps.html">collectPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/filter.html">filter</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/collectPileUps/pileups.html">pileups</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/commands/processPileUps.html">processPileUps</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/processPileUps/cropper.html">cropper</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/bed2mask.html">bed2mask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/buildPartialAssembly.html">buildPartialAssembly</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/chainLocalAlignments.html">chainLocalAlignments</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkResults.html">checkResults</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/checkScaffolding.html">checkScaffolding</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/filterMask.html">filterMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/findClosableGaps.html">findClosableGaps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/generateDazzlerOptions.html">generateDazzlerOptions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/maskRepetitiveRegions.html">maskRepetitiveRegions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeInsertions.html">mergeInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/mergeMasks.html">mergeMasks</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/output.html">output</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/propagateMask.html">propagateMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showInsertions.html">showInsertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showMask.html">showMask</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/showPileUps.html">showPileUps</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/translateCoords.html">translateCoords</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateConfig.html">validateConfig</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/commands/validateRegions.html">validateRegions</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common.html">common</a>
+					</div>
+			<ul class="tree-view">
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/alignments.html">alignments</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/base.html">base</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/alignments/chaining.html">chaining</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">
+						<a href="../../dentist/common/binio.html">binio</a>
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/common.html">common</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/insertiondb.html">insertiondb</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/binio/pileupdb.html">pileupdb</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/commands.html">commands</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/configfile.html">configfile</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/external.html">external</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/insertions.html">insertions</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/common/scaffold.html">scaffold</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li class="tree-view collapsed">
+					<div class="package ">util
+					</div>
+			<ul class="tree-view">
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/algorithm.html">algorithm</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/containers.html">containers</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/fasta.html">fasta</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/graphalgo.html">graphalgo</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/jsonschema.html">jsonschema</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/log.html">log</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/math.html">math</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/process.html">process</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/range.html">range</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/region.html">region</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/saturationmath.html">saturationmath</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/string.html">string</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/util/tempfile.html">tempfile</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module selected">
+						<a href="../../dentist/commandline.html">commandline</a>
+					</div>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../dentist/dazzler.html">dazzler</a>
+					</div>
+				</li>
+			</ul>
+				</li>
+				<li>
+					<div class="module ">
+						<a href="../../app.html">app</a>
+					</div>
+				</li>
+			</ul>
+		</nav>
+		<div id="main-contents">
+			<h1>Struct OptionsFor</h1><p>Options for the different commands. See the source code,
+<code class="lang-d"><a href="../../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">&lt;<a href="../../dentist/commandline/OptionsFor.command.html"></span><span class="pln">command</span></a><span class="pun">&gt; --<a href="../../dentist/commandline/OptionsFor.help.html"></span><span class="pln">help</span></a></code> or <code class="lang-d"><a href="../../dentist.html"><span class="pln">dentist</span></a><span class="pln"> </span><span class="pun">--</span><span class="pln">list</span><span class="pun">-</span><span class="pln">options</span></code> for
+a description of the options.
+</p>
+			<div class="prototype">
+				<code class="lang-d">
+					<div class="single-prototype">
+			<span class="kwd">struct</span> <span class="typ">OptionsFor</span>(<a href="../../dentist/common/commands/DentistCommand.html"><span class="typ">DentistCommand</span></a> _command)
+			<span class="pun">;</span>
+					</div>
+				</code>
+			</div>
+			<section><p>Note, due to a limitation of D's documentation generation the API doc
+is rather useless because it does not capture the decorators (<code class="lang-d"><span class="pun">@</span><span class="typ">Option</span></code>,
+<code class="lang-d"><span class="pun">@</span><span class="typ">Argument</span></code>, ...) that actually describe the CLI.
+</p>
+</section>
+
+			<section><h2>Fields</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalConsensusAlignmentOptions.html" class="public"><code>additionalConsensusAlignmentOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalDaccordOptions.html" class="public"><code>additionalDaccordOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalReadsDustOptions.html" class="public"><code>additionalReadsDustOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalReadsVsReadsAlignmentOptions.html" class="public"><code>additionalReadsVsReadsAlignmentOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalRefDustOptions.html" class="public"><code>additionalRefDustOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalRefVsReadsAlignmentOptions.html" class="public"><code>additionalRefVsReadsAlignmentOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalSelfAlignmentOptions.html" class="public"><code>additionalSelfAlignmentOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.additionalTandemAlignmentOptions.html" class="public"><code>additionalTandemAlignmentOptions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.agpDazzler.html" class="public"><code>agpDazzler</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.agpFile.html" class="public"><code>agpFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.agpSkipReadIds.html" class="public"><code>agpSkipReadIds</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.allowSingleReads.html" class="public"><code>allowSingleReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.assemblyGraphFile.html" class="public"><code>assemblyGraphFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.assemblyGraphFile.html" class="public"><code>assemblyGraphFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.badFraction.html" class="public"><code>badFraction</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.bedFile.html" class="public"><code>bedFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.bestPileUpMargin.html" class="public"><code>bestPileUpMargin</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.bucketSize.html" class="public"><code>bucketSize</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.cacheOnly.html" class="public"><code>cacheOnly</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.chainedAlignments.html" class="public"><code>chainedAlignments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.closedGapsBedFile.html" class="public"><code>closedGapsBedFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.configFile.html" class="public"><code>configFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.contigAlignmentsCache.html" class="public"><code>contigAlignmentsCache</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.contigAlignmentsCache.html" class="public"><code>contigAlignmentsCache</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.contigCutoff.html" class="public"><code>contigCutoff</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.coordStrings.html" class="public"><code>coordStrings</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.coverageBoundsReads.html" class="public"><code>coverageBoundsReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.coverageBoundsReads.html" class="public"><code>coverageBoundsReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.coverageBoundsSelf.html" class="public"><code>coverageBoundsSelf</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.cropAlignment.html" class="public"><code>cropAlignment</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.cropAmbiguous.html" class="public"><code>cropAmbiguous</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.dataComments.html" class="public"><code>dataComments</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.dbAlignmentFile.html" class="public"><code>dbAlignmentFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.debugRepeatMasks.html" class="public"><code>debugRepeatMasks</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.dustMask.html" class="public"><code>dustMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.executableVersion.html" class="public"><code>executableVersion</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.existingGapBonus.html" class="public"><code>existingGapBonus</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.fastaLineWidth.html" class="public"><code>fastaLineWidth</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.gapDetailsContext.html" class="public"><code>gapDetailsContext</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.gapDetailsJson.html" class="public"><code>gapDetailsJson</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.gitCommit.html" class="public"><code>gitCommit</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.help.html" class="public"><code>help</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.improperCoverageBoundsReads.html" class="public"><code>improperCoverageBoundsReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.inMask.html" class="public"><code>inMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.inMasks.html" class="public"><code>inMasks</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.insertionsFile.html" class="public"><code>insertionsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.insertionsFile.html" class="public"><code>insertionsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.insertionsFiles.html" class="public"><code>insertionsFiles</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.intermediatePileUpsStem.html" class="public"><code>intermediatePileUpsStem</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.joinPolicy.html" class="public"><code>joinPolicy</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/scaffold/JoinPolicy.html"><span class="typ">JoinPolicy</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.keepTemp.html" class="public"><code>keepTemp</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.mappedRegionsMask.html" class="public"><code>mappedRegionsMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.masks.html" class="public"><code>masks</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxAlignmentError.html" class="public"><code>maxAlignmentError</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxBubbleResolverIterations.html" class="public"><code>maxBubbleResolverIterations</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ubyte</span></code></td><td>Run the solver at most this number of times
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxBubbleSize.html" class="public"><code>maxBubbleSize</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">ubyte</span></code></td><td>Consider cyclic subgraphs of up to the size when detecting
+bubbles_ aka. skipping pile ups.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxChainGapBps.html" class="public"><code>maxChainGapBps</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxCoverageReads.html" class="public"><code>maxCoverageReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxCoverageSelf.html" class="public"><code>maxCoverageSelf</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxImperfectContigError.html" class="public"><code>maxImperfectContigError</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxImproperCoverageReads.html" class="public"><code>maxImproperCoverageReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxIndelBps.html" class="public"><code>maxIndelBps</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxInsertionError.html" class="public"><code>maxInsertionError</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.maxRelativeOverlap.html" class="public"><code>maxRelativeOverlap</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.mergedInsertionsFile.html" class="public"><code>mergedInsertionsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minAnchorLength.html" class="public"><code>minAnchorLength</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minCoverageReads.html" class="public"><code>minCoverageReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minExtensionLength.html" class="public"><code>minExtensionLength</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minGapSize.html" class="public"><code>minGapSize</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minIntervalSize.html" class="public"><code>minIntervalSize</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minReadsPerPileUp.html" class="public"><code>minReadsPerPileUp</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minRelativeScore.html" class="public"><code>minRelativeScore</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minScore.html" class="public"><code>minScore</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/arithmetic_t.html"><span class="pln">arithmetic_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.minSpanningReads.html" class="public"><code>minSpanningReads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.noHighlightInsertions.html" class="public"><code>noHighlightInsertions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.noMergeExtensions.html" class="public"><code>noMergeExtensions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numAuxiliaryThreads.html" class="public"><code>numAuxiliaryThreads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numAuxiliaryThreads.html" class="public"><code>numAuxiliaryThreads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numThreads.html" class="public"><code>numThreads</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.onlyFlag.html" class="public"><code>onlyFlag</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/commandline/OptionsFor.OnlyFlag.html"><span class="typ">OptionsFor<wbr/></span><span class="pun">.<wbr/></span><span class="typ">OnlyFlag</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.onlyFlags.html" class="public"><code>onlyFlags</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/commandline/OptionsFor.OnlyFlags.html"><span class="typ">OptionsFor<wbr/></span><span class="pun">.<wbr/></span><span class="typ">OnlyFlags</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.outMask.html" class="public"><code>outMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.outMask.html" class="public"><code>outMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.outMask.html" class="public"><code>outMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.outputCoordinates.html" class="public"><code>outputCoordinates</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/OutputCoordinate.html"><span class="typ">OutputCoordinate</span></a><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpBatches.html" class="public"><code>pileUpBatches</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpsFile.html" class="public"><code>pileUpsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpsFile.html" class="public"><code>pileUpsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.ploidy.html" class="public"><code>ploidy</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.printProgress.html" class="public"><code>printProgress</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.printProgressEvery.html" class="public"><code>printProgressEvery</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">uint</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.progressFormat.html" class="public"><code>progressFormat</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/util/log/ProgressMeter.Format.html"><span class="typ">ProgressMeter<wbr/></span><span class="pun">.<wbr/></span><span class="typ">Format</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.properAlignmentAllowance.html" class="public"><code>properAlignmentAllowance</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.quiet.html" class="public"><code>quiet</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.readCoverage.html" class="public"><code>readCoverage</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">double</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.readsAlignmentFile.html" class="public"><code>readsAlignmentFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.readsAlignmentFile.html" class="public"><code>readsAlignmentFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.readsDb.html" class="public"><code>readsDb</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.readsMap.html" class="public"><code>readsMap</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.recoverImperfectContigs.html" class="public"><code>recoverImperfectContigs</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.refDb.html" class="public"><code>refDb</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.referenceContigBatch.html" class="public"><code>referenceContigBatch</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.regionContext.html" class="public"><code>regionContext</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.regions.html" class="public"><code>regions</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.repeatMask.html" class="public"><code>repeatMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.repeatMasks.html" class="public"><code>repeatMasks</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.reportAll.html" class="public"><code>reportAll</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.resultDb.html" class="public"><code>resultDb</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.resultFile.html" class="public"><code>resultFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.resultFile.html" class="public"><code>resultFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.revertOptionNames.html" class="public"><code>revertOptionNames</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.skipGaps.html" class="public"><code>skipGaps</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a><span class="pun">[</span><span class="lit">2</span><span class="pun">]</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.skipGapsFile.html" class="public"><code>skipGapsFile</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.tmpdir.html" class="public"><code>tmpdir</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td>This is a temporary directory to store all working data.
+</td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.tracePointDistance.html" class="public"><code>tracePointDistance</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/trace_point_t.html"><span class="pln">trace_point_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.trueAssemblyDb.html" class="public"><code>trueAssemblyDb</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.useJson.html" class="public"><code>useJson</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">OptionFlag</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.verbosity.html" class="public"><code>verbosity</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="pln">size_t</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.weakCoverageMask.html" class="public"><code>weakCoverageMask</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.weakCoverageWindow.html" class="public"><code>weakCoverageWindow</code></a>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/coord_t.html"><span class="pln">coord_t</span></a></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Properties</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Type</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.anchorSkippingPileUpsOptions.html" class="public property"><code>anchorSkippingPileUpsOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">auto</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.bedFileName.html" class="public property"><code>bedFileName</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.chainingOptions.html" class="public property"><code>chainingOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/chaining/ChainingOptions.html"><span class="typ">ChainingOptions</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.consensusOptions.html" class="public property"><code>consensusOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">auto</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.daccordOptions.html" class="public property"><code>daccordOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="kwd">auto</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hasMaxCoverageReads.html" class="public property"><code>hasMaxCoverageReads</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hasMaxImproperCoverageReads.html" class="public property"><code>hasMaxImproperCoverageReads</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hasMinCoverageReads.html" class="public property"><code>hasMinCoverageReads</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hasReadCoverage.html" class="public property"><code>hasReadCoverage</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hasReadsDb.html" class="public property"><code>hasReadsDb</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.mergeExtensions.html" class="public property"><code>mergeExtensions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">bool</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numPileUps.html" class="public property"><code>numPileUps</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numReferenceContigs.html" class="public property"><code>numReferenceContigs</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpAlignmentOptions.html" class="public property"><code>pileUpAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpDustOptions.html" class="public property"><code>pileUpDustOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.pileUpLength.html" class="public property"><code>pileUpLength</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.postConsensusAlignmentOptions.html" class="public property"><code>postConsensusAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.recoverImperfectContigsAlignmentOptions.html" class="public property"><code>recoverImperfectContigsAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.referenceContigBatchSize.html" class="public property"><code>referenceContigBatchSize</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><a href="../../dentist/common/alignments/base/id_t.html"><span class="pln">id_t</span></a></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.refVsReadsAlignmentOptions.html" class="public property"><code>refVsReadsAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.selfAlignmentOptions.html" class="public property"><code>selfAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.tandemAlignmentOptions.html" class="public property"><code>tandemAlignmentOptions</code></a><span class="tableEntryAnnotation">[get]</span>
+						</td>
+						<td class="typecol"><code class="prettyprint lang-d"><span class="typ">string</span><span class="pun">[]</span></code></td><td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Methods</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalConsensusAlignmentOptions.html" class="public">
+								<code>addAdditionalConsensusAlignmentOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalDaccordOptions.html" class="public">
+								<code>addAdditionalDaccordOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalReadsDustOptions.html" class="public">
+								<code>addAdditionalReadsDustOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalReadsVsReadsAlignmentOptions.html" class="public">
+								<code>addAdditionalReadsVsReadsAlignmentOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalRefDustOptions.html" class="public">
+								<code>addAdditionalRefDustOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalRefVsReadsAlignmentOptions.html" class="public">
+								<code>addAdditionalRefVsReadsAlignmentOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalSelfAlignmentOptions.html" class="public">
+								<code>addAdditionalSelfAlignmentOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addAdditionalTandemAlignmentOptions.html" class="public">
+								<code>addAdditionalTandemAlignmentOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">(option)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addMask.html" class="public">
+								<code>addMask</code>
+							</a>
+							<span class="tableEntryAnnotation">(mask)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.addRevertOption.html" class="public">
+								<code>addRevertOption</code>
+							</a>
+							<span class="tableEntryAnnotation">(optionName)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.createProgressMeter.html" class="public">
+								<code>createProgressMeter</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.defaultValue.html" class="public">
+								<code>defaultValue</code>
+							</a>
+							<span class="tableEntryAnnotation">(precision)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.fixDefaultDustMask.html" class="public">
+								<code>fixDefaultDustMask</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookCleanTmpdir.html" class="public">
+								<code>hookCleanTmpdir</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookCreateTmpdir.html" class="public">
+								<code>hookCreateTmpdir</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookEnsurePresenceOfBatchRange.html" class="public">
+								<code>hookEnsurePresenceOfBatchRange</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookEnsurePresenceOfBatchRanges.html" class="public">
+								<code>hookEnsurePresenceOfBatchRanges</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookEnsurePresenceOfMinScore.html" class="public">
+								<code>hookEnsurePresenceOfMinScore</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookEnsurePresenceOfProperAlignmentAllowance.html" class="public">
+								<code>hookEnsurePresenceOfProperAlignmentAllowance</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookGetTracePointDistance.html" class="public">
+								<code>hookGetTracePointDistance</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookInitDaccordThreads.html" class="public">
+								<code>hookInitDaccordThreads</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookInitLogLevel.html" class="public">
+								<code>hookInitLogLevel</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookInitThreads.html" class="public">
+								<code>hookInitThreads</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookOptimizeBatchRanges.html" class="public">
+								<code>hookOptimizeBatchRanges</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookParseCoordStrings.html" class="public">
+								<code>hookParseCoordStrings</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookReadSkipGapsFile.html" class="public">
+								<code>hookReadSkipGapsFile</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.hookSortSkipGaps.html" class="public">
+								<code>hookSortSkipGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.increaseVerbosity.html" class="public">
+								<code>increaseVerbosity</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.initOnlyFlags.html" class="public">
+								<code>initOnlyFlags</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.numArguments.html" class="public">
+								<code>numArguments</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.openBedFile.html" class="public">
+								<code>openBedFile</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parseArguments.html" class="public">
+								<code>parseArguments</code>
+							</a>
+							<span class="tableEntryAnnotation">(leftOver)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parseGapSpec.html" class="public">
+								<code>parseGapSpec</code>
+							</a>
+							<span class="tableEntryAnnotation">(gapSpec)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parsePileUpBatch.html" class="public">
+								<code>parsePileUpBatch</code>
+							</a>
+							<span class="tableEntryAnnotation">(batchString)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parsePileUpIdxSpec.html" class="public">
+								<code>parsePileUpIdxSpec</code>
+							</a>
+							<span class="tableEntryAnnotation">(idxSpec)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parseReferenceContigBatch.html" class="public">
+								<code>parseReferenceContigBatch</code>
+							</a>
+							<span class="tableEntryAnnotation">(batchString)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.parseSkipGaps.html" class="public">
+								<code>parseSkipGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">(skipGapsString)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.requestUsage.html" class="public">
+								<code>requestUsage</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.revertOption.html" class="public">
+								<code>revertOption</code>
+							</a>
+							<span class="tableEntryAnnotation">(optionName)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.revertOptions.html" class="public">
+								<code>revertOptions</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.setCoverageBoundsReads.html" class="public">
+								<code>setCoverageBoundsReads</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.setCoverageBoundsReads.html" class="public">
+								<code>setCoverageBoundsReads</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.setCoverageBoundsSelf.html" class="public">
+								<code>setCoverageBoundsSelf</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.setImproperCoverageBoundsReads.html" class="public">
+								<code>setImproperCoverageBoundsReads</code>
+							</a>
+							<span class="tableEntryAnnotation">()</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validatePileUpBatches.html" class="public">
+								<code>validatePileUpBatches</code>
+							</a>
+							<span class="tableEntryAnnotation">(pileUpBatches, options)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validatePileUpBatchesDontIntersect.html" class="public">
+								<code>validatePileUpBatchesDontIntersect</code>
+							</a>
+							<span class="tableEntryAnnotation">(pileUpBatches, options)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validatePileUpBatchRange.html" class="public">
+								<code>validatePileUpBatchRange</code>
+							</a>
+							<span class="tableEntryAnnotation">(pileUpBatch, options)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validatePileUpSkipGap.html" class="public">
+								<code>validatePileUpSkipGap</code>
+							</a>
+							<span class="tableEntryAnnotation">(skipGap, options)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validateReadsDb.html" class="public">
+								<code>validateReadsDb</code>
+							</a>
+							<span class="tableEntryAnnotation">(readsDb)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validateReferenceContigBatchRange.html" class="public">
+								<code>validateReferenceContigBatchRange</code>
+							</a>
+							<span class="tableEntryAnnotation">(referenceContigBatch, options)</span>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.validateSkipGaps.html" class="public">
+								<code>validateSkipGaps</code>
+							</a>
+							<span class="tableEntryAnnotation">(skipGaps, options)</span>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Inner structs</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.AnchorSkippingPileUpsOptions.html" class="public">
+								<code>AnchorSkippingPileUpsOptions</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.ConsensusOptions.html" class="public">
+								<code>ConsensusOptions</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Enums</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.OnlyFlag.html" class="public">
+								<code>OnlyFlag</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			<section><h2>Aliases</h2>
+				<table>
+					<col class="caption"/>
+					<tr>
+						<th>Name</th><th>Description</th>
+					</tr>
+					<tr>
+						<td>
+							<a href="../../dentist/commandline/OptionsFor.OnlyFlags.html" class="public">
+								<code>OnlyFlags</code>
+							</a>
+						</td>
+						<td></td>
+					</tr>
+				</table>
+			</section>
+			
+			<footer>
+				<table class="license-info">
+					<tr>
+						<th>Authors</th>
+						<td>
+							<p>Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>Copyright</th>
+						<td>
+							<p>© 2018 Arne Ludwig <arne.ludwig@posteo.de>
+</p>
+
+						</td>
+					</tr>
+					<tr>
+						<th>License</th>
+						<td>
+							<p>Subject to the terms of the MIT license, as written in the
+             included LICENSE file.
+</p>
+
+						</td>
+					</tr>
+				</table>
+				<p class="faint">Generated using the DDOX documentation generator</p>
+			</footer>
+		</div>
+	</body>
+</html>
