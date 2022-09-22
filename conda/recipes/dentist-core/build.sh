@@ -21,6 +21,14 @@ DMD_VERSION="${DMD_VERSION:-"2.100.2"}"
 DLANG_ROOT="$PWD/.dlang"
 
 
+log()
+{
+    echo -ne '\e[1m'
+    echo -n "--" "$@"
+    echo -e '\e[0m'
+} >&2
+
+
 bail_out()
 {
     echo "$PROG: error: $*"
@@ -39,32 +47,44 @@ main()
 
     install_dmd
 
-    # build unit tests
+    log "building unit tests..."
     dub build --config="$DENTIST_BUILD_CONFIG" --build=unittest
     mv dentist dentist-unittest
 
-    # build main executable
+    log "building main executable..."
     dub build --config="$DENTIST_BUILD_CONFIG" --build="$DENTIST_BUILD"
 
     # clean up build artifacts
     rm -rf .dub
     [[ ! -d "$DLANG_ROOT" ]] || rm -rf "$DLANG_ROOT"
 
-    # install binaries
+    log "installing binaries..."
     install -t "$BINDIR" dentist dentist-unittest
 }
 
 
 install_dmd()
 {
+    log "installing DMD $DMD_VERSION..."
     dlang_install install "dmd-$DMD_VERSION"
 
+    log "activating DMD $DMD_VERSION..."
     # Setup PATH, LIBRARY_PATH, LD_LIBRARY_PATH, DMD, DC, and PS1
     # shellcheck disable=SC1090
     source "$(dlang_install "dmd-$DMD_VERSION" -a)"
 
     export DUB
     DUB="$(dlang_install get-path "dmd-$DMD_VERSION" --dub)"
+}
+
+
+gpg_major_version()
+{
+    local GPG_VERSION
+    GPG_VERSION="$(gpg --version | head -n1)"
+    GPG_VERSION="${GPG_VERSION##* }"
+
+    echo "${GPG_VERSION%%.*}"
 }
 
 
@@ -75,6 +95,14 @@ dlang_install()
         mkdir -p "$DLANG_ROOT"
         curl https://dlang.org/install.sh > "$DLANG_ROOT/install.sh"
         chmod +x "$DLANG_ROOT/install.sh"
+
+        if (( $(gpg_major_version) < 2 ))
+        then
+            # NOTE: older GnuPG versions do not support latest trends in
+            #       signature algos. This, we sacrifice verification for
+            #       for a working installation.
+            sed -i -E 's/^verify\(\)\s*\{/\0\n    return/' .dlang/install.sh
+        fi
     fi
 
     "$DLANG_ROOT/install.sh" -p "$DLANG_ROOT" "$@"
