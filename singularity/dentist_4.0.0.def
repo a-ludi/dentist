@@ -30,6 +30,9 @@ From: ubuntu:16.04
     rm -rf /opt/miniconda3
     apt-get remove -y curl && apt-get autoremove -y && apt-get clean
 
+    # Set python3 as the default python installation
+    ln -s /usr/bin/python3 /usr/bin/python
+
 %environment
     # Determine timezone
     export TZ=Europe/London
