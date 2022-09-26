@@ -34,13 +34,8 @@ Install
 
 Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-You can also use the convenient Conda package or Singularity container to
-execute the rules. Just make sure you have [Conda][conda] or [Singularity][singularity] >=3.5.x installed, respectively.
-
-
-[snakemake]: https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html
-[singularity]: https://sylabs.io/guides/3.5/user-guide/quick_start.html
-[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
+You can also use the convenient Conda package to execute the rules. Just make
+sure you have [Mamba][mamba] installed.
 
 
 Usage
@@ -72,9 +67,10 @@ Execution takes approx. 7 minutes and a maximum of 1.7GB memory on my little
 laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 
-### Execution using Conda
+### Execution with Conda
 
-Execute the workflow using a convenient Conda environment by adding
+Make sure [Mamba][mamba] (a frontend for [Conda][conda]) is installed on your
+system. Execute the workflow without explicit installation by adding
 `--use-conda` to the call to Snakemake:
 
 ```sh
@@ -85,8 +81,14 @@ snakemake --configfile=snakemake.yml --use-conda --cores=all
 md5sum -c checksum.md5
 ```
 
+*Note: If you do not have `mamba` installed, you may need to pass
+`--conda-frontend=conda` to Snakemake.*
 
-### Execution in Singularity Container
+
+### Execution in Singularity Container (discouraged)
+
+*Remark: the Singularity container may not work properly depending on your
+system. (see issue #30)*
 
 Execute the workflow inside a convenient Singularity image by adding
 `--use-singularity` to the call to Snakemake:
@@ -125,9 +127,12 @@ Find more advice on execution using a cluster in the
 Citation
 --------
 
-> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST – using long
-> reads to close assembly gaps at high accuracy. __Submitted for peer review__.
-> Pre-print at <https://doi.org/10.1101/2021.02.26.432990>
+> Arne Ludwig, Martin Pippel, Gene Myers, Michael Hiller. DENTIST — using long
+> reads for closing assembly gaps at high accuracy. _GigaScience_, Volume 11,
+> 2022, giab100.
+> [https://doi.org/10.1093/gigascience/giab100][dentist-gigascience]
+
+[dentist-gigascience]: https://academic.oup.com/gigascience/article/doi/10.1093/gigascience/giab100/6514926 "Paper published at GigaScience"
 
 
 Maintainer
@@ -144,3 +149,7 @@ This project is licensed under MIT License (see [LICENSE](./LICENSE)).
 
 
 [dentist]: https://a-ludi.github.io/dentist/
+[snakemake]: https://snakemake.readthedocs.io/en/v5.32.1/getting_started/installation.html
+[singularity]: https://sylabs.io/guides/3.5/user-guide/quick_start.html
+[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
+[mamba]: https://github.com/mamba-org/mamba
