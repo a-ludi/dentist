@@ -2229,7 +2229,10 @@ struct OptionsFor(DentistCommand _command)
     {
         @Option("only")
         @Help(format!"
-            only process/output insertions of the given type. Note, extending
+            only process/output insertions of the given type. Allowed values
+            are `spanning` (i.e. if two contigs would be properly joined),
+            `extending` (i.e. the sequence just extends the contig but does
+            not reach across two contigs) and `both`. Note, extending
             insertions are experimental and may produce invalid results.
             (default: spanning)
         ")
