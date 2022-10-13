@@ -22,3 +22,7 @@ indent_style = tab
 # Makefile - important to use tabs
 [*.tsv]
 indent_style = tab
+
+# YAML use standard 2-spaces indent
+[*.yml,*.yaml]
+indent_size = 2
