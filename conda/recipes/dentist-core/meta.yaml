@@ -36,7 +36,7 @@ requirements:
     - {{ compiler('c') }}
     - jq==1.6
   run:
-    - daligner==2.0.20200115+commit.c2b47da
+    - daligner==2.0.20210330+commit.f61b8cf
     - damapper==1.0.20200322+commit.b2c9d7f
     - damasker==1.0.20200115+commit.22139ff
     - dascrubber==1.0.20200726+commit.a53dbe8

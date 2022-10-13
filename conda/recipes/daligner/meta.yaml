@@ -6,10 +6,10 @@
 package:
   name:     daligner
   # git rev-list -1 --date=format:%Y%m%d --format='2.0.%cd+commit.%h' HEAD | tail -n1
-  version:  "2.0.20200115+commit.c2b47da"
+  version:  "2.0.20210330+commit.f61b8cf"
 
 source:
-  git_rev: c2b47da6b3c94ed248a6be395c5b96a4e63b3f63
+  git_rev: f61b8cf1d38c14e8b8f5f37cec3466b56f09ab39
   git_url: https://github.com/thegenemyers/DALIGNER.git
 
 requirements:

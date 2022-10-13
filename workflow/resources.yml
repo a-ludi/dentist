@@ -1,7 +1,7 @@
 __default__:
     partition:  batch
     # default number of threads for multi-threaded jobs
-    threads:    8
+    threads:    4
 
 mask_dust:
     threads:    1

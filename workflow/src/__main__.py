@@ -18,8 +18,9 @@ from dentist.workflow.engine import (
     safe,
 )
 from util.dazzler import *
+from util.json import multi_json_load
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("dentist.workflow.DentistGapClosing")
 
 
 class DentistGapClosing(Workflow):
@@ -32,6 +33,9 @@ class DentistGapClosing(Workflow):
         "ref_vs_reads_alignment",
         "homogenize_mask",
         "process_pile_ups",
+        "lasplit_by_reference",
+        "lamerge_by_reference",
+        "validate_regions",
     )
     preliminary_output_revert_options = [
         "scaffolding",
@@ -40,6 +44,7 @@ class DentistGapClosing(Workflow):
         "agp-dazzler",
     ] + (["cache-contig-alignments"] if dentist.is_testing() else [])
     closed_gaps_mask = "closed-gaps"
+    weak_coverage_mask = "dentist-weak-coverage"
 
     def __init__(
         self,
@@ -50,10 +55,17 @@ class DentistGapClosing(Workflow):
         super().__init__(*args, **kwargs)
         with workflow_config.open() as config:
             self.config = json.load(config)
-            self.config["__path__"] = workflow_config.resolve()
+        self.config["__path__"] = workflow_config.resolve()
+        self.config["__chdir__"] = workflow_config.parent
 
         log.info(f"changing directory to {workflow_config.parent}")
         os.chdir(workflow_config.parent)
+
+        self.flags = self.config.get("flags", {})
+        self.flags = Namespace(
+            purge_output=self.flags.get("purge_output", True),
+            force_validation=self.flags.get("force_validation", False),
+        )
 
         self.reference_fasta = Path(self.config["inputs"]["reference"])
         self.reads_fasta = Path(self.config["inputs"]["reads"])
@@ -62,9 +74,11 @@ class DentistGapClosing(Workflow):
         self.reads_type = self.config["inputs"]["reads_type"]
         self.dbsplit_options = {
             "reference": self.config["reference_dbsplit"],
+            "gap-closed-preliminary": self.config["reference_dbsplit"],
             "reads": self.config["reads_dbsplit"],
         }
         self.lamerge_opts = ["-v"]
+        self.lasplit_opts = ["-v"]
         if "TMPDIR" in environ:
             self.lamerge_opts.append(f"-P{environ['TMPDIR']}")
         self.tanmask_opts = self.config.get("tanmask", [])
@@ -82,7 +96,8 @@ class DentistGapClosing(Workflow):
             self.tandem_mask,
             self.reads_mask,
         )
-        batch_size = dict((job, 1) for job in self.batched_jobs)
+        default_batch_size = self.config.get("batch_size", dict()).get("__default__", 1)
+        batch_size = dict((job, default_batch_size) for job in self.batched_jobs)
         batch_size |= self.config.get("batch_size", dict())
         self.batch_size = Namespace(**batch_size)
         self.dentist_flags = shlex.split(environ.get("DENTIST_FLAGS", ""))
@@ -90,6 +105,9 @@ class DentistGapClosing(Workflow):
         self.insertion_batches_dir = self.workdir / "insertions"
         self.insertions = self.workdir / "insertions.db"
         self.gap_closed_fasta = Path(self.config["outputs"]["output_assembly"])
+        self.validation_report_block = str(
+            self.workdir / "validation-report.{block}.json"
+        )
 
     def run(self):
         self.create_dirs("create_workdirs", [self.workdir, self.logdir])
@@ -102,17 +120,7 @@ class DentistGapClosing(Workflow):
 
         dentist.validate_config(self.dentist_config)
 
-        self.mask_dust(self.reference)
-        self.execute_jobs()
-        self.tandem_alignment(self.reference)
-        self.execute_jobs()
-        self.mask_tandem(self.reference)
-        self.execute_jobs()
-        self.self_alignment(self.reference)
-        self.execute_jobs()
-        self.mask_self(self.reference)
-        self.execute_jobs()
-        self.ref_vs_reads_alignment(self.reference, self.reads)
+        self.until_reads_alignment(self.reference, self.reads)
         self.execute_jobs()
         self.mask_reads()
         self.execute_jobs()
@@ -123,7 +131,73 @@ class DentistGapClosing(Workflow):
         self.execute_jobs()
         self.process_pile_ups()
         self.execute_jobs()
-        self.assembly_output(self.reference, self.reads, preliminary=True)
+
+        if self.flags.purge_output or self.flags.force_validation:
+            self.assembly_output(self.reference, self.reads, preliminary=True)
+            self.execute_jobs()
+            self.preliminary_gap_closed = self.fasta2dazzler(
+                self.jobs["preliminary_output"].outputs.fasta, "gap-closed-preliminary"
+            )
+            self.execute_jobs()
+            self.bed2mask(
+                self.preliminary_gap_closed,
+                self.jobs["preliminary_output"].outputs.bed,
+                self.closed_gaps_mask,
+                "closed_gaps_bed2mask",
+                self.log_file("closed-gaps-bed2mask"),
+            )
+            self.until_reads_alignment(self.preliminary_gap_closed, self.reads)
+            self.execute_jobs()
+            self.split_and_merge_by_reference(self.preliminary_gap_closed, self.reads)
+            self.execute_jobs()
+            self.validate_regions(self.preliminary_gap_closed, self.reads)
+            self.execute_jobs()
+            self.skip_gaps()
+            self.execute_jobs()
+
+        if self.flags.purge_output:
+            self.assembly_output(
+                self.reference,
+                self.reads,
+                skip_gaps=self.jobs["skip_gaps"].outputs.skip_gaps,
+            )
+        else:
+            self.assembly_output(self.reference, self.reads)
+
+    def on_finished(self):
+        job_names = []
+        if self.flags.purge_output:
+            job_names.append("purged_output")
+        else:
+            job_names.append("unpurged_output")
+
+        if self.flags.purge_output or self.flags.force_validation:
+            job_names.append(
+                f"validate_regions_report_{self.preliminary_gap_closed.stem}_{self.reads.stem}"
+            )
+            job_names.append("skip_gaps")
+
+        outputs = [
+            str(self.config["__chdir__"] / output)
+            for job_name in job_names
+            for output in self.jobs[job_name].outputs
+        ]
+        outputs = "\n  " + "\n  ".join(outputs)
+
+        log.info(f"Check out these result files:{outputs}")
+
+    def until_reads_alignment(self, refdb, readsdb):
+        self.mask_dust(refdb)
+        self.execute_jobs()
+        self.tandem_alignment(refdb)
+        self.execute_jobs()
+        self.mask_tandem(refdb)
+        self.execute_jobs()
+        self.self_alignment(refdb)
+        self.execute_jobs()
+        self.mask_self(refdb)
+        self.execute_jobs()
+        self.ref_vs_reads_alignment(refdb, readsdb)
         self.execute_jobs()
 
     def create_dentist_config(self):
@@ -449,14 +523,17 @@ class DentistGapClosing(Workflow):
             self.merge_masks(
                 refdb,
                 homogenized_mask(mask),
-                [
+                [mask]
+                + [
                     pseudo_block_mask(
                         homogenized_mask(mask), MultiIndex((blocks[0], blocks[-1]))
                     )
                     for blocks in get_blocks(readsdb, self.batch_size.homogenize_mask)
                 ],
                 job=f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}",
-                log=self.log_file(f"homogenize-mask.{refdb.stem}.{readsdb.stem}"),
+                log=self.log_file(
+                    f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{mask}"
+                ),
             )
 
     def homogenize_mask_block(self, refdb, readsdb, mask, blocks_reads):
@@ -484,7 +561,9 @@ class DentistGapClosing(Workflow):
                 config=self.dentist_config,
             ),
             outputs=[mask_files(refdb, homogenized_mask(mask), pseudo_block=index)],
-            log=self.log_file(f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{index}"),
+            log=self.log_file(
+                f"homogenize-mask.{refdb.stem}.{readsdb.stem}.{mask}.{index}"
+            ),
             resources="homogenize_mask_block",
             action=lambda inputs, index, resources: ShellScript(
                 (
@@ -645,6 +724,176 @@ class DentistGapClosing(Workflow):
             ),
         )
 
+    def split_and_merge_by_reference(self, refdb, readsdb):
+        with self.grouped_jobs(
+            f"split_and_merge_by_reference_{refdb.stem}_{readsdb.stem}"
+        ):
+            for blocks_b in get_blocks(readsdb, self.batch_size.lasplit_by_reference):
+                self.lasplit(
+                    refdb,
+                    readsdb,
+                    blocks_b,
+                    job_stem="lasplit_by_reference",
+                    resources="lasplit_by_reference",
+                )
+            self.execute_jobs()
+            for blocks_a in get_blocks(refdb, self.batch_size.lamerge_by_reference):
+                self.lamerge_by_reference(refdb, readsdb, blocks_a)
+
+    def validate_regions(self, refdb, readsdb):
+        with self.grouped_jobs(f"validate_regions_{refdb.stem}_{readsdb.stem}"):
+            block_jobs = [
+                self.validate_regions_block(refdb, readsdb, blocks)
+                for blocks in get_blocks(refdb, self.batch_size.validate_regions)
+            ]
+            weak_coverage_masks = list(
+                chain.from_iterable(job.outputs.masks.keys() for job in block_jobs)
+            )
+            reports = list(
+                chain.from_iterable(job.outputs.reports for job in block_jobs)
+            )
+            self.execute_jobs()
+            self.merge_masks(
+                refdb,
+                self.weak_coverage_mask,
+                weak_coverage_masks,
+                job=f"weak_coverage_mask_{refdb.stem}_{readsdb.stem}",
+                log=self.log_file(f"weak-coverage-mask.{refdb.stem}.{readsdb.stem}"),
+            )
+            self.concatenate(
+                self.workdir / f"validation-report.json",
+                reports,
+                job=f"validate_regions_report_{refdb.stem}_{readsdb.stem}",
+                resources="validate_regions_report",
+                log=self.log_file(
+                    f"validate-regions-report.{refdb.stem}.{readsdb.stem}"
+                ),
+            )
+
+    def validate_regions_block(self, refdb, readsdb, blocks):
+        index = MultiIndex((blocks[0], blocks[-1]))
+        weak_coverage_masks = [
+            pseudo_block_mask(self.weak_coverage_mask, block)
+            for block in index.values()
+        ]
+
+        return self.collect_job(
+            name=f"validate_regions_{refdb.stem}_{readsdb.stem}",
+            index=index,
+            inputs=FileList(
+                refdb=db_files(refdb),
+                readsdb=db_files(readsdb),
+                las=[
+                    self.workdir / alignment_file(refdb, readsdb, block_a=block)
+                    for block in index.values()
+                ],
+                mask={self.closed_gaps_mask: mask_files(refdb, self.closed_gaps_mask)},
+                config=self.dentist_config,
+            ),
+            outputs=FileList(
+                reports=[
+                    self.validation_report_block.format(block=block)
+                    for block in index.values()
+                ],
+                masks=dict(
+                    (mask, mask_files(refdb, mask)) for mask in weak_coverage_masks
+                ),
+            ),
+            log=self.log_file(f"validate-regions.{index}"),
+            action=lambda inputs, outputs, resources: ShellScript(
+                *(
+                    (
+                        "dentist",
+                        "validate-regions",
+                        f"--config={inputs.config}",
+                        f"--threads={resources['threads']}",
+                        f"--weak-coverage-mask={weak_coverage_mask}",
+                        inputs.refdb[0],
+                        inputs.readsdb[0],
+                        las,
+                        *inputs.mask.keys(),
+                        safe(">"),
+                        report,
+                    )
+                    for las, report, weak_coverage_mask in zip(
+                        inputs.las, outputs.reports, outputs.masks.keys()
+                    )
+                )
+            ),
+        )
+
+    def skip_gaps(self):
+        @self.collect_job(
+            inputs=FileList(report=self.workdir / f"validation-report.json"),
+            outputs=FileList(skip_gaps=self.workdir / f"skip-gaps.txt"),
+            log=self.log_file("skip-gaps"),
+            exec_local=True,
+        )
+        @python_code
+        def skip_gaps(inputs, outputs):
+            validations = None
+            with inputs.report.open("r") as validation_report_file:
+                validations = multi_json_load(validation_report_file)
+
+            with outputs.skip_gaps.open("w") as skip_gaps_file:
+                for validation in validations:
+                    if not validation.get("isValid", False):
+                        gap_spec = "-".join(
+                            (str(cid) for cid in validation["contigIds"])
+                        )
+                        print(gap_spec, file=skip_gaps_file)
+
+        return skip_gaps
+
+    def lasplit(self, dba, dbb, blocks_b, job_stem="lasplit", resources=None):
+        index = MultiIndex((blocks_b[0], blocks_b[-1]))
+        las_batch = [
+            self.workdir / alignment_file(dba, dbb, block_b=block_b)
+            for block_b in index.values()
+        ]
+        split_files = dict(
+            (
+                str(
+                    self.workdir
+                    / alignment_file(dba, dbb, block_a="@", block_b=block_b)
+                ),
+                [
+                    self.workdir
+                    / alignment_file(dba, dbb, block_a=block_a, block_b=block_b)
+                    for block_a in range(1, get_num_blocks(dba) + 1)
+                ],
+            )
+            for block_b in index.values()
+        )
+
+        self.collect_job(
+            name=f"{job_stem}_{dba.stem}_{dbb.stem}",
+            index=index,
+            inputs=FileList(
+                las_batch=las_batch,
+                db=db_files(dba),
+            ),
+            outputs=split_files,
+            log=self.log_file(
+                f"{job_stem.replace('_', '-')}.{dba.stem}.{dbb.stem}.{index}"
+            ),
+            resources=resources,
+            action=lambda inputs, outputs: ShellScript(
+                *(
+                    (
+                        "LAsplit",
+                        *self.lasplit_opts,
+                        target,
+                        inputs.db[0],
+                        safe("<"),
+                        las,
+                    )
+                    for las, target in zip(inputs.las_batch, outputs.keys())
+                ),
+                ("file", *outputs),
+            ),
+        )
+
     def lamerge(self, merged, parts, job, log, resources=None):
         self.collect_job(
             name=job,
@@ -654,6 +903,33 @@ class DentistGapClosing(Workflow):
             resources=resources,
             action=lambda inputs, outputs: ShellScript(
                 ("LAmerge", *self.lamerge_opts, outputs[0], *inputs)
+            ),
+        )
+
+    def lamerge_by_reference(self, refdb, readsdb, batch):
+        index = MultiIndex((batch[0], batch[-1]))
+
+        self.collect_job(
+            name=f"lamerge_by_reference_{refdb.stem}_{readsdb.stem}",
+            index=index,
+            inputs=[
+                [
+                    self.workdir / las
+                    for las in block_alignments(refdb, readsdb, block_a=block)
+                ]
+                for block in index.values()
+            ],
+            outputs=[
+                self.workdir / alignment_file(refdb, readsdb, block_a=block)
+                for block in index.values()
+            ],
+            resources="lamerge_by_reference",
+            log=self.log_file(f"lamerge-by-reference.{refdb.stem}.{readsdb.stem}"),
+            action=lambda inputs, outputs: ShellScript(
+                *(
+                    ("LAmerge", *self.lamerge_opts, outputs[0], *inputs)
+                    for las_inputs, las_output in zip(inputs, outputs)
+                )
             ),
         )
 
@@ -695,6 +971,49 @@ class DentistGapClosing(Workflow):
                     *inputs.masks.keys(),
                 )
             ),
+        )
+
+    def bed2mask(self, db, bed, mask, job, log):
+        self.collect_job(
+            name=job,
+            inputs=FileList(
+                db=db_files(db),
+                bed=bed,
+                config=self.dentist_config,
+            ),
+            outputs={mask: mask_files(db, mask)},
+            log=log,
+            exec_local=True,
+            action=lambda inputs, outputs: ShellScript(
+                (
+                    "dentist",
+                    "bed2mask",
+                    f"--config={inputs.config}",
+                    *self.dentist_flags,
+                    "--data-comments",
+                    f"--bed={inputs.bed}",
+                    inputs.db[0],
+                    *outputs.keys(),
+                )
+            ),
+        )
+
+    def concatenate(self, output, inputs, job, resources, log):
+        @python_code
+        def concatenate(inputs, outputs):
+            with outputs[0].open("w") as outfile:
+                for input_ in inputs:
+                    with input_.open() as infile:
+                        outfile.write(infile.read())
+
+        return self.collect_job(
+            name=job,
+            inputs=inputs,
+            outputs=[output],
+            resources=resources,
+            log=log,
+            exec_local=True,
+            action=concatenate,
         )
 
     def assembly_output(self, refdb, readsdb, skip_gaps=None, preliminary=False):
