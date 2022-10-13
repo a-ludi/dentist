@@ -1,7 +1,7 @@
 dentist_version = $(shell git describe)
 arch = $(shell uname -m)
-container = dentist_$(dentist_version).sif
-container_def = singularity/dentist_$(dentist_version).def
+container = dentist_$(dentist_version:v%=%).sif
+container_def = singularity/dentist_$(dentist_version:v%=%).def
 dentist_env=dentist_$(firstword $(subst ., ,$(dentist_version)))
 
 local_only = $(if $(findstring local,$(dentist_version)),$(1))
@@ -70,6 +70,7 @@ api-docs: docs.json
 docs.json:
 	dub build --build=docs-json --config=testing
 	$(ddox) filter $(ddox_filter) $@
+	jq -f scripts/fix-empty-objects-in-docs.jq < $@ > $@~ && mv $@~ $@
 
 
 .PHONY: dist
@@ -95,7 +96,7 @@ $(binaries) &:
 	BINARIES=( $(addprefix "$$PREFIX/bin/",$(notdir $(binaries))) ); \
 	trap 'rm -rf "$$ROOT"' exit; \
 	conda create -y --copy -p "$$PREFIX" -c local -c a_ludi -c bioconda \
-	    dentist-core==local \
+	    dentist-core==$(dentist_version:v%=%) \
 	    jq==1.6 \
 	    'python>=3,<4'; \
 	echo 'Installing binaries into $(dist_dir)'; \

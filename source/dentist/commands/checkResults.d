@@ -96,7 +96,8 @@ import std.algorithm :
 import std.array :
     array,
     minimallyInitializedArray,
-    split;
+    split,
+    staticArray;
 import std.ascii :
     newline,
     toLower;
@@ -293,7 +294,7 @@ private struct ResultAnalyzer
     protected ContigMapping[] contigAlignments;
     protected NaturalNumberSet duplicateContigIds;
     protected GapSummary[] gapSummaries;
-    protected size_t[][identityLevels.length] correctGapsPerIdentityLevel;
+    protected coord_t[][identityLevels.length] correctGapsPerIdentityLevel;
 
     Stats collect()
     {
@@ -1044,10 +1045,10 @@ private struct ResultAnalyzer
         return cast(coord_t) (rhsMappedContig.begin - lhsMappedContig.end);
     }
 
-    size_t[][identityLevels.length] makeIdentityLevelStats()
+    coord_t[][identityLevels.length] makeIdentityLevelStats()
     {
         typeof(return) correctGapsPerIdentityLevel;
-        auto lengthsBuffer = minimallyInitializedArray!(size_t[])(
+        auto lengthsBuffer = minimallyInitializedArray!(coord_t[])(
             getNumClosedGaps() * identityLevels.length,
         );
 
@@ -1547,19 +1548,12 @@ private struct ResultAnalyzer
     {
         mixin(traceExecution);
 
-        typeof(return) correctGapLengthHistograms;
-
-        foreach (i; 0 .. identityLevels.length)
-        {
-            correctGapLengthHistograms[i] = histogram(
+        return iota(identityLevels.length)
+            .map!(i => histogram(
                 options.bucketSize,
                 correctGapsPerIdentityLevel[i],
-            );
-            // NOTE: for some reason bucketSize is not correctly set; force it
-            correctGapLengthHistograms[i].bucketSize = options.bucketSize;
-        }
-
-        return correctGapLengthHistograms;
+            ))
+            .staticArray!(identityLevels.length);
     }
 
     Histogram!coord_t getClosedGapLengthHistogram()

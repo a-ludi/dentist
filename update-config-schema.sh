@@ -6,19 +6,31 @@ SCHEMA_FILE=config-schema.json
 #!/bin/bash
 
 
+function dentist()
+{
+    "${DUB_BUILD_PATH:-$PWD}/dentist" "$@"
+}
+
+
 function main()
 {
-    echo -n 'Updating `'"$SCHEMA_FILE"'` ... ' >&2
+    echo -n 'Updating `'"$SCHEMA_FILE"'` ... '
 
-    ./dentist --config-schema > "$SCHEMA_FILE~"
+    if [[ "$DUB_BUILD_TYPE" == unittest || "$DUB_BUILD_TYPE" == docs-json ]]
+    then
+        echo 'skipped'
+        return
+    fi
+
+    dentist --config-schema > "$SCHEMA_FILE~"
 
     if ! cmp -s "$SCHEMA_FILE" "$SCHEMA_FILE~";
     then
         mv "$SCHEMA_FILE~" "$SCHEMA_FILE"
 
-        echo 'done' >&2
+        echo 'done'
     else
-        echo 'skipped' >&2
+        echo 'skipped'
     fi
 }
 
@@ -29,7 +41,7 @@ function clean_up()
 
 function on_error()
 {
-    echo failed >&2
+    echo failed
 }
 
 trap clean_up EXIT

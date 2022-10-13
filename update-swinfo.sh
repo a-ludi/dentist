@@ -4,7 +4,7 @@ SWINFO_FILE=source/dentist/swinfo.d
 
 function main()
 {
-    echo -n 'Updating `dentist.swinfo` ... ' >&2
+    echo -n 'Updating `dentist.swinfo` ... '
 
     get_updated_swinfo "$SWINFO_FILE" > "$SWINFO_FILE~"
 
@@ -12,9 +12,9 @@ function main()
     then
         mv "$SWINFO_FILE~" "$SWINFO_FILE"
 
-        echo 'done' >&2
+        echo 'done'
     else
-        echo 'skipped' >&2
+        echo 'skipped'
     fi
 }
 
@@ -105,7 +105,7 @@ function clean_up()
 
 function on_error()
 {
-    echo failed >&2
+    echo failed
 }
 
 trap clean_up EXIT

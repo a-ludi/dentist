@@ -47,7 +47,9 @@ function bail_out_usage()
 
 function log()
 {
-    echo "--" "$@"
+    echo -ne '\e[1m'
+    echo -n "--" "$@"
+    echo -e '\e[0m'
 } >&2
 
 
@@ -131,12 +133,6 @@ function parse_args()
 }
 
 
-function has_docker_image()
-{
-    docker image inspect "$1" &> /dev/null
-}
-
-
 function clean_up()
 {
     rm -f .docker-build-id
@@ -152,7 +148,7 @@ function clean_up()
             log "created snapshot image $SNAPSHOT_ID"
         fi
 
-        docker rm "$CONTAINER_ID"
+        docker rm "$CONTAINER_ID" > /dev/null
     fi
 }
 
@@ -164,13 +160,8 @@ function main()
 
     trap 'clean_up' exit
 
-    if has_docker_image "$BUILD_IMAGE"
-    then
-        log "using existing docker image $BUILD_IMAGE"
-    else
-        log "building container image"
-        docker build -t "$BUILD_IMAGE" conda-build
-    fi
+    log "building container image"
+    docker build -t "$BUILD_IMAGE" conda-build
 
     log "gathering release files"
     CONTAINER_ID="$(docker create -v "$(realpath "$RECIPE"):/recipe:ro" "$BUILD_IMAGE" "${CONDA_BUILD_ARGS[@]}")"

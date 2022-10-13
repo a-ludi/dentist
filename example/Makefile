@@ -47,9 +47,9 @@ dist_files = $(generated_inputs) $(workflow_config) $(checksum_workflow) \
 simulator = simulator
 snakemake = $(shell command -v snakemake)
 singularity = $(shell command -v singularity)
-conda = $(shell command -v conda)
+conda = $(shell command -v mamba)
 
-conda_prefix = $(shell conda info --base)/envs/$(dentist_env)
+conda_prefix = $(shell mamba info --base | tail -n1)/envs/$(dentist_env)
 
 
 # Recipe fragments

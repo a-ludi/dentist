@@ -73,7 +73,7 @@ import std.range.primitives;
 import std.string : capitalize, split;
 import std.stdio : File, LockType;
 import std.typecons : BitFlags, PhobosFlag = Flag, No, tuple, Tuple, Yes;
-import std.traits : isArray, TemplateArgsOf, TemplateOf;
+import std.traits : FieldNameTuple, isArray, TemplateArgsOf, TemplateOf;
 import vibe.data.json : Json, toJson = serializeToJson;
 
 debug import std.stdio : writefln, writeln;
@@ -1307,8 +1307,8 @@ struct AlignmentChain
     {
         auto json = Json.emptyObject;
 
-        foreach (alias field; this.tupleof)
-            json[__traits(identifier, field)] = .toJson(field);
+        static foreach (field; FieldNameTuple!(typeof(this)))
+            json[field] = .toJson(__traits(getMember, this, field));
 
         return json;
     }
@@ -1320,10 +1320,51 @@ struct AlignmentChain
 
         AlignmentChain ac;
 
-        foreach (alias field; ac.tupleof)
-            field = deserializeJson!(typeof(field))(json[__traits(identifier, field)]);
+        static foreach (field; FieldNameTuple!(typeof(this)))
+            __traits(getMember, ac, field) = deserializeJson!(typeof(__traits(getMember, this, field)))(json[field]);
 
         return ac;
+    }
+
+    unittest
+    {
+        const ac = AlignmentChain(
+            0,
+            Contig(1, 2584),
+            Contig(58024, 10570),
+            Flags(Flag.complement),
+            [LocalAlignment(
+                Locus(579, 2584),
+                Locus(0, 2158),
+                292,
+                [
+                    TracePoint( 2,  23),
+                    TracePoint(11, 109),
+                    TracePoint(13, 109),
+                    TracePoint(15, 107),
+                    TracePoint(18, 107),
+                    TracePoint(14, 103),
+                    TracePoint(16, 106),
+                    TracePoint(17, 106),
+                    TracePoint( 9, 106),
+                    TracePoint(14, 112),
+                    TracePoint(16, 105),
+                    TracePoint(16, 114),
+                    TracePoint(10, 103),
+                    TracePoint(14, 110),
+                    TracePoint(15, 110),
+                    TracePoint(15, 101),
+                    TracePoint(17, 108),
+                    TracePoint(17, 109),
+                    TracePoint(15, 111),
+                    TracePoint(17, 111),
+                    TracePoint(11,  88),
+                ],
+            )],
+            100,
+        );
+
+        assert(AlignmentChain.fromJson(ac.toJson) == ac);
     }
 }
 

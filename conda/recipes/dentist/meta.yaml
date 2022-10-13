@@ -1,5 +1,5 @@
 {% set name = "DENTIST" %}
-{% set git_rev = "v3.0.0" %}
+{% set git_rev = "v4.0.0" %}
 
 {% set version = environ['GIT_DESCRIBE_TAG'] %}
 {% if version[0] == "v" %}

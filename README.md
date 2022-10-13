@@ -6,7 +6,7 @@ DENTIST
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat)](https://github.com/RichardLitt/standard-readme)
 ![GitHub](https://img.shields.io/github/license/a-ludi/dentist)
 [![DUB](https://img.shields.io/dub/v/dentist)](https://code.dlang.org/packages/dentist)
-[![Singularity Image Version](https://img.shields.io/badge/Singularity-v3.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
+[![Singularity Image Version](https://img.shields.io/badge/Singularity-v4.0.0-gray?color=2563eb)](https://cloud.sylabs.io/library/a-ludi/default/dentist)
 [![Conda package Version](https://img.shields.io/conda/v/a_ludi/dentist?label=conda)](https://anaconda.org/a_ludi/dentist-core)
 [![DOI:10.1093/gigascience/giab100](https://img.shields.io/badge/DOI_10.1093%2Fgigascience%2Fgiab100-informational)][dentist-gigascience]
 
@@ -18,7 +18,11 @@ ideally at high accuracy. DENTIST is a sensitive, highly-accurate and
 automated pipeline method to close gaps in (short read) assemblies with long
 reads.
 
-**API documentation:** ([current][api-current], [v3.0.0][api-v3.0.0], [v2.0.0][api-v2.0.0])
+**API documentation:**
+[current][api-current],
+[v4.0.0][api-v4.0.0],
+[v3.0.0][api-v3.0.0],
+[v2.0.0][api-v2.0.0]
 
 **First time here? Head over to [the example](#example) and make sure it works.**
 
@@ -26,6 +30,7 @@ reads.
 [api-current]: https://a-ludi.github.io/dentist/api/current
 [api-v2.0.0]: https://a-ludi.github.io/dentist/api/v2.0.0
 [api-v3.0.0]: https://a-ludi.github.io/dentist/api/v3.0.0
+[api-v4.0.0]: https://a-ludi.github.io/dentist/api/v4.0.0
 
 
 Table of Contents
@@ -45,12 +50,13 @@ Table of Contents
 Install
 -------
 
-### Use Conda (recommended)
+### Use Conda via Snakemake (recommended)
 
-Make sure [Conda][conda] is installed on your system. You can then use DENTIST like so:
+Make sure [Mamba][mamba] (a frontend for [Conda][conda]) is installed on your
+system. You can then use DENTIST like so:
 
 ```sh
-# run the whole workflow on a cluster using Singularity
+# run the whole workflow on a cluster using Conda
 snakemake --configfile=snakemake.yml --use-conda -jall
 snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 ```
@@ -58,45 +64,44 @@ snakemake --configfile=snakemake.yml --use-conda --profile=slurm
 The last command is explained in more detail below in
 [the usage section](#usage).
 
+*Note: If you do not have `mamba` installed, you may need to pass
+`--conda-frontend=conda` to Snakemake.*
 
-[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
 
+### Use Conda to Manually Install Binaries
 
-### Use a Singularity Container (recommended)
-
-Make sure [Singularity][singularity] is installed on your system. You can then use the container like so:
+Make sure [Mamba][mamba] (a frontend for [Conda][conda]) is installed on your
+system. Install DENTIST and all dependencies like so:
 
 ```sh
-# launch an interactive shell
-singularity shell docker://aludi/dentist:stable
+mamba create -n dentist -c a_ludi -c bioconda dentist-core
+mamba activate dentist
+mamba install -c conda-forge -c bioconda snakemake
 
-# execute a single command inside the container
-singularity exec docker://aludi/dentist:stable dentist --version
-
-# run the whole workflow on a cluster using Singularity
-snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+# execute the workflow
+snakemake --configfile=snakemake.yml --cores=all
 ```
 
-The last command is explained in more detail below in
-[the usage section](#usage).
+More details on executing DENTIST can be found in [the usage section](#usage).
 
 
-[singularity]: https://sylabs.io/guides/3.5/user-guide/index.html
+[conda]: https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html
+[mamba]: https://github.com/mamba-org/mamba
 
 
 ### Use Pre-Built Binaries
 
 Download the latest pre-built binaries from the [releases section][release]
 and extract the contents. The pre-built binaries are stored in a subfolder
-called `bin`. Here are the instructions for `v3.0.0`:
+called `bin`. Here are the instructions for `v4.0.0`:
 
 ```sh
 # download & extract pre-built binaries
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
-tar -xzf dentist.v3.0.0.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+tar -xzf dentist.v4.0.0.x86_64.tar.gz
 
 # make binaries available to your shell
-cd dentist.v3.0.0.x86_64
+cd dentist.v4.0.0.x86_64
 PATH="$PWD/bin:$PATH"
 
 # check installation with
@@ -123,6 +128,32 @@ and this README. In short, everything you to run DENTIST.
 
 
 [release]: https://github.com/a-ludi/dentist/releases
+
+
+### Use a Singularity Container (discouraged)
+
+*Remark: the Singularity container may not work properly depending on your
+system. (see issue #30)*
+
+Make sure [Singularity][singularity] is installed on your system. You can then
+use the container like so:
+
+```sh
+# launch an interactive shell
+singularity shell docker://aludi/dentist:stable
+
+# execute a single command inside the container
+singularity exec docker://aludi/dentist:stable dentist --version
+
+# run the whole workflow on a cluster using Singularity
+snakemake --configfile=snakemake.yml --use-singularity --profile=slurm
+```
+
+The last command is explained in more detail below in
+[the usage section](#usage).
+
+
+[singularity]: https://sylabs.io/guides/3.5/user-guide/index.html
 
 
 ### Build from Source
@@ -191,9 +222,9 @@ make sure your setup is working as expected.
 
 > TL;DR
 >
->     wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
->     tar -xzf dentist.v3.0.0.x86_64.tar.gz
->     cd dentist.v3.0.0.x86_64
+>     wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+>     tar -xzf dentist.v4.0.0.x86_64.tar.gz
+>     cd dentist.v4.0.0.x86_64
 >     
 >     # edit dentist.yml and snakemake.yml
 >
@@ -210,15 +241,15 @@ Install [Snakemake][snakemake] version >=5.32.1 and prepare your working
 directory:
 
 ```sh
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist.v3.0.0.x86_64.tar.gz
-tar -xzf dentist.v3.0.0.x86_64.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist.v4.0.0.x86_64.tar.gz
+tar -xzf dentist.v4.0.0.x86_64.tar.gz
 
 cp -r -t . \
-    dentist.v3.0.0.x86_64/snakemake/dentist.yml \
-    dentist.v3.0.0.x86_64/snakemake/Snakefile \
-    dentist.v3.0.0.x86_64/snakemake/snakemake.yml \
-    dentist.v3.0.0.x86_64/snakemake/envs \
-    dentist.v3.0.0.x86_64/snakemake/scripts
+    dentist.v4.0.0.x86_64/snakemake/dentist.yml \
+    dentist.v4.0.0.x86_64/snakemake/Snakefile \
+    dentist.v4.0.0.x86_64/snakemake/snakemake.yml \
+    dentist.v4.0.0.x86_64/snakemake/envs \
+    dentist.v4.0.0.x86_64/snakemake/scripts
 ```
 
 Next edit `snakemake.yml` and `dentist.yml` to fit your needs and optionally
@@ -301,15 +332,15 @@ Example
 
 Make sure you have [Snakemake][snakemake] 5.32.1 or later installed.
 
-You can also use the convenient Conda package or Singularity container to
-execute the rules. Just make sure you have [Conda][conda] or [Singularity][singularity] >=3.5.x installed, respectively.
+You can also use the convenient Conda package to execute the rules. Just make
+sure you have [Mamba][mamba] installed.
 
 
 First of all download the test data and workflow and switch to the
 `dentist-example` directory.
 
 ```sh
-wget https://github.com/a-ludi/dentist/releases/download/v3.0.0/dentist-example.tar.gz
+wget https://github.com/a-ludi/dentist/releases/download/v4.0.0/dentist-example.tar.gz
 tar -xzf dentist-example.tar.gz
 cd dentist-example
 ```
@@ -333,7 +364,9 @@ laptop with an Intel® Core™ i5-5200U CPU @ 2.20GHz.
 
 ### Execution with Conda
 
-Execute the workflow inside a convenient Singularity image by adding `--use-conda` to the call to Snakemake:
+Make sure [Mamba][mamba] (a frontend for [Conda][conda]) is installed on your
+system. Execute the workflow without explicit installation by adding
+`--use-conda` to the call to Snakemake:
 
 ```sh
 # run the workflow
@@ -343,17 +376,17 @@ snakemake --configfile=snakemake.yml --use-conda --cores=all
 md5sum -c checksum.md5
 ```
 
-In more recent versions of Snakemake, you may need to also pass
-`--conda-frontend=conda` unless you have [Mamba][mamba] installed. Mamba is a
-faster alternative to Conda.
+*Note: If you do not have `mamba` installed, you may need to pass
+`--conda-frontend=conda` to Snakemake.*
 
 
-[mamba]: https://github.com/mamba-org/mamba
+### Execution in Singularity Container (discouraged)
 
+*Remark: the Singularity container may not work properly depending on your
+system. (see issue #30)*
 
-### Execution in Singularity Container
-
-Execute the workflow inside a convenient Singularity image by adding `--use-singularity` to the call to Snakemake:
+Execute the workflow inside a convenient Singularity image by adding
+`--use-singularity` to the call to Snakemake:
 
 ```sh
 # run the workflow
@@ -413,12 +446,14 @@ workflow configuration (`snakemake/snakemake.yml`).
 - `--ploidy`: Combined with `--read-coverage`, this parameters is the preferred
     way of providing `--min-coverage-reads`.
 
-    We use the Wikipedia definition of ploidy, as "the number of complete sets of chromosomes in a cell" (https://en.wikipedia.org/wiki/Ploidy)
+    We use the Wikipedia definition of ploidy, as "the number of complete sets
+    of chromosomes in a cell" (https://en.wikipedia.org/wiki/Ploidy)
 
 - `--max-coverage-reads`, `--max-improper-coverage-reads`: 
   These parameters are used to derive a repeat mask from the ref vs. reads
   alignment. If the coverage of (improper) alignments is larger than the given
-  theshold it will be considered repetitive. If supplied, default values are derived from `--read-coverage` as follows:
+  theshold it will be considered repetitive. If supplied, default values are
+  derived from `--read-coverage` as follows:
   
     The maximum read coverage `C_max` is calculated from the global read
     coverage `C` (provided via --read-coverage) such that the probability of
@@ -443,10 +478,11 @@ workflow configuration (`snakemake/snakemake.yml`).
     aligns, are called improper. Improper alignments are often indicative of
     repetitive regions. Therefore, DENTIST considers genomic regions, where the
     number of improper read alignments is higher than a threshold to be
-    repetitive. By default, this threshold equals half the global read coverage C.
-    (see [paper][dentist-gigascience], Methods section). In practice, a smoothed
-    version of `max(4, x/2)` is used to provide better performance for very low
-    read coverage. The maximum improper read coverage `I_max` is computed as
+    repetitive. By default, this threshold equals half the global
+    read coverage C. (see [paper][dentist-gigascience], Methods section).
+    In practice, a smoothed version of `max(4, x/2)` is used to provide better
+    performance for very low read coverage. The maximum improper read coverage
+    `I_max` is computed as
 
     ```
     I_max = floor(a*x + exp(b*(c - x)))
@@ -468,7 +504,8 @@ workflow configuration (`snakemake/snakemake.yml`).
   [daccord][daccord]).
 
 - `--max-insertion-error`: Strong influence on quality and sensitivity. Lower
-  values lead to lower sensitivity but higher quality. The maximum recommended value is `0.05`.
+  values lead to lower sensitivity but higher quality. The maximum recommended
+  value is `0.05`.
 
 - `--min-anchor-length`: Higher values results in higher accuracy but lower
   sensitivity. Especially, large gaps cannot be closed if the value is too 
@@ -588,7 +625,8 @@ resources they consume.
   how the reads align to each closed gap. The validation is conducted in
   independent jobs for `validation_blocks` many blocks of the gap-closed
   assembly. Decreasing `validation_blocks` reduces the number of submitted
-  jobs and increases the run time and memory requirements per job. The memory requirement is proportional to the size of the read alignment blocks. 
+  jobs and increases the run time and memory requirements per job. The memory
+  requirement is proportional to the size of the read alignment blocks. 
 
 
 Troubleshooting
@@ -684,19 +722,25 @@ the Planck Institute of Molecular Cell Biology and Genetics, Dresden, Germany.
 Contributing
 ------------
 
-Contributions are warmly welcome. Just create an [issue][gh-issues] or [pull request][gh-pr] on GitHub. If you submit a pull request please make sure that:
+Contributions are warmly welcome. Just create an [issue][gh-issues] or
+[pull request][gh-pr] on GitHub. If you submit a pull request please make sure
+that:
 
 - the code compiles on Linux using the current release of [dmd][dmd-download],
 - your code is covered with unit tests (if feasible) and
 - `dub test` runs successfully.
 
-It is recommended to install the Git hooks included in the repository to avoid premature pull requests. You can enable all shipped hooks with this command:
+It is recommended to install the Git hooks included in the repository to avoid
+premature pull requests. You can enable all shipped hooks with this command:
 
 ```sh
 git config --local core.hooksPath .githooks/
 ```
 
-If you do not want to enable just a subset use `ln -s .githooks/{hook} .git/hooks`. If you want to audit code changes before they get executed on your machine you can you `cp .githooks/{hook} .git/hooks` instead.
+If you do not want to enable just a subset use
+`ln -s .githooks/{hook} .git/hooks`. If you want to audit code changes before
+they get executed on your machine you can you `cp .githooks/{hook} .git/hooks`
+instead.
 
 
 [gh-issues]: https://github.com/a-ludi/dentist/issues

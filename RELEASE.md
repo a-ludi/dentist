@@ -36,7 +36,7 @@ The following requirements must be met before creating a release:
 6. Build Singularity image:
     
     ```sh
-    sudo singularity build example/dist/dentist_local.sif dentist_local.def
+    sudo singularity build example/dist/dentist_local.sif singularity/dentist_local.def
     ```
 
 7. The example finishes successfully:

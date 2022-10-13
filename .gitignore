@@ -16,3 +16,4 @@ __dummy.html
 .gdbinit
 *.sif
 .snakemake
+.release-status

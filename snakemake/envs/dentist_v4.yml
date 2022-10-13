@@ -1,0 +1,6 @@
+name: dentist-core
+channels:
+  - a_ludi
+  - defaults
+dependencies:
+  - dentist-core==4.*.*

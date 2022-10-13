@@ -74,6 +74,12 @@ function parse_args()
         if [[ "${ARG:0:1}" == - ]];
         then
             case "$ARG" in
+                -V*)
+                    DENTIST_BUILD_VERSION="${ARG#-V}"
+                    ;;
+                --dentist=*)
+                    DENTIST_BUILD_VERSION="${ARG#--dentist-version=}"
+                    ;;
                 -h|--help)
                     print_help
 
@@ -144,7 +150,7 @@ function main()
 
     log "building container image"
     trap 'rm -f .docker-build-id' exit
-    docker build --iidfile .docker-build-id .
+    docker build --build-arg "DENTIST_VERSION=$DENTIST_BUILD_VERSION" --iidfile .docker-build-id .
 
     (
         log "gathering release files"

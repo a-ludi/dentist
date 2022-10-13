@@ -10,6 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [standard-readme]: https://github.com/RichardLitt/standard-readme
 
 
+## [4.0.0] - 2022-09-02
+
+### Added
+
+- include GIT commit in logs
+- script to generate report on closed and unclosed gaps
+- script `mask2bed` that converts Dazzler masks to BED files
+- JSON schema for config file
+- debugging output to track down issue #31
+
+
+### Changed
+
+- preserve original scaffold headers in output FASTA
+- ensure unique scaffold IDs in `output`
+- output FASTA names/coords in AGP
+- parallelized alignment filters
+- fail early measure against bug in `libmaus2`
+
+### Fixed
+
+- added missing Python installation to Singularity image
+- treat long FASTA lines graciously
+- fixed rule `validate_dentist_config`
+- fixed install instructions Snakemake profile
+- fixed bug with newer versions of Snakemake
+- include Python files in GIT repo
+- close open LAS file asap
+- fixed JSON conversion of `AlignmentChain`
+- workaround for Phobos v2.099.0 bug
+- fixed compiler error
+- treat compiler warning
+
+
 ## [3.0.0] - 2021-12-09
 ### Added
 
