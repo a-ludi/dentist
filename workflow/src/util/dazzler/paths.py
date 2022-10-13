@@ -119,11 +119,13 @@ def blocks_for(db, batch_size, block=None):
         return blocks
 
     def __block_or_range(block):
-        if isinstance(block, str):
+        if isinstance(block, int):
+            return [block]
+        elif isinstance(block, str):
             parts = block.split("-")
 
             if len(parts) == 1:
-                return [parts[0]]
+                return [int(parts[0])]
             elif len(parts) == 2:
                 return range(int(parts[0]), int(parts[1]) + 1)
             else:
