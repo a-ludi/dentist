@@ -600,7 +600,10 @@ class DentistGapClosing(Workflow):
                 readsdb=db_files(self.reads),
                 las=self.workdir / alignment_file(self.reference, self.reads),
                 masks=dict(
-                    (mask, mask_files(self.reference, homogenized_mask(mask)))
+                    (
+                        homogenized_mask(mask),
+                        mask_files(self.reference, homogenized_mask(mask)),
+                    )
                     for mask in self.masks
                 ),
                 config=self.dentist_config,
@@ -647,7 +650,10 @@ class DentistGapClosing(Workflow):
                 readsdb=db_files(self.reads),
                 pile_ups=self.pile_ups,
                 masks=dict(
-                    (mask, mask_files(self.reference, homogenized_mask(mask)))
+                    (
+                        homogenized_mask(mask),
+                        mask_files(self.reference, homogenized_mask(mask)),
+                    )
                     for mask in self.masks
                 ),
                 config=self.dentist_config,
