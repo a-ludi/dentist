@@ -13,17 +13,23 @@ LOG="check-results.log"
 
 # These files must exist after a successful run of the workflow
 RESULT_FILES=(
-    # workdir/.assembly.reference
-    # workdir/.assembly.gap-closed-preliminary
     workdir/reference.reference.las
     workdir/.reference.bps
     workdir/reference.dam
     workdir/.reference.dentist-reads.anno
     workdir/.reference.dentist-reads.data
+    workdir/.reference.dentist-reads-H-1-8B.anno
+    workdir/.reference.dentist-reads-H-1-8B.data
+    workdir/.reference.dentist-reads-H-9-12B.anno
+    workdir/.reference.dentist-reads-H-9-12B.data
     workdir/.reference.dentist-reads-H.anno
     workdir/.reference.dentist-reads-H.data
     workdir/.reference.dentist-self.anno
     workdir/.reference.dentist-self.data
+    workdir/.reference.dentist-self-H-1-8B.anno
+    workdir/.reference.dentist-self-H-1-8B.data
+    workdir/.reference.dentist-self-H-9-12B.anno
+    workdir/.reference.dentist-self-H-9-12B.data
     workdir/.reference.dentist-self-H.anno
     workdir/.reference.dentist-self-H.data
     workdir/.reference.dust.anno
@@ -45,10 +51,15 @@ RESULT_FILES=(
     workdir/reference.reads.las
     workdir/.reference.tan.anno
     workdir/.reference.tan.data
+    workdir/.reference.1.tan.anno
+    workdir/.reference.1.tan.data
+    workdir/.reference.tan-H-1-8B.anno
+    workdir/.reference.tan-H-1-8B.data
+    workdir/.reference.tan-H-9-12B.anno
+    workdir/.reference.tan-H-9-12B.data
     workdir/.reference.tan-H.anno
     workdir/.reference.tan-H.data
     workdir/gap-closed-preliminary.1.reads.las
-    workdir/gap-closed-preliminary.2.reads.las
     workdir/.gap-closed-preliminary.bps
     workdir/gap-closed-preliminary.agp
     workdir/.gap-closed-preliminary.closed-gaps.anno
@@ -59,6 +70,8 @@ RESULT_FILES=(
     workdir/.gap-closed-preliminary.dentist-self.data
     workdir/.gap-closed-preliminary.dentist-weak-coverage.anno
     workdir/.gap-closed-preliminary.dentist-weak-coverage.data
+    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.anno
+    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.data
     workdir/.gap-closed-preliminary.dust.anno
     workdir/.gap-closed-preliminary.dust.data
     workdir/gap-closed-preliminary.fasta
@@ -81,10 +94,10 @@ RESULT_FILES=(
     workdir/.gap-closed-preliminary.tan.anno
     workdir/.gap-closed-preliminary.tan.data
     workdir/insertions.db
+    workdir/insertions/batch.0-50.db
+    workdir/insertions/batch.100-146.db
+    workdir/insertions/batch.50-100.db
     workdir/pile-ups.db
-    # workdir/.propagted-mask.dentist-reads.1-12
-    # workdir/.propagted-mask.dentist-self.1-12
-    # workdir/.propagted-mask.tan.1-12
     workdir/reads.10.reference.las
     workdir/reads.11.reference.las
     workdir/reads.12.reference.las
@@ -97,60 +110,39 @@ RESULT_FILES=(
     workdir/reads.7.reference.las
     workdir/reads.8.reference.las
     workdir/reads.9.reference.las
+    workdir/reads.10.gap-closed-preliminary.las
+    workdir/reads.11.gap-closed-preliminary.las
+    workdir/reads.12.gap-closed-preliminary.las
+    workdir/reads.1.gap-closed-preliminary.las
+    workdir/reads.2.gap-closed-preliminary.las
+    workdir/reads.3.gap-closed-preliminary.las
+    workdir/reads.4.gap-closed-preliminary.las
+    workdir/reads.5.gap-closed-preliminary.las
+    workdir/reads.6.gap-closed-preliminary.las
+    workdir/reads.7.gap-closed-preliminary.las
+    workdir/reads.8.gap-closed-preliminary.las
+    workdir/reads.9.gap-closed-preliminary.las
     workdir/.reads.bps
     workdir/reads.db
-    workdir/.reads.dentist-reads-1B.anno
-    workdir/.reads.dentist-reads-1B.data
-    workdir/.reads.dentist-self-10B.anno
-    workdir/.reads.dentist-self-10B.data
-    workdir/.reads.dentist-self-11B.anno
-    workdir/.reads.dentist-self-11B.data
-    workdir/.reads.dentist-self-12B.anno
-    workdir/.reads.dentist-self-12B.data
-    workdir/.reads.dentist-self-1B.anno
-    workdir/.reads.dentist-self-1B.data
-    workdir/.reads.dentist-self-2B.anno
-    workdir/.reads.dentist-self-2B.data
-    workdir/.reads.dentist-self-3B.anno
-    workdir/.reads.dentist-self-3B.data
-    workdir/.reads.dentist-self-4B.anno
-    workdir/.reads.dentist-self-4B.data
-    workdir/.reads.dentist-self-5B.anno
-    workdir/.reads.dentist-self-5B.data
-    workdir/.reads.dentist-self-6B.anno
-    workdir/.reads.dentist-self-6B.data
-    workdir/.reads.dentist-self-7B.anno
-    workdir/.reads.dentist-self-7B.data
-    workdir/.reads.dentist-self-8B.anno
-    workdir/.reads.dentist-self-8B.data
-    workdir/.reads.dentist-self-9B.anno
-    workdir/.reads.dentist-self-9B.data
+    workdir/.reads.dentist-reads-1-8B.anno
+    workdir/.reads.dentist-reads-1-8B.data
+    workdir/.reads.dentist-reads-9-12B.anno
+    workdir/.reads.dentist-reads-9-12B.data
+    workdir/.reads.dentist-self-1-8B.anno
+    workdir/.reads.dentist-self-1-8B.data
+    workdir/.reads.dentist-self-9-12B.anno
+    workdir/.reads.dentist-self-9-12B.data
     workdir/.reads.idx
-    workdir/.reads.tan-10B.anno
-    workdir/.reads.tan-10B.data
-    workdir/.reads.tan-11B.anno
-    workdir/.reads.tan-11B.data
-    workdir/.reads.tan-12B.anno
-    workdir/.reads.tan-12B.data
-    workdir/.reads.tan-1B.anno
-    workdir/.reads.tan-1B.data
-    workdir/.reads.tan-2B.anno
-    workdir/.reads.tan-2B.data
-    workdir/.reads.tan-3B.anno
-    workdir/.reads.tan-3B.data
-    workdir/.reads.tan-4B.anno
-    workdir/.reads.tan-4B.data
-    workdir/.reads.tan-5B.anno
-    workdir/.reads.tan-5B.data
-    workdir/.reads.tan-6B.anno
-    workdir/.reads.tan-6B.data
-    workdir/.reads.tan-7B.anno
-    workdir/.reads.tan-7B.data
-    workdir/.reads.tan-8B.anno
-    workdir/.reads.tan-8B.data
-    workdir/.reads.tan-9B.anno
-    workdir/.reads.tan-9B.data
+    workdir/.reads.tan-1-8B.anno
+    workdir/.reads.tan-1-8B.data
+    workdir/.reads.tan-9-12B.anno
+    workdir/.reads.tan-9-12B.data
     workdir/skip-gaps.txt
+    workdir/TAN.gap-closed-preliminary.1.las
+    workdir/TAN.gap-closed-preliminary.las
+    workdir/TAN.reference.1.las
+    workdir/TAN.reference.las
+    workdir/validation-report.1.json
     workdir/validation-report.json
     gap-closed.agp
     gap-closed.closed-gaps.bed
@@ -398,9 +390,12 @@ function all_checks()
         'check_mask reference dentist-self'
         'check_alignment reference reads'
         'check_mask reference dentist-reads'
-        'check_mask reads tan-{1..12}B'
-        'check_mask reads dentist-self-{1..12}B'
-        'check_mask reads dentist-reads-{1..12}B'
+        'check_mask reads tan-1-8B'
+        'check_mask reads tan-9-12B'
+        'check_mask reads dentist-self-1-8B'
+        'check_mask reads dentist-self-9-12B'
+        'check_mask reads dentist-reads-1-8B'
+        'check_mask reads dentist-reads-9-12B'
         'check_mask reference tan-H'
         'check_mask reference dentist-self-H'
         'check_mask reference dentist-reads-H'
