@@ -264,7 +264,8 @@ class DentistGapClosing(Workflow):
             inputs=db_files(db),
             outputs=mask_files(db, self.dust_mask),
             resources="mask_dust",
-            action=lambda inputs: ShellScript(
+            action=lambda inputs, outputs: ShellScript(
+                ("rm", "-f", *outputs),
                 (*dustcmd, inputs[0].with_suffix("")),
             ),
         )
