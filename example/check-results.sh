@@ -162,12 +162,12 @@ RESULT_FILES=(
 declare -A CHECKSUMS
 # [[ -f '.checksumsrc' ]] && source '.checksumsrc'
 CHECKSUMS=(
-    ['workdir/reference.reference.las']=bc7252a18a8d502ec35b368112994f06
-    ['workdir/reference.reads.las']=ec8576ba93122feb6213e27bc4be12e7
-    ['workdir/pile-ups.db']=fc74db0db88fe3acab5fa2fd31164300
-    ['workdir/insertions.db']=90ca129de08c0e5c69d0f8fd41831adc
-    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=243f97348b2843b0c20d1da84461bd03
-    ['workdir/gap-closed-preliminary.reads.las']=1d39fdb6f5714cf0e316ce150e3619e0
+    ['workdir/reference.reference.las']=3852a9d97f4ab3adf597a575d4e500da
+    ['workdir/reference.reads.las']=a34110d345aa8da6fda869869dde6a8e
+    ['workdir/pile-ups.db']=a6ee8f8e9429517abfb9bb6ef85d233e
+    ['workdir/insertions.db']=87e87a13228093e8f26adf7991b26184
+    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=914446f52b23ceece78f20f9dc572723
+    ['workdir/gap-closed-preliminary.reads.las']=b186d87d81f83b6577ba578653ec4ea4
     ['gap-closed.agp']=b168b1f66338081b4cefbc0e9907ab2c
 )
 
