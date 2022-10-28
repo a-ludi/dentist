@@ -105,6 +105,7 @@ class DentistGapClosing(Workflow):
         self.insertion_batches_dir = self.workdir / "insertions"
         self.insertions = self.workdir / "insertions.db"
         self.gap_closed_fasta = Path(self.config["outputs"]["output_assembly"])
+        self.validation_blocks = self.config.get("validation_blocks", "DB_BLOCKS")
         self.validation_report_block = str(
             self.workdir / "validation-report.{block}.json"
         )
@@ -148,7 +149,9 @@ class DentistGapClosing(Workflow):
             )
             self.until_reads_alignment(self.preliminary_gap_closed, self.reads)
             self.execute_jobs()
-            self.split_and_merge_by_reference(self.preliminary_gap_closed, self.reads)
+            self.split_and_merge_by_reference(
+                self.preliminary_gap_closed, self.reads, blocks_a=self.validation_blocks
+            )
             self.execute_jobs()
             self.validate_regions(self.preliminary_gap_closed, self.reads)
             self.execute_jobs()
@@ -731,27 +734,39 @@ class DentistGapClosing(Workflow):
             ),
         )
 
-    def split_and_merge_by_reference(self, refdb, readsdb):
+    def split_and_merge_by_reference(self, refdb, readsdb, blocks_a="DB_BLOCKS"):
         with self.grouped_jobs(
             f"split_and_merge_by_reference_{refdb.stem}_{readsdb.stem}"
         ):
+            if not isinstance(blocks_a, int):
+                blocks_a = refdb
+
             for blocks_b in get_blocks(readsdb, self.batch_size.lasplit_by_reference):
                 self.lasplit(
                     refdb,
                     readsdb,
+                    blocks_a,
                     blocks_b,
                     job_stem="lasplit_by_reference",
                     resources="lasplit_by_reference",
                 )
             self.execute_jobs()
-            for blocks_a in get_blocks(refdb, self.batch_size.lamerge_by_reference):
-                self.lamerge_by_reference(refdb, readsdb, blocks_a)
+            for batch_a in get_blocks(blocks_a, self.batch_size.lamerge_by_reference):
+                self.lamerge_by_reference(refdb, readsdb, batch_a)
 
     def validate_regions(self, refdb, readsdb):
         with self.grouped_jobs(f"validate_regions_{refdb.stem}_{readsdb.stem}"):
+            validation_blocks = (
+                self.validation_blocks
+                if isinstance(self.validation_blocks, int)
+                else refdb
+            )
+
             block_jobs = [
                 self.validate_regions_block(refdb, readsdb, blocks)
-                for blocks in get_blocks(refdb, self.batch_size.validate_regions)
+                for blocks in get_blocks(
+                    validation_blocks, self.batch_size.validate_regions
+                )
             ]
             weak_coverage_masks = list(
                 chain.from_iterable(job.outputs.masks.keys() for job in block_jobs)
@@ -852,7 +867,7 @@ class DentistGapClosing(Workflow):
 
         return skip_gaps
 
-    def lasplit(self, dba, dbb, blocks_b, job_stem="lasplit", resources=None):
+    def lasplit(self, dba, dbb, blocks_a, blocks_b, job_stem="lasplit", resources=None):
         index = MultiIndex((blocks_b[0], blocks_b[-1]))
         las_batch = [
             self.workdir / alignment_file(dba, dbb, block_b=block_b)
@@ -866,8 +881,8 @@ class DentistGapClosing(Workflow):
                 ),
                 [
                     self.workdir
-                    / alignment_file(dba, dbb, block_a=block_a, block_b=block_b)
-                    for block_a in range(1, get_num_blocks(dba) + 1)
+                    / alignment_file(dba, dbb, block_a=block_a[0], block_b=block_b)
+                    for block_a in get_blocks(blocks_a)
                 ],
             )
             for block_b in index.values()
@@ -891,7 +906,7 @@ class DentistGapClosing(Workflow):
                         "LAsplit",
                         *self.lasplit_opts,
                         target,
-                        inputs.db[0],
+                        blocks_a,
                         safe("<"),
                         las,
                     )
