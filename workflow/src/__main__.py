@@ -641,7 +641,7 @@ class DentistGapClosing(Workflow):
             self.merge_insertions()
 
     def process_pile_ups_batch(self, batch):
-        index = MultiIndex((batch[0], batch[-1]))
+        index = MultiIndex((batch[0], batch[-1] + 1))
         self.collect_job(
             name="process_pile_ups",
             index=index,
