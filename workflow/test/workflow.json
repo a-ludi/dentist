@@ -3,7 +3,13 @@
         "__default__": {
             "read-coverage": 20.0,
             "ploidy": 2,
+            "// FIXME": "remove after successful reproduction of old workflow",
+            "max-coverage-self": 3,
             "verbose": 2
+        },
+        "// FIXME": "remove after successful reproduction of old workflow",
+        "output": {
+            "fasta-line-width": 80
         }
     },
     "inputs": {
@@ -27,11 +33,14 @@
     "workdir": "workdir",
     "logdir": "logs",
     "threads_per_process": 8,
-    "propagate_batch_size": 14,
     "batch_size": {
-        "ref_vs_reads_alignment": 2,
-        "homogenize_mask": 8,
-        "process_pile_ups": 50
+        "// FIXME": "increase to 2 after successful reproduction of old workflow",
+        "ref_vs_reads_alignment": 1,
+        "// FIXME": "increase to 8 after successful reproduction of old workflow",
+        "homogenize_mask": 1,
+        "process_pile_ups": 50,
+        "validate_regions": 1
     },
+    "// FIXME": "set to 'DB_BLOCKS' after successful reproduction of old workflow",
     "validation_blocks": 2
 }

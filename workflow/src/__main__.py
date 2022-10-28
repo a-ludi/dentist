@@ -532,7 +532,10 @@ class DentistGapClosing(Workflow):
                     pseudo_block_mask(
                         homogenized_mask(mask), MultiIndex((blocks[0], blocks[-1]))
                     )
-                    for blocks in get_blocks(readsdb, self.batch_size.homogenize_mask)
+                    # FIXME remove slice after successful reproduction of old workflow
+                    for blocks in get_blocks(readsdb, self.batch_size.homogenize_mask)[
+                        0:1
+                    ]
                 ],
                 job=f"homogenize_mask_{refdb.stem}_{readsdb.stem}_{mask}",
                 log=self.log_file(

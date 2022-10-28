@@ -13,8 +13,8 @@ LOG="check-results.log"
 
 # These files must exist after a successful run of the workflow
 RESULT_FILES=(
-    workdir/.assembly.reference
-    workdir/.assembly.gap-closed-preliminary
+    # workdir/.assembly.reference
+    # workdir/.assembly.gap-closed-preliminary
     workdir/reference.reference.las
     workdir/.reference.bps
     workdir/reference.dam
@@ -50,7 +50,7 @@ RESULT_FILES=(
     workdir/gap-closed-preliminary.1.reads.las
     workdir/gap-closed-preliminary.2.reads.las
     workdir/.gap-closed-preliminary.bps
-    workdir/gap-closed-preliminary.closed-gaps.agp
+    workdir/gap-closed-preliminary.agp
     workdir/.gap-closed-preliminary.closed-gaps.anno
     workdir/gap-closed-preliminary.closed-gaps.bed
     workdir/.gap-closed-preliminary.closed-gaps.data
@@ -82,9 +82,9 @@ RESULT_FILES=(
     workdir/.gap-closed-preliminary.tan.data
     workdir/insertions.db
     workdir/pile-ups.db
-    workdir/.propagted-mask.dentist-reads.1-12
-    workdir/.propagted-mask.dentist-self.1-12
-    workdir/.propagted-mask.tan.1-12
+    # workdir/.propagted-mask.dentist-reads.1-12
+    # workdir/.propagted-mask.dentist-self.1-12
+    # workdir/.propagted-mask.tan.1-12
     workdir/reads.10.reference.las
     workdir/reads.11.reference.las
     workdir/reads.12.reference.las
@@ -162,13 +162,13 @@ RESULT_FILES=(
 declare -A CHECKSUMS
 # [[ -f '.checksumsrc' ]] && source '.checksumsrc'
 CHECKSUMS=(
-    ['workdir/reference.reference.las']=bc7252a18a8d502ec35b368112994f06
-    ['workdir/reference.reads.las']=ec8576ba93122feb6213e27bc4be12e7
-    ['workdir/pile-ups.db']=b377a10ed82c4c50e33a72eec88f1ef8
-    ['workdir/insertions.db']=4e43d8b3c8fae9a3c5eb5d5bf539ec9e
-    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=243f97348b2843b0c20d1da84461bd03
-    ['workdir/gap-closed-preliminary.reads.las']=1d39fdb6f5714cf0e316ce150e3619e0
-    ['gap-closed.agp']=df99c1f2d380e6de12251ff234805f07
+    ['workdir/reference.reference.las']=3852a9d97f4ab3adf597a575d4e500da
+    ['workdir/reference.reads.las']=a34110d345aa8da6fda869869dde6a8e
+    ['workdir/pile-ups.db']=a6ee8f8e9429517abfb9bb6ef85d233e
+    ['workdir/insertions.db']=87e87a13228093e8f26adf7991b26184
+    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=914446f52b23ceece78f20f9dc572723
+    ['workdir/gap-closed-preliminary.reads.las']=b186d87d81f83b6577ba578653ec4ea4
+    ['gap-closed.agp']=b168b1f66338081b4cefbc0e9907ab2c
 )
 
 
