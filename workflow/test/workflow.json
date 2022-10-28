@@ -3,11 +3,9 @@
         "__default__": {
             "read-coverage": 20.0,
             "ploidy": 2,
-            "// FIXME": "remove after successful reproduction of old workflow",
             "max-coverage-self": 3,
             "verbose": 2
         },
-        "// FIXME": "remove after successful reproduction of old workflow",
         "output": {
             "fasta-line-width": 80
         }
