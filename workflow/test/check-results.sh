@@ -164,11 +164,11 @@ declare -A CHECKSUMS
 CHECKSUMS=(
     ['workdir/reference.reference.las']=3852a9d97f4ab3adf597a575d4e500da
     ['workdir/reference.reads.las']=a34110d345aa8da6fda869869dde6a8e
-    ['workdir/pile-ups.db']=a6ee8f8e9429517abfb9bb6ef85d233e
-    ['workdir/insertions.db']=87e87a13228093e8f26adf7991b26184
-    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=914446f52b23ceece78f20f9dc572723
-    ['workdir/gap-closed-preliminary.reads.las']=b186d87d81f83b6577ba578653ec4ea4
-    ['gap-closed.agp']=b168b1f66338081b4cefbc0e9907ab2c
+    ['workdir/pile-ups.db']=7ca62b79e38399da42a0f8ae7e3dffc6
+    ['workdir/insertions.db']=d36c351322d22a7163e8e3b5c65ee8d9
+    ['workdir/gap-closed-preliminary.gap-closed-preliminary.las']=3852a9d97f4ab3adf597a575d4e500da
+    ['workdir/gap-closed-preliminary.reads.las']=a34110d345aa8da6fda869869dde6a8e
+    ['gap-closed.agp']=c5b1d6df1291c83208fd7892fafc692f
 )
 
 
@@ -222,9 +222,9 @@ function prepare_output_files()
 {
     # [optional] instead of checking md5sums compute them and print a bash
     #   array that can be used by this script
-    if [[ -v PRINT_CHECKSUMS ]]
+    if [[ -v WRITE_CHECKSUMS ]]
     then
-        echo "CHECKSUMS=(" > "$PRINT_CHECKSUMS"
+        echo "CHECKSUMS=(" > "$WRITE_CHECKSUMS"
     fi
 
     # clear the log file
@@ -239,9 +239,9 @@ function prepare_output_files()
 function finish_output_files()
 {
     # see prepare_output_files
-    if [[ -v PRINT_CHECKSUMS ]]
+    if [[ -v WRITE_CHECKSUMS ]]
     then
-        echo ")" >> "$PRINT_CHECKSUMS"
+        echo ")" >> "$WRITE_CHECKSUMS"
     fi
 
     rm -f "$ERROR_FILE"
@@ -282,7 +282,7 @@ function check_md5sum_stdin()
     local FILE="$1"
     local ERROR="${2:-"corrupted file: $FILE"}"
 
-    if [[ ! -v PRINT_CHECKSUMS ]]
+    if [[ ! -v WRITE_CHECKSUMS ]]
     then
         md5sum -c <(echo "${CHECKSUMS["$FILE"]}  -") &>> "$LOG" \
         || ASSERTION="${ASSERTION:-"${FUNCNAME[1]}"}" log_error "$ERROR"
@@ -290,7 +290,7 @@ function check_md5sum_stdin()
         {
             echo -n "    [${FILE@Q}]="
             md5sum - | tr -d ' -'
-        } >> "$PRINT_CHECKSUMS"
+        } >> "$WRITE_CHECKSUMS"
         skip_test
     fi
 }
