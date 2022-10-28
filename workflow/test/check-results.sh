@@ -13,7 +13,89 @@ LOG="check-results.log"
 
 # These files must exist after a successful run of the workflow
 RESULT_FILES=(
-    workdir/reference.reference.las
+    gap-closed.agp
+    gap-closed.closed-gaps.bed
+    gap-closed.fasta
+    workdir/gap-closed-preliminary.1.reads.las
+    workdir/gap-closed-preliminary.agp
+    workdir/.gap-closed-preliminary.bps
+    workdir/.gap-closed-preliminary.closed-gaps.anno
+    workdir/gap-closed-preliminary.closed-gaps.bed
+    workdir/.gap-closed-preliminary.closed-gaps.data
+    workdir/gap-closed-preliminary.dam
+    workdir/.gap-closed-preliminary.dentist-self.anno
+    workdir/.gap-closed-preliminary.dentist-self.data
+    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.anno
+    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.data
+    workdir/.gap-closed-preliminary.dentist-weak-coverage.anno
+    workdir/.gap-closed-preliminary.dentist-weak-coverage.data
+    workdir/.gap-closed-preliminary.dust.anno
+    workdir/.gap-closed-preliminary.dust.data
+    workdir/gap-closed-preliminary.fasta
+    workdir/gap-closed-preliminary.gap-closed-preliminary.las
+    workdir/.gap-closed-preliminary.hdr
+    workdir/.gap-closed-preliminary.idx
+    workdir/gap-closed-preliminary.reads.10.las
+    workdir/gap-closed-preliminary.reads.11.las
+    workdir/gap-closed-preliminary.reads.12.las
+    workdir/gap-closed-preliminary.reads.1.las
+    workdir/gap-closed-preliminary.reads.2.las
+    workdir/gap-closed-preliminary.reads.3.las
+    workdir/gap-closed-preliminary.reads.4.las
+    workdir/gap-closed-preliminary.reads.5.las
+    workdir/gap-closed-preliminary.reads.6.las
+    workdir/gap-closed-preliminary.reads.7.las
+    workdir/gap-closed-preliminary.reads.8.las
+    workdir/gap-closed-preliminary.reads.9.las
+    workdir/gap-closed-preliminary.reads.las
+    workdir/.gap-closed-preliminary.tan.anno
+    workdir/.gap-closed-preliminary.tan.data
+    workdir/insertions/batch.0-50.db
+    workdir/insertions/batch.100-146.db
+    workdir/insertions/batch.50-100.db
+    workdir/insertions.db
+    workdir/pile-ups.db
+    workdir/reads.10.gap-closed-preliminary.las
+    workdir/reads.10.reference.las
+    workdir/reads.11.gap-closed-preliminary.las
+    workdir/reads.11.reference.las
+    workdir/reads.12.gap-closed-preliminary.las
+    workdir/reads.12.reference.las
+    workdir/reads.1.gap-closed-preliminary.las
+    workdir/reads.1.reference.las
+    workdir/reads.2.gap-closed-preliminary.las
+    workdir/reads.2.reference.las
+    workdir/reads.3.gap-closed-preliminary.las
+    workdir/reads.3.reference.las
+    workdir/reads.4.gap-closed-preliminary.las
+    workdir/reads.4.reference.las
+    workdir/reads.5.gap-closed-preliminary.las
+    workdir/reads.5.reference.las
+    workdir/reads.6.gap-closed-preliminary.las
+    workdir/reads.6.reference.las
+    workdir/reads.7.gap-closed-preliminary.las
+    workdir/reads.7.reference.las
+    workdir/reads.8.gap-closed-preliminary.las
+    workdir/reads.8.reference.las
+    workdir/reads.9.gap-closed-preliminary.las
+    workdir/reads.9.reference.las
+    workdir/.reads.bps
+    workdir/reads.db
+    workdir/.reads.dentist-reads-1-8B.anno
+    workdir/.reads.dentist-reads-1-8B.data
+    workdir/.reads.dentist-reads-9-12B.anno
+    workdir/.reads.dentist-reads-9-12B.data
+    workdir/.reads.dentist-self-1-8B.anno
+    workdir/.reads.dentist-self-1-8B.data
+    workdir/.reads.dentist-self-9-12B.anno
+    workdir/.reads.dentist-self-9-12B.data
+    workdir/.reads.idx
+    workdir/.reads.tan-1-8B.anno
+    workdir/.reads.tan-1-8B.data
+    workdir/.reads.tan-9-12B.anno
+    workdir/.reads.tan-9-12B.data
+    workdir/.reference.1.tan.anno
+    workdir/.reference.1.tan.data
     workdir/.reference.bps
     workdir/reference.dam
     workdir/.reference.dentist-reads.anno
@@ -49,94 +131,15 @@ RESULT_FILES=(
     workdir/reference.reads.8.las
     workdir/reference.reads.9.las
     workdir/reference.reads.las
+    workdir/reference.reference.las
     workdir/.reference.tan.anno
     workdir/.reference.tan.data
-    workdir/.reference.1.tan.anno
-    workdir/.reference.1.tan.data
     workdir/.reference.tan-H-1-8B.anno
     workdir/.reference.tan-H-1-8B.data
     workdir/.reference.tan-H-9-12B.anno
     workdir/.reference.tan-H-9-12B.data
     workdir/.reference.tan-H.anno
     workdir/.reference.tan-H.data
-    workdir/gap-closed-preliminary.1.reads.las
-    workdir/.gap-closed-preliminary.bps
-    workdir/gap-closed-preliminary.agp
-    workdir/.gap-closed-preliminary.closed-gaps.anno
-    workdir/gap-closed-preliminary.closed-gaps.bed
-    workdir/.gap-closed-preliminary.closed-gaps.data
-    workdir/gap-closed-preliminary.dam
-    workdir/.gap-closed-preliminary.dentist-self.anno
-    workdir/.gap-closed-preliminary.dentist-self.data
-    workdir/.gap-closed-preliminary.dentist-weak-coverage.anno
-    workdir/.gap-closed-preliminary.dentist-weak-coverage.data
-    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.anno
-    workdir/.gap-closed-preliminary.dentist-weak-coverage-1B.data
-    workdir/.gap-closed-preliminary.dust.anno
-    workdir/.gap-closed-preliminary.dust.data
-    workdir/gap-closed-preliminary.fasta
-    workdir/gap-closed-preliminary.gap-closed-preliminary.las
-    workdir/.gap-closed-preliminary.hdr
-    workdir/.gap-closed-preliminary.idx
-    workdir/gap-closed-preliminary.reads.10.las
-    workdir/gap-closed-preliminary.reads.11.las
-    workdir/gap-closed-preliminary.reads.12.las
-    workdir/gap-closed-preliminary.reads.1.las
-    workdir/gap-closed-preliminary.reads.2.las
-    workdir/gap-closed-preliminary.reads.3.las
-    workdir/gap-closed-preliminary.reads.4.las
-    workdir/gap-closed-preliminary.reads.5.las
-    workdir/gap-closed-preliminary.reads.6.las
-    workdir/gap-closed-preliminary.reads.7.las
-    workdir/gap-closed-preliminary.reads.8.las
-    workdir/gap-closed-preliminary.reads.9.las
-    workdir/gap-closed-preliminary.reads.las
-    workdir/.gap-closed-preliminary.tan.anno
-    workdir/.gap-closed-preliminary.tan.data
-    workdir/insertions.db
-    workdir/insertions/batch.0-50.db
-    workdir/insertions/batch.100-146.db
-    workdir/insertions/batch.50-100.db
-    workdir/pile-ups.db
-    workdir/reads.10.reference.las
-    workdir/reads.11.reference.las
-    workdir/reads.12.reference.las
-    workdir/reads.1.reference.las
-    workdir/reads.2.reference.las
-    workdir/reads.3.reference.las
-    workdir/reads.4.reference.las
-    workdir/reads.5.reference.las
-    workdir/reads.6.reference.las
-    workdir/reads.7.reference.las
-    workdir/reads.8.reference.las
-    workdir/reads.9.reference.las
-    workdir/reads.10.gap-closed-preliminary.las
-    workdir/reads.11.gap-closed-preliminary.las
-    workdir/reads.12.gap-closed-preliminary.las
-    workdir/reads.1.gap-closed-preliminary.las
-    workdir/reads.2.gap-closed-preliminary.las
-    workdir/reads.3.gap-closed-preliminary.las
-    workdir/reads.4.gap-closed-preliminary.las
-    workdir/reads.5.gap-closed-preliminary.las
-    workdir/reads.6.gap-closed-preliminary.las
-    workdir/reads.7.gap-closed-preliminary.las
-    workdir/reads.8.gap-closed-preliminary.las
-    workdir/reads.9.gap-closed-preliminary.las
-    workdir/.reads.bps
-    workdir/reads.db
-    workdir/.reads.dentist-reads-1-8B.anno
-    workdir/.reads.dentist-reads-1-8B.data
-    workdir/.reads.dentist-reads-9-12B.anno
-    workdir/.reads.dentist-reads-9-12B.data
-    workdir/.reads.dentist-self-1-8B.anno
-    workdir/.reads.dentist-self-1-8B.data
-    workdir/.reads.dentist-self-9-12B.anno
-    workdir/.reads.dentist-self-9-12B.data
-    workdir/.reads.idx
-    workdir/.reads.tan-1-8B.anno
-    workdir/.reads.tan-1-8B.data
-    workdir/.reads.tan-9-12B.anno
-    workdir/.reads.tan-9-12B.data
     workdir/skip-gaps.txt
     workdir/TAN.gap-closed-preliminary.1.las
     workdir/TAN.gap-closed-preliminary.las
@@ -144,9 +147,7 @@ RESULT_FILES=(
     workdir/TAN.reference.las
     workdir/validation-report.1.json
     workdir/validation-report.json
-    gap-closed.agp
-    gap-closed.closed-gaps.bed
-    gap-closed.fasta
+
 )
 
 # Checksums for files that cannot be compare directly but need some form of
