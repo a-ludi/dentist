@@ -1,5 +1,19 @@
 srcdir = src
+srcdir_dwe = external/dentist-workflow-engine/src
 source_files = $(shell find -L $(srcdir)/ -name '*.py')
+source_files_dwe = $(shell find -L $(srcdir_dwe)/ -name '*.py')
 
-workflow.pyz: $(source_files)
-	cd $(srcdir) && zip $(abspath $@) $(^:src/%=%)
+distdir = dist
+dist_files = $(source_files:$(srcdir)/%=$(distdir)/%) $(source_files_dwe:$(srcdir_dwe)/%=$(distdir)/%)
+
+
+workflow.pyz: $(dist_files)
+	cd $(distdir) && zip $(abspath $@) $(^:$(distdir)/%=%)
+
+
+$(distdir)/%: $(srcdir)/%
+	install -D $< $(<:$(srcdir)/%=$(distdir)/%)
+
+
+$(distdir)/%: $(srcdir_dwe)/%
+	install -D $< $(<:$(srcdir_dwe)/%=$(distdir)/%)
