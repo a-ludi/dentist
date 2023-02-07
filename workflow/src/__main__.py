@@ -54,6 +54,10 @@ class DentistGapClosing(Workflow):
     ):
         super().__init__(*args, **kwargs)
         with workflow_config.open() as config:
+            if workflow_config.endswith(".json"):
+                from json import load
+            else:
+                from yaml import safe_load as load
             self.config = json.load(config)
         self.config["__path__"] = workflow_config.resolve()
         self.config["__chdir__"] = workflow_config.parent
@@ -1099,9 +1103,9 @@ def main():
     parser = cli_parser(log_level=True, **override_defaults)
     parser.add_argument(
         "workflow_config",
-        metavar="<config:json>",
+        metavar="<config:json|yaml>",
         type=Path,
-        help="workflow configuration file in JSON format",
+        help="workflow configuration file in JSON/YAML format. Must have .json, .yaml or .yml extension.",
         default="workflow.json",
     )
     params = vars(parser.parse_args())
