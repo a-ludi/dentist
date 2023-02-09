@@ -3,4 +3,4 @@
 	url = https://github.com/a-ludi/darg.git
 [submodule "workflow/external/dentist-workflow-engine"]
 	path = workflow/external/dentist-workflow-engine
-	url = /home/alu/projects/dentist-workflow-engine/
+	url = https://github.com/a-ludi/dentist-workflow-engine.git
