@@ -8,15 +8,8 @@ from os import environ
 from pathlib import Path
 
 import util.dentist as dentist
-from dentist.workflow.engine import (
-    FileList,
-    MultiIndex,
-    ShellScript,
-    Workflow,
-    cli_parser,
-    python_code,
-    safe,
-)
+from dentist.workflow.engine import (FileList, MultiIndex, ShellScript,
+                                     Workflow, cli_parser, python_code, safe)
 from util.dazzler import *
 from util.json import multi_json_load
 
@@ -54,7 +47,7 @@ class DentistGapClosing(Workflow):
     ):
         super().__init__(*args, **kwargs)
         with workflow_config.open() as config:
-            if workflow_config.endswith(".json"):
+            if workflow_config.suffix in {".yaml", ".yml"}:
                 from json import load
             else:
                 from yaml import safe_load as load
