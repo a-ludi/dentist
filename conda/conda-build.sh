@@ -55,7 +55,7 @@ function log()
 
 function print_usage()
 {
-    echo "USAGE:  $PROG [-h] <recipes>"
+    echo "USAGE:  $PROG [options] <recipes>"
 } >&2
 
 
