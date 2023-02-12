@@ -24,3 +24,8 @@ $(distdir)/%: $(srcdir)/%
 
 $(distdir)/%: $(srcdir_dwe)/%
 	install -D $< $(<:$(srcdir_dwe)/%=$(distdir)/%)
+
+
+.PHONY: clean
+clean:
+	rm -rf $(distdir) workflow.pyz
