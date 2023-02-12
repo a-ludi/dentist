@@ -275,36 +275,37 @@ private class RegionsValidator
     {
         mixin(traceExecution);
 
-        foreach (
-            data;
-            parallel(zip(
-                StoppingPolicy.longest,
-                regions,
-                regionsWithContext,
-                contigIds,
-                readIds,
-            ))
-        )
-        {
-            auto region = data[0];
-            auto regionWithContext = data[1];
-            auto regionContigs = data[2];
-            auto consensusReadIds = data[3];
+        if (regions.length > 0)
+            foreach (
+                data;
+                parallel(zip(
+                    StoppingPolicy.longest,
+                    regions,
+                    regionsWithContext,
+                    contigIds,
+                    readIds,
+                ))
+            )
+            {
+                auto region = data[0];
+                auto regionWithContext = data[1];
+                auto regionContigs = data[2];
+                auto consensusReadIds = data[3];
 
-            auto validator = RegionValidator(
-                options,
-                cast(const) alignments,
-                region,
-                regionWithContext,
-                regionContigs,
-                consensusReadIds,
-            );
+                auto validator = RegionValidator(
+                    options,
+                    cast(const) alignments,
+                    region,
+                    regionWithContext,
+                    regionContigs,
+                    consensusReadIds,
+                );
 
-            validator.run();
+                validator.run();
 
-            synchronized (this)
-                weakCoverageMask |= validator.weakCoverageMask;
-        }
+                synchronized (this)
+                    weakCoverageMask |= validator.weakCoverageMask;
+            }
 
         if (options.weakCoverageMask !is null)
             writeMask(options.refDb, options.weakCoverageMask, weakCoverageMask.intervals);
