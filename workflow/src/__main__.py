@@ -737,6 +737,10 @@ class DentistGapClosing(Workflow):
             if not isinstance(blocks_a, int):
                 blocks_a = refdb
 
+                refdb_blocks = get_num_blocks(refdb)
+                if refdb_blocks <= 1:
+                    blocks_a = refdb_blocks
+
             for blocks_b in get_blocks(readsdb, self.batch_size.lasplit_by_reference):
                 self.lasplit(
                     refdb,
