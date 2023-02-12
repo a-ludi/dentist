@@ -689,7 +689,6 @@ class DentistGapClosing(Workflow):
         @self.collect_job(
             inputs=insertion_batches,
             outputs=[merge_config],
-            log=self.log_file("merge-insertions"),
             exec_local=True,
         )
         @python_code
