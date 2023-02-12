@@ -13,7 +13,7 @@ SIMULATOR_ARGS=(
 )
 
 REPO_ROOT="$(realpath "$(dirname "$0")/..")"
-SNAKEFILE="$REPO_ROOT/snakemake/Snakefile"
+DENTIST_WORKFLOW_PYZ="$REPO_ROOT/workflow/workflow.pyz"
 ASSEMBLY_REF_DATA="\
 H4sIAAAAAAAAA02XQZLkNgwE7/sd3/0I/4CBA3x24P9hIrOomdneboqSSKCAKoB/17///fXPnzp1
 Zqaqa39mv8796a6qs6Px68ydOXtVfvr0feB+eeMO7tS9vsOzz937O9h/vn6y+o7Kl6dnN9nH9mVM
@@ -42,23 +42,21 @@ BD7Hih7tVOBc8PVEKVGRPU9g8KJfdE5w8GySzrHUbvNy0hqXFlBIx8KV3uJXpX5nhfF0ld4h/tnu
 GAP_SEQ_DATA="\
 H4sIAAAAAAAAAyWMwQ0AMAgC/92S8GCB2z9FjVFQwCBPATGinSCFKJLgRnWHXevUHD1onaHcg311
 sY1Uex/yrOV8YgAAAA=="
-DENTIST_CONFIG_DATA="\
-H4sIAAAAAAAAA6tWio9PSU1LLM0piY9XsqpWKkpNTNFNzi9LLUpMT1WyMjLQM9BRKsjJz0ypBPJq
-a7kALygudjIAAAA="
 WORKFLOW_CONFIG_DATA="\
-H4sIAAAAAAAAA22QQU/DMAyF/4vPKWwILr0BJw4TCLghFLmJ24WFJIpdYEz976SUaCBxe8/2++zk
-AJaCOBZtYujdAG0tnLxwDKCgH73Xb+idRXGl0koeSYELaRSG9gCZesoUDM1ZFDxFZnrt/L4RKpge
-WbBwMqHlOvJt/ra07NOMuLu8vrq51Q+b+0eYFMRR6qJF6oovswOmxvjIZH9Ykzqeo23HyTuB9gma
-j7MVPNdN/zTeY95ZlwuzKgU+DkupCC5etks8UdYpR0NczlorKDrhgEK6QzFbze6zPGR9ruC3v1gp
-OH6j7nw0uzk/fQFgPnmIgwEAAA=="
-# generate with: md5sum data/* data/.??* dentist.json snakemake.json checksums.output.md5 | bzip2 | base64
+H4sIAAAAAAAAA21QMU7EMBDsecbWzhEOaK6DqygQCOgQWjnxJrHOiS2vEzhO+Tub5CKERLfj2ZlZ
+zwkMdclygt0JEA1VuncJcYKRtMlKP1DUNcFum29yBcF5a46CFAhReBbmehwV2C70iRddRZG6Uhgw
+OulLzUxt4Y5ZIk6bSnPSoGZ7Xldm8JfCdAyTxfPd/v7hCV8fX95Acnyf1qBlxNVedmsdstLJUebs
+Narfc9AUHJyVr75D9rXN4WNN+of49PFgbBTPdVLgfL08ycCCU7PIA0UM0ZfEctaVgkKnskG233Su
+AwfGZVU7W3etVD432PjW19TJIraaDyK+kYYXJwzWEfZBLG+l90GU0hSJT219NwWN48UPTg3un78B
+AAA="
+# generate with: md5sum data/* data/.??* workflow.json checksums.output.md5 | gzip | base64
 INPUT_CHECKSUMS_DATA="\
-H4sIAAAAAAAAA33QOVIDQQwF0HxOMRfA9KZW6zhaCwMeKM8EcHu6ChMBDhQ+/S9xaiHFSrNgk1GE
-CncuoNSKD+V1NT74kffdL/L6+XD18Ktv6ifjy4LWcyoFEtSSa62IBu5CTVRdgf7XwfvBC0qSpmEV
-rSG1rmjmWZ1ihqP8Sj98P25UR9UZ1C31iEpCLKw1NR1Sc+o/0Vdn22+kNuAiCF6BB4EqG88LGKr0
-LDVu5PRHXXnfl4SBKRcdLfqsXLvPm5G0QmNwpjv8ya5LSr1bt8Y6mQAMs5yiDS+cBCXf4Wf7WDJL
-80ruHDiYxSywpw5Ec0limdy34zz/87y/bQvknAE9GpA654JiodaFQ8Mp9XXdN37xy5xv8AWelVCk
-CQIAAA=="
+H4sIAAAAAAAAA33QyXHkMAyF4buiUAKWuQAgEQ42lrd2u0R12ZP96NA+ecYBfPXjQRIMLV7Ah7j2
+olyEpKAxlOgm6+pyyKPMGRd9+/Owx4g93i02l8vSnHIqBRPWkmutrTlGKIOahSH/Xw+ZhyxNk4IN
+r82hMZA198gWPM540x/1I+Zxp9arnSHyRGNUVhYVqwmsa82JvtN7iM87qYBStGFUlM5oJi7nAsGq
+lLWOO9n+ca5+zCW10VIu1mHQeXKlODc3toogGMK/8Cffl5SInBzETqaI3T2nAT2KJG2af+HP/rVg
+bkgZGhQC4I4uRuyd3EYDyL6un9f9dbxdP7eXeX1fGDhrBm+De9ZBuUoS85ooGZ8/Xld7Cnudt8vc
+rrfj43ZsF8flL1dm6acQAgAA"
 # generate with: md5sum gap-closed.closed-gaps.bed gap-closed.fasta | gzip | base64
 OUTPUT_CHECKSUMS_DATA="\
 H4sIAAAAAAAAA1XLSwrDMAxF0XlWkQ0kyJblyMt51ieTQgvu/mmho44uHLiSOppIFiPtIJ9zFmlj
@@ -105,12 +103,6 @@ function _reads()
 }
 
 
-function _dentist_config()
-{
-    _decompress <<<"$DENTIST_CONFIG_DATA"
-}
-
-
 function _workflow_config()
 {
     _decompress <<<"$WORKFLOW_CONFIG_DATA"
@@ -142,9 +134,12 @@ function setup_workdir()
 
 function save_workdir()
 {
-    mv "$WORKDIR" "$EXECDIR/test-workflow-failed"
+    local DIR="$EXECDIR/${1:-test-workflow-failed}"
 
-    echo "saved results under $EXECDIR/test-workflow-failed"
+    [[ -d "$DIR" ]] && rm -rf "$DIR"
+    mv "$WORKDIR" "$DIR"
+
+    echo "saved results under $DIR"
 }
 
 
@@ -162,8 +157,7 @@ function generate_files()
     | fasta2DAM -i data/assembly-reference.dam
     _reads data/assembly-reference.dam > data/reads.fasta
     _test_assembly > data/assembly-test.fasta
-    _dentist_config > dentist.json
-    _workflow_config > snakemake.json
+    _workflow_config > workflow.json
     _input_checksums > checksums.input.md5
     _output_checksums > checksums.output.md5
 
@@ -171,9 +165,20 @@ function generate_files()
 }
 
 
+function dentist-workflow()
+{
+    if [[ "$(type -ft dentist-workflow || echo 'function')" == file ]] &> /dev/null
+    then
+        command dentist-workflow "$@"
+    else
+        "$DENTIST_WORKFLOW_PYZ" "$@"
+    fi
+}
+
+
 function run_workflow()
 {
-    snakemake --snakefile="$SNAKEFILE" --configfile=snakemake.json -j1 -p "$@"
+    dentist-workflow --print-commands workflow.json "$@"
 }
 
 
@@ -187,8 +192,9 @@ function main()
 {
     setup_workdir
     generate_files
-    run_workflow "$@"
-    run_tests
+    run_workflow "$@" || { save_workdir; return 1; }
+    run_tests || { save_workdir; return 2; }
+    save_workdir 'test-workflow-success'
 }
 
 
