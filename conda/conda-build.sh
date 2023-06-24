@@ -13,6 +13,7 @@ function set_defaults()
     CONDA_BUILD_ARGS=(
         -c a_ludi
         -c bioconda
+        -c conda-forge
     )
     CONTAINER_ID=''
 }
@@ -71,6 +72,7 @@ function print_help()
     echo 'Optional arguments:'
     echo ' --artifacts=<dir>  Place build artifacts under <dir> '"(default: $ARTIFACTS_DIR)."
     echo ' --debug            If given make a snapshot of the build image for debugging.'
+    echo ' --local            Build from local sources.'
     echo ' --upload, -u       Automatically upload package to Anaconda.'
     echo ' --help, -h         Prints this help.'
     echo ' --usage            Print a short command summary.'
@@ -99,6 +101,9 @@ function parse_args()
                     ;;
                 --debug)
                     DEBUG=1
+                    ;;
+                --local)
+                    LOCAL_BUILD=1
                     ;;
                 -u|--upload)
                     DO_UPLOAD=1
@@ -130,6 +135,15 @@ function parse_args()
     (( ${#ARGS[*]} == 1 )) || bail_out_usage "<recipe> is missing"
 
     RECIPE="${ARGS[0]}"
+
+    if [[ -f "$RECIPE/local-build.yaml" ]]
+    then
+        [[ -v LOCAL_BUILD ]] || bail_out "$RECIPE has no local build configuration"
+        CONDA_BUILD_ARGS=(
+            -c local
+            "${CONDA_BUILD_ARGS[@]}"
+        )
+    fi
 }
 
 
@@ -164,9 +178,28 @@ function main()
     docker build -t "$BUILD_IMAGE" conda-build
 
     log "gathering release files"
-    CONTAINER_ID="$(docker create -v "$(realpath "$RECIPE"):/recipe:ro" "$BUILD_IMAGE" "${CONDA_BUILD_ARGS[@]}")"
+    local MORE_CONTAINER_ARGS=()
+    if [[ -v LOCAL_BUILD ]]
+    then
+        MORE_CONTAINER_ARGS+=(
+            -v "$(realpath "$(git rev-parse --show-toplevel)"):/dentist:ro" \
+            -e 'GIT_URL=/dentist' \
+            -e 'DENTIST_VERSION=HEAD'
+            -e 'BUILD_TYPE=debug'
+        )
+    fi
 
-    log "building conda package ..."
+    CONTAINER_ID="$(
+        docker \
+            create \
+            -v "$(realpath "$RECIPE"):/recipe:ro" \
+            "${MORE_CONTAINER_ARGS[@]}" \
+            "$BUILD_IMAGE" \
+            "${CONDA_BUILD_ARGS[@]}"
+    )"
+
+    log "building conda package $RECIPE ..."
+    log "build command:" "$BUILD_IMAGE" "${CONDA_BUILD_ARGS[@]}"
     # builds conda package and sets TARBALL
     ENV_EXPORT="$(docker start -a "$CONTAINER_ID")"
     eval "$ENV_EXPORT"

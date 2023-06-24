@@ -1,0 +1,48 @@
+{% set name = "DENTIST" %}
+{% set git_url = environ.get("GIT_URL", "https://github.com/a-ludi/dentist.git") %}
+{% set git_rev = environ.get("DENTIST_VERSION", "v4.0.0") %}
+
+{% set version = environ.get('GIT_DESCRIBE_TAG', '') %}
+{% if version[0] == "v" %}
+  {% set version = version[1:] %}
+{% endif %}
+{% if git_rev[0] != "v" %}
+  {% set version = "local" %}
+{% endif %}
+{% set minor_version = version.split('.')[:2] | join('.') %}
+{% if environ['GIT_DESCRIBE_NUMBER'] == 0 %}
+  {% set version = version~".dev"~environ['GIT_BUILD_STR'] %}
+{% endif %}
+
+package:
+  name:     "{{ name | lower }}-workflow"
+  version:  "{{ version }}"
+
+source:
+  git_rev: "{{ git_rev }}"
+  git_url: "{{ git_url }}"
+
+requirements:
+  build:
+    - python>=3.10
+    - make>=4.3
+    - zip>=3.0
+  run:
+    - python>=3.10
+    - pyyaml
+
+test:
+  requires:
+    - "dentist-core>={{ minor_version }}"
+  source_files:
+    - tests/test-workflow.sh
+  commands:
+    - dentist-workflow -h
+    - tests/test-workflow.sh
+
+about:
+  home: https://a-ludi.github.io/dentist/
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: DENTIST workflow tools. Install package `dentist` instead.

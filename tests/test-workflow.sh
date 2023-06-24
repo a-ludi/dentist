@@ -13,7 +13,7 @@ SIMULATOR_ARGS=(
 )
 
 REPO_ROOT="$(realpath "$(dirname "$0")/..")"
-DENTIST_WORKFLOW_PYZ="$REPO_ROOT/workflow/workflow.pyz"
+DENTIST_WORKFLOW_PYZ="$REPO_ROOT/workflow/dist/dentist-workflow"
 ASSEMBLY_REF_DATA="\
 H4sIAAAAAAAAA02XQZLkNgwE7/sd3/0I/4CBA3x24P9hIrOomdneboqSSKCAKoB/17///fXPnzp1
 Zqaqa39mv8796a6qs6Px68ydOXtVfvr0feB+eeMO7tS9vsOzz937O9h/vn6y+o7Kl6dnN9nH9mVM

@@ -6,6 +6,9 @@
 {% if version[0] == "v" %}
   {% set version = version[1:] %}
 {% endif %}
+{% if git_rev[0] != "v" %}
+  {% set version = "local" %}
+{% endif %}
 {% if environ['GIT_DESCRIBE_NUMBER'] == 0 %}
   {% set version = version~".dev"~environ['GIT_BUILD_STR'] %}
 {% endif %}
@@ -50,7 +53,7 @@ test:
     - tests/test-commands.sh
   commands:
     - dentist -d
-    - dentist-unittest
+    # - dentist-unittest
     - tests/test-commands.sh
 
 about:

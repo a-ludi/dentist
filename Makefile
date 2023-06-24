@@ -18,17 +18,14 @@ ddox_filter = \
 
 dist_dir = dentist.$(dentist_version).$(arch)
 dist_tarball = dentist.$(dentist_version).$(arch).tar.gz
-binaries=$(addprefix $(dist_dir)/bin/,Catrack computeintrinsicqv daccord \
-    daligner DAM2fasta damapper DAScover DASqv datander DB2fasta DBa2b DBb2a \
-    DBdump DBdust DBmv DBrm DBshow DBsplit DBstats DBtrim DBwipe dentist \
-    dumpLA fasta2DAM fasta2DB LAa2b LAb2a LAcat LAcheck LAdump LAmerge \
-    lasfilteralignments LAshow LAsort LAsplit rangen simulator TANmask)
+binaries=$(addprefix $(dist_dir)/bin/, Catrack computeintrinsicqv daccord \
+	daligner DAM2fasta damapper DAScover DASqv datander DB2fasta DBa2b DBb2a \
+	DBdump DBdust DBmv DBrm DBshow DBsplit DBstats DBtrim DBwipe dentist \
+	dentist-workflow dumpLA fasta2DAM fasta2DB LAa2b LAb2a LAcat LAcheck \
+	LAdump LAmerge lasfilteralignments LAshow LAsort LAsplit rangen \
+	simulator TANmask)
 info_files = $(addprefix $(dist_dir)/,README.md CHANGELOG.md LICENSE)
-workflow_files = $(addprefix $(dist_dir)/,\
-    cluster.yml dentist.yml dentist.greedy.yml snakemake.yml \
-    envs/$(dentist_env).yml Snakefile \
-    $(patsubst snakemake/%,%,$(wildcard snakemake/profile-slurm.*.yml)) \
-    $(patsubst snakemake/%,%,$(wildcard snakemake/scripts/*.py)))
+workflow_files = $(addprefix $(dist_dir)/,resources.yml workflow.yml)
 
 dist_files = $(info_files) $(workflow_files) $(binaries)
 
@@ -37,6 +34,9 @@ dist_files = $(info_files) $(workflow_files) $(binaries)
 .PHONY: all
 all: singularity-image conda-env
 
+
+.PHONY: dentist
+dentist: $(dist_dir)/bin/dentist
 
 
 .PHONY: singularity-image
@@ -101,6 +101,9 @@ $(binaries) &:
 	    'python>=3,<4'; \
 	echo 'Installing binaries into $(dist_dir)'; \
 	install -Dt $(dist_dir)/bin "$${BINARIES[@]}"
+
+$(dist_dir)/bin/dentist:
+
 
 
 $(dist_tarball): $(dist_files)

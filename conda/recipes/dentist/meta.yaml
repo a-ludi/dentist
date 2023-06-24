@@ -1,20 +1,26 @@
 {% set name = "DENTIST" %}
-{% set git_rev = "v4.0.0" %}
+{% set git_url = environ.get("GIT_URL", "https://github.com/a-ludi/dentist.git") %}
+{% set git_rev = environ.get("DENTIST_VERSION", "v4.0.0") %}
 
 {% set version = environ['GIT_DESCRIBE_TAG'] %}
 {% if version[0] == "v" %}
   {% set version = version[1:] %}
 {% endif %}
+{% if git_rev[0] != "v" %}
+  {% set version = "local" %}
+{% endif %}
 {% if environ['GIT_DESCRIBE_NUMBER'] == 0 %}
   {% set version = version~".dev"~environ['GIT_BUILD_STR'] %}
 {% endif %}
+
 {% set build_type = environ.get('BUILD_TYPE', 'release') %}
+{% set version_dub = version %}
 {% set build_config = environ.get('DUB_CONFIG', 'default') %}
 {% if build_type != "release" %}
-  {% set version = version~"."~build_type %}
+  {% set version_dub = version_dub~"."~build_type %}
 {% endif %}
 {% if build_config != "default" %}
-  {% set version = version~"."~build_config %}
+  {% set version_dub = version_dub~"."~build_config %}
 {% endif %}
 
 package:
@@ -27,17 +33,16 @@ source:
 
 requirements:
   run:
-    - dentist-core=={{ version }}
-    - snakemake==6.10.0
-    - pygraphviz==1.7 # NOTE: fixes some bug in the dependency solver
+    - dentist-core=={{ version_dub }}
+    - dentist-workflow=={{ version }}
 
 test:
   source_files:
-    - snakemake
+    - tests/test-commands.sh
     - tests/test-workflow.sh
   commands:
     - "dentist -d"
-    - "( cd snakemake && snakemake --lint --configfile=snakemake.yml || true )"
+    - "tests/test-commands.sh"
     - "tests/test-workflow.sh"
 
 about:

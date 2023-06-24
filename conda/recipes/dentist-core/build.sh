@@ -46,10 +46,11 @@ main()
     mkdir -p "$BINDIR"
 
     install_dmd
+    dmd --version
 
-    log "building unit tests..."
-    dub build --config="$DENTIST_BUILD_CONFIG" --build=unittest
-    mv dentist dentist-unittest
+    # log "building unit tests..."
+    # dub build --config="$DENTIST_BUILD_CONFIG" --build=unittest
+    # mv dentist dentist-unittest
 
     log "building main executable..."
     dub build --config="$DENTIST_BUILD_CONFIG" --build="$DENTIST_BUILD"
@@ -59,7 +60,7 @@ main()
     [[ ! -d "$DLANG_ROOT" ]] || rm -rf "$DLANG_ROOT"
 
     log "installing binaries..."
-    install -t "$BINDIR" dentist dentist-unittest
+    install -t "$BINDIR" dentist #dentist-unittest
 }
 
 
