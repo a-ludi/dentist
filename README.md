@@ -1,3 +1,17 @@
+> **:construction: Maintenance Update: :construction:**
+>
+> This software project is presently not under active maintenance. Users are
+> advised that there won't be regular updates or bug fixes.
+>
+> We welcome any interested individuals to consider taking up the role of a
+> new maintainer for the project. Feel free to express your interest or fork
+> the project to continue its development.
+>
+> Thank you for your understanding.
+
+---
+
+
 DENTIST
 =======
 
